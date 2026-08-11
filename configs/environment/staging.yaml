@@ -1,14 +1,18 @@
-log_level:
+log_level: INFO
+configs_dir: ${BROADWAY_CONFIGS_DIR}
 data_dir: ${DATA_DIR}
-mlflow_tracking_uri:
-database_user:
-database_password:
-database_name:
-database_host:
-database_port:
-sample_size_ci:
-sample_size_stats:
-api_replicas_min:
-api_replicas_max:
-api_hpa_cpu_threshold:
-monitoring_schedule:
+raw_subdir: raw
+processed_subdir: processed
+download_chunk_size: 8192
+mlflow_tracking_uri: ${MLFLOW_TRACKING_URI}
+database_user: ${DATABASE_USER}
+database_password: ${DATABASE_PASSWORD}
+database_name: ${DATABASE_NAME}
+database_host: ${DATABASE_HOST}
+database_port: ${DATABASE_PORT}
+sample_size_ci: 1000
+sample_size_stats: 10000
+api_replicas_min: 1
+api_replicas_max: 3
+api_hpa_cpu_threshold: 80
+monitoring_schedule: "0 * * * *"
