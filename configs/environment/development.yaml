@@ -1,4 +1,5 @@
 log_level:
+data_dir: data
 mlflow_tracking_uri:
 database_user:
 database_password:

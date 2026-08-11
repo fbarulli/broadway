@@ -7,7 +7,7 @@ spec:
     spec:
       containers:
         - name: train
-          image: broad-way:latest
+          image: broadway:latest
           command:
             - uv
             - run

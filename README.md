@@ -1,4 +1,4 @@
-# broad-way
+# broadway
 
 Generalized ML experimentation platform.
 

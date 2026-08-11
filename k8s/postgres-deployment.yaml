@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: postgres
-          image: broad-way-postgres:latest
+          image: broadway-postgres:latest
           ports:
             - containerPort: 5432
           env:

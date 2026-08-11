@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: mlflow
-          image: broad-way-mlflow:latest
+          image: broadway-mlflow:latest
           ports:
             - containerPort: 5000
           command:

@@ -1,4 +1,4 @@
-## broad-way — Coding Standards
+## broadway — Coding Standards
 
 ### Type Hints
 
@@ -57,3 +57,11 @@ class DatasetContract(BaseModel):
 ```
 
 YAML is the single source of truth. Pydantic is the enforcement layer. Nothing is silently filled in.
+
+### Single Source of Truth
+
+Every constant, threshold, default, path, and magic number lives in exactly one place — a config YAML, `schema.py`, or an environment variable. No hardcoded values anywhere else. If a value appears in two places, one of them is wrong by definition.
+
+### Function Size
+
+Single responsibility, ~25 lines max. If a function is approaching that, split it — extract a helper, break apart a pipeline stage, or decompose a conditional block. No mega-functions doing three things badly.

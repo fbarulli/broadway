@@ -1,1 +1,1 @@
-"""Thin wrapper — from broad_way.cli import main; main()"""
+"""Thin wrapper — from broadway.cli import main; main()"""

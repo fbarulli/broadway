@@ -1,7 +1,7 @@
-## broad-way/ — Complete Structure
+## broadway/ — Complete Structure
 
 ```
-broad-way/
+broadway/
 │
 ├── configs/
 │   ├── dataset/
@@ -153,7 +153,7 @@ broad-way/
 │       └── model_evaluation.html        # Holdout metrics, feature importance, residual analysis
 │
 ├── scripts/
-│   └── ds_pipeline.py                   # Thin wrapper: from broad_way.cli import main; main()
+│   └── ds_pipeline.py                   # Thin wrapper: from broadway.cli import main; main()
 │
 ├── tests/
 │   ├── test_config.py                   # Pydantic schema validation, loader round-trip

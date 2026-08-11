@@ -10,7 +10,7 @@ spec:
         spec:
           containers:
             - name: monitor
-              image: broad-way:latest
+              image: broadway:latest
               command:
                 - uv
                 - run
