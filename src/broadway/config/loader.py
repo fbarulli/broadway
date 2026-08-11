@@ -70,7 +70,7 @@ def _load_yaml(relative_path: str) -> dict:
     path = CONFIGS_DIR / relative_path
     if not path.exists():
         raise FileNotFoundError(f"config file not found: {path}")
-    with open(path) as f:
+    with open(path, encoding="utf-8") as f:
         return yaml.safe_load(f) or {}
 
 
