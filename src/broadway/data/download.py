@@ -1,1 +1,29 @@
-"""Fetch raw files from URLs defined in dataset config."""
+"""Fetch raw files from URLs into the data directory."""
+
+from __future__ import annotations
+
+import logging
+from pathlib import Path
+
+import requests
+
+from broadway.config.schema import EnvironmentConfig
+
+logger = logging.getLogger(__name__)
+
+CHUNK_SIZE = 8192
+RAW_DIR = "raw"
+
+
+def download(url: str, env: EnvironmentConfig) -> Path:
+    filename = url.rstrip("/").split("/")[-1]
+    dest_dir = Path(env.data_dir) / RAW_DIR
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    dest = dest_dir / filename
+    logger.info(f"downloading {url} → {dest}")
+    response = requests.get(url, stream=True)
+    response.raise_for_status()
+    with open(dest, "wb") as f:
+        for chunk in response.iter_content(chunk_size=CHUNK_SIZE):
+            f.write(chunk)
+    return dest
