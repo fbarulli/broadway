@@ -65,3 +65,7 @@ Every constant, threshold, default, path, and magic number lives in exactly one 
 ### Function Size
 
 Single responsibility, ~25 lines max. If a function is approaching that, split it — extract a helper, break apart a pipeline stage, or decompose a conditional block. No mega-functions doing three things badly.
+
+### No Noise
+
+No functions that exist just to exist. Before writing anything, ask: does this produce something the user sees, a decision they act on, or a transformation the pipeline depends on? If not, it's noise — don't write it. No vanity metrics, no infrastructure peeking out at the user, no dead wrappers.
