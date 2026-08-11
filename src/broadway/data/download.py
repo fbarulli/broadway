@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+from urllib.parse import unquote, urlparse
 
 import requests
 
@@ -16,7 +17,7 @@ RAW_DIR = "raw"
 
 
 def download(url: str, env: EnvironmentConfig) -> Path:
-    filename = url.rstrip("/").split("/")[-1]
+    filename = Path(unquote(urlparse(url).path)).name or "download"
     dest_dir = Path(env.data_dir) / RAW_DIR
     dest_dir.mkdir(parents=True, exist_ok=True)
     dest = dest_dir / filename
