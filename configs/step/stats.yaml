@@ -1,8 +1,6 @@
-group_column: pickup_borough
+group_column: neighborhood
 group_values:
-  - Manhattan
-  - Brooklyn
-  - Queens
-  - Bronx
-  - Staten Island
+  - downtown
+  - suburb
+  - rural
 sample_fraction: 0.1
