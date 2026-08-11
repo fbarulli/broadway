@@ -37,6 +37,7 @@ class DatasetContract(BaseModel):
 
 class EnvironmentConfig(BaseModel):
     log_level: str
+    data_dir: str
     mlflow_tracking_uri: str
     database_user: str
     database_password: str
