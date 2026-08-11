@@ -37,7 +37,11 @@ class DatasetContract(BaseModel):
 
 class EnvironmentConfig(BaseModel):
     log_level: str
+    configs_dir: str
     data_dir: str
+    raw_subdir: str
+    processed_subdir: str
+    download_chunk_size: int
     mlflow_tracking_uri: str
     database_user: str
     database_password: str
@@ -78,7 +82,6 @@ class ModelConfig(BaseModel):
 
 class SplitConfig(BaseModel):
     type: Literal["time", "random", "stratified"]
-    cutoff: str | None
     validation_size: float = Field(ge=0.0, le=1.0)
 
 
@@ -106,7 +109,8 @@ class DiscoverStep(BaseModel):
 
 
 class EtlStep(BaseModel):
-    ci_sample_size: int
+    ci_sample_size: int = Field(ge=0)
+    random_state: int
 
 
 class ContractsStep(BaseModel):
