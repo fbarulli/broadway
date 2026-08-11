@@ -16,7 +16,7 @@ def null_patterns(df: pd.DataFrame) -> pd.DataFrame:
     return patterns.sort_values("count", ascending=False)
 
 
-def littles_mcar_test(df: pd.DataFrame) -> dict:
+def littles_mcar_test(df: pd.DataFrame, alpha: float = 0.05) -> dict:
     numeric = df.select_dtypes(include="number")
     if numeric.shape[1] < 2 or numeric.isna().sum().sum() == 0:
         return {"p_value": 1.0, "is_mcar": True}
@@ -34,4 +34,4 @@ def littles_mcar_test(df: pd.DataFrame) -> dict:
     if not p_values:
         return {"p_value": None, "is_mcar": None}
     avg_p = sum(p_values) / len(p_values)
-    return {"p_value": round(avg_p, 4), "is_mcar": avg_p > 0.05}
+    return {"p_value": round(avg_p, 4), "is_mcar": avg_p > alpha}

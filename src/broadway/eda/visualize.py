@@ -21,10 +21,3 @@ def correlation_heatmap(df: pd.DataFrame) -> go.Figure:
         return go.Figure()
     corr = numeric.corr()
     return px.imshow(corr, text_auto=".2f", title="Correlation Heatmap")
-
-
-def scatter_matrix(df: pd.DataFrame) -> go.Figure:
-    numeric = df.select_dtypes(include="number")
-    if numeric.shape[1] < 2:
-        return go.Figure()
-    return px.scatter_matrix(df, dimensions=numeric.columns.tolist()[:6], title="Scatter Matrix")

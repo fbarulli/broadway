@@ -1,3 +1,5 @@
-sample_size: 10000
-plot_format: html
 output_dir: artifacts/reports
+max_columns: 4
+output_file: eda.html
+mcar_alpha: 0.05
+outlier_iqr_multiplier: 1.5

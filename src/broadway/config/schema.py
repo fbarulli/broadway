@@ -117,13 +117,14 @@ class EtlStep(BaseModel):
 
 class ContractsStep(BaseModel):
     null_threshold: float
-    range_tolerance: float
 
 
 class EdaStep(BaseModel):
-    sample_size: int
-    plot_format: str
     output_dir: str
+    max_columns: int
+    output_file: str
+    mcar_alpha: float
+    outlier_iqr_multiplier: float
 
 
 class FeaturesStep(BaseModel):
