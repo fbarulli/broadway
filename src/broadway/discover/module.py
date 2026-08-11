@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 
 import pandas as pd
@@ -13,7 +14,7 @@ from broadway.config.schema import ColumnRole, ColumnSchema, DatasetContract, Ta
 
 logger = logging.getLogger(__name__)
 
-DATASET_DIR = "dataset"
+DATASET_DIR = os.getenv("BROADWAY_DATASET_DIR", "dataset")
 
 
 def _assign_role(col: str, target: str, dt_col: str | None, ignore: list[str]) -> ColumnRole:
