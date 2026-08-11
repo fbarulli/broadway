@@ -8,7 +8,7 @@ from typing import Any
 
 
 def _resolve_string(value: str) -> str:
-    return os.path.expandvars(value)
+    return os.path.expanduser(os.path.expandvars(value))
 
 
 def _resolve_globs(value: str) -> list[str]:
