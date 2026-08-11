@@ -10,7 +10,6 @@ def summarize(df: pd.DataFrame) -> dict:
     stats = {
         "row_count": len(df),
         "column_count": len(df.columns),
-        "memory_mb": round(df.memory_usage(deep=True).sum() / (1024 * 1024), 2),
     }
     col_stats = {}
     for col in df.columns:
