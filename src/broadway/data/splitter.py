@@ -5,7 +5,7 @@ from __future__ import annotations
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
-from broadway.config.schema import DatasetContract, SplitConfig
+from broadway.config.schema import DatasetContract, SplitConfig, TaskType
 
 
 def _random_split(df: pd.DataFrame, val_size: float, random_state: int) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -34,5 +34,7 @@ def split(
             raise ValueError("time split requires a datetime_column in dataset config")
         return _time_split(df, dataset.datetime_column, split_cfg.validation_size)
     if split_cfg.type == "stratified":
+        if dataset.task != TaskType.CLASSIFICATION:
+            raise ValueError("stratified split requires a classification task")
         return _stratified_split(df, dataset.target, split_cfg.validation_size, random_state)
     return _random_split(df, split_cfg.validation_size, random_state)
