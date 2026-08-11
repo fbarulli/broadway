@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import logging
+import os
 from copy import deepcopy
 from pathlib import Path
+from typing import Any
 
 import yaml
 
@@ -26,9 +28,8 @@ from broadway.config.schema import (
 
 logger = logging.getLogger(__name__)
 
-CONFIGS_DIR = Path("configs")
+CONFIGS_DIR = Path(os.getenv("BROADWAY_CONFIGS_DIR", "configs"))
 DEFAULT_ENVIRONMENT = "development"
-DEFAULT_RANDOM_STATE = 42
 
 STEP_MODELS = {
     "discover": DiscoverStep,
@@ -66,17 +67,24 @@ def _deep_merge(base: dict, override: dict) -> dict:
     return result
 
 
-def _load_yaml(relative_path: str) -> dict:
+def _load_yaml(relative_path: str) -> Any:
     path = CONFIGS_DIR / relative_path
     if not path.exists():
         raise FileNotFoundError(f"config file not found: {path}")
     with open(path, encoding="utf-8") as f:
-        return yaml.safe_load(f) or {}
+        data = yaml.safe_load(f)
+    if data is None:
+        raise ValueError(f"config file is empty: {path}")
+    if not isinstance(data, dict):
+        raise ValueError(f"config file must be a mapping: {path}")
+    return data
 
 
 def _merge_section(merged: dict, section: str, name: str | None, optional: bool) -> None:
     if optional and name is None:
         return
+    if not optional and name is None:
+        raise ValueError(f"section '{section}' is required but name is None")
     raw = _load_yaml(f"{section}/{name}.yaml")
     merged.update({section: _deep_merge(merged.get(section, {}), raw)})
 
