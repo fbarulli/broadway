@@ -25,6 +25,9 @@ def load(dataset: DatasetContract) -> pd.DataFrame:
         raise ValueError(f"unsupported format: {ext}")
     df = READERS[ext](path)
     for col, lookup_path in dataset.lookup_tables.items():
-        lookup = pd.read_csv(lookup_path)
-        df = df.merge(lookup, on=col, how=MERGE_HOW)
+        parts = lookup_path.split(":")
+        path = parts[0]
+        right_on = parts[1] if len(parts) > 1 else col
+        lookup = pd.read_csv(path)
+        df = df.merge(lookup, left_on=col, right_on=right_on, how=MERGE_HOW, suffixes=("", "_lookup"))
     return df

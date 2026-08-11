@@ -10,7 +10,7 @@ features:
       source: area
   encodings:
     - type: target
-      on:
+      columns:
         - neighborhood
       smoothing: 20
 model:

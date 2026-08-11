@@ -24,7 +24,7 @@ class FeaturePipeline:
 
     def fit(self, df: pd.DataFrame, target: str, smoothing: int) -> FeaturePipeline:
         for enc in self.encodings:
-            for col in enc.on:
+            for col in enc.columns:
                 if enc.type == "target":
                     self._target_mappings[col] = fit_target_encoding(df, col, target, smoothing)
                 elif enc.type == "frequency":

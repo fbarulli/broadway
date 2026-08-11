@@ -1,0 +1,34 @@
+columns:
+  dropoff_location_id:
+    dtype: int32
+    null_count: 0
+    role: feature
+  passenger_count:
+    dtype: float64
+    null_count: 0
+    role: feature
+  pickup_datetime:
+    dtype: datetime64[us]
+    null_count: 0
+    role: datetime
+  pickup_location_id:
+    dtype: int32
+    null_count: 0
+    role: feature
+  trip_distance:
+    dtype: float64
+    null_count: 0
+    role: feature
+  trip_duration_minutes:
+    dtype: float64
+    null_count: 0
+    role: target
+datetime_column: pickup_datetime
+lookup_tables:
+  pickup_location_id: data/raw/taxi_zone_lookup.csv:LocationID
+  dropoff_location_id: data/raw/taxi_zone_lookup.csv:LocationID
+name: taxi
+path: data/processed/training_data.parquet
+row_count: 8647673
+target: trip_duration_minutes
+task: regression

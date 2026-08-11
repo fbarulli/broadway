@@ -63,7 +63,7 @@ class DerivedFeature(BaseModel):
 
 class EncodingConfig(BaseModel):
     type: str
-    on: list[str]
+    columns: list[str]
     smoothing: int | None
 
 

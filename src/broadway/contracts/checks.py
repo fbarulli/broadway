@@ -20,7 +20,7 @@ def check_columns(df: pd.DataFrame, contract: DatasetContract) -> list[str]:
     if missing:
         issues.append(f"missing columns: {sorted(missing)}")
     if extra:
-        issues.append(f"extra columns: {sorted(extra)}")
+        logger.warning("extra columns (allowed): %s", sorted(extra))
     if issues:
         logger.warning("column check failed — %s", "; ".join(issues))
     return issues

@@ -30,7 +30,7 @@ def _assign_role(col: str, target: str, dt_col: str | None, ignore: list[str]) -
 def _build_contract(
     csv_path: str, target: str, task: str, dt_col: str | None, ignore_cols: list[str],
 ) -> DatasetContract:
-    df = pd.read_csv(csv_path)
+    df = pd.read_csv(csv_path) if csv_path.endswith(".csv") else pd.read_parquet(csv_path)
     columns = {
         col: ColumnSchema(
             dtype=str(df[col].dtype),

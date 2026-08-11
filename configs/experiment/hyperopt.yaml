@@ -7,7 +7,7 @@ features:
   derived: []
   encodings:
     - type: target
-      on:
+      columns:
         - neighborhood
       smoothing: 20
 model:
