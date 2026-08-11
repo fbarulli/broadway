@@ -12,6 +12,7 @@ import pandas as pd
 from broadway.config.schema import PipelineConfig
 from broadway.evaluate.metrics import compute_metrics
 from broadway.evaluate.promotion import should_promote
+from broadway.utils import feature_columns
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +28,7 @@ def run(cfg: PipelineConfig) -> None:
     val_df = pd.read_parquet(val_path)
     target = cfg.dataset.target
     y_true = val_df[target].values
-    X_val = val_df.drop(columns=[col for col in val_df.columns if col == target or col not in val_df.select_dtypes(include="number").columns])
+    X_val = feature_columns(val_df, target)
     model_path = out_dir / "model.pkl"
     with open(model_path, "rb") as f:
         model = pickle.load(f)

@@ -10,6 +10,7 @@ import pandas as pd
 
 from broadway.config.schema import PipelineConfig
 from broadway.training.trainer import train
+from broadway.utils import feature_columns
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +22,7 @@ def run(cfg: PipelineConfig) -> None:
     train_df = pd.read_parquet(out_dir / "train_features.parquet")
     target = cfg.dataset.target
     y = train_df[target]
-    X = train_df.drop(columns=[col for col in train_df.columns if col == target or col not in train_df.select_dtypes(include="number").columns])
+    X = feature_columns(train_df, target)
     model, elapsed = train(cfg.experiment.model.type, X, y, **cfg.experiment.model.params)
     logger.info(f"model trained in {elapsed:.1f}s")
     model_path = out_dir / "model.pkl"
