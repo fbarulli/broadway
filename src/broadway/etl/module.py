@@ -1,1 +1,42 @@
 """Orchestrates data layer — download → load → clean → split → save parquet."""
+
+from __future__ import annotations
+
+import logging
+from pathlib import Path
+
+from broadway.config.loader import DEFAULT_RANDOM_STATE
+from broadway.config.schema import PipelineConfig
+from broadway.data.cleaner import clean
+from broadway.data.loader import load
+from broadway.data.splitter import split
+
+logger = logging.getLogger(__name__)
+
+PROCESSED_DIR = "processed"
+TRAIN_FILE = "train.parquet"
+VAL_FILE = "val.parquet"
+TRAINING_DATA_FILE = "training_data.parquet"
+
+
+def run(cfg: PipelineConfig) -> None:
+    if not cfg.dataset:
+        raise ValueError("etl step requires a dataset config")
+    dataset = cfg.dataset
+    df = load(dataset)
+    if cfg.etl.ci_sample_size > 0:
+        df = df.sample(n=min(cfg.etl.ci_sample_size, len(df)), random_state=DEFAULT_RANDOM_STATE)
+    df = clean(df, dataset)
+    split_cfg = cfg.experiment.split if cfg.experiment else None
+    out_dir = Path(cfg.environment.data_dir) / PROCESSED_DIR
+    if split_cfg:
+        rs = cfg.experiment.random_state if cfg.experiment else DEFAULT_RANDOM_STATE
+        train, val = split(df, dataset, split_cfg, random_state=rs)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        train.to_parquet(out_dir / TRAIN_FILE, index=False)
+        val.to_parquet(out_dir / VAL_FILE, index=False)
+        logger.info(f"saved train ({len(train)} rows) and val ({len(val)} rows)")
+    else:
+        out_dir.mkdir(parents=True, exist_ok=True)
+        df.to_parquet(out_dir / TRAINING_DATA_FILE, index=False)
+        logger.info(f"saved training_data ({len(df)} rows)")
