@@ -1,5 +1,4 @@
 log_level: INFO
-configs_dir: configs
 data_dir: data
 raw_subdir: raw
 processed_subdir: processed

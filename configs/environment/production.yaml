@@ -1,5 +1,4 @@
 log_level: WARNING
-configs_dir: ${BROADWAY_CONFIGS_DIR}
 data_dir: ${DATA_DIR}
 raw_subdir: raw
 processed_subdir: processed

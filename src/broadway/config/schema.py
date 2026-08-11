@@ -37,7 +37,6 @@ class DatasetContract(BaseModel):
 
 class EnvironmentConfig(BaseModel):
     log_level: str
-    configs_dir: str
     data_dir: str
     raw_subdir: str
     processed_subdir: str
