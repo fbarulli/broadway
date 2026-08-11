@@ -92,7 +92,7 @@ def _build_config(merged: dict, step: str) -> PipelineConfig:
     )
     if step == "full" and config.full:
         for sub_step in config.full.steps:
-            if sub_step not in STEP_MODELS or sub_step == "full":
+            if sub_step not in STEP_MODELS or sub_step == "full" or sub_step == "discover":
                 continue
             raw = _load_yaml(f"step/{sub_step}.yaml")
             resolved = resolve_values(raw)
