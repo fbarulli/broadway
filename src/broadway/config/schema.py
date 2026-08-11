@@ -110,6 +110,9 @@ class DiscoverStep(BaseModel):
 class EtlStep(BaseModel):
     ci_sample_size: int = Field(ge=0)
     random_state: int
+    train_file: str
+    val_file: str
+    training_data_file: str
 
 
 class ContractsStep(BaseModel):

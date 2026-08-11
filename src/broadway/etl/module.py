@@ -12,10 +12,6 @@ from broadway.data.splitter import split
 
 logger = logging.getLogger(__name__)
 
-TRAIN_FILE = "train.parquet"
-VAL_FILE = "val.parquet"
-TRAINING_DATA_FILE = "training_data.parquet"
-
 
 def run(cfg: PipelineConfig) -> None:
     if not cfg.dataset:
@@ -33,10 +29,10 @@ def run(cfg: PipelineConfig) -> None:
     if split_cfg:
         train, val = split(df, dataset, split_cfg, random_state=rs)
         out_dir.mkdir(parents=True, exist_ok=True)
-        train.to_parquet(out_dir / TRAIN_FILE, index=False)
-        val.to_parquet(out_dir / VAL_FILE, index=False)
+        train.to_parquet(out_dir / cfg.etl.train_file, index=False)
+        val.to_parquet(out_dir / cfg.etl.val_file, index=False)
         logger.info(f"saved train ({len(train)} rows) and val ({len(val)} rows)")
     else:
         out_dir.mkdir(parents=True, exist_ok=True)
-        df.to_parquet(out_dir / TRAINING_DATA_FILE, index=False)
+        df.to_parquet(out_dir / cfg.etl.training_data_file, index=False)
         logger.info(f"saved training_data ({len(df)} rows)")
