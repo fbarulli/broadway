@@ -22,15 +22,17 @@ TRAINING_DATA_FILE = "training_data.parquet"
 def run(cfg: PipelineConfig) -> None:
     if not cfg.dataset:
         raise ValueError("etl step requires a dataset config")
+    if not cfg.etl:
+        raise ValueError("etl step requires an etl config")
     dataset = cfg.dataset
     df = load(dataset)
+    rs = cfg.experiment.random_state if cfg.experiment else DEFAULT_RANDOM_STATE
     if cfg.etl.ci_sample_size > 0:
-        df = df.sample(n=min(cfg.etl.ci_sample_size, len(df)), random_state=DEFAULT_RANDOM_STATE)
+        df = df.sample(n=min(cfg.etl.ci_sample_size, len(df)), random_state=rs)
     df = clean(df, dataset)
     split_cfg = cfg.experiment.split if cfg.experiment else None
     out_dir = Path(cfg.environment.data_dir) / PROCESSED_DIR
     if split_cfg:
-        rs = cfg.experiment.random_state if cfg.experiment else DEFAULT_RANDOM_STATE
         train, val = split(df, dataset, split_cfg, random_state=rs)
         out_dir.mkdir(parents=True, exist_ok=True)
         train.to_parquet(out_dir / TRAIN_FILE, index=False)
