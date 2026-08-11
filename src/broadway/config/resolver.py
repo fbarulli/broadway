@@ -2,17 +2,12 @@
 
 from __future__ import annotations
 
-import glob
 import os
 from typing import Any
 
 
 def _resolve_string(value: str) -> str:
     return os.path.expanduser(os.path.expandvars(value))
-
-
-def _resolve_globs(value: str) -> list[str]:
-    return sorted(glob.glob(value, recursive=True))
 
 
 def resolve_values(obj: Any) -> Any:
