@@ -96,7 +96,7 @@ class ExperimentConfig(BaseModel):
     split: SplitConfig
     random_state: int
     target_metric: str
-    hpo: HPOConfig | None
+    hpo: HPOConfig | None = None
 
 
 class DiscoverStep(BaseModel):
