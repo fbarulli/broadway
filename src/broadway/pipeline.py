@@ -18,5 +18,9 @@ def run(cfg: PipelineConfig, steps: list[str]) -> None:
             continue
         logger.info(f"step starting: {step}")
         module = importlib.import_module(STEP_MODULES[step])
-        module.run(cfg)
+        try:
+            module.run(cfg)
+        except Exception:
+            logger.exception(f"step failed: {step}")
+            raise
         logger.info(f"step complete: {step}")
