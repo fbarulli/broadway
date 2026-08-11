@@ -154,16 +154,16 @@ class FullStep(BaseModel):
 
 
 class PipelineConfig(BaseModel):
-    dataset: DatasetContract | None
+    dataset: DatasetContract | None = None
     environment: EnvironmentConfig
-    experiment: ExperimentConfig | None
-    discover: DiscoverStep | None
-    etl: EtlStep | None
-    contracts: ContractsStep | None
-    eda: EdaStep | None
-    features: FeaturesStep | None
-    stats: StatsStep | None
-    causal: CausalStep | None
-    train: TrainStep | None
-    evaluate: EvaluateStep | None
-    full: FullStep | None
+    experiment: ExperimentConfig | None = None
+    discover: DiscoverStep | None = None
+    etl: EtlStep | None = None
+    contracts: ContractsStep | None = None
+    eda: EdaStep | None = None
+    features: FeaturesStep | None = None
+    stats: StatsStep | None = None
+    causal: CausalStep | None = None
+    train: TrainStep | None = None
+    evaluate: EvaluateStep | None = None
+    full: FullStep | None = None
