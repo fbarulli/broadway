@@ -23,8 +23,8 @@ def _load_split(cfg: PipelineConfig) -> tuple[pd.DataFrame, pd.DataFrame | None]
 
 
 def run(cfg: PipelineConfig) -> None:
-    if not cfg.dataset or not cfg.experiment or not cfg.features:
-        raise ValueError("features step requires dataset, experiment, and features config")
+    if not cfg.dataset or not cfg.experiment or not cfg.features or not cfg.etl:
+        raise ValueError("features step requires dataset, experiment, features, and etl config")
     train, val = _load_split(cfg)
     pipeline = FeaturePipeline(encodings=cfg.experiment.features.encodings)
     pipeline.fit(train, cfg.dataset.target, cfg.features.encoding_smoothing)

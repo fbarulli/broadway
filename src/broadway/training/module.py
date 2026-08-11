@@ -16,8 +16,8 @@ logger = logging.getLogger(__name__)
 
 
 def run(cfg: PipelineConfig) -> None:
-    if not cfg.dataset or not cfg.experiment or not cfg.train:
-        raise ValueError("training step requires dataset, experiment, and train config")
+    if not cfg.dataset or not cfg.experiment or not cfg.train or not cfg.etl:
+        raise ValueError("training step requires dataset, experiment, train, and etl config")
     out_dir = Path(cfg.environment.data_dir) / cfg.environment.processed_subdir
     train_df = pd.read_parquet(out_dir / cfg.etl.train_features_file)
     target = cfg.dataset.target

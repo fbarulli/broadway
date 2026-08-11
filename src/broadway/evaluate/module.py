@@ -18,8 +18,8 @@ logger = logging.getLogger(__name__)
 
 
 def run(cfg: PipelineConfig) -> None:
-    if not cfg.dataset or not cfg.experiment or not cfg.evaluate:
-        raise ValueError("evaluate step requires dataset, experiment, and evaluate config")
+    if not cfg.dataset or not cfg.experiment or not cfg.evaluate or not cfg.etl or not cfg.train:
+        raise ValueError("evaluate step requires dataset, experiment, evaluate, etl, and train config")
     out_dir = Path(cfg.environment.data_dir) / cfg.environment.processed_subdir
     val_path = out_dir / cfg.etl.val_features_file
     if not val_path.exists():
