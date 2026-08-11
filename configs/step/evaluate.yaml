@@ -1,2 +1,2 @@
-target_metric:
-promotion_threshold:
+target_metric: rmse
+promotion_threshold: 0.05

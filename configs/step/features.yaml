@@ -1,2 +1,2 @@
-encoding_smoothing:
-frequency_fill:
+encoding_smoothing: 20
+frequency_fill: -1

@@ -1,2 +1,2 @@
-null_threshold:
-range_tolerance:
+null_threshold: 0.5
+range_tolerance: 0.1

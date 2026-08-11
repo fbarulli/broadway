@@ -1,4 +1,4 @@
-treatment_column:
-outcome_column:
-power:
-alpha:
+treatment_column: treatment
+outcome_column: price
+power: 0.8
+alpha: 0.05

@@ -1,14 +1,14 @@
-log_level:
+log_level: INFO
 data_dir: data
-mlflow_tracking_uri:
-database_user:
-database_password:
-database_name:
-database_host:
-database_port:
-sample_size_ci:
-sample_size_stats:
-api_replicas_min:
-api_replicas_max:
-api_hpa_cpu_threshold:
-monitoring_schedule:
+mlflow_tracking_uri: http://localhost:5000
+database_user: postgres
+database_password: postgres
+database_name: broadway
+database_host: localhost
+database_port: 5432
+sample_size_ci: 1000
+sample_size_stats: 10000
+api_replicas_min: 1
+api_replicas_max: 3
+api_hpa_cpu_threshold: 80
+monitoring_schedule: "0 * * * *"

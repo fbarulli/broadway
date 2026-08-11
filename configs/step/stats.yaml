@@ -1,3 +1,8 @@
-group_column:
+group_column: pickup_borough
 group_values:
-sample_fraction:
+  - Manhattan
+  - Brooklyn
+  - Queens
+  - Bronx
+  - Staten Island
+sample_fraction: 0.1
