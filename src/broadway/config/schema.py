@@ -131,13 +131,16 @@ class EdaStep(BaseModel):
 
 class FeaturesStep(BaseModel):
     encoding_smoothing: int
-    frequency_fill: int
+    frequency_fill: float
+    pipeline_file: str
 
 
 class StatsStep(BaseModel):
     group_column: str
     group_values: list[str]
     sample_fraction: float
+    output_dir: str
+    output_file: str
 
 
 class CausalStep(BaseModel):
@@ -157,6 +160,8 @@ class TrainStep(BaseModel):
 class EvaluateStep(BaseModel):
     target_metric: str
     promotion_threshold: float
+    output_dir: str
+    output_file: str
 
 
 class FullStep(BaseModel):

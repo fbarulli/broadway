@@ -34,9 +34,9 @@ def run(cfg: PipelineConfig) -> None:
         model = pickle.load(f)
     y_pred = model.predict(X_val)
     metrics = compute_metrics(y_true, y_pred)
-    promote, reason = should_promote(metrics["rmse"], None, cfg.evaluate.promotion_threshold)
+    promote, reason = should_promote(metrics[cfg.evaluate.target_metric], None, cfg.evaluate.promotion_threshold)
     result = {"metrics": metrics, "promote": promote, "reason": reason}
-    eval_dir = Path("artifacts/evaluation")
+    eval_dir = Path(cfg.evaluate.output_dir)
     eval_dir.mkdir(parents=True, exist_ok=True)
-    (eval_dir / "metrics.json").write_text(json.dumps(result, indent=2), encoding="utf-8")
+    (eval_dir / cfg.evaluate.output_file).write_text(json.dumps(result, indent=2), encoding="utf-8")
     logger.info(f"evaluate: RMSE={metrics['rmse']:.4f}, promote={promote}")

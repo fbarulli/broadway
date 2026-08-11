@@ -13,7 +13,7 @@ def duplicate_rows(df: pd.DataFrame) -> int:
     return int(df.duplicated().sum())
 
 
-def outlier_counts_iqr(df: pd.DataFrame, multiplier: float = 1.5) -> dict[str, int]:
+def outlier_counts_iqr(df: pd.DataFrame, multiplier: float) -> dict[str, int]:
     numeric = df.select_dtypes(include="number")
     counts: dict[str, int] = {}
     for col in numeric.columns:

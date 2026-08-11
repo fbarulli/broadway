@@ -36,8 +36,8 @@ def run(cfg: PipelineConfig) -> None:
         "p_value": round(float(p_value), 6),
         "group_stats": {g: {"mean": round(float(vals.mean()), 2), "count": int(len(vals))} for g, vals in groups.items()},
     }
-    out_dir = Path("artifacts/reports")
+    out_dir = Path(cfg.stats.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    out_path = out_dir / "stats.json"
+    out_path = out_dir / cfg.stats.output_file
     out_path.write_text(json.dumps(result, indent=2), encoding="utf-8")
     logger.info(f"stats: ANOVA p={p_value:.4f}, results written to {out_path}")

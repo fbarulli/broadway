@@ -22,7 +22,7 @@ def fit_frequency_encoding(df: pd.DataFrame, col: str) -> dict[str, float]:
     return (df[col].value_counts(normalize=True)).to_dict()
 
 
-def transform_frequency_encoding(df: pd.DataFrame, col: str, mapping: dict[str, float]) -> pd.DataFrame:
+def transform_frequency_encoding(df: pd.DataFrame, col: str, mapping: dict[str, float], fill: float = 0) -> pd.DataFrame:
     df = df.copy()
-    df[f"{col}_freq_enc"] = df[col].map(mapping).fillna(0)
+    df[f"{col}_freq_enc"] = df[col].map(mapping).fillna(fill)
     return df

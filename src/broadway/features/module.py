@@ -28,15 +28,15 @@ def run(cfg: PipelineConfig) -> None:
     train, val = _load_split(cfg)
     pipeline = FeaturePipeline(encodings=cfg.experiment.features.encodings)
     pipeline.fit(train, cfg.dataset.target, cfg.features.encoding_smoothing)
-    train_out = pipeline.transform(train, cfg.experiment.features, cfg.dataset.target)
+    train_out = pipeline.transform(train, cfg.experiment.features, cfg.dataset.target, cfg.features.frequency_fill)
     out_dir = Path(cfg.environment.data_dir) / cfg.environment.processed_subdir
     train_out.to_parquet(out_dir / cfg.etl.train_features_file, index=False)
     logger.info(f"train features written ({len(train_out)} rows)")
     if val is not None:
-        val_out = pipeline.transform(val, cfg.experiment.features, cfg.dataset.target)
+        val_out = pipeline.transform(val, cfg.experiment.features, cfg.dataset.target, cfg.features.frequency_fill)
         val_out.to_parquet(out_dir / cfg.etl.val_features_file, index=False)
         logger.info(f"val features written ({len(val_out)} rows)")
-    pipeline_path = out_dir / "feature_pipeline.pkl"
+    pipeline_path = out_dir / cfg.features.pipeline_file
     with open(pipeline_path, "wb") as f:
         pickle.dump(pipeline, f)
     logger.info(f"pipeline saved to {pipeline_path}")

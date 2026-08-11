@@ -1,4 +1,4 @@
-"""Distributions, skew, kurtosis, cardinality, memory usage."""
+"""Distributions, skew, kurtosis, cardinality."""
 
 from __future__ import annotations
 

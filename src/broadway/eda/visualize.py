@@ -1,4 +1,4 @@
-"""Histograms, boxplots, scatter matrix, correlation heatmap using Plotly."""
+"""Histograms, boxplots, correlation heatmap using Plotly."""
 
 from __future__ import annotations
 
