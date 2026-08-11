@@ -1,14 +1,15 @@
 features:
   include:
-  exclude:
-  derived:
-  encodings:
+    - rooms
+    - area
+  exclude: []
+  derived: []
+  encodings: []
 model:
-  type:
-  params:
+  type: linear
+  params: {}
 split:
-  type:
-  cutoff:
-  validation_size:
-random_state:
-target_metric:
+  type: random
+  validation_size: 0.2
+random_state: 42
+target_metric: rmse

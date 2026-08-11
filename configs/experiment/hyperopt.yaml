@@ -1,18 +1,32 @@
 features:
   include:
-  exclude:
-  derived:
+    - rooms
+    - area
+    - neighborhood
+  exclude: []
+  derived: []
   encodings:
+    - type: target
+      on:
+        - neighborhood
+      smoothing: 20
 model:
-  type:
+  type: xgboost
   params:
+    max_depth: 6
+    learning_rate: 0.1
 split:
-  type:
-  cutoff:
-  validation_size:
-random_state:
-target_metric:
+  type: random
+  validation_size: 0.2
+random_state: 42
+target_metric: rmse
 hpo:
-  engine:
-  trials:
-  params:
+  engine: optuna
+  trials: 50
+  search_space:
+    max_depth:
+      - 3
+      - 10
+    learning_rate:
+      - 0.01
+      - 0.3
