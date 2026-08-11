@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 import pandas as pd
@@ -9,6 +10,8 @@ import yaml
 
 from broadway.config.loader import CONFIGS_DIR
 from broadway.config.schema import ColumnRole, ColumnSchema, DatasetContract, TaskType
+
+logger = logging.getLogger(__name__)
 
 DATASET_DIR = "dataset"
 
@@ -59,5 +62,6 @@ def run(
     out_dir = CONFIGS_DIR / DATASET_DIR
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / f"{contract.name}.yaml"
-    with open(out_path, "w") as f:
-        yaml.dump(contract.model_dump(), f, default_flow_style=False)
+    logger.info(f"discover: writing {len(contract.columns)} columns to {out_path}")
+    with open(out_path, "w", encoding="utf-8") as f:
+        yaml.dump(contract.model_dump(mode="json"), f, default_flow_style=False)

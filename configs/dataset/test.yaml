@@ -1,0 +1,24 @@
+columns:
+  area:
+    dtype: int64
+    null_count: 0
+    role: !!python/object/apply:broadway.config.schema.ColumnRole
+    - feature
+  price:
+    dtype: int64
+    null_count: 0
+    role: !!python/object/apply:broadway.config.schema.ColumnRole
+    - target
+  rooms:
+    dtype: int64
+    null_count: 0
+    role: !!python/object/apply:broadway.config.schema.ColumnRole
+    - feature
+datetime_column: null
+lookup_tables: {}
+name: test
+path: /tmp/test.csv
+row_count: 1
+target: price
+task: !!python/object/apply:broadway.config.schema.TaskType
+- regression
