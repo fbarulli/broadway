@@ -19,13 +19,13 @@ def run(cfg: PipelineConfig) -> None:
     if not cfg.dataset or not cfg.experiment or not cfg.train:
         raise ValueError("training step requires dataset, experiment, and train config")
     out_dir = Path(cfg.environment.data_dir) / cfg.environment.processed_subdir
-    train_df = pd.read_parquet(out_dir / "train_features.parquet")
+    train_df = pd.read_parquet(out_dir / cfg.etl.train_features_file)
     target = cfg.dataset.target
     y = train_df[target]
     X = feature_columns(train_df, target)
     model, elapsed = train(cfg.experiment.model.type, X, y, **cfg.experiment.model.params)
     logger.info(f"model trained in {elapsed:.1f}s")
-    model_path = out_dir / "model.pkl"
+    model_path = out_dir / cfg.train.model_file
     with open(model_path, "wb") as f:
         pickle.dump(model, f)
     logger.info(f"model saved to {model_path}")

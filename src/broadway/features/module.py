@@ -30,11 +30,11 @@ def run(cfg: PipelineConfig) -> None:
     pipeline.fit(train, cfg.dataset.target, cfg.features.encoding_smoothing)
     train_out = pipeline.transform(train, cfg.experiment.features, cfg.dataset.target)
     out_dir = Path(cfg.environment.data_dir) / cfg.environment.processed_subdir
-    train_out.to_parquet(out_dir / "train_features.parquet", index=False)
+    train_out.to_parquet(out_dir / cfg.etl.train_features_file, index=False)
     logger.info(f"train features written ({len(train_out)} rows)")
     if val is not None:
         val_out = pipeline.transform(val, cfg.experiment.features, cfg.dataset.target)
-        val_out.to_parquet(out_dir / "val_features.parquet", index=False)
+        val_out.to_parquet(out_dir / cfg.etl.val_features_file, index=False)
         logger.info(f"val features written ({len(val_out)} rows)")
     pipeline_path = out_dir / "feature_pipeline.pkl"
     with open(pipeline_path, "wb") as f:

@@ -113,6 +113,8 @@ class EtlStep(BaseModel):
     train_file: str
     val_file: str
     training_data_file: str
+    train_features_file: str
+    val_features_file: str
 
 
 class ContractsStep(BaseModel):
@@ -149,6 +151,7 @@ class TrainStep(BaseModel):
     random_state: int
     n_jobs: int
     cv_folds: int
+    model_file: str
 
 
 class EvaluateStep(BaseModel):
