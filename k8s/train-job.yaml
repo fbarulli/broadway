@@ -1,0 +1,22 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: train-{{ .Values.runId }}
+spec:
+  template:
+    spec:
+      containers:
+        - name: train
+          image: broad-way:latest
+          command:
+            - uv
+            - run
+            - ds-pipeline
+            - train
+            - --dataset
+            - "{{ .Values.dataset }}"
+            - --experiment
+            - "{{ .Values.experiment }}"
+            - --environment
+            - production
+      restartPolicy: Never

@@ -1,0 +1,46 @@
+[project]
+name = "broad-way"
+version = "0.1.0"
+description = "Generalized ML experimentation platform"
+requires-python = ">=3.12"
+
+dependencies = [
+    "lightgbm==4.7.0",
+    "optuna==4.4.0",
+    "pandas==2.3.3",
+    "pyarrow==19.0.1",
+    "psycopg[binary]==3.2.6",
+    "pydantic==2.11.7",
+    "pyyaml==6.0.2",
+    "scikit-learn==1.7.2",
+    "scipy==1.16.2",
+    "sqlalchemy==2.0.40",
+    "tqdm==4.67.1",
+    "xgboost==3.3.2",
+    "joblib==1.5.2",
+    "mlflow==2.22.1",
+    "kubernetes==32.0.1",
+    "python-dotenv==1.1.1",
+    "pytest==8.4.2",
+    "pingouin==0.6.1",
+    "statsmodels==0.14.4",
+    "matplotlib==3.10.6",
+    "plotly==6.2.0",
+]
+
+[project.optional-dependencies]
+spark = ["pyspark==4.0.1"]
+viz = ["matplotlib==3.10.6", "seaborn==0.13.2", "plotly==6.2.0"]
+db = ["psycopg[binary]==3.2.6", "sqlalchemy==2.0.40"]
+k8s = ["kubernetes==32.0.1"]
+all = ["broad-way[spark,viz,db,k8s]"]
+
+[project.scripts]
+ds-pipeline = "broad_way.cli:main"
+
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
