@@ -1,0 +1,125 @@
+from __future__ import annotations
+
+import csv as csv_module
+import os
+import subprocess
+from pathlib import Path
+
+import pytest
+
+
+def _run(*args: str, **kwargs: object) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["uv", "run", "ds-pipeline", *args],
+        capture_output=True,
+        text=True,
+        **kwargs,
+    )
+
+
+def _write_csv(path: Path, rows: list[dict[str, object]]) -> None:
+    with open(path, "w", newline="") as f:
+        w = csv_module.DictWriter(f, fieldnames=list(rows[0].keys()))
+        w.writeheader()
+        w.writerows(rows)
+
+
+class TestDiscoverCLI:
+    def test_discover_parses_and_generates_yaml(self, tmp_path: Path) -> None:
+        csv_path = tmp_path / "test_data.csv"
+        _write_csv(
+            csv_path,
+            [
+                {"trip_distance": 1.5, "duration_min": 10.0, "passenger_count": 1, "fare": 15.0},
+                {"trip_distance": 3.2, "duration_min": 22.0, "passenger_count": 2, "fare": 30.0},
+                {"trip_distance": 0.8, "duration_min":  8.0, "passenger_count": 1, "fare":  9.0},
+            ],
+        )
+
+        configs_dir = tmp_path / "configs"
+        dataset_dir = configs_dir / "dataset"
+        env = {
+            **os.environ,
+            "BROADWAY_CONFIGS_DIR": str(configs_dir),
+            "BROADWAY_DATASET_DIR": "dataset",
+        }
+
+        result = _run(
+            "discover",
+            "--csv", str(csv_path),
+            "--target", "fare",
+            "--task", "regression",
+            env=env,
+        )
+
+        assert result.returncode == 0, f"stderr: {result.stderr}"
+        yaml_path = dataset_dir / f"{csv_path.stem}.yaml"
+        assert yaml_path.exists()
+
+    def test_discover_missing_csv_raises(self, tmp_path: Path) -> None:
+        result = _run(
+            "discover",
+            "--csv", "/nonexistent/path.csv",
+            "--target", "fare",
+            "--task", "regression",
+        )
+        assert result.returncode != 0
+        assert "usage:" not in result.stderr.lower()
+
+    def test_discover_with_optional_args(self, tmp_path: Path) -> None:
+        csv_path = tmp_path / "data.csv"
+        _write_csv(
+            csv_path,
+            [
+                {"a": 1, "b": 2, "c": 3, "dt": "2024-01-01"},
+                {"a": 4, "b": 5, "c": 6, "dt": "2024-01-02"},
+            ],
+        )
+
+        configs_dir = tmp_path / "configs"
+        dataset_dir = configs_dir / "dataset"
+        env = {
+            **os.environ,
+            "BROADWAY_CONFIGS_DIR": str(configs_dir),
+            "BROADWAY_DATASET_DIR": "dataset",
+        }
+
+        result = _run(
+            "discover",
+            "--csv", str(csv_path),
+            "--target", "a",
+            "--task", "regression",
+            "--datetime-column", "dt",
+            "--ignore-columns", "c",
+            env=env,
+        )
+        assert result.returncode == 0, f"stderr: {result.stderr}"
+        assert dataset_dir.joinpath(f"{csv_path.stem}.yaml").exists()
+
+
+class TestTrainCLI:
+    def test_train_dispatches_to_pipeline(self) -> None:
+        result = _run("train", "--dataset", "taxi", "--experiment", "taxi")
+        assert result.returncode != 2, (
+            f"argparse error (exit 2): {result.stderr}"
+        )
+
+    def test_train_without_dataset_still_dispatches(self) -> None:
+        result = _run("train", "--experiment", "taxi")
+        assert result.returncode not in (2,), (
+            f"argparse error (exit 2), should have dispatched: {result.stderr}"
+        )
+
+
+class TestMissingSubcommand:
+    def test_no_subcommand_raises_error(self) -> None:
+        result = _run()
+        assert result.returncode == 2
+        assert "required" in result.stderr.lower()
+
+
+class TestInvalidStep:
+    def test_invalid_step_raises_error(self) -> None:
+        result = _run("bogus")
+        assert result.returncode == 2
+        assert "invalid" in result.stderr.lower()
