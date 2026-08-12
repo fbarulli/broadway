@@ -42,8 +42,8 @@ def _lookup_path(contract: DatasetContract) -> Path:
     return Path(next(iter(contract.lookup_tables.values())).path)
 
 
-DATA_PATH = _contract.path
-LOOKUP_PATH = _lookup_path(_contract)
+DATA_PATH = Path(_contract.path)
+LOOKUP_PATH = Path(_lookup_path(_contract))
 BOROUGHS = _stats.group_values
 MIN_ROWS_FOR_SAMPLING = _stats.min_rows_for_sampling
 SAMPLE_FRACTION = _stats.per_group_sample_fraction

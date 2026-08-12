@@ -3,7 +3,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class TaskType(str, Enum):
@@ -95,6 +95,14 @@ class HPOConfig(BaseModel):
     search_space: dict[str, list[float | int]]
 
 
+VALID_MODEL_PARAMS: dict[str, frozenset[str]] = {
+    "linear": frozenset({"fit_intercept", "positive", "copy_X", "n_jobs"}),
+    "lgbm": frozenset({"n_estimators", "learning_rate", "num_leaves", "max_depth", "subsample", "colsample_bytree", "random_state", "n_jobs"}),
+    "xgb": frozenset({"n_estimators", "learning_rate", "max_depth", "subsample", "colsample_bytree", "random_state", "n_jobs", "tree_method"}),
+    "rf": frozenset({"n_estimators", "max_depth", "max_samples", "random_state", "n_jobs"}),
+}
+
+
 class ExperimentConfig(BaseModel):
     features: FeatureConfig
     model: ModelConfig
@@ -102,6 +110,19 @@ class ExperimentConfig(BaseModel):
     random_state: int
     target_metric: str
     hpo: HPOConfig | None = None
+
+    @model_validator(mode="after")
+    def _validate_hpo_search_space(self) -> ExperimentConfig:
+        if self.hpo is None:
+            return self
+        valid_params = VALID_MODEL_PARAMS.get(self.model.type, frozenset())
+        invalid_params = set(self.hpo.search_space) - valid_params
+        if invalid_params:
+            raise ValueError(
+                f"invalid HPO search-space params for model type '{self.model.type}': "
+                f"{sorted(invalid_params)}. valid params: {sorted(valid_params)}"
+            )
+        return self
 
 
 class DiscoverStep(BaseModel):

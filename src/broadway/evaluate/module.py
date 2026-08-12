@@ -116,6 +116,9 @@ def run(cfg: PipelineConfig) -> None:
         reason=reason,
         cv_metrics=cv_metrics,
         residuals=residuals,
+        # persist the candidate-vs-champion comparison even when champion is None,
+        # so downstream consumers can trace champion-None (delta=None) values explicitly.
+        comparison=comparison,
     )
 
     eval_dir = Path(cfg.evaluate.output_dir)

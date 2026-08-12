@@ -11,7 +11,7 @@ features:
         - neighborhood
       smoothing: 20
 model:
-  type: linear
+  type: lgbm
   params: {}
 split:
   type: random

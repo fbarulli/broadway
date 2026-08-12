@@ -5,6 +5,21 @@ from __future__ import annotations
 from pydantic import BaseModel, ConfigDict
 
 
+class MetricComparison(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    candidate: float | None
+    champion: float | None
+    delta: float | None
+    delta_pct: float | None
+
+
+class ModelComparison(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    metrics: dict[str, MetricComparison]
+
+
 class EvaluationResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -13,3 +28,4 @@ class EvaluationResult(BaseModel):
     reason: str
     cv_metrics: dict[str, float] | None = None
     residuals: dict[str, float] | None = None
+    comparison: ModelComparison | None = None

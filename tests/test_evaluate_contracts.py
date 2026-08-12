@@ -25,19 +25,30 @@ from broadway.config.schema import (
 )
 from broadway.evaluate import module as evaluate_module
 from broadway.evaluate.comparison import compare_models
-from broadway.evaluate.contracts import EvaluationResult
+from broadway.evaluate.contracts import EvaluationResult, ModelComparison
 from broadway.evaluate.promotion import should_promote
 from broadway.evaluate.validation import cross_validate, residual_summary
 from broadway.training import module as training_module
 
 
 def test_evaluation_result_json_round_trip() -> None:
+    comparison = ModelComparison(
+        metrics={
+            "mae": {
+                "candidate": 0.5,
+                "champion": 0.4,
+                "delta": 0.1,
+                "delta_pct": 0.25,
+            }
+        }
+    )
     result = EvaluationResult(
         metrics={"mae": 0.5, "rmse": 0.8, "r2": 0.9},
         promote=True,
         reason="improvement over champion",
         cv_metrics={"mae": 0.6, "rmse": 0.9, "r2": 0.88},
         residuals={"mean_residual": 0.1, "std_residual": 0.2, "max_abs_residual": 0.5},
+        comparison=comparison,
     )
     data = result.model_dump_json()
     assert json.loads(data) == {
@@ -46,6 +57,16 @@ def test_evaluation_result_json_round_trip() -> None:
         "reason": "improvement over champion",
         "cv_metrics": {"mae": 0.6, "rmse": 0.9, "r2": 0.88},
         "residuals": {"mean_residual": 0.1, "std_residual": 0.2, "max_abs_residual": 0.5},
+        "comparison": {
+            "metrics": {
+                "mae": {
+                    "candidate": 0.5,
+                    "champion": 0.4,
+                    "delta": 0.1,
+                    "delta_pct": 0.25,
+                }
+            }
+        },
     }
     assert EvaluationResult.model_validate_json(data) == result
 
@@ -58,9 +79,11 @@ def test_evaluation_result_optional_fields_default_to_none() -> None:
     )
     assert result.cv_metrics is None
     assert result.residuals is None
+    assert result.comparison is None
     loaded = EvaluationResult.model_validate_json(result.model_dump_json())
     assert loaded.cv_metrics is None
     assert loaded.residuals is None
+    assert loaded.comparison is None
 
 
 def test_should_promote_no_champion() -> None:
@@ -78,12 +101,13 @@ def test_should_promote_worse_candidate() -> None:
 def test_compare_models_champion_none() -> None:
     candidate = {"mae": 0.5, "rmse": 0.8, "r2": 0.9}
     result = compare_models(candidate, None)
-    assert set(result) == set(candidate)
+    assert isinstance(result, ModelComparison)
+    assert set(result.metrics) == set(candidate)
     for metric, value in candidate.items():
-        assert result[metric]["candidate"] == value
-        assert result[metric]["champion"] is None
-        assert result[metric]["delta"] is None
-        assert result[metric]["delta_pct"] is None
+        assert result.metrics[metric].candidate == value
+        assert result.metrics[metric].champion is None
+        assert result.metrics[metric].delta is None
+        assert result.metrics[metric].delta_pct is None
 
 
 def test_compare_models_with_champion() -> None:
@@ -91,23 +115,23 @@ def test_compare_models_with_champion() -> None:
     champion = {"mae": 0.4, "rmse": 1.0}
     result = compare_models(candidate, champion)
 
-    mae = result["mae"]
-    assert mae["candidate"] == 0.5
-    assert mae["champion"] == 0.4
-    assert mae["delta"] == pytest.approx(0.1)
-    assert mae["delta_pct"] == pytest.approx(0.25)
+    mae = result.metrics["mae"]
+    assert mae.candidate == 0.5
+    assert mae.champion == 0.4
+    assert mae.delta == pytest.approx(0.1)
+    assert mae.delta_pct == pytest.approx(0.25)
 
-    rmse = result["rmse"]
-    assert rmse["candidate"] == 0.8
-    assert rmse["champion"] == 1.0
-    assert rmse["delta"] == pytest.approx(-0.2)
-    assert rmse["delta_pct"] == pytest.approx(-0.2)
+    rmse = result.metrics["rmse"]
+    assert rmse.candidate == 0.8
+    assert rmse.champion == 1.0
+    assert rmse.delta == pytest.approx(-0.2)
+    assert rmse.delta_pct == pytest.approx(-0.2)
 
-    r2 = result["r2"]
-    assert r2["candidate"] == 0.9
-    assert r2["champion"] is None
-    assert r2["delta"] is None
-    assert r2["delta_pct"] is None
+    r2 = result.metrics["r2"]
+    assert r2.candidate == 0.9
+    assert r2.champion is None
+    assert r2.delta is None
+    assert r2.delta_pct is None
 
 
 def test_cross_validate_returns_finite_metrics() -> None:

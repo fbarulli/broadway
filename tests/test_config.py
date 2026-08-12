@@ -1,8 +1,16 @@
 from __future__ import annotations
 
 import pytest
+from pydantic import ValidationError
 
 from broadway.config.loader import load_config
+from broadway.config.schema import (
+    ExperimentConfig,
+    FeatureConfig,
+    HPOConfig,
+    ModelConfig,
+    SplitConfig,
+)
 from broadway.etl.process_config import (
     min_trip_duration_minutes,
     max_trip_duration_minutes,
@@ -76,3 +84,28 @@ def test_invalid_step_raises() -> None:
 def test_stats_config_fields(stats_cfg) -> None:
     assert stats_cfg.min_rows_for_sampling
     assert stats_cfg.group_values
+
+
+def _experiment_config(model_type: str, search_space: dict[str, list[float | int]]) -> ExperimentConfig:
+    return ExperimentConfig(
+        features=FeatureConfig(include=["rooms"], exclude=[], derived=[], encodings=[]),
+        model=ModelConfig(type=model_type, params={}),
+        split=SplitConfig(type="random", validation_size=0.2),
+        random_state=42,
+        target_metric="rmse",
+        hpo=HPOConfig(engine="optuna", trials=10, search_space=search_space),
+    )
+
+
+def test_hpo_search_space_valid_for_lgbm() -> None:
+    config = _experiment_config(
+        "lgbm",
+        {"max_depth": [3, 10], "learning_rate": [0.01, 0.3]},
+    )
+    assert config.hpo is not None
+    assert set(config.hpo.search_space) == {"max_depth", "learning_rate"}
+
+
+def test_hpo_search_space_invalid_for_linear_raises() -> None:
+    with pytest.raises(ValidationError):
+        _experiment_config("linear", {"max_depth": [3, 10]})
