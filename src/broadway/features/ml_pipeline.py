@@ -6,12 +6,8 @@ from broadway.features.basic import add_basic_features
 from broadway.features.boroughs import add_borough_features, load_zones
 from broadway.features.ml_encodings import apply_target_encoding, make_target_encoding
 from broadway.features.frequency import apply_frequency_encoding, make_frequency_encoding
-from broadway.features.schema import (
-    ENGINEERED_FEATURES,
-    EngineeredFeaturesSchema,
-    ROUTE_KEYS,
-    TARGET,
-)
+from broadway.features.schema import ROUTE_KEYS, TARGET
+from projects.taxi.features import ENGINEERED_FEATURES, ENGINEERED_SCHEMA
 
 
 class FeaturePipeline:
@@ -93,8 +89,8 @@ class FeaturePipeline:
                 "Row-to-row alignment with the input dataframe can no "
                 "longer be trusted."
             )
-        result = engineered[ENGINEERED_FEATURES]
-        return EngineeredFeaturesSchema.validate(result)
+        result = engineered[list(ENGINEERED_FEATURES)]
+        return ENGINEERED_SCHEMA.validate(result)
 
     def fit_transform(self, train_df: pd.DataFrame) -> pd.DataFrame:
         self.fit(train_df)

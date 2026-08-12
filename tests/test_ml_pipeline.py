@@ -9,7 +9,8 @@ import pytest
 from broadway.config.loader import load_config
 from broadway.config.schema import FeaturesStep
 from broadway.features.ml_pipeline import FeaturePipeline
-from broadway.features.schema import ENGINEERED_FEATURES, TARGET
+from broadway.features.schema import TARGET
+from projects.taxi.features import ENGINEERED_FEATURES
 
 
 @pytest.fixture

@@ -8,10 +8,7 @@ import pytest
 
 from broadway.config.schema import ColumnSchema, ColumnRole, DatasetContract
 from broadway.contracts.pandera import build_raw_schema
-from broadway.features.schema import (
-    ENGINEERED_FEATURES,
-    EngineeredFeaturesSchema,
-)
+from projects.taxi.features import ENGINEERED_FEATURES, ENGINEERED_SCHEMA
 
 _RAW_COLUMNS = {
     "pickup_datetime": ColumnSchema(
@@ -108,13 +105,13 @@ def test_build_raw_schema_validates_and_rejects() -> None:
 
 def test_engineered_features_schema_validates_and_rejects() -> None:
     valid = _valid_engineered()
-    assert list(valid.columns) == ENGINEERED_FEATURES
-    EngineeredFeaturesSchema.validate(valid)
+    assert list(valid.columns) == list(ENGINEERED_FEATURES)
+    ENGINEERED_SCHEMA.validate(valid)
 
     with pytest.raises(pandera.errors.SchemaError):
-        EngineeredFeaturesSchema.validate(valid.drop(columns=["log_distance"]))
+        ENGINEERED_SCHEMA.validate(valid.drop(columns=["log_distance"]))
 
     wrong = valid.copy()
     wrong["pickup_hour"] = wrong["pickup_hour"].astype("float64")
     with pytest.raises(pandera.errors.SchemaError):
-        EngineeredFeaturesSchema.validate(wrong)
+        ENGINEERED_SCHEMA.validate(wrong)

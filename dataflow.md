@@ -24,7 +24,12 @@ broadway/
       time_series.py        # durbin_watson_test, plot_acf
       baseline.py           # train_lgbm, evaluate
       module.py             # pipeline step: build groups → run_anova → save_plan
+    features/               # feature transforms + generic schema generation
+      schema.py             # FeatureSpec, build_engineered_schema
+      ml_pipeline.py        # FeaturePipeline (taxi orchestration; moves to projects in Phase 3)
+      basic.py, boroughs.py, ml_encodings.py, frequency.py
   projects/taxi/
+    features.py             # FEATURE_SPECS registry → ENGINEERED_FEATURES/types/schema
     data.py                 # loaders, constants, mode system, streaming cache
     STATS.md                # script index (what each numbered script does)
     scripts/                # numbered experiment scripts (01..12)
@@ -118,12 +123,13 @@ results/*.json / *.png  (AnalysisPlan JSON, residual plots, ACF plot)
 | Configuration | Pydantic | `broadway/config/schema.py` |
 | AnalysisPlan | Pydantic | `broadway/stats/plan.py` |
 | Raw DataFrame | Pandera | `broadway/contracts/pandera.py::build_raw_schema(contract)` (generated) |
-| Engineered features | Pandera | `broadway/features/schema.py` |
+| Engineered features | Pandera | `projects/taxi/features.py` (`FEATURE_SPECS`) → `broadway/features/schema.py::build_engineered_schema` |
 | Python interfaces | type hints | throughout |
 
 - The raw schema is generated at runtime from `DatasetContract.columns` — one `pa.Column` per contract entry (the raw 6 columns, not join-derived `pickup_borough`/`LocationID`). Dtypes are checked strictly (`coerce=False`); `null_count` is observed, not an invariant, so nullability is left at Pandera's default.
 - Role-based column selection is `broadway/contracts/selectors.py` (`feature_columns`, `datetime_columns`, `target_columns`) — pure functions over the contract, no hardcoded names.
-- Enforcement points: `read_training_data()` validates the raw frame via `build_raw_schema`; `FeaturePipeline.transform()` validates against `EngineeredFeaturesSchema`.
+- Engineered features are defined ONCE in `projects/taxi/features.py::FEATURE_SPECS`; `ENGINEERED_FEATURES`, `ENGINEERED_FEATURE_TYPES`, and `ENGINEERED_SCHEMA` are all derived from that registry (no parallel hand-maintained list).
+- Enforcement points: `read_training_data()` validates the raw frame via `build_raw_schema`; `FeaturePipeline.transform()` validates against `ENGINEERED_SCHEMA`.
 
 ## Where to make changes
 

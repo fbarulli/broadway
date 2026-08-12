@@ -15,7 +15,6 @@ import pandas as pd
 from broadway.features.schema import (
     RAW_FEATURES,
     RAW_FEATURE_TYPES,
-    ENGINEERED_FEATURES,
     TARGET,
 )
 
@@ -65,16 +64,3 @@ def validate_raw_schema(df: pd.DataFrame) -> None:
             raise DataContractError(f"[{stage}] '{col}' expected int dtype, got {df[col].dtype}")
         if issubclass(expected_type, datetime) and not pd.api.types.is_datetime64_any_dtype(df[col]):
             raise DataContractError(f"[{stage}] '{col}' expected datetime dtype, got {df[col].dtype}")
-
-
-def validate_engineered_schema(df: pd.DataFrame) -> None:
-    """
-    Contract for the output of the feature pipeline.
-    Must contain exactly ENGINEERED_FEATURES, no nulls. TARGET is
-    intentionally excluded - transform() is used at inference time
-    (see models/pyfunc_wrapper.py), where no target is available.
-    """
-    stage = "engineered_schema"
-    expected = ENGINEERED_FEATURES
-    _check_columns(df, expected, stage)
-    _check_no_nulls(df, stage)

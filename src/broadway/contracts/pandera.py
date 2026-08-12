@@ -27,7 +27,7 @@ _DATETIME_DTYPES = {"datetime64[us]", "datetime64[ns]", "datetime64"}
 _STRING_DTYPES = {"object", "str", "string"}
 
 
-def _pandera_dtype(dtype: str) -> type[pa.DataType]:
+def pandera_dtype(dtype: str) -> type[pa.DataType]:
     if dtype in _INT_DTYPES:
         return _INT_DTYPES[dtype]
     if dtype in _FLOAT_DTYPES:
@@ -49,7 +49,7 @@ def build_raw_schema(contract: DatasetContract) -> pa.DataFrameSchema:
     """
     return pa.DataFrameSchema(
         {
-            name: pa.Column(_pandera_dtype(col.dtype))
+            name: pa.Column(pandera_dtype(col.dtype))
             for name, col in contract.columns.items()
         }
     )
