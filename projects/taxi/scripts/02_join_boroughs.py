@@ -8,7 +8,7 @@ from projects.taxi import data
 
 def main() -> None:
     data.write_quality_report()
-    print(f"\nWrote quality report to {data.QUALITY_REPORT}")
+    print(f"\nWrote quality report to {data._quality_report_path()}")
 
 
 if __name__ == "__main__":

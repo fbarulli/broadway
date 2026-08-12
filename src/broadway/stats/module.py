@@ -27,9 +27,6 @@ def run(cfg: PipelineConfig) -> None:
         for g in cfg.stats.group_values
         if not df[df[group_col] == g].empty
     }
-    if len(groups) < 2:
-        logger.warning("stats: fewer than 2 groups — skipping ANOVA")
-        return
     plan = run_anova(groups)
     out_dir = Path(cfg.stats.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)

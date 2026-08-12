@@ -75,6 +75,8 @@ def _build_plan(
 
 
 def run_anova(groups: dict[str, np.ndarray], alpha: float = 0.05) -> AnalysisPlan:
+    if len(groups) < 2:
+        raise ValueError(f"at least two groups required, got {len(groups)}")
     sizes = _group_sizes(groups)
     n_total = sum(sizes.values())
     k = len(groups)
@@ -110,6 +112,8 @@ def run_anova(groups: dict[str, np.ndarray], alpha: float = 0.05) -> AnalysisPla
 
 
 def run_welch(groups: dict[str, np.ndarray], alpha: float = 0.05) -> AnalysisPlan:
+    if len(groups) < 2:
+        raise ValueError(f"at least two groups required, got {len(groups)}")
     sizes = _group_sizes(groups)
     n_total = sum(sizes.values())
     k = len(groups)
@@ -143,6 +147,8 @@ def run_welch(groups: dict[str, np.ndarray], alpha: float = 0.05) -> AnalysisPla
 
 
 def run_kruskal(groups: dict[str, np.ndarray], alpha: float = 0.05) -> AnalysisPlan:
+    if len(groups) < 2:
+        raise ValueError(f"at least two groups required, got {len(groups)}")
     sizes = _group_sizes(groups)
     n_total = sum(sizes.values())
     k = len(groups)

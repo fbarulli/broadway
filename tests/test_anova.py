@@ -38,6 +38,11 @@ def test_run_anova_not_passed_when_means_equal() -> None:
     assert plan.next_step is None
 
 
+def test_run_anova_requires_two_groups() -> None:
+    with pytest.raises(ValueError):
+        run_anova({"a": np.array([1.0, 2.0, 3.0])})
+
+
 def test_run_welch_valid_plan() -> None:
     plan = run_welch(_groups())
     assert plan.analysis_type == "group_comparison"

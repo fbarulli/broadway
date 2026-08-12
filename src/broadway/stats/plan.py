@@ -1,20 +1,22 @@
-"""AnalysisPlan dataclass and JSON (de)serialization helpers."""
+"""AnalysisPlan Pydantic model and JSON (de)serialization helpers."""
 
 from __future__ import annotations
 
 import json
-from dataclasses import asdict, dataclass
 from pathlib import Path
 
+from pydantic import BaseModel, ConfigDict
 
-@dataclass
-class AnalysisPlan:
+
+class AnalysisPlan(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     script: str
     analysis_type: str
     test_name: str
-    statistics: dict
-    effect_sizes: dict
-    threshold_context: dict
+    statistics: dict[str, float]
+    effect_sizes: dict[str, float]
+    threshold_context: dict[str, float | bool]
     reason: list[str]
     warnings: list[str]
     passed: bool
@@ -22,11 +24,8 @@ class AnalysisPlan:
 
 
 def save_plan(plan: AnalysisPlan, path: Path) -> None:
-    with path.open("w") as f:
-        json.dump(asdict(plan), f, indent=2)
+    path.write_text(plan.model_dump_json(indent=2))
 
 
 def load_plan(path: Path) -> AnalysisPlan:
-    with path.open("r") as f:
-        data = json.load(f)
-    return AnalysisPlan(**data)
+    return AnalysisPlan.model_validate(json.loads(path.read_text()))

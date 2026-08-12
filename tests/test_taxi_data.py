@@ -80,7 +80,6 @@ def patched_data(
     monkeypatch.setattr(data, "DATA_PATH", str(synthetic_parquet))
     monkeypatch.setattr(data, "LOOKUP_PATH", str(zones_csv))
     monkeypatch.setattr(data, "RESULTS_DIR", tmp_path)
-    monkeypatch.setattr(data, "QUALITY_REPORT", tmp_path / "quality_report.json")
     monkeypatch.delenv("DATA_MODE", raising=False)
 
 

@@ -99,9 +99,10 @@ PICKUP_BOROUGH_COL = "pickup_borough"
 DURATION_COL = "trip_duration_minutes"
 
 RESULTS_DIR = Path("results")
-SAMPLE_CACHE = _cache_path(MODE)
-SAMPLE_META = _meta_path(MODE)
-QUALITY_REPORT = RESULTS_DIR / "quality_report.json"
+
+
+def _quality_report_path() -> Path:
+    return RESULTS_DIR / "quality_report.json"
 
 _DOWNCAST_MAP = {"int64": "int32", "float64": "float32"}
 _BATCH_SIZE = 100_000
@@ -287,7 +288,7 @@ def inspect_schema() -> None:
 
 
 def write_quality_report() -> None:
-    if QUALITY_REPORT.exists():
+    if _quality_report_path().exists():
         return
 
     df = load_boroughs_pandas()
@@ -314,4 +315,4 @@ def _write_quality_report(
     }
 
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    QUALITY_REPORT.write_text(json.dumps(report, indent=2))
+    _quality_report_path().write_text(json.dumps(report, indent=2))
