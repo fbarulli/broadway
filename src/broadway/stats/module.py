@@ -2,14 +2,15 @@
 
 from __future__ import annotations
 
-import json
 import logging
 from pathlib import Path
 
-from scipy import stats as sp_stats
+import numpy as np
 
 from broadway.config.schema import PipelineConfig
 from broadway.data.loader import load
+from broadway.stats.anova import run_anova
+from broadway.stats.plan import save_plan
 
 logger = logging.getLogger(__name__)
 
@@ -21,23 +22,20 @@ def run(cfg: PipelineConfig) -> None:
     group_col = cfg.stats.group_column
     if group_col not in df.columns:
         raise ValueError(f"group column '{group_col}' not found in data")
-    groups = {
-        g: df[df[group_col] == g][cfg.dataset.target].dropna()
+    groups: dict[str, np.ndarray] = {
+        g: df[df[group_col] == g][cfg.dataset.target].dropna().to_numpy()
         for g in cfg.stats.group_values
         if not df[df[group_col] == g].empty
     }
     if len(groups) < 2:
         logger.warning("stats: fewer than 2 groups — skipping ANOVA")
         return
-    _, p_value = sp_stats.f_oneway(*groups.values())
-    result = {
-        "test": "one-way ANOVA",
-        "group_column": group_col,
-        "p_value": round(float(p_value), 6),
-        "group_stats": {g: {"mean": round(float(vals.mean()), 2), "count": int(len(vals))} for g, vals in groups.items()},
-    }
+    plan = run_anova(groups)
     out_dir = Path(cfg.stats.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / cfg.stats.output_file
-    out_path.write_text(json.dumps(result, indent=2), encoding="utf-8")
-    logger.info(f"stats: ANOVA p={p_value:.4f}, results written to {out_path}")
+    save_plan(plan, out_path)
+    logger.info(
+        f"stats: {plan.test_name} p={plan.statistics['p_value']:.4f}, "
+        f"plan written to {out_path}"
+    )

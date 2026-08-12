@@ -1,6 +1,6 @@
 | # | Script | What it does |
 |---|---|---|---|
-| 00 | prepare_data.py | Generate deterministic cached sample (results/joined_sample.parquet) used by scripts 08-12 |
+| 00 | data.generate_sample_cache() | Generate deterministic cached sample (results/joined_sample_{MODE}.parquet) used by scripts 04-12 |
 | 01 | load_data.py | Load training_data.parquet with Spark, inspect schema |
 | 02 | join_boroughs.py | Join taxi_zone_lookup.csv for pickup borough, show group sizes and mean durations |
 | 04 | anova_boroughs.py | One-way ANOVA testing whether trip duration differs across boroughs |
@@ -13,4 +13,5 @@
 | 11 | interaction_ols.py | Interaction OLS with trip_distance * pickup_borough, nested F-test vs baseline |
 | 12 | lgbm_baseline.py | LightGBM baseline with time-based train/test split, feature importance |
 
-Shared helpers, constants, and the sample cache live in `_config.py`. Run `00_prepare_data.py` once before scripts 08-12.
+Shared helpers, constants, and the sample cache live in `projects/taxi/data.py`.
+Run `generate_sample_cache()` once before scripts 04-12.

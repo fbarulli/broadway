@@ -20,9 +20,10 @@ broadway/
       diagnostics.py        # bp_test, jb_test, durbin_watson, plot_residuals
       time_series.py        # durbin_watson_test, plot_acf
       baseline.py           # train_lgbm, evaluate
-      module.py             # pipeline step run(cfg)
+      module.py             # pipeline step: build groups → run_anova → save_plan
   projects/taxi/
     data.py                 # loaders, constants, mode system, streaming cache
+    STATS.md                # script index (what each numbered script does)
     scripts/                # numbered experiment scripts (01..12)
   configs/step/
     stats.yaml              # stats SSOT

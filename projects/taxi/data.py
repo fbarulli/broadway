@@ -128,7 +128,7 @@ def load_stratified_sample() -> pd.DataFrame:
     current_hash = _params_hash()
     if not SAMPLE_CACHE.exists():
         raise FileNotFoundError(
-            f"{SAMPLE_CACHE} not found. Run 'python learning/stats/00_prepare_data.py' first."
+            f"{SAMPLE_CACHE} not found. Call generate_sample_cache() first."
         )
 
     if SAMPLE_META.exists():
@@ -136,7 +136,7 @@ def load_stratified_sample() -> pd.DataFrame:
         if meta.get("params_hash") != current_hash:
             logger.warning(
                 "sample params changed (current=%s, cached=%s). "
-                "Run 00_prepare_data.py to regenerate.",
+                "Run generate_sample_cache() to regenerate.",
                 current_hash,
                 meta.get("params_hash"),
             )
