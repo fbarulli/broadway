@@ -14,10 +14,19 @@ import pandas as pd
 import pyarrow.parquet as pq
 import yaml
 
-from broadway.config.schema import FeaturesStep, StatsStep, TrainStep
+from broadway.config.schema import (
+    DatasetContract,
+    FeaturesStep,
+    StatsStep,
+    TrainStep,
+)
 from broadway.stats.effect_size import group_imbalance
+from projects.taxi.schemas import TaxiRawSchema
 
 logger = logging.getLogger(__name__)
+
+_DATASET_YAML = Path("configs/dataset/taxi.yaml")
+_contract = DatasetContract(**yaml.safe_load(_DATASET_YAML.read_text()))
 
 _STATS_YAML = Path("configs/step/stats.yaml")
 _stats = StatsStep(**yaml.safe_load(_STATS_YAML.read_text()))
@@ -28,8 +37,15 @@ _train = TrainStep(**yaml.safe_load(_TRAIN_YAML.read_text()))
 _FEATURES_YAML = Path("configs/step/features.yaml")
 _features = FeaturesStep(**yaml.safe_load(_FEATURES_YAML.read_text()))
 
-DATA_PATH = _stats.data_path
-LOOKUP_PATH = _stats.lookup_path
+
+def _lookup_path(contract: DatasetContract) -> Path:
+    # TEMPORARY: lookup_tables encodes "path:key"; Phase 2 replaces this with a structured {path, key} model.
+    value = next(iter(contract.lookup_tables.values()))
+    return Path(value.split(":")[0])
+
+
+DATA_PATH = _contract.path
+LOOKUP_PATH = _lookup_path(_contract)
 BOROUGHS = _stats.group_values
 MIN_ROWS_FOR_SAMPLING = _stats.min_rows_for_sampling
 SAMPLE_FRACTION = _stats.per_group_sample_fraction
@@ -88,12 +104,12 @@ QUANTILE_TAIL = _train.quantile_tail
 
 ZONE_ID_COL = "LocationID"
 ZONE_BOROUGH_COL = "Borough"
-PICKUP_LOCATION_COL = "pickup_location_id"
-DROPOFF_LOCATION_COL = "dropoff_location_id"
-DATETIME_COL = "pickup_datetime"
+PICKUP_LOCATION_COL = next(k for k in _contract.lookup_tables if "pickup" in k)
+DROPOFF_LOCATION_COL = next(k for k in _contract.lookup_tables if "dropoff" in k)
+DATETIME_COL = _contract.datetime_column
 TRIP_DISTANCE_COL = "trip_distance"
 PASSENGER_COUNT_COL = "passenger_count"
-TARGET_COL = "trip_duration_minutes"
+TARGET_COL = _contract.target
 
 PICKUP_BOROUGH_COL = "pickup_borough"
 DURATION_COL = "trip_duration_minutes"
@@ -172,7 +188,7 @@ def load_stratified_sample(mode: str | None = None) -> pd.DataFrame:
                 meta.get("params_hash"),
             )
 
-    return pd.read_parquet(cache_path)
+    return TaxiRawSchema.validate(pd.read_parquet(cache_path))
 
 
 def generate_sample_cache(mode: str | None = None) -> None:
@@ -266,7 +282,8 @@ def load_time_slice(mode: str | None = None) -> pd.DataFrame:
             (DATETIME_COL, "<", pd.Timestamp(end)),
         ]
     )
-    return _join_boroughs(df).sort_values(DATETIME_COL).reset_index(drop=True)
+    result = _join_boroughs(df).sort_values(DATETIME_COL).reset_index(drop=True)
+    return TaxiRawSchema.validate(result)
 
 
 def inspect_schema() -> None:

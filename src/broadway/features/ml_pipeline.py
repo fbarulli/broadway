@@ -4,10 +4,14 @@ import pandas as pd
 
 from broadway.features.basic import add_basic_features
 from broadway.features.boroughs import add_borough_features, load_zones
-from broadway.features.contracts import validate_engineered_schema
 from broadway.features.ml_encodings import apply_target_encoding, make_target_encoding
 from broadway.features.frequency import apply_frequency_encoding, make_frequency_encoding
-from broadway.features.schema import ENGINEERED_FEATURES, ROUTE_KEYS, TARGET
+from broadway.features.schema import (
+    ENGINEERED_FEATURES,
+    EngineeredFeaturesSchema,
+    ROUTE_KEYS,
+    TARGET,
+)
 
 
 class FeaturePipeline:
@@ -90,8 +94,7 @@ class FeaturePipeline:
                 "longer be trusted."
             )
         result = engineered[ENGINEERED_FEATURES]
-        validate_engineered_schema(result)
-        return result
+        return EngineeredFeaturesSchema.validate(result)
 
     def fit_transform(self, train_df: pd.DataFrame) -> pd.DataFrame:
         self.fit(train_df)

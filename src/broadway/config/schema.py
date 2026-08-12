@@ -169,8 +169,6 @@ class StatsStep(BaseModel):
     sample_fraction: float
     output_dir: str
     output_file: str
-    data_path: str
-    lookup_path: str
     min_rows_for_sampling: int
     per_group_sample_fraction: float
     time_slice_start: str

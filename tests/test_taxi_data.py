@@ -31,6 +31,16 @@ _BOROUGH_COUNTS: dict[str, int] = {
 }
 
 
+def _synthetic_series(
+    dtype: str, n: int, rng: np.random.Generator
+) -> pd.Series:
+    if dtype.startswith("datetime"):
+        return pd.Series(pd.date_range("2024-01-01", periods=n, freq="90s"))
+    if dtype.startswith("int"):
+        return pd.Series(rng.integers(1, 100, size=n), dtype=dtype)
+    return pd.Series(rng.uniform(0.0, 100.0, size=n), dtype=dtype)
+
+
 @pytest.fixture
 def synthetic_df() -> pd.DataFrame:
     rng = np.random.default_rng(42)
@@ -42,12 +52,15 @@ def synthetic_df() -> pd.DataFrame:
 
     df = pd.DataFrame(
         {
-            data.DATETIME_COL: pd.date_range("2023-12-30 00:00:00", periods=n, freq="90s"),
-            data.PICKUP_LOCATION_COL: np.asarray(location_ids, dtype=np.int64),
-            data.TRIP_DISTANCE_COL: rng.uniform(0.5, 25.0, size=n).astype("float64"),
-            data.DURATION_COL: rng.uniform(1.0, 120.0, size=n).astype("float64"),
+            col: _synthetic_series(col_schema.dtype, n, rng)
+            for col, col_schema in data._contract.columns.items()
         }
     )
+
+    df[data.DATETIME_COL] = pd.date_range("2023-12-30 00:00:00", periods=n, freq="90s")
+    df[data.PICKUP_LOCATION_COL] = np.asarray(location_ids, dtype=np.int64)
+    df[data.DURATION_COL] = rng.uniform(1.0, 120.0, size=n).astype("float64")
+
     return df.sample(frac=1, random_state=42).reset_index(drop=True)
 
 

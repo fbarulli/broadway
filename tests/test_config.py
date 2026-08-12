@@ -74,6 +74,5 @@ def test_invalid_step_raises() -> None:
 
 
 def test_stats_config_fields(stats_cfg) -> None:
-    assert stats_cfg.data_path
     assert stats_cfg.min_rows_for_sampling
     assert stats_cfg.group_values

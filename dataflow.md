@@ -85,7 +85,7 @@ results/*.json / *.png  (AnalysisPlan JSON, residual plots, ACF plot)
 | `time_slice_start_{mode}` / `time_slice_end_{mode}` | `configs/step/stats.yaml` → `StatsStep` | `data.TIME_SLICE_START/END` |
 | `time_split_cutoff` | `configs/step/stats.yaml` → `StatsStep` | `data.TIME_SPLIT_CUTOFF` |
 | `min_rows_for_sampling`, `per_group_sample_fraction`, `group_values` | `configs/step/stats.yaml` | `data.MIN_ROWS_FOR_SAMPLING`, `data.BOROUGHS` |
-| `data_path`, `lookup_path` | `configs/step/stats.yaml` | `data.DATA_PATH`, `data.LOOKUP_PATH` |
+| `data_path`, `lookup_path` (from `path` / `lookup_tables`) | `configs/dataset/taxi.yaml` → `DatasetContract` | `data.DATA_PATH`, `data.LOOKUP_PATH` (`projects/taxi/data.py`) |
 | `n_estimators`, `learning_rate`, `num_leaves`, ... | `configs/step/train.yaml` → `TrainStep` | `data.N_ESTIMATORS`, ... |
 | rush-hour/night/passenger params | `configs/step/features.yaml` → `FeaturesStep` | `data.FEATURE_*` |
 | column names | module constants in `data.py` | scripts |
@@ -108,11 +108,25 @@ results/*.json / *.png  (AnalysisPlan JSON, residual plots, ACF plot)
 | Stratified random | `load_stratified_sample` | per-borough proportions preserved; deterministic (`RANDOM_STATE`) | 08, 09, 11, 07 (games-howell), 04–06 (ANOVA groups via `load_borough_durations`) |
 | Contiguous time slice | `load_time_slice` | rows sorted by `pickup_datetime`, no random sampling (filter pushdown) | 10 (Durbin-Watson / ACF) |
 
+## Contracts
+
+| Contract | Tool | Where |
+|---|---|---|
+| Configuration | Pydantic | `broadway/config/schema.py` |
+| AnalysisPlan | Pydantic | `broadway/stats/plan.py` |
+| Taxi raw DataFrame | Pandera | `projects/taxi/schemas.py` |
+| Engineered features | Pandera | `broadway/features/schema.py` |
+| Python interfaces | type hints | throughout |
+
+- Pandera `DataFrameModel`s are structure-only (columns, dtypes, nullability). Range/value checks stay in `etl/process.py` + `contracts/checks.py`.
+- Enforcement points: `load_stratified_sample()` / `load_time_slice()` validate against `TaxiRawSchema`; `FeaturePipeline.transform()` validates against `EngineeredFeaturesSchema`.
+
 ## Where to make changes
 
 | Goal | Change |
 |---|---|
 | New config knob | `configs/step/stats.yaml` + matching field in `StatsStep` (`schema.py`) + constant in `data.py` |
+| New DataFrame contract | add a Pandera `DataFrameModel` (`projects/taxi/schemas.py` or `broadway/features/schema.py`) and call `Schema.validate(df)` at the stage boundary |
 | New loader | add function in `projects/taxi/data.py`; reuse `read_training_data` / `_downcast` / `_join_boroughs` |
 | New statistical test | add function in `src/broadway/stats/` (pandas/numpy only) + document in `API.md` |
 | New experiment script | add `projects/taxi/scripts/NN_*.py`; import from `projects.taxi.data` and `broadway.stats` |
