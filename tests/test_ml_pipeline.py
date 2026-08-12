@@ -37,8 +37,8 @@ def taxi_data() -> pd.DataFrame:
     return pd.DataFrame(
         {
             "pickup_datetime": pd.date_range("2024-01-01", periods=50, freq="h"),
-            "pickup_location_id": [1, 2, 3, 1, 2] * 10,
-            "dropoff_location_id": [2, 3, 1, 3, 2] * 10,
+            "pickup_location_id": pd.Series([1, 2, 3, 1, 2] * 10, dtype="int32"),
+            "dropoff_location_id": pd.Series([2, 3, 1, 3, 2] * 10, dtype="int32"),
             "trip_distance": [1.0 + i * 0.3 for i in range(50)],
             "passenger_count": [1.0] * 50,
             TARGET: [5.0 + i * 0.5 for i in range(50)],

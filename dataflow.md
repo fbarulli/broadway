@@ -72,8 +72,7 @@ broadway/
 data/processed/training_data.parquet   (raw, 8.6M rows)
         │  pyarrow ParquetFile.iter_batches(batch_size=100_000)
         ▼
-generate_sample_cache()   ── downcast int64→int32 / float64→float32
-        │                     merge zone lookup (pickup_borough)
+generate_sample_cache()   ── merge zone lookup (pickup_borough)
         │                     incremental per-borough stratified sample
         ├──▶ results/joined_sample_{MODE}.parquet   (≈ SAMPLE_SIZE rows)
         ├──▶ results/sample_meta_{MODE}.json        (params_hash)
@@ -139,7 +138,7 @@ results/*.json / *.png  (AnalysisPlan JSON, residual plots, ACF plot)
 |---|---|
 | New config knob | `configs/step/stats.yaml` + matching field in `StatsStep` (`schema.py`) + constant in `data.py` |
 | New DataFrame contract | add the column to `configs/dataset/taxi.yaml` — `build_raw_schema` regenerates the raw schema; call `Schema.validate(df)` at the stage boundary |
-| New loader | add function in `project/data.py`; reuse `read_training_data` / `_downcast` / `_join_boroughs` |
+| New loader | add function in `project/data.py`; reuse `read_training_data` / `_join_boroughs` |
 | New statistical test | add function in `src/broadway/stats/` (pandas/numpy only) + document in `API.md` |
 | New experiment script | add `project/scripts/NN_*.py`; import from `project.data` and `broadway.stats` |
 | Change sample behavior | edit `generate_sample_cache` / `_params_hash` in `data.py`; bump stale `params_hash` by regenerating |

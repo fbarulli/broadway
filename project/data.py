@@ -118,7 +118,6 @@ RESULTS_DIR = Path("results")
 def _quality_report_path() -> Path:
     return RESULTS_DIR / "quality_report.json"
 
-_DOWNCAST_MAP = {"int64": "int32", "float64": "float32"}
 _BATCH_SIZE = 100_000
 
 
@@ -131,15 +130,6 @@ def _params_hash(mode: str | None = None) -> str:
         "group_col": PICKUP_BOROUGH_COL,
     }
     return hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()[:8]
-
-
-def _downcast(df: pd.DataFrame) -> pd.DataFrame:
-    dtype_map = {
-        col: _DOWNCAST_MAP[str(dtype)]
-        for col, dtype in df.dtypes.items()
-        if str(dtype) in _DOWNCAST_MAP
-    }
-    return df.astype(dtype_map) if dtype_map else df
 
 
 def _load_zones() -> pd.DataFrame:
@@ -159,7 +149,7 @@ def read_training_data(
     columns: list[str] | None = None, filters: list | None = None
 ) -> pd.DataFrame:
     raw = pd.read_parquet(DATA_PATH, columns=columns, filters=filters)
-    return _downcast(build_raw_schema(_contract).validate(raw))
+    return build_raw_schema(_contract).validate(raw)
 
 
 def load_boroughs_pandas() -> pd.DataFrame:
@@ -260,7 +250,7 @@ def _stream_sample(pf: pq.ParquetFile, targets: dict[str, int]) -> pd.DataFrame:
 
 def _iter_joined_batches(pf: pq.ParquetFile) -> Iterator[pd.DataFrame]:
     for batch in pf.iter_batches(batch_size=_BATCH_SIZE):
-        yield _join_boroughs(_downcast(batch.to_pandas()))
+        yield _join_boroughs(batch.to_pandas())
 
 
 def load_borough_durations(mode: str | None = None) -> dict[str, np.ndarray]:

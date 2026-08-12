@@ -56,7 +56,6 @@ class FeatureSpec:
     name: str
     dtype: str
     nullable: bool = False
-    coerce: bool = False
 
 
 def build_engineered_schema(specs: dict[str, FeatureSpec]) -> pa.DataFrameSchema:
@@ -66,7 +65,6 @@ def build_engineered_schema(specs: dict[str, FeatureSpec]) -> pa.DataFrameSchema
             spec.name: pa.Column(
                 pandera_dtype(spec.dtype),
                 nullable=spec.nullable,
-                coerce=spec.coerce,
             )
             for spec in specs.values()
         }

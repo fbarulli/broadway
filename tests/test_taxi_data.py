@@ -148,7 +148,7 @@ def test_load_borough_durations_returns_all_groups(patched_data: None) -> None:
     assert durations[SMALL_BOROUGH].shape[0] == SMALL_FULL_COUNT
 
 
-def test_read_training_data_downcasts_dtypes(patched_data: None) -> None:
+def test_read_training_data_matches_contract_dtypes(patched_data: None) -> None:
     df = data.read_training_data()
 
     int_cols = [c for c in df.columns if pd.api.types.is_integer_dtype(df[c])]
@@ -156,7 +156,7 @@ def test_read_training_data_downcasts_dtypes(patched_data: None) -> None:
     assert int_cols
     assert float_cols
     assert all(df[c].dtype == "int32" for c in int_cols)
-    assert all(df[c].dtype == "float32" for c in float_cols)
+    assert all(df[c].dtype == "float64" for c in float_cols)
 
 
 @pytest.mark.parametrize("mode", ["dev", "live"])
