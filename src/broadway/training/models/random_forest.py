@@ -1,1 +1,9 @@
 """sklearn RandomForestRegressor / RandomForestClassifier wrapper."""
+
+from __future__ import annotations
+
+from sklearn.ensemble import RandomForestRegressor
+
+
+def create(**params: float | int | str) -> RandomForestRegressor:
+    return RandomForestRegressor(**{k: v for k, v in params.items() if k != "type"})

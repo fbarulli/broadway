@@ -39,6 +39,7 @@ class FeaturePipeline:
             ROUTE_KEYS,
             TARGET,
             "route_avg_duration",
+            data_config.encoding_smoothing,
         )
 
         self.route_frequency = make_frequency_encoding(
@@ -74,6 +75,7 @@ class FeaturePipeline:
             self.route_frequency,
             ROUTE_KEYS,
             "route_frequency",
+            data_config.frequency_fill,
         )
 
         if len(engineered) != input_rows:

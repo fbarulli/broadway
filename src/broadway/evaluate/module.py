@@ -23,8 +23,7 @@ def run(cfg: PipelineConfig) -> None:
     out_dir = Path(cfg.environment.data_dir) / cfg.environment.processed_subdir
     val_path = out_dir / cfg.etl.val_features_file
     if not val_path.exists():
-        val_path = out_dir / cfg.etl.train_features_file
-        logger.warning(f"no validation set — evaluating on train set")
+        raise FileNotFoundError(f"validation set not found: {val_path}")
     val_df = pd.read_parquet(val_path)
     target = cfg.dataset.target
     y_true = val_df[target].values

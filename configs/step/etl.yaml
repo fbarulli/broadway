@@ -1,7 +1,30 @@
-ci_sample_size: 1000
+ci_sample_size: 50000
 random_state: 42
 train_file: train.parquet
 val_file: val.parquet
 training_data_file: training_data.parquet
 train_features_file: train_features.parquet
 val_features_file: val_features.parquet
+raw_dir: data/raw
+processed_dir: data/processed
+processed_file: training_data.parquet
+min_trip_distance: 0
+max_trip_distance: 50
+min_trip_duration_minutes: 1
+max_trip_duration_minutes: 180
+batch_size: 200000
+rename_map:
+  tpep_pickup_datetime: pickup_datetime
+  PULocationID: pickup_location_id
+  DOLocationID: dropoff_location_id
+taxi_urls:
+  - https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2024-01.parquet
+  - https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2024-02.parquet
+  - https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2024-03.parquet
+lookup_filename: taxi_zone_lookup.csv
+lookup_url: https://d37ci6vzurychx.cloudfront.net/misc/taxi_zone_lookup.csv
+training_table: training_data
+target: trip_duration_minutes
+validation_cutoff: "2024-03-01"
+encoding_smoothing: 50
+frequency_fill: 0

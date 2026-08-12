@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import argparse
 
-from broadway.config.loader import DEFAULT_ENVIRONMENT, STEP_MODELS, load_config
+from broadway.config.loader import STEP_MODELS, load_config
 
 STEPS = list(STEP_MODELS.keys())
 
@@ -12,7 +12,7 @@ STEPS = list(STEP_MODELS.keys())
 def _add_step_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--dataset", type=str, default=None)
     parser.add_argument("--experiment", type=str, default=None)
-    parser.add_argument("--environment", type=str, default=DEFAULT_ENVIRONMENT)
+    parser.add_argument("--environment", type=str, required=True)
 
 
 def _build_parser() -> argparse.ArgumentParser:

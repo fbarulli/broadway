@@ -133,6 +133,9 @@ class FeaturesStep(BaseModel):
     encoding_smoothing: int
     frequency_fill: float
     pipeline_file: str
+    borough_column: str
+    borough_lookup_column: str
+    rush_hour_hours: list[int]
 
 
 class StatsStep(BaseModel):
@@ -141,6 +144,14 @@ class StatsStep(BaseModel):
     sample_fraction: float
     output_dir: str
     output_file: str
+    data_path: str
+    lookup_path: str
+    min_rows_for_sampling: int
+    per_group_sample_fraction: float
+    time_slice_start: str
+    time_slice_end: str
+    time_split_cutoff: str
+    acf_lags: int
 
 
 class CausalStep(BaseModel):
@@ -168,6 +179,48 @@ class FullStep(BaseModel):
     steps: list[str]
 
 
+class DataPipelineConfig(BaseModel):
+    raw_dir: str
+    processed_dir: str
+    processed_file: str
+    ci_sample_size: int
+    min_trip_distance: float
+    max_trip_distance: float
+    min_trip_duration_minutes: float
+    max_trip_duration_minutes: float
+    batch_size: int
+    rename_map: dict[str, str]
+    taxi_urls: list[str]
+    lookup_url: str
+    lookup_filename: str
+    training_table: str
+    target: str
+    validation_cutoff: str
+    encoding_smoothing: int
+    frequency_fill: float
+
+
+class MLflowServiceConfig(BaseModel):
+    tracking_uri: str
+    experiment_name: str
+    registered_model_name: str
+    champion_alias: str
+
+
+class DatabaseServiceConfig(BaseModel):
+    url: str
+
+
+class TrainingPipelineConfig(BaseModel):
+    train_test_cutoff: str
+    random_state: int
+    validation_size: float
+    metric: str
+    maximize: bool
+    default_model: str
+    supported_models: list[str]
+
+
 class PipelineConfig(BaseModel):
     dataset: DatasetContract | None = None
     environment: EnvironmentConfig
@@ -182,3 +235,7 @@ class PipelineConfig(BaseModel):
     train: TrainStep | None = None
     evaluate: EvaluateStep | None = None
     full: FullStep | None = None
+    data_pipeline: DataPipelineConfig | None = None
+    mlflow_service: MLflowServiceConfig | None = None
+    database_service: DatabaseServiceConfig | None = None
+    training_pipeline: TrainingPipelineConfig | None = None

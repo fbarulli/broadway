@@ -6,6 +6,8 @@ Run with: python learning/stats/02_join_boroughs.py
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 
+from _config import DATA_PATH, LOOKUP_PATH
+
 spark = (
     SparkSession.builder
     .appName("stats-learning")
@@ -13,13 +15,13 @@ spark = (
     .getOrCreate()
 )
 
-trips = spark.read.parquet("data/processed/training_data.parquet")
+trips = spark.read.parquet(DATA_PATH)
 
 zones = (
     spark.read
     .option("header", True)
     .option("inferSchema", True)
-    .csv("data/raw/taxi_zone_lookup.csv")
+    .csv(LOOKUP_PATH)
 )
 
 print("=== Zone lookup schema ===")

@@ -4,14 +4,14 @@ Run with: python learning/stats/01_load_data.py
 """
 from pyspark.sql import SparkSession
 
+from _config import DATA_PATH
+
 spark = (
     SparkSession.builder
     .appName("stats-learning")
     .master("local[*]")          # run locally using all cores, no cluster needed
     .getOrCreate()
 )
-
-DATA_PATH = "data/processed/training_data.parquet"
 
 df = spark.read.parquet(DATA_PATH)
 

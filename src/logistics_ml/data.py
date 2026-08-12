@@ -1,22 +1,21 @@
-# src/logistics_ml/data.py
-import pandas as pd
 from pathlib import Path
 
-PROCESSED_FILE = Path("data/processed/training_data.parquet")
+import pandas as pd
+
+from logistics_ml.config import data as data_config
 
 
 def load_training_data() -> pd.DataFrame:
-    """
-    Load the offline training dataset from the processed Parquet file.
-    """
-    print(f"Loading training data from {PROCESSED_FILE}...")
+    processed_file = data_config.processed_dir / data_config.processed_file
 
-    if not PROCESSED_FILE.exists():
+    print(f"Loading training data from {processed_file}...")
+
+    if not processed_file.exists():
         raise FileNotFoundError(
-            f"Processed data not found at {PROCESSED_FILE}. "
+            f"Processed data not found at {processed_file}. "
             "Run `python scripts/prepare_data.py` first."
         )
 
-    df = pd.read_parquet(PROCESSED_FILE)
+    df = pd.read_parquet(processed_file)
     print(f"Loaded {len(df):,} rows")
     return df

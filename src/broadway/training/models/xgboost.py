@@ -1,1 +1,9 @@
 """XGBRegressor / XGBClassifier wrapper."""
+
+from __future__ import annotations
+
+from xgboost import XGBRegressor
+
+
+def create(**params: float | int | str) -> XGBRegressor:
+    return XGBRegressor(**{k: v for k, v in params.items() if k != "type"})

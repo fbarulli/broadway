@@ -1,20 +1,27 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
-import os
+
+from broadway.config.schema import MLflowServiceConfig
+
+from ._config import _config as _cfg
 
 
 @dataclass(frozen=True)
 class MLflowConfig:
+    tracking_uri: str
+    experiment_name: str
+    registered_model_name: str
+    champion_alias: str
 
-    tracking_uri: str = os.getenv(
-        "MLFLOW_TRACKING_URI",
-        "http://mlflow:5000",
+
+def _build(cfg: MLflowServiceConfig) -> MLflowConfig:
+    return MLflowConfig(
+        tracking_uri=cfg.tracking_uri,
+        experiment_name=cfg.experiment_name,
+        registered_model_name=cfg.registered_model_name,
+        champion_alias=cfg.champion_alias,
     )
 
-    experiment_name: str = "taxi-duration-prediction"
 
-    registered_model_name: str = "taxi-duration-model"
-
-    champion_alias: str = "champion"
-
-
-mlflow = MLflowConfig()
+mlflow: MLflowConfig = _build(_cfg.mlflow_service)

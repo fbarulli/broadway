@@ -27,14 +27,12 @@ from statsmodels.stats.stattools import durbin_watson
 from statsmodels.graphics.tsaplots import plot_acf
 import matplotlib.pyplot as plt
 
-TIME_SLICE_START = "2024-01-01"
-TIME_SLICE_END = "2024-01-31"
-ACF_LAGS = 48  # e.g. 48 hours if timestamps are ~hourly-resolution-ish
+from _config import DATA_PATH, LOOKUP_PATH, TIME_SLICE_START, TIME_SLICE_END, ACF_LAGS
 
 
 def load_time_slice() -> pd.DataFrame:
-    df = pd.read_parquet("data/processed/training_data.parquet")
-    zones = pd.read_csv("data/raw/taxi_zone_lookup.csv")
+    df = pd.read_parquet(DATA_PATH)
+    zones = pd.read_csv(LOOKUP_PATH)
     df = df.merge(
         zones[["LocationID", "Borough"]],
         left_on="pickup_location_id",

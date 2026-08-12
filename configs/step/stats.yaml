@@ -4,6 +4,15 @@ group_values:
   - Brooklyn
   - Queens
   - Bronx
+  - Staten Island
 sample_fraction: 0.1
 output_dir: artifacts/reports
 output_file: stats.json
+data_path: data/processed/training_data.parquet
+lookup_path: data/raw/taxi_zone_lookup.csv
+min_rows_for_sampling: 10000
+per_group_sample_fraction: 0.02
+time_slice_start: "2024-01-01"
+time_slice_end: "2024-01-31"
+time_split_cutoff: "2024-02-15"
+acf_lags: 48

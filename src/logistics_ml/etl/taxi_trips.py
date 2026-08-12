@@ -5,9 +5,8 @@ import time
 import pyarrow.parquet as pq
 from tqdm import tqdm
 
+from logistics_ml.config.data import data
 from logistics_ml.db import engine
-
-RAW_DIR = Path("data/raw")
 
 RENAME = {
     "pulocationid": "pickup_location_id",
@@ -16,11 +15,9 @@ RENAME = {
     "tpep_dropoff_datetime": "dropoff_datetime",
 }
 
-BATCH_SIZE = 200_000
-
 
 def get_parquet_files():
-    files = sorted(RAW_DIR.glob("yellow_tripdata_*.parquet"))
+    files = sorted(data.raw_data_dir.glob("yellow_tripdata_*.parquet"))
     print(f"Found {len(files)} files: {[f.name for f in files]}")
     return files
 
@@ -87,7 +84,6 @@ def copy_batch(raw_conn, part):
             f"COPY taxi_trips ({cols}) FROM STDIN WITH (FORMAT CSV)"
         ) as copy:
             copy.write(buf.read())
-    # no commit here — caller commits once per file
 
 
 def load_taxi_trips():
@@ -114,7 +110,7 @@ def load_taxi_trips():
 
             try:
                 for batch in tqdm(
-                    parquet_file.iter_batches(batch_size=BATCH_SIZE),
+                    parquet_file.iter_batches(batch_size=data.batch_size),
                     desc=f.name,
                     unit="batch",
                 ):

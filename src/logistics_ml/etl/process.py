@@ -1,4 +1,3 @@
-# src/logistics_ml/etl/process.py
 import logging
 import os
 from pathlib import Path
@@ -12,23 +11,11 @@ from logistics_ml.features.schema import RAW_FEATURES, TARGET
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
-RAW_DIR = Path("data/raw")
-PROCESSED_DIR = Path("data/processed")
-PROCESSED_FILE = PROCESSED_DIR / "training_data.parquet"
-
-RENAME_MAP = {
-    "tpep_pickup_datetime": "pickup_datetime",
-    "PULocationID": "pickup_location_id",
-    "DOLocationID": "dropoff_location_id",
-}
-
-CI_SAMPLE_SIZE = 50_000
-
 
 def get_raw_files() -> list[Path]:
-    files = sorted(RAW_DIR.glob("yellow_tripdata_*.parquet"))
+    files = sorted(data.raw_data_dir.glob("yellow_tripdata_*.parquet"))
     if not files:
-        raise FileNotFoundError(f"No raw parquet files found in {RAW_DIR}")
+        raise FileNotFoundError(f"No raw parquet files found in {data.raw_data_dir}")
     return files
 
 
@@ -44,16 +31,14 @@ def read_raw_data(files: list[Path]) -> pd.DataFrame:
 
 
 def sample_for_ci(df: pd.DataFrame) -> pd.DataFrame:
-    """In CI, sample down to a fixed size for fast, small-artifact runs."""
     if os.getenv("CI") == "true":
-        logger.info(f"⚡ CI mode detected: sampling {CI_SAMPLE_SIZE:,} raw rows for fast processing.")
-        if len(df) > CI_SAMPLE_SIZE:
-            df = df.sample(n=CI_SAMPLE_SIZE, random_state=42)
+        logger.info(f"CI mode detected: sampling {data.ci_sample_size:,} raw rows for fast processing.")
+        if len(df) > data.ci_sample_size:
+            df = df.sample(n=data.ci_sample_size, random_state=42)
     return df
 
 
 def filter_valid_trips(df: pd.DataFrame) -> pd.DataFrame:
-    """Drop trips with invalid distance or non-positive duration."""
     n_before = len(df)
     df = df[
         (df["trip_distance"] > data.min_trip_distance) &
@@ -65,7 +50,6 @@ def filter_valid_trips(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def compute_trip_duration(df: pd.DataFrame) -> pd.DataFrame:
-    """Create the target variable from pickup/dropoff timestamps."""
     df[TARGET] = (
         df["tpep_dropoff_datetime"] - df["tpep_pickup_datetime"]
     ).dt.total_seconds() / 60
@@ -83,12 +67,10 @@ def filter_valid_duration(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def rename_columns(df: pd.DataFrame) -> pd.DataFrame:
-    """Rename raw TLC column names to match schema.py's RAW_FEATURES naming."""
-    return df.rename(columns=RENAME_MAP)
+    return df.rename(columns=data.rename_map)
 
 
 def select_and_clean_columns(df: pd.DataFrame) -> pd.DataFrame:
-    """Keep only schema-defined columns and drop any remaining nulls."""
     n_before = len(df)
     df = df[RAW_FEATURES + [TARGET]].dropna()
     logger.info(f"After dropna: {len(df)} ({n_before - len(df)} dropped)")
@@ -96,13 +78,14 @@ def select_and_clean_columns(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def save_processed_data(df: pd.DataFrame) -> None:
-    PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
-    df.to_parquet(PROCESSED_FILE, index=False)
-    logger.info(f"✅ Processed data saved to {PROCESSED_FILE} ({len(df)} rows)")
+    processed_dir = data.processed_dir
+    processed_file = processed_dir / data.processed_file
+    processed_dir.mkdir(parents=True, exist_ok=True)
+    df.to_parquet(processed_file, index=False)
+    logger.info(f"Processed data saved to {processed_file} ({len(df)} rows)")
 
 
 def process_data() -> None:
-    """Orchestrates the raw -> processed ETL pipeline, step by step."""
     logger.info("Processing data...")
 
     files = get_raw_files()

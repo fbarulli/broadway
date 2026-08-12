@@ -31,13 +31,15 @@ from statsmodels.stats.diagnostic import het_breuschpagan
 from statsmodels.stats.stattools import jarque_bera
 from statsmodels.stats.anova import anova_lm
 
+from _config import DATA_PATH, LOOKUP_PATH
+
 SAMPLE_SIZE = 200_000
 RANDOM_STATE = 42
 
 
 def load_sample() -> pd.DataFrame:
-    df = pd.read_parquet("data/processed/training_data.parquet")
-    zones = pd.read_csv("data/raw/taxi_zone_lookup.csv")
+    df = pd.read_parquet(DATA_PATH)
+    zones = pd.read_csv(LOOKUP_PATH)
     df = df.merge(
         zones[["LocationID", "Borough"]],
         left_on="pickup_location_id",
@@ -45,10 +47,7 @@ def load_sample() -> pd.DataFrame:
         how="left",
     ).rename(columns={"Borough": "pickup_borough"})
     frac = min(1.0, SAMPLE_SIZE / len(df))
-    sample = (
-        df.groupby("pickup_borough", group_keys=False)
-        .apply(lambda g: g.sample(frac=frac, random_state=RANDOM_STATE))
-    )
+    sample = df.groupby("pickup_borough").sample(frac=frac, random_state=RANDOM_STATE)
     return sample.reset_index(drop=True)
 
 

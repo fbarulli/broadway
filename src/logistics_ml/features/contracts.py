@@ -9,6 +9,8 @@ Call the relevant validate_* function at the boundary of each stage
 (end of process_data(), end of the feature pipeline, etc.) so a schema
 mismatch fails loudly at the point it's introduced, not downstream.
 """
+from datetime import datetime
+
 import pandas as pd
 
 from logistics_ml.features.schema import (
@@ -62,6 +64,8 @@ def validate_raw_schema(df: pd.DataFrame) -> None:
             raise DataContractError(f"[{stage}] '{col}' expected float dtype, got {df[col].dtype}")
         if expected_type is int and not pd.api.types.is_integer_dtype(df[col]):
             raise DataContractError(f"[{stage}] '{col}' expected int dtype, got {df[col].dtype}")
+        if issubclass(expected_type, datetime) and not pd.api.types.is_datetime64_any_dtype(df[col]):
+            raise DataContractError(f"[{stage}] '{col}' expected datetime dtype, got {df[col].dtype}")
 
 
 def validate_engineered_schema(df: pd.DataFrame) -> None:

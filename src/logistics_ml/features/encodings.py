@@ -6,7 +6,7 @@ def make_target_encoding(
     cols: list[str],
     target: str,
     feature_name: str,
-    smoothing: int = 50,
+    smoothing: int,
 ):
     """
     Compute a smoothed target encoding from the training data.

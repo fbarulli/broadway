@@ -11,9 +11,8 @@ def download_taxi_lookup():
         print(f"✓ {lookup_target} already exists.")
         return
 
-    lookup_url = "https://d37ci6vzurychx.cloudfront.net/misc/taxi_zone_lookup.csv"
-    print(f"Downloading {lookup_url}")
-    urllib.request.urlretrieve(lookup_url, lookup_target)
+    print(f"Downloading {data_config.lookup_url}")
+    urllib.request.urlretrieve(data_config.lookup_url, lookup_target)
     print(f"✓ Saved to {lookup_target}")
 
 

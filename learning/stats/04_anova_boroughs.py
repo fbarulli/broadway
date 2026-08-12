@@ -11,6 +11,8 @@ from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 from scipy import stats
 
+from _config import BOROUGHS, DATA_PATH, LOOKUP_PATH, MIN_ROWS_FOR_SAMPLING, SAMPLE_FRACTION
+
 spark = (
     SparkSession.builder
     .appName("stats-learning")
@@ -18,12 +20,12 @@ spark = (
     .getOrCreate()
 )
 
-trips = spark.read.parquet("data/processed/training_data.parquet")
+trips = spark.read.parquet(DATA_PATH)
 zones = (
     spark.read
     .option("header", True)
     .option("inferSchema", True)
-    .csv("data/raw/taxi_zone_lookup.csv")
+    .csv(LOOKUP_PATH)
 )
 
 trips_with_borough = trips.join(
@@ -35,12 +37,10 @@ trips_with_borough = trips.join(
     how="left",
 )
 
-real_boroughs = ["Manhattan", "Brooklyn", "Queens", "Bronx", "Staten Island"]
+real_boroughs = list(BOROUGHS)
 
 # Small groups (e.g. Staten Island: 84 rows total) get taken in FULL.
 # Large groups get sampled for speed - still thousands of rows either way.
-MIN_ROWS_FOR_SAMPLING = 10_000
-SAMPLE_FRACTION = 0.02
 
 groups = {}
 for borough in real_boroughs:

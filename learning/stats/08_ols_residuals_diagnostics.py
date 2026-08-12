@@ -40,14 +40,16 @@ from statsmodels.stats.stattools import durbin_watson, jarque_bera
 import matplotlib.pyplot as plt
 import scipy.stats as stats
 
+from _config import DATA_PATH, LOOKUP_PATH, SAMPLE_FRACTION
+
 SAMPLE_SIZE = 200_000
 RANDOM_STATE = 42
 
 
 def load_sample() -> pd.DataFrame:
     """Load processed training data + borough labels, stratified sample."""
-    df = pd.read_parquet("data/processed/training_data.parquet")
-    zones = pd.read_csv("data/raw/taxi_zone_lookup.csv")
+    df = pd.read_parquet(DATA_PATH)
+    zones = pd.read_csv(LOOKUP_PATH)
 
     df = df.merge(
         zones[["LocationID", "Borough"]],
@@ -60,10 +62,7 @@ def load_sample() -> pd.DataFrame:
     # drowned out by Manhattan's volume -- we want the variance structure
     # from the ANOVA work to actually show up in this sample.
     frac = min(1.0, SAMPLE_SIZE / len(df))
-    sample = (
-        df.groupby("pickup_borough", group_keys=False)
-        .apply(lambda g: g.sample(frac=frac, random_state=RANDOM_STATE))
-    )
+    sample = df.groupby("pickup_borough").sample(frac=frac, random_state=RANDOM_STATE)
     return sample.reset_index(drop=True)
 
 

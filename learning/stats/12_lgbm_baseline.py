@@ -33,11 +33,11 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error
 from logistics_ml.features.schema import ENGINEERED_FEATURES, TARGET
 from logistics_ml.features.pipeline import FeaturePipeline
 
-TIME_SPLIT_CUTOFF = "2024-06-01"  # adjust to match actual data coverage
+from _config import DATA_PATH, TIME_SPLIT_CUTOFF
 
 
 def load_and_split():
-    df = pd.read_parquet("data/processed/training_data.parquet")
+    df = pd.read_parquet(DATA_PATH)
     df["pickup_datetime"] = pd.to_datetime(df["pickup_datetime"])
     df = df.sort_values("pickup_datetime")
 

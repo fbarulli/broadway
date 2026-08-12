@@ -48,4 +48,6 @@ class BaseModel(BaseEstimator, RegressorMixin, ABC):
 
     def set_params(self, **params):
         self.params.update(params)
+        if hasattr(self, "model") and hasattr(self.model, "set_params"):
+            self.model.set_params(**params)
         return self
