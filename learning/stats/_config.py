@@ -139,3 +139,30 @@ def _load_boroughs(spark):
         how="left",
     )
 
+
+def load_borough_durations(spark, trips_df=None):
+    import numpy as np
+
+    if trips_df is None:
+        trips_df = _load_boroughs(spark)
+
+    groups = {}
+    for borough in BOROUGHS:
+        borough_df = trips_df.filter(F.col(PICKUP_BOROUGH_COL) == borough)
+        total = borough_df.count()
+        if total > MIN_ROWS_FOR_SAMPLING:
+            rows = borough_df.select(DURATION_COL).sample(fraction=SAMPLE_FRACTION, seed=RANDOM_STATE).collect()
+        else:
+            rows = borough_df.select(DURATION_COL).collect()
+        groups[borough] = np.array([r[DURATION_COL] for r in rows])
+    return groups
+
+
+def bp_jb_diagnostics(resid, exog):
+    from statsmodels.stats.diagnostic import het_breuschpagan
+    from statsmodels.stats.stattools import jarque_bera
+
+    bp_stat, bp_pval, _, _ = het_breuschpagan(resid, exog)
+    jb_stat, jb_pval, skew, kurtosis = jarque_bera(resid)
+    return bp_stat, bp_pval, jb_stat, jb_pval, skew, kurtosis
+

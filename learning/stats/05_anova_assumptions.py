@@ -6,29 +6,16 @@ Step 5: Check ANOVA's assumptions before trusting the last step's result.
 
 Run with: python learning/stats/05_anova_assumptions.py
 """
-from pyspark.sql import functions as F
 from scipy import stats
 import numpy as np
 
 from _config import (
-    BOROUGHS, MIN_ROWS_FOR_SAMPLING, RANDOM_STATE, SAMPLE_FRACTION,
-    PICKUP_BOROUGH_COL, DURATION_COL,
-    get_spark_session, _load_boroughs,
+    get_spark_session, load_borough_durations,
 )
 
 spark = get_spark_session()
 
-trips_with_borough = _load_boroughs(spark)
-
-groups = {}
-for borough in BOROUGHS:
-    borough_df = trips_with_borough.filter(F.col(PICKUP_BOROUGH_COL) == borough)
-    total = borough_df.count()
-    if total > MIN_ROWS_FOR_SAMPLING:
-        rows = borough_df.select(DURATION_COL).sample(fraction=SAMPLE_FRACTION, seed=RANDOM_STATE).collect()
-    else:
-        rows = borough_df.select(DURATION_COL).collect()
-    groups[borough] = np.array([r[DURATION_COL] for r in rows])
+groups = load_borough_durations(spark)
 
 # --- Assumption 1: Homogeneity of variance (Levene's test) ---
 # H0: all groups have equal variance. Unlike ANOVA, Levene's test is

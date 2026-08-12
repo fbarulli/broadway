@@ -28,20 +28,18 @@ Two things are checked:
 import numpy as np
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
-from statsmodels.stats.diagnostic import het_breuschpagan
-from statsmodels.stats.stattools import jarque_bera
 
 from _config import (
     PICKUP_BOROUGH_COL, TARGET_COL,
     TRIP_DISTANCE_COL, load_stratified_sample,
+    bp_jb_diagnostics,
 )
 
 
 def run_diagnostics(model, label: str) -> None:
     resid = model.resid
     exog = model.model.exog
-    bp_stat, bp_pval, _, _ = het_breuschpagan(resid, exog)
-    jb_stat, jb_pval, skew, kurtosis = jarque_bera(resid)
+    bp_stat, bp_pval, jb_stat, jb_pval, skew, kurtosis = bp_jb_diagnostics(resid, exog)
 
     print(f"--- {label} ---")
     print(f"R^2 = {model.rsquared:.3f}")

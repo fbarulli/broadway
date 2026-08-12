@@ -35,26 +35,25 @@ import numpy as np
 import pandas as pd
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
-from statsmodels.stats.diagnostic import het_breuschpagan
-from statsmodels.stats.stattools import durbin_watson, jarque_bera
+from statsmodels.stats.stattools import durbin_watson
 import matplotlib.pyplot as plt
 import scipy.stats as stats
 
 from _config import (
     RANDOM_STATE, PICKUP_BOROUGH_COL, TARGET_COL,
     TRIP_DISTANCE_COL, load_stratified_sample,
+    bp_jb_diagnostics,
 )
 
 
 def main():
     print("Loading cached stratified sample...")
     df = load_stratified_sample()
-    """Fit trip_duration_minutes ~ trip_distance + C(pickup_borough)."""
     model = smf.ols(
         f"{TARGET_COL} ~ {TRIP_DISTANCE_COL} + C({PICKUP_BOROUGH_COL})",
         data=df,
     ).fit()
-    return model
+    return model, df
 
 
 def plot_diagnostics(model, out_path="residual_diagnostics.png"):
@@ -86,21 +85,16 @@ def plot_diagnostics(model, out_path="residual_diagnostics.png"):
 
 def run_formal_tests(model, df: pd.DataFrame) -> None:
     resid = model.resid
-    fitted = model.fittedvalues
 
     print("=== Formal residual diagnostics ===\n")
 
-    # Breusch-Pagan: H0 = homoskedastic (constant variance)
     exog = model.model.exog
-    bp_stat, bp_pval, _, _ = het_breuschpagan(resid, exog)
+    bp_stat, bp_pval, jb_stat, jb_pval, skew, kurtosis = bp_jb_diagnostics(resid, exog)
+
     print(f"Breusch-Pagan: stat={bp_stat:.2f}, p={bp_pval:.4g}")
     print("  -> ", "REJECT H0: heteroskedastic" if bp_pval < 0.05
           else "fail to reject H0: homoskedastic")
 
-    # Jarque-Bera: H0 = normal. Valid at any n (unlike Shapiro, which
-    # scipy won't even run above n=5000 and which over-rejects at scale
-    # anyway -- see the CLT/LLN discussion earlier in this project).
-    jb_stat, jb_pval, skew, kurtosis = jarque_bera(resid)
     print(f"\nJarque-Bera: stat={jb_stat:.2f}, p={jb_pval:.4g}, "
           f"skew={skew:.3f}, kurtosis={kurtosis:.3f}")
     print("  -> ", "REJECT H0: non-normal residuals" if jb_pval < 0.05
@@ -118,11 +112,8 @@ def run_formal_tests(model, df: pd.DataFrame) -> None:
     print(resid_df.groupby(PICKUP_BOROUGH_COL)["resid"].std().sort_values())
 
 
-def fit_baseline_ols(df: pd.DataFrame):
+def fit_baseline_ols(model, df: pd.DataFrame):
     print(f"Sample size: {len(df)}\n")
-
-    print(f"Fitting baseline OLS: {TARGET_COL} ~ {TRIP_DISTANCE_COL} + C({PICKUP_BOROUGH_COL})")
-    model = fit_baseline_ols(df)
     print(model.summary())
     print()
 
@@ -131,4 +122,5 @@ def fit_baseline_ols(df: pd.DataFrame):
 
 
 if __name__ == "__main__":
-    main()
+    model, df = main()
+    fit_baseline_ols(model, df)

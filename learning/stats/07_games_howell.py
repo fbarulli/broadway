@@ -9,30 +9,22 @@ group sizes range from 84 to 155,502).
 
 Run with: python learning/stats/07_games_howell.py
 """
-from pyspark.sql import functions as F
 import pandas as pd
 import pingouin as pg
 
 from _config import (
-    BOROUGHS, MIN_ROWS_FOR_SAMPLING, RANDOM_STATE, SAMPLE_FRACTION,
     PICKUP_BOROUGH_COL, DURATION_COL,
-    get_spark_session, _load_boroughs,
+    get_spark_session, load_borough_durations,
 )
 
 spark = get_spark_session()
 
-trips_with_borough = _load_boroughs(spark)
+groups = load_borough_durations(spark)
 
 rows = []
-for borough in BOROUGHS:
-    borough_df = trips_with_borough.filter(F.col(PICKUP_BOROUGH_COL) == borough)
-    total = borough_df.count()
-    if total > MIN_ROWS_FOR_SAMPLING:
-        sampled = borough_df.select(DURATION_COL).sample(fraction=SAMPLE_FRACTION, seed=RANDOM_STATE).collect()
-    else:
-        sampled = borough_df.select(DURATION_COL).collect()
-    for r in sampled:
-        rows.append({PICKUP_BOROUGH_COL: borough, DURATION_COL: r[DURATION_COL]})
+for borough, values in groups.items():
+    for v in values:
+        rows.append({PICKUP_BOROUGH_COL: borough, DURATION_COL: v})
 
 df = pd.DataFrame(rows)
 print(f"Total rows across all groups: {len(df)}")

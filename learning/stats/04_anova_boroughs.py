@@ -7,33 +7,16 @@ It does NOT tell you which one(s) - that needs a post-hoc test (next step).
 
 Run with: python learning/stats/04_anova_boroughs.py
 """
-from pyspark.sql import functions as F
 from scipy import stats
 
-from _config import BOROUGHS, MIN_ROWS_FOR_SAMPLING, RANDOM_STATE, SAMPLE_FRACTION, PICKUP_BOROUGH_COL, DURATION_COL, get_spark_session, _load_boroughs
+from _config import get_spark_session, load_borough_durations, BOROUGHS
 
 spark = get_spark_session()
 
-trips_with_borough = _load_boroughs(spark)
+groups = load_borough_durations(spark)
 
-real_boroughs = list(BOROUGHS)
-
-# Small groups (e.g. Staten Island: 84 rows total) get taken in FULL.
-# Large groups get sampled for speed - still thousands of rows either way.
-
-groups = {}
-for borough in real_boroughs:
-    borough_df = trips_with_borough.filter(F.col(PICKUP_BOROUGH_COL) == borough)
-    total = borough_df.count()
-
-    if total > MIN_ROWS_FOR_SAMPLING:
-        rows = borough_df.select(DURATION_COL).sample(fraction=SAMPLE_FRACTION, seed=RANDOM_STATE).collect()
-    else:
-        rows = borough_df.select(DURATION_COL).collect()
-
-    values = [r[DURATION_COL] for r in rows]
-    groups[borough] = values
-    print(f"{borough}: total_rows={total}, sampled_n={len(values)}, mean={sum(values)/len(values):.2f}")
+for borough, values in groups.items():
+    print(f"{borough}: sampled_n={len(values)}, mean={values.mean():.2f}")
 
 print()
 
