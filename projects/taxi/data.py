@@ -39,9 +39,7 @@ _features = FeaturesStep(**yaml.safe_load(_FEATURES_YAML.read_text()))
 
 
 def _lookup_path(contract: DatasetContract) -> Path:
-    # TEMPORARY: lookup_tables encodes "path:key"; Phase 2 replaces this with a structured {path, key} model.
-    value = next(iter(contract.lookup_tables.values()))
-    return Path(value.split(":")[0])
+    return Path(next(iter(contract.lookup_tables.values())).path)
 
 
 DATA_PATH = _contract.path

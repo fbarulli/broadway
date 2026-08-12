@@ -24,10 +24,8 @@ def load(dataset: DatasetContract) -> pd.DataFrame:
     if ext not in READERS:
         raise ValueError(f"unsupported format: {ext}")
     df = READERS[ext](path)
-    for col, lookup_path in dataset.lookup_tables.items():
-        parts = lookup_path.split(":")
-        path = parts[0]
-        right_on = parts[1] if len(parts) > 1 else col
-        lookup = pd.read_csv(path)
-        df = df.merge(lookup, left_on=col, right_on=right_on, how=MERGE_HOW, suffixes=("", "_lookup"))
+    for col, lookup in dataset.lookup_tables.items():
+        right_on = lookup.key
+        lookup_df = pd.read_csv(lookup.path)
+        df = df.merge(lookup_df, left_on=col, right_on=right_on, how=MERGE_HOW, suffixes=("", "_lookup"))
     return df

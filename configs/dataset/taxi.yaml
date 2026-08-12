@@ -25,8 +25,12 @@ columns:
     role: target
 datetime_column: pickup_datetime
 lookup_tables:
-  pickup_location_id: data/raw/taxi_zone_lookup.csv:LocationID
-  dropoff_location_id: data/raw/taxi_zone_lookup.csv:LocationID
+  pickup_location_id:
+    path: data/raw/taxi_zone_lookup.csv
+    key: LocationID
+  dropoff_location_id:
+    path: data/raw/taxi_zone_lookup.csv
+    key: LocationID
 name: taxi
 path: data/processed/training_data.parquet
 row_count: 8647673

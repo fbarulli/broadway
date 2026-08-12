@@ -24,6 +24,11 @@ class ColumnSchema(BaseModel):
     role: ColumnRole
 
 
+class LookupSpec(BaseModel):
+    path: str
+    key: str
+
+
 class DatasetContract(BaseModel):
     name: str
     path: str
@@ -31,7 +36,7 @@ class DatasetContract(BaseModel):
     task: TaskType
     datetime_column: str | None
     columns: dict[str, ColumnSchema]
-    lookup_tables: dict[str, str]
+    lookup_tables: dict[str, LookupSpec]
     row_count: int
 
 
