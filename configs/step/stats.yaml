@@ -16,3 +16,9 @@ time_slice_start: "2024-01-01"
 time_slice_end: "2024-01-31"
 time_split_cutoff: "2024-02-15"
 acf_lags: 48
+sample_size_dev: 2000
+sample_size_live: 200000
+time_slice_start_dev: "2024-01-01"
+time_slice_end_dev: "2024-01-02"
+time_slice_start_live: "2024-01-01"
+time_slice_end_live: "2024-01-31"

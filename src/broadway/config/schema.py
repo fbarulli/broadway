@@ -177,6 +177,12 @@ class StatsStep(BaseModel):
     time_slice_end: str
     time_split_cutoff: str
     acf_lags: int
+    sample_size_dev: int
+    sample_size_live: int
+    time_slice_start_dev: str
+    time_slice_end_dev: str
+    time_slice_start_live: str
+    time_slice_end_live: str
 
 
 class CausalStep(BaseModel):

@@ -6,6 +6,9 @@ in the library reads config or filesystem paths; it receives plain data
 (DataFrames, arrays) and returns plain results. Dataset specifics live in
 `projects/<name>/data.py`.
 
+The library is **pandas/numpy only** — there is no Spark dependency anywhere
+in `src/broadway/stats/`.
+
 ## Conventions
 
 - `groups: dict[str, np.ndarray]` — group name → array of target values
@@ -19,9 +22,6 @@ in the library reads config or filesystem paths; it receives plain data
 ## base.py
 
 ```python
-def get_spark_session(app_name: str = "stats-learning") -> SparkSession
-    # create a local[*] Spark session
-
 def stratified_sample(df: pd.DataFrame, group_col: str, frac: float, random_state: int) -> pd.DataFrame
     # stratified sample preserving per-group proportions; returns reset-index frame
 ```

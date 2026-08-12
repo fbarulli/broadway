@@ -1,19 +1,8 @@
-"""Spark session lifecycle and stratified sampling."""
+"""Stratified sampling (pandas/numpy only)."""
 
 from __future__ import annotations
 
 import pandas as pd
-from pyspark.sql import SparkSession
-
-
-def get_spark_session(app_name: str = "stats-learning") -> SparkSession:
-    return (
-        SparkSession.builder.appName(app_name)
-        .master("local[*]")
-        .config("spark.ui.enabled", "false")
-        .config("spark.sql.shuffle.partitions", "4")
-        .getOrCreate()
-    )
 
 
 def stratified_sample(
