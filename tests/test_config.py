@@ -53,7 +53,9 @@ def test_load_evaluate_config(evaluate_cfg) -> None:
 def test_load_etl_with_pipeline_fields(etl_cfg) -> None:
     assert etl_cfg.min_trip_distance == min_trip_distance
     assert etl_cfg.max_trip_distance == max_trip_distance
-    assert etl_cfg.rename_map["PULocationID"] == rename_map["PULocationID"]
+    assert etl_cfg.min_trip_duration_minutes == min_trip_duration_minutes
+    assert etl_cfg.max_trip_duration_minutes == max_trip_duration_minutes
+    assert etl_cfg.rename_map == rename_map
 
 
 def test_missing_dataset_raises() -> None:

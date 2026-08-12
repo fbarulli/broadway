@@ -1,15 +1,15 @@
 from __future__ import annotations
 
 import subprocess
-from pathlib import Path
 
 import pytest
 
 from broadway.config.loader import load_config
+from broadway.config.schema import FeaturesStep
 
 
 @pytest.fixture
-def features_cfg():
+def features_cfg() -> FeaturesStep:
     cfg = load_config("features", dataset="taxi", experiment="taxi")
     assert cfg.features is not None
     return cfg.features

@@ -13,7 +13,7 @@ from broadway.training.trainer import train
 
 
 @pytest.fixture
-def tmp_dataset(tmp_path) -> Path:
+def tmp_dataset(tmp_path: Path) -> Path:
     rows = 100
     df = pd.DataFrame(
         {
@@ -32,47 +32,33 @@ def tmp_dataset(tmp_path) -> Path:
 
 def test_pipeline_on_synthetic_data(tmp_dataset: Path) -> None:
     cfg = load_config("full", dataset="taxi", experiment="taxi")
-
-    df = pd.read_parquet(tmp_dataset)
-    assert len(df) == 100
-
-    df = clean(df, cfg.dataset)
-    assert not df["trip_duration_minutes"].isna().any()
-
+    df = clean(pd.read_parquet(tmp_dataset), cfg.dataset)
+    target = cfg.dataset.target
+    assert not df[target].isna().any()
     split_cfg = cfg.experiment.split
     train_df, val_df = split(df, cfg.dataset, split_cfg, random_state=cfg.experiment.random_state)
-    assert len(train_df) > 0
-    assert len(val_df) > 0
+    assert len(train_df) > 0 and len(val_df) > 0
     assert len(train_df) + len(val_df) == len(df)
-
-    target = cfg.dataset.target
-    X_train = train_df.drop(columns=[target, "pickup_datetime"])
+    dt_col = cfg.dataset.datetime_column
+    X_train = train_df.drop(columns=[target, dt_col])
     y_train = train_df[target]
-
     model, elapsed = train(cfg.experiment.model.type, X_train, y_train)
     assert elapsed > 0
-
-    X_val = val_df.drop(columns=[target, "pickup_datetime"])
+    X_val = val_df.drop(columns=[target, dt_col])
     y_val = val_df[target]
     y_pred = model.predict(X_val)
-
     metrics = compute_metrics(y_val.values, y_pred)
-    assert metrics["rmse"] >= 0
-    assert metrics["r2"] >= -1
-
+    assert metrics["rmse"] >= 0 and metrics["r2"] >= -1 and metrics["mae"] >= 0
     assert metrics["rmse"] < 10, f"RMSE too high on synthetic data: {metrics['rmse']}"
 
 
 def test_linear_model_coefficients(tmp_dataset: Path) -> None:
     cfg = load_config("full", dataset="taxi", experiment="taxi")
-
-    df = pd.read_parquet(tmp_dataset)
-    df = clean(df, cfg.dataset)
-
+    df = clean(pd.read_parquet(tmp_dataset), cfg.dataset)
     target = cfg.dataset.target
-    X = df.drop(columns=[target, "pickup_datetime"])
+    dt_col = cfg.dataset.datetime_column
+    X = df.drop(columns=[target, dt_col])
     y = df[target]
-
-    model, _ = train("linear", X, y)
+    model, _ = train(cfg.experiment.model.type, X, y)
     assert hasattr(model, "coef_")
     assert len(model.coef_) == len(X.columns)

@@ -9,6 +9,11 @@ constructors (e.g. `FeaturePipeline`).
 Verifies YAML → Pydantic config loading for every step type. Ensures missing
 or invalid configs raise the correct errors.
 
+## test_ml_pipeline.py
+Unit tests for `FeaturePipeline`: fit learns route encodings and stats,
+transform produces all engineered features, fit_transform combines both,
+and transform-before-fit raises `RuntimeError`.
+
 ## test_process.py
 Unit tests for individual ETL functions (`filter_valid_trips`,
 `compute_trip_duration`, `rename_columns`, etc.) using synthetic DataFrames.

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pandas as pd
 import pytest
 
@@ -41,7 +43,7 @@ def raw_trips() -> pd.DataFrame:
     )
 
 
-def test_read_raw_data(raw_trips: pd.DataFrame, tmp_path) -> None:
+def test_read_raw_data(raw_trips: pd.DataFrame, tmp_path: Path) -> None:
     f = tmp_path / "yellow_tripdata_2024-01.parquet"
     raw_trips.to_parquet(f)
     result = read_raw_data([f])
