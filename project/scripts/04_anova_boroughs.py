@@ -5,9 +5,9 @@ A t-test compares 2 groups. ANOVA compares 3+ groups at once, asking
 one question: "is at least one group's mean different from the others?"
 It does NOT tell you which one(s) - that needs a post-hoc test (next step).
 
-Run with: python projects/taxi/scripts/04_anova_boroughs.py
+Run with: python project/scripts/04_anova_boroughs.py
 """
-from projects.taxi import data
+from project import data
 from broadway.stats import anova
 
 

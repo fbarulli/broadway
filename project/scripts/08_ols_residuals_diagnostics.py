@@ -33,7 +33,7 @@ variance structure we're testing for) capped at SAMPLE_SIZE.
 
 import pandas as pd
 
-from projects.taxi import data
+from project import data
 from broadway.stats import diagnostics, regression
 
 

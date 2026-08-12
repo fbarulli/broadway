@@ -20,9 +20,9 @@ Pure pandas/numpy. Every test returns an `AnalysisPlan` (not a bare float), and 
 | `baseline.py` | `train_lgbm`, `evaluate` |
 | `module.py` | pipeline step: build groups → `run_anova` → `save_plan` |
 
-### Dataset project — `projects/taxi/`
+### Dataset project — `project/`
 - `data.py` — dataset-specific loaders. Memory-efficient: column projection, dtype downcast, pyarrow filter pushdown, and **streaming** cache build (`iter_batches`, never holds 8.6M rows). Small groups (Staten Island 84, EWR 77) are kept in full.
-- `scripts/01…12` — numbered analysis wrappers, run via `python -m projects.taxi.scripts.NN_xxx`. They keep the ANOVA → assumptions → post-hoc → OLS → LGBM narrative.
+- `scripts/01…12` — numbered analysis wrappers, run via `python -m project.scripts.NN_xxx`. They keep the ANOVA → assumptions → post-hoc → OLS → LGBM narrative.
 - `STATS.md` — what each script does.
 
 ### Modes — `DATA_MODE` env var
@@ -32,8 +32,8 @@ Pure pandas/numpy. Every test returns an `AnalysisPlan` (not a bare float), and 
 | `live` | 200K + small groups in full | 31 days | real results |
 
 ```bash
-DATA_MODE=dev  uv run python -m projects.taxi.scripts.04_anova_boroughs
-DATA_MODE=live uv run python -m projects.taxi.scripts.12_lgbm_baseline
+DATA_MODE=dev  uv run python -m project.scripts.04_anova_boroughs
+DATA_MODE=live uv run python -m project.scripts.12_lgbm_baseline
 ```
 
 ### Config (SSOT)
@@ -46,7 +46,7 @@ DATA_MODE=live uv run python -m projects.taxi.scripts.12_lgbm_baseline
 
 - **Spark** — dropped. 8.6M rows is pandas-sized (~200MB downcast). `pyspark` remains an optional extra for genuinely large future datasets.
 - **Kafka** — not needed for parallel HPO. Optuna + Postgres (already in `docker-compose.yml`) coordinates distributed trials; the DB is the queue. Revisit only for real-time streaming.
-- **`learning/stats/`** — deleted; logic migrated into `src/broadway/stats/` + `projects/taxi/`.
+- **`learning/stats/`** — deleted; logic migrated into `src/broadway/stats/` + `project/`.
 
 ## Not built yet (stubs remain in `src/broadway/`)
 

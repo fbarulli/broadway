@@ -5,9 +5,9 @@ import pandas as pd
 from broadway.features.ml_encodings import apply_target_encoding, make_target_encoding
 from broadway.features.frequency import apply_frequency_encoding, make_frequency_encoding
 from broadway.features.schema import ROUTE_KEYS, TARGET
-from projects.taxi.basic import add_basic_features
-from projects.taxi.boroughs import add_borough_features, load_zones
-from projects.taxi.features import ENGINEERED_FEATURES, ENGINEERED_SCHEMA
+from project.basic import add_basic_features
+from project.boroughs import add_borough_features, load_zones
+from project.features import ENGINEERED_FEATURES, ENGINEERED_SCHEMA
 
 
 class FeaturePipeline:

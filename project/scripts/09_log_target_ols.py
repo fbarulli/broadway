@@ -27,7 +27,7 @@ Two things are checked:
 
 import numpy as np
 
-from projects.taxi import data
+from project import data
 from broadway.stats import regression
 
 

@@ -8,7 +8,7 @@ import pytest
 
 from broadway.config.schema import ColumnSchema, ColumnRole, DatasetContract
 from broadway.contracts.pandera import build_raw_schema
-from projects.taxi.features import ENGINEERED_FEATURES, ENGINEERED_SCHEMA
+from project.features import ENGINEERED_FEATURES, ENGINEERED_SCHEMA
 
 _RAW_COLUMNS = {
     "pickup_datetime": ColumnSchema(

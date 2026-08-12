@@ -7,11 +7,11 @@ etc.) while correcting for multiple comparisons AND not assuming equal
 variance or equal sample sizes - which fits our data (Levene's test failed,
 group sizes range from 84 to 155,502).
 
-Run with: python projects/taxi/scripts/07_games_howell.py
+Run with: python project/scripts/07_games_howell.py
 """
 import pandas as pd
 
-from projects.taxi import data
+from project import data
 from broadway.stats import post_hoc
 
 

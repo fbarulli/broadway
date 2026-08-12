@@ -28,7 +28,7 @@ broadway/
       schema.py             # FeatureSpec, build_engineered_schema
       ml_encodings.py, frequency.py   # generic target/frequency encodings
       pipeline.py, builders.py, encodings.py, module.py, contracts.py  # ds-pipeline features step
-  projects/taxi/
+  project/
     features.py             # FEATURE_SPECS registry → ENGINEERED_FEATURES/types/schema
     ml_pipeline.py          # FeaturePipeline (taxi orchestration)
     basic.py, boroughs.py   # taxi datetime features + zone join
@@ -47,12 +47,12 @@ broadway/
 
 | Call site (script) | Function | File |
 |---|---|---|
-| `data.load_stratified_sample()` | `load_stratified_sample` | `projects/taxi/data.py` |
-| `data.load_time_slice()` | `load_time_slice` | `projects/taxi/data.py` |
-| `data.load_borough_durations()` | `load_borough_durations` | `projects/taxi/data.py` |
-| `data.generate_sample_cache()` | `generate_sample_cache` (streaming) | `projects/taxi/data.py` |
-| `data.inspect_schema()` | `inspect_schema` | `projects/taxi/data.py` |
-| `data.write_quality_report()` | `write_quality_report` | `projects/taxi/data.py` |
+| `data.load_stratified_sample()` | `load_stratified_sample` | `project/data.py` |
+| `data.load_time_slice()` | `load_time_slice` | `project/data.py` |
+| `data.load_borough_durations()` | `load_borough_durations` | `project/data.py` |
+| `data.generate_sample_cache()` | `generate_sample_cache` (streaming) | `project/data.py` |
+| `data.inspect_schema()` | `inspect_schema` | `project/data.py` |
+| `data.write_quality_report()` | `write_quality_report` | `project/data.py` |
 | `anova.run_anova(groups)` | `run_anova` | `src/broadway/stats/anova.py` |
 | `anova.run_welch(groups)` | `run_welch` | `src/broadway/stats/anova.py` |
 | `anova.run_kruskal(groups)` | `run_kruskal` | `src/broadway/stats/anova.py` |
@@ -95,7 +95,7 @@ results/*.json / *.png  (AnalysisPlan JSON, residual plots, ACF plot)
 | `time_slice_start_{mode}` / `time_slice_end_{mode}` | `configs/step/stats.yaml` → `StatsStep` | `data.TIME_SLICE_START/END` |
 | `time_split_cutoff` | `configs/step/stats.yaml` → `StatsStep` | `data.TIME_SPLIT_CUTOFF` |
 | `min_rows_for_sampling`, `per_group_sample_fraction`, `group_values` | `configs/step/stats.yaml` | `data.MIN_ROWS_FOR_SAMPLING`, `data.BOROUGHS` |
-| `data_path`, `lookup_path` (from `path` / `lookup_tables`) | `configs/dataset/taxi.yaml` → `DatasetContract` | `data.DATA_PATH`, `data.LOOKUP_PATH` (`projects/taxi/data.py`) |
+| `data_path`, `lookup_path` (from `path` / `lookup_tables`) | `configs/dataset/taxi.yaml` → `DatasetContract` | `data.DATA_PATH`, `data.LOOKUP_PATH` (`project/data.py`) |
 | `n_estimators`, `learning_rate`, `num_leaves`, ... | `configs/step/train.yaml` → `TrainStep` | `data.N_ESTIMATORS`, ... |
 | rush-hour/night/passenger params | `configs/step/features.yaml` → `FeaturesStep` | `data.FEATURE_*` |
 | column names | module constants in `data.py` | scripts |
@@ -125,12 +125,12 @@ results/*.json / *.png  (AnalysisPlan JSON, residual plots, ACF plot)
 | Configuration | Pydantic | `broadway/config/schema.py` |
 | AnalysisPlan | Pydantic | `broadway/stats/plan.py` |
 | Raw DataFrame | Pandera | `broadway/contracts/pandera.py::build_raw_schema(contract)` (generated) |
-| Engineered features | Pandera | `projects/taxi/features.py` (`FEATURE_SPECS`) → `broadway/features/schema.py::build_engineered_schema` |
+| Engineered features | Pandera | `project/features.py` (`FEATURE_SPECS`) → `broadway/features/schema.py::build_engineered_schema` |
 | Python interfaces | type hints | throughout |
 
 - The raw schema is generated at runtime from `DatasetContract.columns` — one `pa.Column` per contract entry (the raw 6 columns, not join-derived `pickup_borough`/`LocationID`). Dtypes are checked strictly (`coerce=False`); `null_count` is observed, not an invariant, so nullability is left at Pandera's default.
 - Role-based column selection is `broadway/contracts/selectors.py` (`feature_columns`, `datetime_columns`, `target_columns`) — pure functions over the contract, no hardcoded names.
-- Engineered features are defined ONCE in `projects/taxi/features.py::FEATURE_SPECS`; `ENGINEERED_FEATURES`, `ENGINEERED_FEATURE_TYPES`, and `ENGINEERED_SCHEMA` are all derived from that registry (no parallel hand-maintained list).
+- Engineered features are defined ONCE in `project/features.py::FEATURE_SPECS`; `ENGINEERED_FEATURES`, `ENGINEERED_FEATURE_TYPES`, and `ENGINEERED_SCHEMA` are all derived from that registry (no parallel hand-maintained list).
 - Enforcement points: `read_training_data()` validates the raw frame via `build_raw_schema`; `FeaturePipeline.transform()` validates against `ENGINEERED_SCHEMA`.
 
 ## Where to make changes
@@ -139,7 +139,7 @@ results/*.json / *.png  (AnalysisPlan JSON, residual plots, ACF plot)
 |---|---|
 | New config knob | `configs/step/stats.yaml` + matching field in `StatsStep` (`schema.py`) + constant in `data.py` |
 | New DataFrame contract | add the column to `configs/dataset/taxi.yaml` — `build_raw_schema` regenerates the raw schema; call `Schema.validate(df)` at the stage boundary |
-| New loader | add function in `projects/taxi/data.py`; reuse `read_training_data` / `_downcast` / `_join_boroughs` |
+| New loader | add function in `project/data.py`; reuse `read_training_data` / `_downcast` / `_join_boroughs` |
 | New statistical test | add function in `src/broadway/stats/` (pandas/numpy only) + document in `API.md` |
-| New experiment script | add `projects/taxi/scripts/NN_*.py`; import from `projects.taxi.data` and `broadway.stats` |
+| New experiment script | add `project/scripts/NN_*.py`; import from `project.data` and `broadway.stats` |
 | Change sample behavior | edit `generate_sample_cache` / `_params_hash` in `data.py`; bump stale `params_hash` by regenerating |

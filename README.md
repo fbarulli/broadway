@@ -2,7 +2,7 @@
 
 Generalized ML experimentation platform. Two surfaces: a pipeline CLI
 (`ds-pipeline`) and a set of numbered analysis scripts for the taxi dataset
-(`projects/taxi/scripts/`). Full architecture map in `dataflow.md`; status
+(`project/scripts/`). Full architecture map in `dataflow.md`; status
 snapshot in `HANDOFF.md`.
 
 ## Install
@@ -16,10 +16,10 @@ docker compose up -d       # mlflow + postgres (optional; training infra, not ye
 
 ```bash
 # 1. build the mode-keyed sample cache (streams 8.6M rows, keeps small groups in full)
-DATA_MODE=dev uv run python -c "from projects.taxi import data; data.generate_sample_cache()"
+DATA_MODE=dev uv run python -c "from project import data; data.generate_sample_cache()"
 
 # 2. run an analysis script
-DATA_MODE=dev uv run python -m projects.taxi.scripts.04_anova_boroughs
+DATA_MODE=dev uv run python -m project.scripts.04_anova_boroughs
 ```
 
 `dev` mode is the default (small sample, fast). Prefix any command with
@@ -64,22 +64,22 @@ Every step except `discover` takes the same three flags.
 
 ---
 
-## 2. Stats scripts — `projects/taxi/scripts/`
+## 2. Stats scripts — `project/scripts/`
 
 Numbered narrative: ANOVA → assumptions → post-hoc → OLS diagnostics →
 remediation → non-linear baseline. Each is a thin wrapper over
-`broadway.stats` (agnostic library) + `projects/taxi/data` (dataset loaders).
+`broadway.stats` (agnostic library) + `project/data` (dataset loaders).
 
 Run via module form (no `sys.path` hacks needed):
 
 ```bash
-uv run python -m projects.taxi.scripts.NN_name
+uv run python -m project.scripts.NN_name
 ```
 
 Build the cache first (needed by scripts 04-12):
 
 ```bash
-uv run python -c "from projects.taxi import data; data.generate_sample_cache()"
+uv run python -c "from project import data; data.generate_sample_cache()"
 ```
 
 | # | Module | What it does |
@@ -112,8 +112,8 @@ uv run python -c "from projects.taxi import data; data.generate_sample_cache()"
 - Two sampling strategies, both mode-aware: `load_stratified_sample()` (random, stratified — scripts 04-09, 11, 12) and `load_time_slice()` (contiguous, time-sorted, filter pushdown — script 10). Never randomly sample the time slice.
 
 ```bash
-DATA_MODE=dev  uv run python -m projects.taxi.scripts.08_ols_residuals_diagnostics
-DATA_MODE=live uv run python -m projects.taxi.scripts.12_lgbm_baseline
+DATA_MODE=dev  uv run python -m project.scripts.08_ols_residuals_diagnostics
+DATA_MODE=live uv run python -m project.scripts.12_lgbm_baseline
 ```
 
 ---
@@ -148,8 +148,8 @@ defaults, no `get(key, default)`, no hardcoded values anywhere.
 | Architecture map | `dataflow.md` |
 | Status / what works | `HANDOFF.md` |
 | Stats library (agnostic) | `src/broadway/stats/` (+ `API.md` contract) |
-| Dataset loaders + constants | `projects/taxi/data.py` |
-| Script index | `projects/taxi/STATS.md` |
+| Dataset loaders + constants | `project/data.py` |
+| Script index | `project/STATS.md` |
 | Config schema | `src/broadway/config/schema.py` |
 | Tests | `tests/` |
 

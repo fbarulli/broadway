@@ -26,7 +26,7 @@ borough its own slope AND its own intercept. Compare:
 
 from statsmodels.stats.anova import anova_lm
 
-from projects.taxi import data
+from project import data
 from broadway.stats import regression
 
 

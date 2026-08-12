@@ -4,10 +4,10 @@ under all remediations (kurtosis=25.5, Breusch-Pagan/Jarque-Bera p≈0)."""
 import numpy as np
 import pandas as pd
 
-from projects.taxi import data
-from projects.taxi.ml_pipeline import FeaturePipeline
+from project import data
+from project.ml_pipeline import FeaturePipeline
 from broadway.features.schema import TARGET
-from projects.taxi.features import ENGINEERED_FEATURES
+from project.features import ENGINEERED_FEATURES
 from broadway.stats import baseline
 
 

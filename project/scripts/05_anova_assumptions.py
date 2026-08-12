@@ -4,9 +4,9 @@ Step 5: Check ANOVA's assumptions before trusting the last step's result.
 1. Homogeneity of variance -> Levene's test
 2. Normality within each group -> skew/kurtosis + Shapiro (on a subsample)
 
-Run with: python projects/taxi/scripts/05_anova_assumptions.py
+Run with: python project/scripts/05_anova_assumptions.py
 """
-from projects.taxi import data
+from project import data
 from broadway.stats import assumptions
 
 

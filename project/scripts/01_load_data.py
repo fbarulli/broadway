@@ -1,8 +1,8 @@
 """
 Step 1: Load training_data.parquet with Spark and get a feel for it.
-Run with: python projects/taxi/scripts/01_load_data.py
+Run with: python project/scripts/01_load_data.py
 """
-from projects.taxi import data
+from project import data
 
 
 def main() -> None:

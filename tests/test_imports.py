@@ -27,8 +27,8 @@ def test_core_imports() -> None:
 
 def test_features_imports(features_cfg) -> None:
     from broadway.features.schema import RAW_FEATURES, TARGET
-    from projects.taxi.ml_pipeline import FeaturePipeline
-    from projects.taxi.features import ENGINEERED_FEATURES
+    from project.ml_pipeline import FeaturePipeline
+    from project.features import ENGINEERED_FEATURES
 
     assert isinstance(ENGINEERED_FEATURES, tuple)
     assert isinstance(RAW_FEATURES, list)
@@ -79,7 +79,7 @@ def test_no_learning_stats_references() -> None:
             "-E",
             "learning/stats|learning\\.stats|from _config import|import _config",
             "src/",
-            "projects/",
+            "project/",
         ],
         capture_output=True,
         text=True,

@@ -13,5 +13,5 @@
 | 11 | interaction_ols.py | Interaction OLS with trip_distance * pickup_borough, nested F-test vs baseline |
 | 12 | lgbm_baseline.py | LightGBM baseline with time-based train/test split, feature importance |
 
-Shared helpers, constants, and the sample cache live in `projects/taxi/data.py`.
+Shared helpers, constants, and the sample cache live in `project/data.py`.
 Run `generate_sample_cache()` once before scripts 04-12.

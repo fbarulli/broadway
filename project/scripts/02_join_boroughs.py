@@ -1,9 +1,9 @@
 """
 Step 2: Join taxi_zone_lookup.csv to get pickup borough, then see
 group sizes and mean trip duration per borough.
-Run with: python projects/taxi/scripts/02_join_boroughs.py
+Run with: python project/scripts/02_join_boroughs.py
 """
-from projects.taxi import data
+from project import data
 
 
 def main() -> None:

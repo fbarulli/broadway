@@ -7,9 +7,9 @@ given that we found unequal variance AND non-normal data.
 3. Welch's ANOVA                    - doesn't assume equal variance
 4. Kruskal-Wallis                   - doesn't assume normality OR equal variance
 
-Run with: python projects/taxi/scripts/06_anova_comparison.py
+Run with: python project/scripts/06_anova_comparison.py
 """
-from projects.taxi import data
+from project import data
 from broadway.stats import anova
 
 

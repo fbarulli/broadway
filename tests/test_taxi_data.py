@@ -1,4 +1,4 @@
-"""Unit tests for ``projects/taxi/data.py`` against a small synthetic parquet."""
+"""Unit tests for ``project/data.py`` against a small synthetic parquet."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from projects.taxi import data
+from project import data
 
 SMALL_BOROUGH = "Staten Island"
 SMALL_FULL_COUNT = 300
