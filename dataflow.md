@@ -8,7 +8,10 @@ top-to-bottom, use the tables to locate code.
 ```
 broadway/
   src/broadway/
-    config/schema.py        # Pydantic models (StatsStep, TrainStep, FeaturesStep, ...)
+    config/schema.py        # Pydantic models (DatasetContract, StatsStep, TrainStep, FeaturesStep, ...)
+    contracts/              # contract-generated schema + role selectors
+      pandera.py            # build_raw_schema(contract) -> pa.DataFrameSchema (generated)
+      selectors.py          # feature/datetime/target column selectors over DatasetContract
     stats/                  # pandas/numpy stats library (no Spark)
       base.py               # stratified_sample
       plan.py               # AnalysisPlan (Pydantic model) + save/load
@@ -114,19 +117,20 @@ results/*.json / *.png  (AnalysisPlan JSON, residual plots, ACF plot)
 |---|---|---|
 | Configuration | Pydantic | `broadway/config/schema.py` |
 | AnalysisPlan | Pydantic | `broadway/stats/plan.py` |
-| Taxi raw DataFrame | Pandera | `projects/taxi/schemas.py` |
+| Raw DataFrame | Pandera | `broadway/contracts/pandera.py::build_raw_schema(contract)` (generated) |
 | Engineered features | Pandera | `broadway/features/schema.py` |
 | Python interfaces | type hints | throughout |
 
-- Pandera `DataFrameModel`s are structure-only (columns, dtypes, nullability). Range/value checks stay in `etl/process.py` + `contracts/checks.py`.
-- Enforcement points: `load_stratified_sample()` / `load_time_slice()` validate against `TaxiRawSchema`; `FeaturePipeline.transform()` validates against `EngineeredFeaturesSchema`.
+- The raw schema is generated at runtime from `DatasetContract.columns` — one `pa.Column` per contract entry (the raw 6 columns, not join-derived `pickup_borough`/`LocationID`). Dtypes are checked strictly (`coerce=False`); `null_count` is observed, not an invariant, so nullability is left at Pandera's default.
+- Role-based column selection is `broadway/contracts/selectors.py` (`feature_columns`, `datetime_columns`, `target_columns`) — pure functions over the contract, no hardcoded names.
+- Enforcement points: `read_training_data()` validates the raw frame via `build_raw_schema`; `FeaturePipeline.transform()` validates against `EngineeredFeaturesSchema`.
 
 ## Where to make changes
 
 | Goal | Change |
 |---|---|
 | New config knob | `configs/step/stats.yaml` + matching field in `StatsStep` (`schema.py`) + constant in `data.py` |
-| New DataFrame contract | add a Pandera `DataFrameModel` (`projects/taxi/schemas.py` or `broadway/features/schema.py`) and call `Schema.validate(df)` at the stage boundary |
+| New DataFrame contract | add the column to `configs/dataset/taxi.yaml` — `build_raw_schema` regenerates the raw schema; call `Schema.validate(df)` at the stage boundary |
 | New loader | add function in `projects/taxi/data.py`; reuse `read_training_data` / `_downcast` / `_join_boroughs` |
 | New statistical test | add function in `src/broadway/stats/` (pandas/numpy only) + document in `API.md` |
 | New experiment script | add `projects/taxi/scripts/NN_*.py`; import from `projects.taxi.data` and `broadway.stats` |

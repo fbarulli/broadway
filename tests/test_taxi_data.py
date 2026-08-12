@@ -58,7 +58,7 @@ def synthetic_df() -> pd.DataFrame:
     )
 
     df[data.DATETIME_COL] = pd.date_range("2023-12-30 00:00:00", periods=n, freq="90s")
-    df[data.PICKUP_LOCATION_COL] = np.asarray(location_ids, dtype=np.int64)
+    df[data.PICKUP_LOCATION_COL] = np.asarray(location_ids, dtype=np.int32)
     df[data.DURATION_COL] = rng.uniform(1.0, 120.0, size=n).astype("float64")
 
     return df.sample(frac=1, random_state=42).reset_index(drop=True)

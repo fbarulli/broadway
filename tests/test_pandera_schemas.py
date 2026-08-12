@@ -6,29 +6,60 @@ import pandas as pd
 import pandera.errors
 import pytest
 
+from broadway.config.schema import ColumnSchema, ColumnRole, DatasetContract
+from broadway.contracts.pandera import build_raw_schema
 from broadway.features.schema import (
     ENGINEERED_FEATURES,
     EngineeredFeaturesSchema,
 )
-from projects.taxi import data
-from projects.taxi.schemas import TaxiRawSchema
+
+_RAW_COLUMNS = {
+    "pickup_datetime": ColumnSchema(
+        dtype="datetime64[us]", null_count=0, role=ColumnRole.DATETIME
+    ),
+    "passenger_count": ColumnSchema(
+        dtype="float64", null_count=0, role=ColumnRole.FEATURE
+    ),
+    "trip_distance": ColumnSchema(
+        dtype="float64", null_count=0, role=ColumnRole.FEATURE
+    ),
+    "pickup_location_id": ColumnSchema(
+        dtype="int32", null_count=0, role=ColumnRole.FEATURE
+    ),
+    "dropoff_location_id": ColumnSchema(
+        dtype="int32", null_count=0, role=ColumnRole.FEATURE
+    ),
+    "trip_duration_minutes": ColumnSchema(
+        dtype="float64", null_count=0, role=ColumnRole.TARGET
+    ),
+}
 
 
-def _valid_raw() -> pd.DataFrame:
-    return pd.DataFrame(
-        {
-            data.DATETIME_COL: pd.to_datetime(
-                ["2024-01-01 00:00:00", "2024-01-01 01:00:00", "2024-01-01 02:00:00"]
-            ),
-            data.PASSENGER_COUNT_COL: pd.Series([1.0, 2.0, 3.0], dtype="float32"),
-            data.TRIP_DISTANCE_COL: pd.Series([1.5, 2.5, 3.5], dtype="float32"),
-            data.PICKUP_LOCATION_COL: pd.Series([1, 2, 3], dtype="int32"),
-            data.DROPOFF_LOCATION_COL: pd.Series([4, 5, 6], dtype="int32"),
-            data.TARGET_COL: pd.Series([10.0, 20.0, 30.0], dtype="float32"),
-            data.ZONE_ID_COL: pd.Series([1, 2, 3], dtype="int64"),
-            data.PICKUP_BOROUGH_COL: ["Manhattan", "Brooklyn", "Queens"],
-        }
+def _contract() -> DatasetContract:
+    return DatasetContract(
+        name="taxi",
+        path="data/processed/training_data.parquet",
+        target="trip_duration_minutes",
+        task="regression",
+        datetime_column="pickup_datetime",
+        columns=_RAW_COLUMNS,
+        lookup_tables={},
+        row_count=1,
     )
+
+
+def _valid_raw(contract: DatasetContract) -> pd.DataFrame:
+    frames: dict[str, pd.Series] = {}
+    for name, col in contract.columns.items():
+        if col.dtype.startswith("datetime"):
+            frames[name] = pd.to_datetime(
+                ["2024-01-01 00:00:00", "2024-01-01 01:00:00", "2024-01-01 02:00:00"]
+            )
+        elif col.dtype.startswith("int"):
+            frames[name] = pd.Series([1, 2, 3], dtype=col.dtype)
+        else:
+            frames[name] = pd.Series([1.0, 2.0, 3.0], dtype=col.dtype)
+    return pd.DataFrame(frames)
 
 
 _ENGINEERED_DTYPES = {
@@ -58,17 +89,21 @@ def _valid_engineered() -> pd.DataFrame:
     )
 
 
-def test_taxi_raw_schema_validates_and_rejects() -> None:
-    valid = _valid_raw()
-    TaxiRawSchema.validate(valid)
+def test_build_raw_schema_validates_and_rejects() -> None:
+    contract = _contract()
+    schema = build_raw_schema(contract)
+    assert list(schema.columns.keys()) == list(contract.columns.keys())
+
+    valid = _valid_raw(contract)
+    schema.validate(valid)
 
     with pytest.raises(pandera.errors.SchemaError):
-        TaxiRawSchema.validate(valid.drop(columns=[data.TRIP_DISTANCE_COL]))
+        schema.validate(valid.drop(columns=["trip_distance"]))
 
     wrong = valid.copy()
-    wrong[data.PICKUP_LOCATION_COL] = wrong[data.PICKUP_LOCATION_COL].astype("float64")
+    wrong["pickup_location_id"] = wrong["pickup_location_id"].astype("float64")
     with pytest.raises(pandera.errors.SchemaError):
-        TaxiRawSchema.validate(wrong)
+        schema.validate(wrong)
 
 
 def test_engineered_features_schema_validates_and_rejects() -> None:

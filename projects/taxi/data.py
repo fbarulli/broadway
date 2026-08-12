@@ -20,8 +20,8 @@ from broadway.config.schema import (
     StatsStep,
     TrainStep,
 )
+from broadway.contracts.pandera import build_raw_schema
 from broadway.stats.effect_size import group_imbalance
-from projects.taxi.schemas import TaxiRawSchema
 
 logger = logging.getLogger(__name__)
 
@@ -158,7 +158,8 @@ def _join_boroughs(df: pd.DataFrame) -> pd.DataFrame:
 def read_training_data(
     columns: list[str] | None = None, filters: list | None = None
 ) -> pd.DataFrame:
-    return _downcast(pd.read_parquet(DATA_PATH, columns=columns, filters=filters))
+    raw = pd.read_parquet(DATA_PATH, columns=columns, filters=filters)
+    return _downcast(build_raw_schema(_contract).validate(raw))
 
 
 def load_boroughs_pandas() -> pd.DataFrame:
@@ -186,7 +187,7 @@ def load_stratified_sample(mode: str | None = None) -> pd.DataFrame:
                 meta.get("params_hash"),
             )
 
-    return TaxiRawSchema.validate(pd.read_parquet(cache_path))
+    return pd.read_parquet(cache_path)
 
 
 def generate_sample_cache(mode: str | None = None) -> None:
@@ -280,8 +281,7 @@ def load_time_slice(mode: str | None = None) -> pd.DataFrame:
             (DATETIME_COL, "<", pd.Timestamp(end)),
         ]
     )
-    result = _join_boroughs(df).sort_values(DATETIME_COL).reset_index(drop=True)
-    return TaxiRawSchema.validate(result)
+    return _join_boroughs(df).sort_values(DATETIME_COL).reset_index(drop=True)
 
 
 def inspect_schema() -> None:
