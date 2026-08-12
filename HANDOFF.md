@@ -50,10 +50,20 @@ DATA_MODE=live uv run python -m project.scripts.12_lgbm_baseline
 
 ## Not built yet (stubs remain in `src/broadway/`)
 
-- **HPO** — `training/optuna.py` is a stub. The intended shape: Optuna study in Postgres + `k8s/train-job.yaml` with `parallelism: N` + MLflow tracking.
+- **HPO integration** — `training/optuna.py::run_study` is implemented but not yet invoked by the training step; distributed trials via Postgres + `k8s/train-job.yaml` (`parallelism: N`) remain deferred.
 - **trust/** (drift, leakage, fairness, sensitivity, interpretability, uncertainty)
-- **monitoring/**, **selection/**, **unsupervised/**, **causal/** — stubs.
-- **MLflow/K8s/CD** — infra scaffolding exists (`docker/`, `k8s/`, `.github/`) but isn't wired into a working training run yet.
+- **monitoring/**, **selection/**, **unsupervised/** — stubs.
+- **K8s/CD** — infra scaffolding exists (`docker/`, `k8s/`, `.github/`); promotion → deploy → serve isn't wired yet.
+
+Training is now wired end-to-end: `train` emits `TrainingResult` and logs the
+run + model to MLflow (`src/broadway/training/`); `evaluate` produces
+`EvaluationResult` + a promotion decision.
+
+`causal` is a separate analysis mode, not part of `full`
+(`configs/step/full.yaml` = discover, etl, contracts, eda, features, stats,
+train, evaluate). Run it on its own:
+`ds-pipeline causal --dataset <d> --experiment <e>` (experiment design / power
+analysis → `ExperimentDesign`).
 
 ## Conventions (enforced)
 

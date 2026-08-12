@@ -42,8 +42,8 @@ def test_pipeline_on_synthetic_data(tmp_dataset: Path) -> None:
     dt_col = cfg.dataset.datetime_column
     X_train = train_df.drop(columns=[target, dt_col])
     y_train = train_df[target]
-    model, elapsed = train(cfg.experiment.model.type, X_train, y_train)
-    assert elapsed > 0
+    model, result = train(cfg.experiment.model.type, X_train, y_train)
+    assert result.train_time_seconds >= 0
     X_val = val_df.drop(columns=[target, dt_col])
     y_val = val_df[target]
     y_pred = model.predict(X_val)

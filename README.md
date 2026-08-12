@@ -9,7 +9,7 @@ snapshot in `HANDOFF.md`.
 
 ```bash
 uv sync                    # install deps (add --extra spark only for genuinely large datasets)
-docker compose up -d       # mlflow + postgres (optional; training infra, not yet wired)
+docker compose up -d       # mlflow + postgres (optional; training logs runs + artifacts here)
 ```
 
 ## Quick start (taxi)
@@ -24,6 +24,30 @@ DATA_MODE=dev uv run python -m project.scripts.04_anova_boroughs
 
 `dev` mode is the default (small sample, fast). Prefix any command with
 `DATA_MODE=live` for full-size results.
+
+---
+
+## Lifecycle
+
+One coherent flow, from dataset contract to champion model:
+
+```
+DatasetContract → FeatureSpec → TrainingConfig → Optuna → TrainingResult
+  → MLflow model/artifacts → EvaluationResult → promotion decision
+  → champion model → prediction
+```
+
+| Stage | What it is | Feeds |
+|-------|------------|-------|
+| `DatasetContract` | raw schema + target/task (`configs/dataset/<name>.yaml`) | etl, features, stats |
+| `FeatureSpec` | engineered schema + fitted pipeline | train |
+| `TrainingConfig` | model type + params (`configs/experiment/<name>.yaml`) | optuna, train |
+| `Optuna` | HPO → best params | train |
+| `TrainingResult` | trained model + params + artifact path | MLflow |
+| `MLflow model/artifacts` | logged run + model | evaluate |
+| `EvaluationResult` | holdout metrics | promotion decision |
+| promotion decision | candidate vs champion verdict | champion model |
+| champion model | promoted artifact | prediction |
 
 ---
 
@@ -57,10 +81,14 @@ Every step except `discover` takes the same three flags.
 | eda | `ds-pipeline eda …` | `artifacts/reports/eda.html` | works |
 | features | `ds-pipeline features …` | fitted feature pipeline | works |
 | stats | `ds-pipeline stats …` | `AnalysisPlan` JSON | works (uses stats library) |
-| causal | `ds-pipeline causal …` | — | **stub** (empty module) |
-| train | `ds-pipeline train …` | pickled model | **partial** (pickle, not MLflow) |
-| evaluate | `ds-pipeline evaluate …` | `artifacts/evaluation/` | **partial** (metrics only) |
-| full | `ds-pipeline full …` | all steps in `configs/step/full.yaml` | works for non-stub steps |
+| causal | `ds-pipeline causal --dataset <d> --experiment <e>` | `ExperimentDesign` (power analysis) | separate mode (not in `full`) |
+| train | `ds-pipeline train …` | `TrainingResult` → MLflow model/artifacts | works |
+| evaluate | `ds-pipeline evaluate …` | `EvaluationResult` + promotion decision | works |
+| full | `ds-pipeline full …` | all steps in `configs/step/full.yaml` | works |
+
+`causal` is a separate analysis mode, run on its own — it is not part of
+`full`. `configs/step/full.yaml` runs discover, etl, contracts, eda, features,
+stats, train, evaluate.
 
 ---
 

@@ -8,3 +8,5 @@ num_leaves: 63
 subsample: 0.8
 colsample_bytree: 0.8
 quantile_tail: 0.9
+output_dir: artifacts/training
+output_file: training_result.json

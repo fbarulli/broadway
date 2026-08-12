@@ -207,6 +207,8 @@ class TrainStep(BaseModel):
     subsample: float
     colsample_bytree: float
     quantile_tail: float
+    output_dir: str
+    output_file: str
 
 
 class EvaluateStep(BaseModel):

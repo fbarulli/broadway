@@ -3,6 +3,25 @@
 Architecture map for the taxi stats learning project. LLM-friendly: read
 top-to-bottom, use the tables to locate code.
 
+## Lifecycle
+
+One coherent platform flow (pipeline CLI), from dataset contract to champion
+model:
+
+```
+DatasetContract → FeatureSpec → TrainingConfig → Optuna → TrainingResult
+  → MLflow model/artifacts → EvaluationResult → promotion decision
+  → champion model → prediction
+```
+
+`causal` is a separate analysis mode, not part of this flow and not part of
+`full`. `configs/step/full.yaml` = discover, etl, contracts, eda, features,
+stats, train, evaluate. Run causal explicitly:
+
+```
+ds-pipeline causal --dataset <d> --experiment <e>
+```
+
 ## Directory tree
 
 ```

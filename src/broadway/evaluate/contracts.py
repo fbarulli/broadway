@@ -11,3 +11,5 @@ class EvaluationResult(BaseModel):
     metrics: dict[str, float]
     promote: bool
     reason: str
+    cv_metrics: dict[str, float] | None = None
+    residuals: dict[str, float] | None = None
