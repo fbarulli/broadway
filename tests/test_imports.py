@@ -68,3 +68,19 @@ def test_no_logistics_ml_references() -> None:
         ["grep", "-r", "logistics_ml", "src/"], capture_output=True, text=True
     )
     assert result.returncode != 0, f"stale logistics_ml references:\n{result.stdout}"
+
+
+def test_no_learning_stats_references() -> None:
+    result = subprocess.run(
+        [
+            "grep",
+            "-r",
+            "-E",
+            "learning/stats|learning\\.stats|from _config import|import _config",
+            "src/",
+            "projects/",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode != 0, f"stale learning/stats references:\n{result.stdout}"

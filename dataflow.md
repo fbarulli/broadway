@@ -98,7 +98,8 @@ results/*.json / *.png  (AnalysisPlan JSON, residual plots, ACF plot)
 | `DATA_MODE=live` | | `sample_size_live` (200000) | `time_slice_start_live` → `time_slice_end_live` (1 month) |
 
 - Cache files are mode-keyed: `joined_sample_{MODE}.parquet`, `sample_meta_{MODE}.json`.
-- `DATA_MODE` is read once at import; any value other than `dev`/`live` raises.
+- `mode` is a per-call parameter on the loaders (`load_stratified_sample(mode=None)`, `generate_sample_cache(mode=None)`, `load_time_slice(mode=None)`, `load_borough_durations(mode=None)`). `mode=None` falls back to `os.getenv("DATA_MODE", "dev")` via `_resolve_mode`; any value other than `dev`/`live` raises.
+- The module constants `MODE`, `SAMPLE_SIZE`, `TIME_SLICE_START`, `TIME_SLICE_END`, `SAMPLE_CACHE`, `SAMPLE_META` are still resolved at import (from `_resolve_mode()`) as defaults, because scripts read `data.TIME_SLICE_START`/`TIME_SLICE_END` and `data.SAMPLE_SIZE`.
 
 ## Sampling strategies
 

@@ -48,13 +48,35 @@ FEATURE_NIGHT_END = _features.night_end
 FEATURE_PASSENGER_COUNT_MIN = _features.passenger_count_min
 FEATURE_PASSENGER_COUNT_MAX = _features.passenger_count_max
 
-MODE = os.getenv("DATA_MODE", "dev")
-if MODE not in ("dev", "live"):
-    raise ValueError(f"DATA_MODE must be 'dev' or 'live', got {MODE!r}")
+def _resolve_mode(mode: str | None = None) -> str:
+    m = mode or os.getenv("DATA_MODE", "dev")
+    if m not in ("dev", "live"):
+        raise ValueError(f"DATA_MODE must be 'dev' or 'live', got {m!r}")
+    return m
 
-SAMPLE_SIZE = getattr(_stats, f"sample_size_{MODE}")
-TIME_SLICE_START = getattr(_stats, f"time_slice_start_{MODE}")
-TIME_SLICE_END = getattr(_stats, f"time_slice_end_{MODE}")
+
+def _sample_size(mode: str) -> int:
+    return getattr(_stats, f"sample_size_{mode}")
+
+
+def _time_slice_bounds(mode: str) -> tuple[str, str]:
+    return (
+        getattr(_stats, f"time_slice_start_{mode}"),
+        getattr(_stats, f"time_slice_end_{mode}"),
+    )
+
+
+def _cache_path(mode: str) -> Path:
+    return RESULTS_DIR / f"joined_sample_{mode}.parquet"
+
+
+def _meta_path(mode: str) -> Path:
+    return RESULTS_DIR / f"sample_meta_{mode}.json"
+
+
+MODE = _resolve_mode()
+SAMPLE_SIZE = _sample_size(MODE)
+TIME_SLICE_START, TIME_SLICE_END = _time_slice_bounds(MODE)
 
 RANDOM_STATE = _train.random_state
 N_ESTIMATORS = _train.n_estimators
@@ -77,18 +99,22 @@ PICKUP_BOROUGH_COL = "pickup_borough"
 DURATION_COL = "trip_duration_minutes"
 
 RESULTS_DIR = Path("results")
-SAMPLE_CACHE = RESULTS_DIR / f"joined_sample_{MODE}.parquet"
-SAMPLE_META = RESULTS_DIR / f"sample_meta_{MODE}.json"
+SAMPLE_CACHE = _cache_path(MODE)
+SAMPLE_META = _meta_path(MODE)
 QUALITY_REPORT = RESULTS_DIR / "quality_report.json"
-
-_SAMPLE_PARAMS = ["SAMPLE_SIZE", "RANDOM_STATE", "PICKUP_BOROUGH_COL"]
 
 _DOWNCAST_MAP = {"int64": "int32", "float64": "float32"}
 _BATCH_SIZE = 100_000
 
 
-def _params_hash() -> str:
-    payload = {k: globals()[k] for k in _SAMPLE_PARAMS}
+def _params_hash(mode: str | None = None) -> str:
+    m = _resolve_mode(mode)
+    payload = {
+        "mode": m,
+        "sample_size": _sample_size(m),
+        "random_state": RANDOM_STATE,
+        "group_col": PICKUP_BOROUGH_COL,
+    }
     return hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()[:8]
 
 
@@ -124,15 +150,19 @@ def load_boroughs_pandas() -> pd.DataFrame:
     return _join_boroughs(read_training_data())
 
 
-def load_stratified_sample() -> pd.DataFrame:
-    current_hash = _params_hash()
-    if not SAMPLE_CACHE.exists():
+def load_stratified_sample(mode: str | None = None) -> pd.DataFrame:
+    m = _resolve_mode(mode)
+    current_hash = _params_hash(m)
+    cache_path = _cache_path(m)
+    meta_path = _meta_path(m)
+
+    if not cache_path.exists():
         raise FileNotFoundError(
-            f"{SAMPLE_CACHE} not found. Call generate_sample_cache() first."
+            f"{cache_path} not found. Call generate_sample_cache() first."
         )
 
-    if SAMPLE_META.exists():
-        meta = json.loads(SAMPLE_META.read_text())
+    if meta_path.exists():
+        meta = json.loads(meta_path.read_text())
         if meta.get("params_hash") != current_hash:
             logger.warning(
                 "sample params changed (current=%s, cached=%s). "
@@ -141,14 +171,15 @@ def load_stratified_sample() -> pd.DataFrame:
                 meta.get("params_hash"),
             )
 
-    return pd.read_parquet(SAMPLE_CACHE)
+    return pd.read_parquet(cache_path)
 
 
-def generate_sample_cache() -> None:
+def generate_sample_cache(mode: str | None = None) -> None:
+    m = _resolve_mode(mode)
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
     pf = pq.ParquetFile(DATA_PATH)
-    frac = min(1.0, SAMPLE_SIZE / pf.metadata.num_rows)
+    frac = min(1.0, _sample_size(m) / pf.metadata.num_rows)
 
     counts, sums = _stream_counts(pf)
     targets = {
@@ -156,10 +187,12 @@ def generate_sample_cache() -> None:
         for borough, n in counts.items()
     }
 
+    cache_path = _cache_path(m)
+    meta_path = _meta_path(m)
     sample = _stream_sample(pf, targets)
-    sample.to_parquet(SAMPLE_CACHE)
-    SAMPLE_META.write_text(json.dumps({"params_hash": _params_hash()}))
-    logger.info("wrote %d rows to %s", len(sample), SAMPLE_CACHE)
+    sample.to_parquet(cache_path)
+    meta_path.write_text(json.dumps({"params_hash": _params_hash(m)}))
+    logger.info("wrote %d rows to %s", len(sample), cache_path)
 
     _write_quality_report(
         counts, {borough: total / counts[borough] for borough, total in sums.items()}
@@ -214,8 +247,8 @@ def _iter_joined_batches(pf: pq.ParquetFile) -> Iterator[pd.DataFrame]:
         yield _join_boroughs(_downcast(batch.to_pandas()))
 
 
-def load_borough_durations() -> dict[str, np.ndarray]:
-    df = load_stratified_sample()
+def load_borough_durations(mode: str | None = None) -> dict[str, np.ndarray]:
+    df = load_stratified_sample(mode)
     return {
         borough: df.loc[
             df[PICKUP_BOROUGH_COL] == borough, DURATION_COL
@@ -224,11 +257,12 @@ def load_borough_durations() -> dict[str, np.ndarray]:
     }
 
 
-def load_time_slice() -> pd.DataFrame:
+def load_time_slice(mode: str | None = None) -> pd.DataFrame:
+    start, end = _time_slice_bounds(_resolve_mode(mode))
     df = read_training_data(
         filters=[
-            (DATETIME_COL, ">=", pd.Timestamp(TIME_SLICE_START)),
-            (DATETIME_COL, "<", pd.Timestamp(TIME_SLICE_END)),
+            (DATETIME_COL, ">=", pd.Timestamp(start)),
+            (DATETIME_COL, "<", pd.Timestamp(end)),
         ]
     )
     return _join_boroughs(df).sort_values(DATETIME_COL).reset_index(drop=True)
