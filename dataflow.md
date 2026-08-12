@@ -24,10 +24,39 @@ broadway/
       time_series.py        # durbin_watson_test, plot_acf
       baseline.py           # train_lgbm, evaluate
       module.py             # pipeline step: build groups → run_anova → save_plan
+    causal/                 # experiment design + causal analysis (statsmodels/scipy)
+      contracts.py          # ExperimentDesign, ExperimentResult (Pydantic) + save/load
+      design.py             # design_experiment, minimum_detectable_effect (TTestIndPower)
+      assignment.py         # assign_randomly, assign_stratified
+      analysis.py           # analyze_two_groups (Welch's t-test, Cohen's d, 95% CI)
+      multiple.py           # correct_pvalues (bonferroni, fdr_bh)
+      sequential.py, hte.py # out-of-scope docstring stubs
+      module.py             # pipeline step: reads cfg.causal, logs ExperimentDesign
     features/               # generic feature machinery + the config-driven pipeline step
       schema.py             # FeatureSpec, build_engineered_schema
       ml_encodings.py, frequency.py   # generic target/frequency encodings
       pipeline.py, builders.py, encodings.py, module.py, contracts.py  # ds-pipeline features step
+    evaluate/               # model evaluation + promotion decision
+      contracts.py          # EvaluationResult (Pydantic model)
+      metrics.py            # compute_metrics (mae/rmse/r2)
+      comparison.py         # compare_models (candidate vs champion)
+      validation.py         # cross_validate, residual_summary
+      promotion.py          # should_promote
+      module.py             # pipeline step: load model → evaluate → promotion
+    training/               # model training + HPO + MLflow tracking
+      contracts.py          # TrainingResult (Pydantic model)
+      trainer.py            # train(model_type, X, y, **params) -> (model, elapsed)
+      module.py             # pipeline step: load data → train → pickle to disk
+      optuna.py             # run_study(objective, n_trials, ...) -> best_params
+      mlflow_utils.py       # setup_mlflow, log_metrics, log_model
+      models/               # model factories + ABC
+        base.py             # BaseModel ABC (fit/predict/feature_importance/get_params/set_params)
+        linear.py           # LinearRegression factory
+        random_forest.py    # RandomForestRegressor factory
+        xgboost.py          # XGBRegressor factory
+        lightgbm.py         # LGBMRegressor factory
+        registry.py         # get_model(name, **params)
+        pyfunc_wrapper.py   # ModelPyFunc (MLflow PyFunc over a pickled model)
   project/
     features.py             # FEATURE_SPECS registry → ENGINEERED_FEATURES/types/schema
     ml_pipeline.py          # FeaturePipeline (taxi orchestration)
@@ -123,6 +152,10 @@ results/*.json / *.png  (AnalysisPlan JSON, residual plots, ACF plot)
 |---|---|---|
 | Configuration | Pydantic | `broadway/config/schema.py` |
 | AnalysisPlan | Pydantic | `broadway/stats/plan.py` |
+| ExperimentDesign | Pydantic | `broadway/causal/contracts.py` |
+| ExperimentResult | Pydantic | `broadway/causal/contracts.py` |
+| EvaluationResult | Pydantic | `broadway/evaluate/contracts.py` |
+| TrainingResult | Pydantic | `broadway/training/contracts.py` |
 | Raw DataFrame | Pandera | `broadway/contracts/pandera.py::build_raw_schema(contract)` (generated) |
 | Engineered features | Pandera | `project/features.py` (`FEATURE_SPECS`) → `broadway/features/schema.py::build_engineered_schema` |
 | Python interfaces | type hints | throughout |
