@@ -127,6 +127,16 @@ def plot_acf(resid: np.ndarray, lags: int, out_path: str) -> None
     # ACF plot over bounded lag window → save PNG
 ```
 
+## baseline.py
+
+```python
+def train_lgbm(X: pd.DataFrame, y: np.ndarray, **params) -> object
+    # LGBMRegressor; hyperparams passed in, no defaults
+
+def evaluate(model, X: pd.DataFrame, y: np.ndarray, tail_quantile: float) -> dict
+    # {"mae": ..., "rmse": ..., "tail_mae": ...}
+```
+
 ## module.py (pipeline step)
 
 `run(cfg: PipelineConfig) -> None` — orchestrates the library against the
