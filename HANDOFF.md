@@ -1,73 +1,148 @@
 # HANDOFF
 
-Status of the broadway ML experimentation platform — what works, how to run it, and what's next. `dataflow.md` is the living architecture map; this file is the "is it working" snapshot.
+How the broadway ML experimentation platform works — architecture, lifecycle,
+contracts, and how to run it. `dataflow.md` is the living module→file map; this
+file is the conceptual explanation.
 
-## What works now
+## The one-sentence summary
 
-### Agnostic stats library — `src/broadway/stats/`
-Pure pandas/numpy. Every test returns an `AnalysisPlan` (not a bare float), and every effect size is computed in pairs (eta² AND omega², Cohen's d AND Hedges' g). Signatures are the contract in `src/broadway/stats/API.md`.
+Broadway is a **generic ML pipeline core** (`src/broadway/`) driven by **one
+dataset** (`project/`), where every boundary is a typed contract: Pydantic for
+config and results, Pandera for DataFrames, `FeatureSpec` for features.
 
-| Module | Functions |
-|--------|-----------|
-| `effect_size.py` | eta², omega², Cohen's d, Hedges' g, group_imbalance |
-| `plan.py` | `AnalysisPlan` dataclass + save/load JSON |
-| `anova.py` | `run_anova`, `run_welch`, `run_kruskal` |
-| `assumptions.py` | `run_levene`, `check_normality` |
-| `post_hoc.py` | `games_howell` (adds d/g per pair) |
-| `regression.py` | `fit_ols`, `fit_robust`, `bp_jb` |
-| `diagnostics.py` | `bp_test`, `jb_test`, `durbin_watson`, `plot_residuals` |
-| `time_series.py` | `durbin_watson_test`, `plot_acf` |
-| `baseline.py` | `train_lgbm`, `evaluate` |
-| `module.py` | pipeline step: build groups → `run_anova` → `save_plan` |
+## Architecture: three layers
 
-### Dataset project — `project/`
-- `data.py` — dataset-specific loaders. Memory-efficient: column projection, dtype downcast, pyarrow filter pushdown, and **streaming** cache build (`iter_batches`, never holds 8.6M rows). Small groups (Staten Island 84, EWR 77) are kept in full.
-- `scripts/01…12` — numbered analysis wrappers, run via `python -m project.scripts.NN_xxx`. They keep the ANOVA → assumptions → post-hoc → OLS → LGBM narrative.
-- `STATS.md` — what each script does.
+```
+project/                 dataset-specific (knows "taxi")
+    data.py              loaders, mode system, streaming cache
+    features.py          FEATURE_SPECS registry (the engineered feature set)
+    ml_pipeline.py       FeaturePipeline (fit/transform) + basic.py/boroughs.py
+    scripts/01..12       numbered analysis narrative (ANOVA → OLS → LGBM)
 
-### Modes — `DATA_MODE` env var
-| Mode | Sample | Time window | Use |
-|------|--------|-------------|-----|
-| `dev` (default) | 2000 rows | 1 day | does it run |
-| `live` | 200K + small groups in full | 31 days | real results |
+src/broadway/            generic (never knows "taxi")
+    config/              Pydantic models + YAML loader (load_config)
+    contracts/           selectors + build_raw_schema(contract) → Pandera
+    stats/               statistical library (anova, assumptions, post_hoc, …)
+    features/            FeatureSpec, build_engineered_schema, encodings
+    training/            trainer, optuna, mlflow_utils, models
+    evaluate/            metrics, comparison, validation, promotion
+    causal/              experiment design + analysis (separate mode)
 
-```bash
-DATA_MODE=dev  uv run python -m project.scripts.04_anova_boroughs
-DATA_MODE=live uv run python -m project.scripts.12_lgbm_baseline
+configs/                 single source of truth (dataset/experiment/environment/step YAML)
 ```
 
-### Config (SSOT)
-`configs/{dataset,experiment,environment,step}/*.yaml` → Pydantic (`src/broadway/config/schema.py`) → `load_config()`. No hardcoded values, no defaults, no `get(key, default)`.
+The litmus test: **if you swapped the dataset YAML tomorrow, would you have to
+edit `src/broadway/**`?** The answer should be no; only `project/` and the
+config YAML change.
 
-### Tests
-82 passing: `uv run pytest`. Library tests are synthetic; data-layer tests use real data (`.head(1000)` or the cache).
+## The contract system
 
-## What was deliberately dropped / deferred
+Every boundary carries a typed contract — a value is either valid (typed) or it
+fails loudly. Nothing is a bare dict or a magic number.
 
-- **Spark** — dropped. 8.6M rows is pandas-sized (~200MB downcast). `pyspark` remains an optional extra for genuinely large future datasets.
-- **Kafka** — not needed for parallel HPO. Optuna + Postgres (already in `docker-compose.yml`) coordinates distributed trials; the DB is the queue. Revisit only for real-time streaming.
-- **`learning/stats/`** — deleted; logic migrated into `src/broadway/stats/` + `project/`.
+| Layer | Tool | Where |
+|-------|------|-------|
+| Configuration | Pydantic | `config/schema.py` (`DatasetContract`, `StatsStep`, `TrainStep`, `ExperimentConfig`, …) |
+| Raw DataFrame | Pandera | `contracts/pandera.py::build_raw_schema(contract)` — generated from `DatasetContract` |
+| Engineered DataFrame | Pandera | `features/schema.py::build_engineered_schema(specs)` — generated from `FEATURE_SPECS` |
+| Feature definitions | `FeatureSpec` | `project/features.py::FEATURE_SPECS` (single source; names/types/schema all derive from it) |
+| Analysis result | Pydantic `AnalysisPlan` | `stats/plan.py` |
+| Experiment design/result | Pydantic | `causal/contracts.py` (`ExperimentDesign`, `ExperimentResult`) |
+| Training result | Pydantic `TrainingResult` | `training/contracts.py` |
+| Evaluation result | Pydantic `EvaluationResult` | `evaluate/contracts.py` (+ `ModelComparison`) |
 
-## Not built yet (stubs remain in `src/broadway/`)
+Principles: no hardcoded values, no defaults, no `get(key, default)`. A missing
+or wrong value raises at load/validation time, not silently later.
 
-- **HPO integration** — `training/optuna.py::run_study` is implemented but not yet invoked by the training step; distributed trials via Postgres + `k8s/train-job.yaml` (`parallelism: N`) remain deferred.
+## The lifecycle
+
+```
+DatasetContract  →  FeatureSpec  →  TrainingConfig  →  Optuna
+      →  TrainingResult  →  MLflow model/artifacts  →  EvaluationResult
+      →  promotion decision  →  champion model  →  prediction
+```
+
+- **Training** (`training/module.py`): if `ExperimentConfig.hpo` is set, `run_study`
+  searches the space (from `HPOConfig.search_space`, validated against the model
+  type); else it uses `model.params`. The best model is fit, `params`/`metrics`/
+  the artifact are logged to MLflow, and a `TrainingResult` is written.
+- **Evaluation** (`evaluate/module.py`): loads the candidate from
+  `TrainingResult.artifact_path` via MLflow, loads the champion if one exists
+  (`get_champion`), computes `compare_models` + `cross_validate` +
+  `residual_summary`, and emits an `EvaluationResult` with the promotion decision.
+- **Promotion**: `should_promote` + `promote_candidate` (champion alias in the
+  MLflow registry). Champion is compared only when one exists; otherwise the
+  candidate promotes unconditionally.
+
+`causal` is **not** part of this flow — it is a separate analysis mode run on
+its own (`ds-pipeline causal …`), not in `configs/step/full.yaml`.
+
+## Data flow (the taxi project)
+
+```
+data/processed/training_data.parquet  (8.6M rows)
+    │  pyarrow ParquetFile.iter_batches  (streaming — never holds all rows)
+    ▼
+generate_sample_cache()  →  results/joined_sample_{MODE}.parquet
+                          →  results/quality_report.json  (exact group sizes/means)
+    │
+    ▼
+load_stratified_sample()   random stratified (08/09/11/12)
+load_time_slice()          contiguous time-ordered slice, filter pushdown (10)
+    │
+    ▼
+scripts 01..12  →  AnalysisPlan JSON, residual/ACF plots
+```
+
+Two sampling strategies, both correct in every mode:
+- **Stratified random** — preserves per-borough proportions, deterministic seed.
+- **Contiguous time slice** — never randomly sampled (contiguity + ordering
+  matter for Durbin-Watson/ACF). Dev mode shrinks the *window*, not the ordering.
+
+Small groups (Staten Island 84, EWR 77) are always kept **in full** — never
+sampled away.
+
+## Modes
+
+`DATA_MODE=dev` (default, 2000 rows / 1-day window) vs `DATA_MODE=live` (200K +
+small groups in full / 1-month window). Set via env var, per-call parameter on
+the loaders.
+
+## How to run
+
+```bash
+uv sync                                   # install deps
+uv run pytest                             # 129 tests
+
+# build the sample cache once, then run analysis scripts
+DATA_MODE=dev  uv run python -m project.scripts.04_anova_boroughs
+DATA_MODE=live uv run python -m project.scripts.12_lgbm_baseline
+
+# the pipeline CLI (causal is a separate mode, not in `full`)
+uv run ds-pipeline full --dataset taxi --experiment taxi
+uv run ds-pipeline causal --dataset taxi --experiment taxi
+```
+
+## What was deliberately dropped
+
+- **Spark** — 8.6M rows is pandas-sized; `pyspark` stays an optional extra.
+- **Kafka** — not needed for parallel HPO (Optuna + Postgres is the queue).
+- **dtype downcast** — removed; `DatasetContract` dtypes are the single truth.
+
+## Not built yet (stubs)
+
 - **trust/** (drift, leakage, fairness, sensitivity, interpretability, uncertainty)
 - **monitoring/**, **selection/**, **unsupervised/** — stubs.
-- **K8s/CD** — infra scaffolding exists (`docker/`, `k8s/`, `.github/`); promotion → deploy → serve isn't wired yet.
-
-Training is now wired end-to-end: `train` emits `TrainingResult` and logs the
-run + model to MLflow (`src/broadway/training/`); `evaluate` produces
-`EvaluationResult` + a promotion decision.
-
-`causal` is a separate analysis mode, not part of `full`
-(`configs/step/full.yaml` = discover, etl, contracts, eda, features, stats,
-train, evaluate). Run it on its own:
-`ds-pipeline causal --dataset <d> --experiment <e>` (experiment design / power
-analysis → `ExperimentDesign`).
+- **inference/api.py** — stub; `pyfunc_wrapper` is defined but not wired (no
+  serving contract yet).
+- **K8s/CD** — infra scaffolding exists (`docker/`, `k8s/`, `.github/`);
+  promotion → deploy → serve isn't wired.
 
 ## Conventions (enforced)
 
 1. No hardcoded values — config YAML / `schema.py` / env var only.
 2. Shared functions live in one place and are imported, never duplicated.
-3. Agents: work only on assigned files; report (don't change) out-of-scope findings; review only recent changes (`git diff HEAD`).
+3. All coding changes are made by agents; agents work only on assigned files,
+   report (don't change) out-of-scope findings, and review only recent changes
+   (`git diff HEAD`).
 4. The agent making a change updates `dataflow.md` in the same commit.
