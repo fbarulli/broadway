@@ -1,3 +1,6 @@
+import json
+import hashlib
+import logging
 import yaml
 from pathlib import Path
 
@@ -5,6 +8,8 @@ from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 
 from broadway.config.schema import FeaturesStep, StatsStep, TrainStep
+
+logger = logging.getLogger(__name__)
 
 _STATS_YAML = Path("configs/step/stats.yaml")
 _stats = StatsStep(**yaml.safe_load(_STATS_YAML.read_text()))
@@ -60,6 +65,39 @@ TARGET_COL = "trip_duration_minutes"
 
 PICKUP_BOROUGH_COL = "pickup_borough"
 DURATION_COL = "trip_duration_minutes"
+
+RESULTS_DIR = Path("results")
+SAMPLE_CACHE = RESULTS_DIR / "joined_sample.parquet"
+SAMPLE_META = RESULTS_DIR / "sample_meta.json"
+
+_SAMPLE_PARAMS = ["SAMPLE_SIZE", "RANDOM_STATE", "PICKUP_BOROUGH_COL"]
+
+
+def _params_hash() -> str:
+    payload = {k: globals()[k] for k in _SAMPLE_PARAMS}
+    return hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()[:8]
+
+
+def load_stratified_sample() -> "pd.DataFrame":
+    import pandas as pd
+
+    current_hash = _params_hash()
+    if not SAMPLE_CACHE.exists():
+        raise FileNotFoundError(
+            f"{SAMPLE_CACHE} not found. Run 'python learning/stats/00_prepare_data.py' first."
+        )
+
+    if SAMPLE_META.exists():
+        meta = json.loads(SAMPLE_META.read_text())
+        if meta.get("params_hash") != current_hash:
+            logger.warning(
+                "sample params changed (current=%s, cached=%s). "
+                "Run 00_prepare_data.py to regenerate.",
+                current_hash,
+                meta.get("params_hash"),
+            )
+
+    return pd.read_parquet(SAMPLE_CACHE)
 
 
 def load_boroughs_pandas():

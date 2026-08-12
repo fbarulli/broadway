@@ -1,3 +1,6 @@
+"""LGBM non-linear baseline — routed here from 08-11: OLS assumptions failed
+under all remediations (kurtosis=25.5, Breusch-Pagan/Jarque-Bera p≈0)."""
+
 import numpy as np
 import pandas as pd
 import lightgbm as lgb

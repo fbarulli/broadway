@@ -32,22 +32,14 @@ from statsmodels.stats.stattools import jarque_bera
 from statsmodels.stats.anova import anova_lm
 
 from _config import (
-    RANDOM_STATE, SAMPLE_SIZE,
-    PICKUP_BOROUGH_COL, TARGET_COL, TRIP_DISTANCE_COL,
-    load_boroughs_pandas,
+    RANDOM_STATE, PICKUP_BOROUGH_COL, TARGET_COL, TRIP_DISTANCE_COL,
+    load_stratified_sample,
 )
 
 
-def load_sample() -> pd.DataFrame:
-    df = load_boroughs_pandas()
-    frac = min(1.0, SAMPLE_SIZE / len(df))
-    sample = df.groupby(PICKUP_BOROUGH_COL).sample(frac=frac, random_state=RANDOM_STATE)
-    return sample.reset_index(drop=True)
-
-
 def main():
-    print("Loading stratified sample...")
-    df = load_sample()
+    print("Loading cached stratified sample...")
+    df = load_stratified_sample()
 
     print("\n=== Baseline (no interaction, from 08) ===")
     baseline = smf.ols(

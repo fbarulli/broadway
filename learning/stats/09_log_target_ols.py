@@ -26,23 +26,15 @@ Two things are checked:
 """
 
 import numpy as np
-import pandas as pd
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
 from statsmodels.stats.diagnostic import het_breuschpagan
 from statsmodels.stats.stattools import jarque_bera
 
 from _config import (
-    RANDOM_STATE, SAMPLE_SIZE, PICKUP_BOROUGH_COL, TARGET_COL,
-    TRIP_DISTANCE_COL, load_boroughs_pandas,
+    PICKUP_BOROUGH_COL, TARGET_COL,
+    TRIP_DISTANCE_COL, load_stratified_sample,
 )
-
-
-def load_sample() -> pd.DataFrame:
-    df = load_boroughs_pandas()
-    frac = min(1.0, SAMPLE_SIZE / len(df))
-    sample = df.groupby(PICKUP_BOROUGH_COL).sample(frac=frac, random_state=RANDOM_STATE)
-    return sample.reset_index(drop=True)
 
 
 def run_diagnostics(model, label: str) -> None:
@@ -61,9 +53,9 @@ def run_diagnostics(model, label: str) -> None:
     print()
 
 
-def main():
-    print("Loading stratified sample...")
-    df = load_sample()
+def main() -> None:
+    print("Loading cached stratified sample...")
+    df = load_stratified_sample()
 
     # Duration is always > 0 post-filtering (config/data.py enforces
     # min_trip_duration_minutes), so plain log is safe -- no log1p needed.

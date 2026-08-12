@@ -41,21 +41,14 @@ import matplotlib.pyplot as plt
 import scipy.stats as stats
 
 from _config import (
-    RANDOM_STATE, SAMPLE_SIZE, PICKUP_BOROUGH_COL, TARGET_COL,
-    TRIP_DISTANCE_COL, load_boroughs_pandas,
+    RANDOM_STATE, PICKUP_BOROUGH_COL, TARGET_COL,
+    TRIP_DISTANCE_COL, load_stratified_sample,
 )
 
 
-def load_sample() -> pd.DataFrame:
-    """Load processed training data + borough labels, stratified sample."""
-    df = load_boroughs_pandas()
-
-    frac = min(1.0, SAMPLE_SIZE / len(df))
-    sample = df.groupby(PICKUP_BOROUGH_COL).sample(frac=frac, random_state=RANDOM_STATE)
-    return sample.reset_index(drop=True)
-
-
-def fit_baseline_ols(df: pd.DataFrame):
+def main():
+    print("Loading cached stratified sample...")
+    df = load_stratified_sample()
     """Fit trip_duration_minutes ~ trip_distance + C(pickup_borough)."""
     model = smf.ols(
         f"{TARGET_COL} ~ {TRIP_DISTANCE_COL} + C({PICKUP_BOROUGH_COL})",
@@ -125,9 +118,7 @@ def run_formal_tests(model, df: pd.DataFrame) -> None:
     print(resid_df.groupby(PICKUP_BOROUGH_COL)["resid"].std().sort_values())
 
 
-def main():
-    print("Loading stratified sample...")
-    df = load_sample()
+def fit_baseline_ols(df: pd.DataFrame):
     print(f"Sample size: {len(df)}\n")
 
     print(f"Fitting baseline OLS: {TARGET_COL} ~ {TRIP_DISTANCE_COL} + C({PICKUP_BOROUGH_COL})")
