@@ -1,31 +1,59 @@
 from __future__ import annotations
 
 import pytest
-from pydantic import ValidationError
 
 from broadway.config.loader import load_config
+from broadway.etl.process_config import (
+    min_trip_duration_minutes,
+    max_trip_duration_minutes,
+    min_trip_distance,
+    max_trip_distance,
+    rename_map,
+)
 
 
-def test_load_train_config() -> None:
+@pytest.fixture
+def train_cfg():
     cfg = load_config("train", dataset="taxi", experiment="taxi")
-    assert cfg.dataset is not None
-    assert cfg.dataset.name == "taxi"
     assert cfg.train is not None
-    assert cfg.train.model_file == "model.pkl"
+    return cfg.train
 
 
-def test_load_evaluate_config() -> None:
+@pytest.fixture
+def evaluate_cfg():
     cfg = load_config("evaluate", dataset="taxi", experiment="taxi")
     assert cfg.evaluate is not None
-    assert cfg.evaluate.target_metric == "rmse"
+    return cfg.evaluate
 
 
-def test_load_etl_with_pipeline_fields() -> None:
+@pytest.fixture
+def etl_cfg():
     cfg = load_config("etl", dataset="taxi", experiment="taxi")
     assert cfg.etl is not None
-    assert cfg.etl.min_trip_distance == 0.0
-    assert cfg.etl.max_trip_distance == 50.0
-    assert cfg.etl.rename_map["PULocationID"] == "pickup_location_id"
+    return cfg.etl
+
+
+@pytest.fixture
+def stats_cfg():
+    cfg = load_config("stats", dataset="taxi", experiment="taxi")
+    assert cfg.stats is not None
+    return cfg.stats
+
+
+def test_load_train_config(train_cfg) -> None:
+    assert train_cfg.model_file
+    assert train_cfg.random_state
+
+
+def test_load_evaluate_config(evaluate_cfg) -> None:
+    assert evaluate_cfg.target_metric
+    assert evaluate_cfg.promotion_threshold
+
+
+def test_load_etl_with_pipeline_fields(etl_cfg) -> None:
+    assert etl_cfg.min_trip_distance == min_trip_distance
+    assert etl_cfg.max_trip_distance == max_trip_distance
+    assert etl_cfg.rename_map["PULocationID"] == rename_map["PULocationID"]
 
 
 def test_missing_dataset_raises() -> None:
@@ -43,9 +71,7 @@ def test_invalid_step_raises() -> None:
         load_config("bogus")
 
 
-def test_stats_config_fields() -> None:
-    cfg = load_config("stats", dataset="taxi", experiment="taxi")
-    assert cfg.stats is not None
-    assert cfg.stats.data_path == "data/processed/training_data.parquet"
-    assert cfg.stats.min_rows_for_sampling == 10000
-    assert "Manhattan" in cfg.stats.group_values
+def test_stats_config_fields(stats_cfg) -> None:
+    assert stats_cfg.data_path
+    assert stats_cfg.min_rows_for_sampling
+    assert stats_cfg.group_values

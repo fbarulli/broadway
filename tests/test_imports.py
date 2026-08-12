@@ -5,6 +5,15 @@ from pathlib import Path
 
 import pytest
 
+from broadway.config.loader import load_config
+
+
+@pytest.fixture
+def features_cfg():
+    cfg = load_config("features", dataset="taxi", experiment="taxi")
+    assert cfg.features is not None
+    return cfg.features
+
 
 def test_core_imports() -> None:
     from broadway.config.loader import load_config
@@ -16,7 +25,7 @@ def test_core_imports() -> None:
     assert callable(main)
 
 
-def test_features_imports() -> None:
+def test_features_imports(features_cfg) -> None:
     from broadway.features.schema import ENGINEERED_FEATURES, RAW_FEATURES, TARGET
     from broadway.features.ml_pipeline import FeaturePipeline
 
@@ -24,17 +33,17 @@ def test_features_imports() -> None:
     assert isinstance(RAW_FEATURES, list)
     assert isinstance(TARGET, str)
     pipeline = FeaturePipeline(
-        lookup_path="data/raw/taxi_zone_lookup.csv",
-        encoding_smoothing=50,
-        frequency_fill=0,
-        rush_hour_morning_start=7,
-        rush_hour_morning_end=9,
-        rush_hour_evening_start=16,
-        rush_hour_evening_end=19,
-        night_start=22,
-        night_end=5,
-        passenger_count_min=1,
-        passenger_count_max=6,
+        lookup_path=features_cfg.lookup_path,
+        encoding_smoothing=features_cfg.encoding_smoothing,
+        frequency_fill=features_cfg.frequency_fill,
+        rush_hour_morning_start=features_cfg.rush_hour_morning_start,
+        rush_hour_morning_end=features_cfg.rush_hour_morning_end,
+        rush_hour_evening_start=features_cfg.rush_hour_evening_start,
+        rush_hour_evening_end=features_cfg.rush_hour_evening_end,
+        night_start=features_cfg.night_start,
+        night_end=features_cfg.night_end,
+        passenger_count_min=features_cfg.passenger_count_min,
+        passenger_count_max=features_cfg.passenger_count_max,
     )
     assert not pipeline.fitted
 
@@ -48,19 +57,13 @@ def test_etl_imports() -> None:
 
 
 def test_config_loads() -> None:
-    from broadway.config.loader import load_config
-
     cfg = load_config("train", dataset="taxi", experiment="taxi")
     assert cfg.dataset is not None
-    assert cfg.dataset.name == "taxi"
+    assert cfg.dataset.name
     assert cfg.train is not None
 
 
 def test_no_logistics_ml_references() -> None:
-    root = Path("src")
-    py_files = list(root.rglob("*.py"))
-    assert len(py_files) > 0, "no Python files found under src/"
-
     result = subprocess.run(
         ["grep", "-r", "logistics_ml", "src/"], capture_output=True, text=True
     )

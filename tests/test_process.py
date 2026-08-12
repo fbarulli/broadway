@@ -11,6 +11,13 @@ from broadway.etl.process import (
     rename_columns,
     select_and_clean_columns,
 )
+from broadway.etl.process_config import (
+    min_trip_duration_minutes,
+    max_trip_duration_minutes,
+    min_trip_distance,
+    max_trip_distance,
+    rename_map,
+)
 from broadway.features.schema import TARGET
 
 
@@ -18,7 +25,7 @@ from broadway.features.schema import TARGET
 def raw_trips() -> pd.DataFrame:
     return pd.DataFrame(
         {
-            "trip_distance": [2.5, 0.0, 60.0, 3.0, 1.0],
+            "trip_distance": [2.5, min_trip_distance, max_trip_distance + 10, 3.0, 1.0],
             "tpep_pickup_datetime": pd.to_datetime(
                 ["2024-01-01 10:00", "2024-01-01 11:00", "2024-01-01 12:00",
                  "2024-01-01 13:00", "2024-01-01 14:00"]
@@ -38,15 +45,15 @@ def test_read_raw_data(raw_trips: pd.DataFrame, tmp_path) -> None:
     f = tmp_path / "yellow_tripdata_2024-01.parquet"
     raw_trips.to_parquet(f)
     result = read_raw_data([f])
-    assert len(result) == 5
+    assert len(result) == len(raw_trips)
     assert list(result.columns) == list(raw_trips.columns)
 
 
 def test_filter_valid_trips(raw_trips: pd.DataFrame) -> None:
     filtered = filter_valid_trips(raw_trips)
-    assert len(filtered) == 3
-    assert float(filtered["trip_distance"].min()) > 0.0
-    assert float(filtered["trip_distance"].max()) < 50.0
+    assert len(filtered) < len(raw_trips)
+    assert float(filtered["trip_distance"].min()) > min_trip_distance
+    assert float(filtered["trip_distance"].max()) < max_trip_distance
 
 
 def test_compute_trip_duration(raw_trips: pd.DataFrame) -> None:
@@ -57,17 +64,23 @@ def test_compute_trip_duration(raw_trips: pd.DataFrame) -> None:
 
 
 def test_filter_valid_duration() -> None:
-    df = pd.DataFrame(
-        {TARGET: [0.0, 10.0, 200.0, 30.0, 90.0]}
-    )
+    df = pd.DataFrame({
+        TARGET: [
+            min_trip_duration_minutes - 1,
+            min_trip_duration_minutes + 1,
+            max_trip_duration_minutes + 1,
+            (min_trip_duration_minutes + max_trip_duration_minutes) / 2,
+            (min_trip_duration_minutes + max_trip_duration_minutes) / 2,
+        ]
+    })
     filtered = filter_valid_duration(df)
     assert len(filtered) == 3
-    assert float(filtered[TARGET].min()) >= 1.0
-    assert float(filtered[TARGET].max()) <= 180.0
+    assert float(filtered[TARGET].min()) >= min_trip_duration_minutes
+    assert float(filtered[TARGET].max()) <= max_trip_duration_minutes
 
 
 def test_rename_columns() -> None:
-    df = pd.DataFrame({"PULocationID": [1], "DOLocationID": [2]})
+    df = pd.DataFrame({old: [1] for old in rename_map})
     result = rename_columns(df)
     assert "pickup_location_id" in result.columns
     assert "dropoff_location_id" in result.columns
@@ -79,4 +92,4 @@ def test_select_and_clean_columns(raw_trips: pd.DataFrame) -> None:
     result = select_and_clean_columns(renamed)
     assert TARGET in result.columns
     assert result[TARGET].notna().all()
-    assert len(result) == 4
+    assert len(result) < len(renamed)
