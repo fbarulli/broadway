@@ -25,7 +25,7 @@ def apply_frequency_encoding(
     stats: pd.DataFrame,
     cols: list[str],
     feature_name: str,
-    fill_value: int,
+    fill_value: float,
 ) -> pd.DataFrame:
     """
     Merge a frequency encoding into a dataframe.

@@ -152,7 +152,15 @@ class FeaturesStep(BaseModel):
     pipeline_file: str
     borough_column: str
     borough_lookup_column: str
-    rush_hour_hours: list[int]
+    lookup_path: str
+    rush_hour_morning_start: int
+    rush_hour_morning_end: int
+    rush_hour_evening_start: int
+    rush_hour_evening_end: int
+    night_start: int
+    night_end: int
+    passenger_count_min: int
+    passenger_count_max: int
 
 
 class StatsStep(BaseModel):
@@ -183,6 +191,12 @@ class TrainStep(BaseModel):
     n_jobs: int
     cv_folds: int
     model_file: str
+    n_estimators: int
+    learning_rate: float
+    num_leaves: int
+    subsample: float
+    colsample_bytree: float
+    quantile_tail: float
 
 
 class EvaluateStep(BaseModel):

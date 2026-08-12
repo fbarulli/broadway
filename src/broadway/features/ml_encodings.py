@@ -7,7 +7,7 @@ def make_target_encoding(
     target: str,
     feature_name: str,
     smoothing: int,
-):
+) -> tuple[pd.DataFrame, float]:
     """
     Compute a smoothed target encoding from the training data.
     """

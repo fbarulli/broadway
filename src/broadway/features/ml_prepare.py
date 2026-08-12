@@ -6,13 +6,16 @@ from broadway.features.ml_pipeline import FeaturePipeline
 from broadway.features.schema import TARGET
 
 
-def prepare_dataset(df: pd.DataFrame, train_test_cutoff: str) -> tuple:
+def prepare_dataset(
+    df: pd.DataFrame,
+    train_test_cutoff: str,
+    pipeline: FeaturePipeline,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series, FeaturePipeline]:
     cutoff = pd.Timestamp(train_test_cutoff)
 
     train_df = df[df["pickup_datetime"] < cutoff].copy().reset_index(drop=True)
     test_df = df[df["pickup_datetime"] >= cutoff].copy().reset_index(drop=True)
 
-    pipeline = FeaturePipeline()
     pipeline.fit(train_df)
 
     train_features = pipeline.transform(train_df)

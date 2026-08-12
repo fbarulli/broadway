@@ -3,4 +3,12 @@ frequency_fill: -1.0
 pipeline_file: feature_pipeline.pkl
 borough_column: Borough
 borough_lookup_column: Borough_lookup
-rush_hour_hours: [7, 8, 9, 17, 18, 19]
+lookup_path: data/raw/taxi_zone_lookup.csv
+rush_hour_morning_start: 7
+rush_hour_morning_end: 9
+rush_hour_evening_start: 16
+rush_hour_evening_end: 19
+night_start: 22
+night_end: 5
+passenger_count_min: 1
+passenger_count_max: 6

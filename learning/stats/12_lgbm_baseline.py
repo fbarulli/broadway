@@ -1,30 +1,3 @@
-"""
-12_lgbm_baseline.py
-
-The non-linear baseline promised after the OLS diagnostics made the case
-against pure linear modeling: heteroskedastic residuals (Breusch-Pagan
-p=0), heavy right tail (kurtosis=25.5), and now (11) likely borough-varying
-slopes. Trees don't assume homoskedastic normal errors or a fixed linear
-functional form, so they should absorb all three of those issues without
-needing a workaround the way OLS does.
-
-Two things this script does differently from the OLS scripts, deliberately:
-
-  1. TIME-BASED split, not random. Taxi demand/traffic is autocorrelated
-     (see 10 -- pickup_datetime carries structure). A random train/test
-     split would let the model see trips from the same rush-hour window
-     it's being tested on, leaking information and overstating performance.
-     Train on everything before a cutoff date, test on everything after.
-
-  2. Uses the full ENGINEERED_FEATURES set from features/, not just
-     distance + borough -- this is meant as a real baseline to build on,
-     not another diagnostic-only fit.
-
-Compares against the OLS baseline (08) and interaction model (11) on the
-same holdout using MAE and RMSE, since R^2 alone hides how the model does
-in the heavy tail that was the whole point of this diagnostic detour.
-"""
-
 import numpy as np
 import pandas as pd
 import lightgbm as lgb
@@ -33,10 +6,31 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error
 from broadway.features.schema import ENGINEERED_FEATURES, TARGET
 from broadway.features.ml_pipeline import FeaturePipeline
 
-from _config import DATA_PATH, TIME_SPLIT_CUTOFF
+from _config import (
+    DATA_PATH,
+    TIME_SPLIT_CUTOFF,
+    FEATURE_LOOKUP_PATH,
+    FEATURE_ENCODING_SMOOTHING,
+    FEATURE_FREQUENCY_FILL,
+    FEATURE_RUSH_HOUR_MORNING_START,
+    FEATURE_RUSH_HOUR_MORNING_END,
+    FEATURE_RUSH_HOUR_EVENING_START,
+    FEATURE_RUSH_HOUR_EVENING_END,
+    FEATURE_NIGHT_START,
+    FEATURE_NIGHT_END,
+    FEATURE_PASSENGER_COUNT_MIN,
+    FEATURE_PASSENGER_COUNT_MAX,
+    RANDOM_STATE,
+    N_ESTIMATORS,
+    LEARNING_RATE,
+    NUM_LEAVES,
+    SUBSAMPLE,
+    COLSAMPLE_BYTREE,
+    QUANTILE_TAIL,
+)
 
 
-def load_and_split():
+def load_and_split() -> tuple[pd.DataFrame, pd.DataFrame]:
     df = pd.read_parquet(DATA_PATH)
     df["pickup_datetime"] = pd.to_datetime(df["pickup_datetime"])
     df = df.sort_values("pickup_datetime")
@@ -47,7 +41,19 @@ def load_and_split():
     print(f"Train: {len(train)} rows (< {TIME_SPLIT_CUTOFF})")
     print(f"Test:  {len(test)} rows (>= {TIME_SPLIT_CUTOFF})")
 
-    pipeline = FeaturePipeline()
+    pipeline = FeaturePipeline(
+        lookup_path=FEATURE_LOOKUP_PATH,
+        encoding_smoothing=FEATURE_ENCODING_SMOOTHING,
+        frequency_fill=FEATURE_FREQUENCY_FILL,
+        rush_hour_morning_start=FEATURE_RUSH_HOUR_MORNING_START,
+        rush_hour_morning_end=FEATURE_RUSH_HOUR_MORNING_END,
+        rush_hour_evening_start=FEATURE_RUSH_HOUR_EVENING_START,
+        rush_hour_evening_end=FEATURE_RUSH_HOUR_EVENING_END,
+        night_start=FEATURE_NIGHT_START,
+        night_end=FEATURE_NIGHT_END,
+        passenger_count_min=FEATURE_PASSENGER_COUNT_MIN,
+        passenger_count_max=FEATURE_PASSENGER_COUNT_MAX,
+    )
     pipeline.fit(train)
     train_feat = pipeline.transform(train)
     test_feat = pipeline.transform(test)
@@ -55,24 +61,24 @@ def load_and_split():
     return train_feat, test_feat
 
 
-def train_lgbm(train_feat: pd.DataFrame):
+def train_lgbm(train_feat: pd.DataFrame) -> lgb.LGBMRegressor:
     X_train = train_feat[ENGINEERED_FEATURES]
     y_train = train_feat[TARGET] if TARGET in train_feat else None
 
     model = lgb.LGBMRegressor(
         objective="regression",
-        n_estimators=500,
-        learning_rate=0.05,
-        num_leaves=63,
-        subsample=0.8,
-        colsample_bytree=0.8,
-        random_state=42,
+        n_estimators=N_ESTIMATORS,
+        learning_rate=LEARNING_RATE,
+        num_leaves=NUM_LEAVES,
+        subsample=SUBSAMPLE,
+        colsample_bytree=COLSAMPLE_BYTREE,
+        random_state=RANDOM_STATE,
     )
     model.fit(X_train, y_train)
     return model
 
 
-def evaluate(model, test_feat: pd.DataFrame) -> dict:
+def evaluate(model: lgb.LGBMRegressor, test_feat: pd.DataFrame) -> dict:
     X_test = test_feat[ENGINEERED_FEATURES]
     y_test = test_feat[TARGET]
     preds = model.predict(X_test)
@@ -80,17 +86,21 @@ def evaluate(model, test_feat: pd.DataFrame) -> dict:
     mae = mean_absolute_error(y_test, preds)
     rmse = np.sqrt(mean_squared_error(y_test, preds))
 
-    # Tail-specific check: this is the part OLS struggled with
-    # (kurtosis=25.5 in 08's residuals). MAE/RMSE on the slowest decile
-    # tells you directly whether the tree model actually fixed that,
-    # rather than just improving the easy majority of trips.
-    tail_mask = y_test >= y_test.quantile(0.9)
+    tail_mask = y_test >= y_test.quantile(QUANTILE_TAIL)
     tail_mae = mean_absolute_error(y_test[tail_mask], preds[tail_mask])
 
     return {"mae": mae, "rmse": rmse, "tail_mae_p90": tail_mae}
 
 
-def main():
+def _print_feature_importance(model: lgb.LGBMRegressor) -> None:
+    print("\n=== Feature importance (top 15) ===")
+    importance = pd.Series(
+        model.feature_importances_, index=ENGINEERED_FEATURES
+    ).sort_values(ascending=False)
+    print(importance.head(15))
+
+
+def main() -> None:
     print("Loading data with time-based split...")
     train_feat, test_feat = load_and_split()
 
@@ -102,11 +112,7 @@ def main():
     for k, v in metrics.items():
         print(f"{k}: {v:.3f}")
 
-    print("\n=== Feature importance (top 15) ===")
-    importance = pd.Series(
-        model.feature_importances_, index=ENGINEERED_FEATURES
-    ).sort_values(ascending=False)
-    print(importance.head(15))
+    _print_feature_importance(model)
 
     print(
         "\nCompare mae/rmse here against 08 (baseline OLS) and 11 "
