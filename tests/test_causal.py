@@ -67,7 +67,7 @@ def test_analyze_two_groups_detects_effect() -> None:
     rng = np.random.default_rng(42)
     treated = rng.normal(1.0, 1.0, 200)
     control = rng.normal(0.0, 1.0, 200)
-    result = analyze_two_groups(treated, control, alpha=0.05)
+    result = analyze_two_groups(treated, control, alpha=0.05, small_group_threshold=30)
     assert isinstance(result, ExperimentResult)
     assert result.passed is True
     assert result.effect_size > 0
@@ -77,7 +77,7 @@ def test_analyze_two_groups_detects_effect() -> None:
 def test_analyze_two_groups_identical_fails() -> None:
     rng = np.random.default_rng(42)
     group = rng.normal(0.0, 1.0, 200)
-    result = analyze_two_groups(group, group, alpha=0.05)
+    result = analyze_two_groups(group, group, alpha=0.05, small_group_threshold=30)
     assert result.passed is False
     assert result.effect_size == pytest.approx(0.0)
     assert result.p_value == pytest.approx(1.0)
@@ -112,7 +112,10 @@ def test_experiment_design_json_roundtrip() -> None:
 def test_experiment_result_json_roundtrip() -> None:
     rng = np.random.default_rng(42)
     result = analyze_two_groups(
-        rng.normal(1.0, 1.0, 100), rng.normal(0.0, 1.0, 100), alpha=0.05
+        rng.normal(1.0, 1.0, 100),
+        rng.normal(0.0, 1.0, 100),
+        alpha=0.05,
+        small_group_threshold=30,
     )
     restored = ExperimentResult.model_validate_json(result.model_dump_json())
     assert restored == result

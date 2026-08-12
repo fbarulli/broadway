@@ -14,15 +14,8 @@ def run(cfg: PipelineConfig) -> None:
     if not cfg.causal:
         raise ValueError("causal step requires causal config")
     causal = cfg.causal
-    effect_size = getattr(causal, "effect_size", None)
-    if effect_size is None:
-        logger.warning(
-            "causal: effect_size is not in the causal config; "
-            "add it to CausalStep to enable experiment design"
-        )
-        return
     design = design_experiment(
-        effect_size=float(effect_size),
+        effect_size=causal.effect_size,
         power=causal.power,
         alpha=causal.alpha,
         treatment_column=causal.treatment_column,

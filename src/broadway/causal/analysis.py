@@ -8,8 +8,6 @@ from scipy import stats
 from broadway.causal.contracts import ExperimentResult
 from broadway.stats.effect_size import cohens_d
 
-_SMALL_GROUP_THRESHOLD = 30
-
 
 def _welch_df(na: int, nb: int, va: float, vb: float) -> float:
     if na < 2 or nb < 2 or (va == 0.0 and vb == 0.0):
@@ -32,7 +30,10 @@ def _mean_diff_ci(a: np.ndarray, b: np.ndarray, alpha: float) -> tuple[float, fl
 
 
 def analyze_two_groups(
-    treated: np.ndarray, control: np.ndarray, alpha: float
+    treated: np.ndarray,
+    control: np.ndarray,
+    alpha: float,
+    small_group_threshold: int,
 ) -> ExperimentResult:
     treated = np.asarray(treated, dtype=float)
     control = np.asarray(control, dtype=float)
@@ -50,7 +51,7 @@ def analyze_two_groups(
         else "fail to reject H0: no detectable effect",
     ]
     warnings = ["does not assume equal variance"]
-    if treated.size < _SMALL_GROUP_THRESHOLD or control.size < _SMALL_GROUP_THRESHOLD:
+    if treated.size < small_group_threshold or control.size < small_group_threshold:
         warnings.append("small sample size")
 
     return ExperimentResult(

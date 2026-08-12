@@ -35,7 +35,12 @@ def test_run_study_finds_quadratic_optimum() -> None:
     def objective(params: dict) -> float:
         return (params["x"] - 3.0) ** 2
 
-    best = run_study(objective, n_trials=50, random_state=42)
+    best = run_study(
+        objective,
+        search_space={"x": [-10.0, 10.0]},
+        n_trials=50,
+        random_state=42,
+    )
     assert best["x"] == pytest.approx(3.0, abs=1.0)
 
 

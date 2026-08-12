@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from typing import Any
 
 import mlflow
 
@@ -20,6 +21,6 @@ def log_metrics(metrics: dict[str, float]) -> None:
     mlflow.log_metrics(metrics)
 
 
-def log_model(model, artifact_path: str) -> str:
+def log_model(model: Any, artifact_path: str) -> str:
     info = mlflow.sklearn.log_model(model, artifact_path)
     return info.model_uri

@@ -193,6 +193,7 @@ class CausalStep(BaseModel):
     outcome_column: str
     power: float
     alpha: float
+    effect_size: float = Field(gt=0.0)
 
 
 class TrainStep(BaseModel):
