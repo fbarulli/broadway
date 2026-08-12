@@ -1,36 +1,30 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import pandas as pd
 
-from logistics_ml.config import data as data_config
-
-from .basic import add_basic_features
-from .boroughs import add_borough_features, load_zones
-from .contracts import validate_engineered_schema
-from .encodings import apply_target_encoding, make_target_encoding
-from .frequency import apply_frequency_encoding, make_frequency_encoding
-from .schema import ENGINEERED_FEATURES, ROUTE_KEYS, TARGET
+from broadway.features.basic import add_basic_features
+from broadway.features.boroughs import add_borough_features, load_zones
+from broadway.features.contracts import validate_engineered_schema
+from broadway.features.ml_encodings import apply_target_encoding, make_target_encoding
+from broadway.features.frequency import apply_frequency_encoding, make_frequency_encoding
+from broadway.features.schema import ENGINEERED_FEATURES, ROUTE_KEYS, TARGET
 
 
 @dataclass
 class FeaturePipeline:
-    """
-    Learns and applies feature engineering.
-
-    fit() learns statistics from training data.
-    transform() applies the learned transformations.
-    """
-
-    zones: pd.DataFrame | None = None
-    route_stats: pd.DataFrame | None = None
-    route_frequency: pd.DataFrame | None = None
-    global_mean: float | None = None
-    fitted: bool = False
+    lookup_path: str = ""
+    encoding_smoothing: int = 50
+    frequency_fill: float = 0.0
+    zones: pd.DataFrame | None = field(default=None, init=False)
+    route_stats: pd.DataFrame | None = field(default=None, init=False)
+    route_frequency: pd.DataFrame | None = field(default=None, init=False)
+    global_mean: float | None = field(default=None, init=False)
+    fitted: bool = field(default=False, init=False)
 
     def fit(self, train_df: pd.DataFrame) -> "FeaturePipeline":
-        self.zones = load_zones(data_config.taxi_lookup)
+        self.zones = load_zones(self.lookup_path)
 
         engineered = self._add_deterministic_features(train_df)
 
@@ -39,7 +33,7 @@ class FeaturePipeline:
             ROUTE_KEYS,
             TARGET,
             "route_avg_duration",
-            data_config.encoding_smoothing,
+            self.encoding_smoothing,
         )
 
         self.route_frequency = make_frequency_encoding(
@@ -75,7 +69,7 @@ class FeaturePipeline:
             self.route_frequency,
             ROUTE_KEYS,
             "route_frequency",
-            data_config.frequency_fill,
+            self.frequency_fill,
         )
 
         if len(engineered) != input_rows:

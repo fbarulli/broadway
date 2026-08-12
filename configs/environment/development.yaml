@@ -4,15 +4,11 @@ raw_subdir: raw
 processed_subdir: processed
 download_chunk_size: 8192
 mlflow_tracking_uri: http://localhost:5000
-mlflow_experiment_name: taxi-duration-prediction
-mlflow_registered_model_name: taxi-duration-model
-mlflow_champion_alias: champion
 database_user: postgres
 database_password: postgres
 database_name: broadway
 database_host: localhost
 database_port: 5432
-database_url: postgresql+psycopg://logistics:logistics@localhost:5432/logistics
 sample_size_ci: 1000
 sample_size_stats: 10000
 api_replicas_min: 1

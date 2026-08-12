@@ -2,14 +2,12 @@ from __future__ import annotations
 
 import pandas as pd
 
-from logistics_ml.config import training as training_config
-
-from .feature_pipeline import FeaturePipeline
-from .schema import TARGET
+from broadway.features.ml_pipeline import FeaturePipeline
+from broadway.features.schema import TARGET
 
 
-def prepare_dataset(df: pd.DataFrame):
-    cutoff = pd.Timestamp(training_config.train_test_cutoff)
+def prepare_dataset(df: pd.DataFrame, train_test_cutoff: str) -> tuple:
+    cutoff = pd.Timestamp(train_test_cutoff)
 
     train_df = df[df["pickup_datetime"] < cutoff].copy().reset_index(drop=True)
     test_df = df[df["pickup_datetime"] >= cutoff].copy().reset_index(drop=True)

@@ -30,8 +30,8 @@ import pandas as pd
 import lightgbm as lgb
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 
-from logistics_ml.features.schema import ENGINEERED_FEATURES, TARGET
-from logistics_ml.features.pipeline import FeaturePipeline
+from broadway.features.schema import ENGINEERED_FEATURES, TARGET
+from broadway.features.ml_pipeline import FeaturePipeline
 
 from _config import DATA_PATH, TIME_SPLIT_CUTOFF
 

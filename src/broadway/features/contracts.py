@@ -1,4 +1,3 @@
-# src/logistics_ml/features/contracts.py
 """
 Data contracts: runtime checks that a DataFrame matches the schema
 expected at a given pipeline stage. These are the enforcement layer for
@@ -13,7 +12,7 @@ from datetime import datetime
 
 import pandas as pd
 
-from logistics_ml.features.schema import (
+from broadway.features.schema import (
     RAW_FEATURES,
     RAW_FEATURE_TYPES,
     ENGINEERED_FEATURES,

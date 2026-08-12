@@ -12,8 +12,6 @@ from broadway.config.resolver import resolve_values
 from broadway.config.schema import (
     CausalStep,
     ContractsStep,
-    DataPipelineConfig,
-    DatabaseServiceConfig,
     DatasetContract,
     DiscoverStep,
     EdaStep,
@@ -23,16 +21,14 @@ from broadway.config.schema import (
     ExperimentConfig,
     FeaturesStep,
     FullStep,
-    MLflowServiceConfig,
     PipelineConfig,
     StatsStep,
-    TrainingPipelineConfig,
     TrainStep,
 )
 
 logger = logging.getLogger(__name__)
 
-CONFIGS_DIR = Path(os.getenv("BROADWAY_CONFIGS_DIR", "configs"))
+CONFIGS_DIR = Path(os.getenv("BROADWAY_CONFIGS_DIR") or "configs")
 DEFAULT_ENVIRONMENT = "development"
 
 STEP_MODELS = {
@@ -93,24 +89,6 @@ def _merge_section(merged: dict, section: str, name: str | None, optional: bool)
     merged.update({section: _deep_merge(merged.get(section, {}), raw)})
 
 
-def _build_logistics_config(config: PipelineConfig, env: dict) -> None:
-    config.mlflow_service = MLflowServiceConfig(
-        tracking_uri=env["mlflow_tracking_uri"],
-        experiment_name=env["mlflow_experiment_name"],
-        registered_model_name=env["mlflow_registered_model_name"],
-        champion_alias=env["mlflow_champion_alias"],
-    )
-    config.database_service = DatabaseServiceConfig(
-        url=env["database_url"],
-    )
-
-    etl_raw = resolve_values(_load_yaml("step/etl.yaml"))
-    config.data_pipeline = DataPipelineConfig(**etl_raw)
-
-    train_raw = resolve_values(_load_yaml("step/train.yaml"))
-    config.training_pipeline = TrainingPipelineConfig(**train_raw)
-
-
 def _build_config(merged: dict, step: str) -> PipelineConfig:
     step_model = STEP_MODELS[step]
     merged = resolve_values(merged)
@@ -127,8 +105,6 @@ def _build_config(merged: dict, step: str) -> PipelineConfig:
             raw = _load_yaml(f"step/{sub_step}.yaml")
             resolved = resolve_values(raw)
             setattr(config, sub_step, STEP_MODELS[sub_step](**resolved))
-
-    _build_logistics_config(config, merged.get("environment", {}))
     return config
 
 

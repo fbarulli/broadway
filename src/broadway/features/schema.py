@@ -1,11 +1,11 @@
-from datetime import datetime
-
 """
 Canonical feature definitions.
 
 This file is the single source of truth for every feature used by
 training and inference.
 """
+
+from datetime import datetime
 
 RAW_FEATURES = [
     "pickup_datetime",
