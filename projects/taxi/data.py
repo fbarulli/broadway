@@ -151,7 +151,10 @@ def generate_sample_cache() -> None:
     frac = min(1.0, SAMPLE_SIZE / pf.metadata.num_rows)
 
     counts, sums = _stream_counts(pf)
-    targets = {borough: round(frac * n) for borough, n in counts.items()}
+    targets = {
+        borough: n if n <= MIN_ROWS_FOR_SAMPLING else round(frac * n)
+        for borough, n in counts.items()
+    }
 
     sample = _stream_sample(pf, targets)
     sample.to_parquet(SAMPLE_CACHE)
