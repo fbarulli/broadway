@@ -1,6 +1,9 @@
 import yaml
 from pathlib import Path
 
+from pyspark.sql import SparkSession
+from pyspark.sql import functions as F
+
 from broadway.config.schema import FeaturesStep, StatsStep, TrainStep
 
 _STATS_YAML = Path("configs/step/stats.yaml")
@@ -34,6 +37,7 @@ FEATURE_NIGHT_END = _features.night_end
 FEATURE_PASSENGER_COUNT_MIN = _features.passenger_count_min
 FEATURE_PASSENGER_COUNT_MAX = _features.passenger_count_max
 
+SAMPLE_SIZE = 200_000
 RANDOM_STATE = _train.random_state
 N_JOBS = _train.n_jobs
 CV_FOLDS = _train.cv_folds
@@ -44,3 +48,56 @@ NUM_LEAVES = _train.num_leaves
 SUBSAMPLE = _train.subsample
 COLSAMPLE_BYTREE = _train.colsample_bytree
 QUANTILE_TAIL = _train.quantile_tail
+
+ZONE_ID_COL = "LocationID"
+ZONE_BOROUGH_COL = "Borough"
+PICKUP_LOCATION_COL = "pickup_location_id"
+DROPOFF_LOCATION_COL = "dropoff_location_id"
+DATETIME_COL = "pickup_datetime"
+TRIP_DISTANCE_COL = "trip_distance"
+PASSENGER_COUNT_COL = "passenger_count"
+TARGET_COL = "trip_duration_minutes"
+
+PICKUP_BOROUGH_COL = "pickup_borough"
+DURATION_COL = "trip_duration_minutes"
+
+
+def load_boroughs_pandas():
+    import pandas as pd
+    df = pd.read_parquet(DATA_PATH)
+    zones = pd.read_csv(LOOKUP_PATH)
+    df = df.merge(
+        zones[[ZONE_ID_COL, ZONE_BOROUGH_COL]],
+        left_on=PICKUP_LOCATION_COL,
+        right_on=ZONE_ID_COL,
+        how="left",
+    )
+    return df.rename(columns={ZONE_BOROUGH_COL: PICKUP_BOROUGH_COL})
+
+
+def get_spark_session(app_name="stats-learning", master="local[*]"):
+    return (
+        SparkSession.builder
+        .appName(app_name)
+        .master(master)
+        .getOrCreate()
+    )
+
+
+def _load_boroughs(spark):
+    trips = spark.read.parquet(DATA_PATH)
+    zones = (
+        spark.read
+        .option("header", True)
+        .option("inferSchema", True)
+        .csv(LOOKUP_PATH)
+    )
+    return trips.join(
+        zones.select(
+            F.col(ZONE_ID_COL).alias(PICKUP_LOCATION_COL),
+            F.col(_stats.group_column).alias(PICKUP_BOROUGH_COL),
+        ),
+        on=PICKUP_LOCATION_COL,
+        how="left",
+    )
+

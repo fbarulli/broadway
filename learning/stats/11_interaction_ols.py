@@ -31,23 +31,17 @@ from statsmodels.stats.diagnostic import het_breuschpagan
 from statsmodels.stats.stattools import jarque_bera
 from statsmodels.stats.anova import anova_lm
 
-from _config import DATA_PATH, LOOKUP_PATH
-
-SAMPLE_SIZE = 200_000
-RANDOM_STATE = 42
+from _config import (
+    RANDOM_STATE, SAMPLE_SIZE,
+    PICKUP_BOROUGH_COL, TARGET_COL, TRIP_DISTANCE_COL,
+    load_boroughs_pandas,
+)
 
 
 def load_sample() -> pd.DataFrame:
-    df = pd.read_parquet(DATA_PATH)
-    zones = pd.read_csv(LOOKUP_PATH)
-    df = df.merge(
-        zones[["LocationID", "Borough"]],
-        left_on="pickup_location_id",
-        right_on="LocationID",
-        how="left",
-    ).rename(columns={"Borough": "pickup_borough"})
+    df = load_boroughs_pandas()
     frac = min(1.0, SAMPLE_SIZE / len(df))
-    sample = df.groupby("pickup_borough").sample(frac=frac, random_state=RANDOM_STATE)
+    sample = df.groupby(PICKUP_BOROUGH_COL).sample(frac=frac, random_state=RANDOM_STATE)
     return sample.reset_index(drop=True)
 
 
@@ -57,13 +51,13 @@ def main():
 
     print("\n=== Baseline (no interaction, from 08) ===")
     baseline = smf.ols(
-        "trip_duration_minutes ~ trip_distance + C(pickup_borough)", data=df
+        f"{TARGET_COL} ~ {TRIP_DISTANCE_COL} + C({PICKUP_BOROUGH_COL})", data=df
     ).fit()
     print(f"R^2 = {baseline.rsquared:.4f}")
 
     print("\n=== Interaction model: distance * borough ===")
     interaction = smf.ols(
-        "trip_duration_minutes ~ trip_distance * C(pickup_borough)", data=df
+        f"{TARGET_COL} ~ {TRIP_DISTANCE_COL} * C({PICKUP_BOROUGH_COL})", data=df
     ).fit()
     print(interaction.summary())
 
@@ -78,10 +72,11 @@ def main():
     )
 
     print("\n=== Implied minutes-per-mile slope by borough ===")
-    base_slope = interaction.params["trip_distance"]
+    base_slope = interaction.params[TRIP_DISTANCE_COL]
     print(f"Reference borough slope: {base_slope:.3f} min/mile")
+    interaction_prefix = f"{TRIP_DISTANCE_COL}:C({PICKUP_BOROUGH_COL})"
     for name, coef in interaction.params.items():
-        if "trip_distance:C(pickup_borough)" in name:
+        if interaction_prefix in name:
             borough = name.split("[T.")[-1].rstrip("]")
             print(f"{borough}: {base_slope + coef:.3f} min/mile "
                   f"(delta={coef:+.3f})")

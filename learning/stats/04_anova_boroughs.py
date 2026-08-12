@@ -7,35 +7,14 @@ It does NOT tell you which one(s) - that needs a post-hoc test (next step).
 
 Run with: python learning/stats/04_anova_boroughs.py
 """
-from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 from scipy import stats
 
-from _config import BOROUGHS, DATA_PATH, LOOKUP_PATH, MIN_ROWS_FOR_SAMPLING, SAMPLE_FRACTION
+from _config import BOROUGHS, MIN_ROWS_FOR_SAMPLING, RANDOM_STATE, SAMPLE_FRACTION, PICKUP_BOROUGH_COL, DURATION_COL, get_spark_session, _load_boroughs
 
-spark = (
-    SparkSession.builder
-    .appName("stats-learning")
-    .master("local[*]")
-    .getOrCreate()
-)
+spark = get_spark_session()
 
-trips = spark.read.parquet(DATA_PATH)
-zones = (
-    spark.read
-    .option("header", True)
-    .option("inferSchema", True)
-    .csv(LOOKUP_PATH)
-)
-
-trips_with_borough = trips.join(
-    zones.select(
-        F.col("LocationID").alias("pickup_location_id"),
-        F.col("Borough").alias("pickup_borough"),
-    ),
-    on="pickup_location_id",
-    how="left",
-)
+trips_with_borough = _load_boroughs(spark)
 
 real_boroughs = list(BOROUGHS)
 
@@ -44,15 +23,15 @@ real_boroughs = list(BOROUGHS)
 
 groups = {}
 for borough in real_boroughs:
-    borough_df = trips_with_borough.filter(F.col("pickup_borough") == borough)
+    borough_df = trips_with_borough.filter(F.col(PICKUP_BOROUGH_COL) == borough)
     total = borough_df.count()
 
     if total > MIN_ROWS_FOR_SAMPLING:
-        rows = borough_df.select("trip_duration_minutes").sample(fraction=SAMPLE_FRACTION, seed=42).collect()
+        rows = borough_df.select(DURATION_COL).sample(fraction=SAMPLE_FRACTION, seed=RANDOM_STATE).collect()
     else:
-        rows = borough_df.select("trip_duration_minutes").collect()
+        rows = borough_df.select(DURATION_COL).collect()
 
-    values = [r["trip_duration_minutes"] for r in rows]
+    values = [r[DURATION_COL] for r in rows]
     groups[borough] = values
     print(f"{borough}: total_rows={total}, sampled_n={len(values)}, mean={sum(values)/len(values):.2f}")
 

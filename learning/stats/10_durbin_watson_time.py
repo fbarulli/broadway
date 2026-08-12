@@ -27,24 +27,22 @@ from statsmodels.stats.stattools import durbin_watson
 from statsmodels.graphics.tsaplots import plot_acf
 import matplotlib.pyplot as plt
 
-from _config import DATA_PATH, LOOKUP_PATH, TIME_SLICE_START, TIME_SLICE_END, ACF_LAGS
+from _config import (
+    TIME_SLICE_START, TIME_SLICE_END, ACF_LAGS,
+    DATETIME_COL,
+    PICKUP_BOROUGH_COL, TARGET_COL, TRIP_DISTANCE_COL,
+    load_boroughs_pandas,
+)
 
 
 def load_time_slice() -> pd.DataFrame:
-    df = pd.read_parquet(DATA_PATH)
-    zones = pd.read_csv(LOOKUP_PATH)
-    df = df.merge(
-        zones[["LocationID", "Borough"]],
-        left_on="pickup_location_id",
-        right_on="LocationID",
-        how="left",
-    ).rename(columns={"Borough": "pickup_borough"})
+    df = load_boroughs_pandas()
 
-    df["pickup_datetime"] = pd.to_datetime(df["pickup_datetime"])
-    mask = (df["pickup_datetime"] >= TIME_SLICE_START) & (
-        df["pickup_datetime"] < TIME_SLICE_END
+    df[DATETIME_COL] = pd.to_datetime(df[DATETIME_COL])
+    mask = (df[DATETIME_COL] >= TIME_SLICE_START) & (
+        df[DATETIME_COL] < TIME_SLICE_END
     )
-    df = df.loc[mask].sort_values("pickup_datetime").reset_index(drop=True)
+    df = df.loc[mask].sort_values(DATETIME_COL).reset_index(drop=True)
     return df
 
 
@@ -59,7 +57,7 @@ def main():
         return
 
     model = smf.ols(
-        "trip_duration_minutes ~ trip_distance + C(pickup_borough)", data=df
+        f"{TARGET_COL} ~ {TRIP_DISTANCE_COL} + C({PICKUP_BOROUGH_COL})", data=df
     ).fit()
 
     dw = durbin_watson(model.resid)

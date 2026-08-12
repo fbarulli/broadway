@@ -9,58 +9,39 @@ group sizes range from 84 to 155,502).
 
 Run with: python learning/stats/07_games_howell.py
 """
-from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 import pandas as pd
 import pingouin as pg
 
-from _config import BOROUGHS, DATA_PATH, LOOKUP_PATH, MIN_ROWS_FOR_SAMPLING, SAMPLE_FRACTION
-
-spark = (
-    SparkSession.builder
-    .appName("stats-learning")
-    .master("local[*]")
-    .getOrCreate()
+from _config import (
+    BOROUGHS, MIN_ROWS_FOR_SAMPLING, RANDOM_STATE, SAMPLE_FRACTION,
+    PICKUP_BOROUGH_COL, DURATION_COL,
+    get_spark_session, _load_boroughs,
 )
 
-trips = spark.read.parquet(DATA_PATH)
-zones = (
-    spark.read
-    .option("header", True)
-    .option("inferSchema", True)
-    .csv(LOOKUP_PATH)
-)
+spark = get_spark_session()
 
-trips_with_borough = trips.join(
-    zones.select(
-        F.col("LocationID").alias("pickup_location_id"),
-        F.col("Borough").alias("pickup_borough"),
-    ),
-    on="pickup_location_id",
-    how="left",
-)
-
-real_boroughs = list(BOROUGHS)
+trips_with_borough = _load_boroughs(spark)
 
 rows = []
-for borough in real_boroughs:
-    borough_df = trips_with_borough.filter(F.col("pickup_borough") == borough)
+for borough in BOROUGHS:
+    borough_df = trips_with_borough.filter(F.col(PICKUP_BOROUGH_COL) == borough)
     total = borough_df.count()
     if total > MIN_ROWS_FOR_SAMPLING:
-        sampled = borough_df.select("trip_duration_minutes").sample(fraction=SAMPLE_FRACTION, seed=42).collect()
+        sampled = borough_df.select(DURATION_COL).sample(fraction=SAMPLE_FRACTION, seed=RANDOM_STATE).collect()
     else:
-        sampled = borough_df.select("trip_duration_minutes").collect()
+        sampled = borough_df.select(DURATION_COL).collect()
     for r in sampled:
-        rows.append({"borough": borough, "duration": r["trip_duration_minutes"]})
+        rows.append({PICKUP_BOROUGH_COL: borough, DURATION_COL: r[DURATION_COL]})
 
 df = pd.DataFrame(rows)
 print(f"Total rows across all groups: {len(df)}")
-print(df.groupby("borough")["duration"].agg(["count", "mean", "std"]))
+print(df.groupby(PICKUP_BOROUGH_COL)[DURATION_COL].agg(["count", "mean", "std"]))
 print()
 
 # pingouin's Games-Howell: pairwise comparisons, Welch-Satterthwaite df,
 # studentized range distribution, no equal-variance/equal-n assumption
-result = pg.pairwise_gameshowell(data=df, dv="duration", between="borough")
+result = pg.pairwise_gameshowell(data=df, dv=DURATION_COL, between=PICKUP_BOROUGH_COL)
 pd.set_option("display.width", 140)
 pd.set_option("display.max_columns", None)
 print("=== Games-Howell pairwise comparisons ===")

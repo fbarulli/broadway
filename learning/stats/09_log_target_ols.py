@@ -32,23 +32,16 @@ import statsmodels.formula.api as smf
 from statsmodels.stats.diagnostic import het_breuschpagan
 from statsmodels.stats.stattools import jarque_bera
 
-from _config import DATA_PATH, LOOKUP_PATH
-
-SAMPLE_SIZE = 200_000
-RANDOM_STATE = 42
+from _config import (
+    RANDOM_STATE, SAMPLE_SIZE, PICKUP_BOROUGH_COL, TARGET_COL,
+    TRIP_DISTANCE_COL, load_boroughs_pandas,
+)
 
 
 def load_sample() -> pd.DataFrame:
-    df = pd.read_parquet(DATA_PATH)
-    zones = pd.read_csv(LOOKUP_PATH)
-    df = df.merge(
-        zones[["LocationID", "Borough"]],
-        left_on="pickup_location_id",
-        right_on="LocationID",
-        how="left",
-    ).rename(columns={"Borough": "pickup_borough"})
+    df = load_boroughs_pandas()
     frac = min(1.0, SAMPLE_SIZE / len(df))
-    sample = df.groupby("pickup_borough").sample(frac=frac, random_state=RANDOM_STATE)
+    sample = df.groupby(PICKUP_BOROUGH_COL).sample(frac=frac, random_state=RANDOM_STATE)
     return sample.reset_index(drop=True)
 
 
@@ -74,18 +67,18 @@ def main():
 
     # Duration is always > 0 post-filtering (config/data.py enforces
     # min_trip_duration_minutes), so plain log is safe -- no log1p needed.
-    df["log_duration"] = np.log(df["trip_duration_minutes"])
+    df["log_duration"] = np.log(df[TARGET_COL])
 
     print("\n=== 1. Log-target model ===")
     log_model = smf.ols(
-        "log_duration ~ trip_distance + C(pickup_borough)", data=df
+        f"log_duration ~ {TRIP_DISTANCE_COL} + C({PICKUP_BOROUGH_COL})", data=df
     ).fit()
     print(log_model.summary())
     run_diagnostics(log_model, "log(duration) ~ distance + borough")
 
     print("=== 2. Original-scale model, robust (HC3) SEs ===")
     baseline = smf.ols(
-        "trip_duration_minutes ~ trip_distance + C(pickup_borough)", data=df
+        f"{TARGET_COL} ~ {TRIP_DISTANCE_COL} + C({PICKUP_BOROUGH_COL})", data=df
     ).fit()
     baseline_robust = baseline.get_robustcov_results(cov_type="HC3")
     print(baseline_robust.summary())

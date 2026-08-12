@@ -6,48 +6,29 @@ Step 5: Check ANOVA's assumptions before trusting the last step's result.
 
 Run with: python learning/stats/05_anova_assumptions.py
 """
-from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 from scipy import stats
 import numpy as np
 
-from _config import BOROUGHS, DATA_PATH, LOOKUP_PATH, MIN_ROWS_FOR_SAMPLING, SAMPLE_FRACTION
-
-spark = (
-    SparkSession.builder
-    .appName("stats-learning")
-    .master("local[*]")
-    .getOrCreate()
+from _config import (
+    BOROUGHS, MIN_ROWS_FOR_SAMPLING, RANDOM_STATE, SAMPLE_FRACTION,
+    PICKUP_BOROUGH_COL, DURATION_COL,
+    get_spark_session, _load_boroughs,
 )
 
-trips = spark.read.parquet(DATA_PATH)
-zones = (
-    spark.read
-    .option("header", True)
-    .option("inferSchema", True)
-    .csv(LOOKUP_PATH)
-)
+spark = get_spark_session()
 
-trips_with_borough = trips.join(
-    zones.select(
-        F.col("LocationID").alias("pickup_location_id"),
-        F.col("Borough").alias("pickup_borough"),
-    ),
-    on="pickup_location_id",
-    how="left",
-)
-
-real_boroughs = list(BOROUGHS)
+trips_with_borough = _load_boroughs(spark)
 
 groups = {}
-for borough in real_boroughs:
-    borough_df = trips_with_borough.filter(F.col("pickup_borough") == borough)
+for borough in BOROUGHS:
+    borough_df = trips_with_borough.filter(F.col(PICKUP_BOROUGH_COL) == borough)
     total = borough_df.count()
     if total > MIN_ROWS_FOR_SAMPLING:
-        rows = borough_df.select("trip_duration_minutes").sample(fraction=SAMPLE_FRACTION, seed=42).collect()
+        rows = borough_df.select(DURATION_COL).sample(fraction=SAMPLE_FRACTION, seed=RANDOM_STATE).collect()
     else:
-        rows = borough_df.select("trip_duration_minutes").collect()
-    groups[borough] = np.array([r["trip_duration_minutes"] for r in rows])
+        rows = borough_df.select(DURATION_COL).collect()
+    groups[borough] = np.array([r[DURATION_COL] for r in rows])
 
 # --- Assumption 1: Homogeneity of variance (Levene's test) ---
 # H0: all groups have equal variance. Unlike ANOVA, Levene's test is

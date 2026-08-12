@@ -9,6 +9,9 @@ from broadway.features.ml_pipeline import FeaturePipeline
 from _config import (
     DATA_PATH,
     TIME_SPLIT_CUTOFF,
+    SAMPLE_SIZE,
+    RANDOM_STATE,
+    DATETIME_COL,
     FEATURE_LOOKUP_PATH,
     FEATURE_ENCODING_SMOOTHING,
     FEATURE_FREQUENCY_FILL,
@@ -20,7 +23,6 @@ from _config import (
     FEATURE_NIGHT_END,
     FEATURE_PASSENGER_COUNT_MIN,
     FEATURE_PASSENGER_COUNT_MAX,
-    RANDOM_STATE,
     N_ESTIMATORS,
     LEARNING_RATE,
     NUM_LEAVES,
@@ -30,13 +32,15 @@ from _config import (
 )
 
 
-def load_and_split() -> tuple[pd.DataFrame, pd.DataFrame]:
+def load_and_split() -> tuple[pd.DataFrame, pd.DataFrame, np.ndarray, np.ndarray]:
     df = pd.read_parquet(DATA_PATH)
-    df["pickup_datetime"] = pd.to_datetime(df["pickup_datetime"])
-    df = df.sort_values("pickup_datetime")
+    if len(df) > SAMPLE_SIZE:
+        df = df.sample(n=SAMPLE_SIZE, random_state=RANDOM_STATE)
+    df[DATETIME_COL] = pd.to_datetime(df[DATETIME_COL])
+    df = df.sort_values(DATETIME_COL)
 
-    train = df[df["pickup_datetime"] < TIME_SPLIT_CUTOFF]
-    test = df[df["pickup_datetime"] >= TIME_SPLIT_CUTOFF]
+    train = df[df[DATETIME_COL] < TIME_SPLIT_CUTOFF]
+    test = df[df[DATETIME_COL] >= TIME_SPLIT_CUTOFF]
 
     print(f"Train: {len(train)} rows (< {TIME_SPLIT_CUTOFF})")
     print(f"Test:  {len(test)} rows (>= {TIME_SPLIT_CUTOFF})")
@@ -55,15 +59,17 @@ def load_and_split() -> tuple[pd.DataFrame, pd.DataFrame]:
         passenger_count_max=FEATURE_PASSENGER_COUNT_MAX,
     )
     pipeline.fit(train)
+    y_train = train[TARGET].values if TARGET in train else None
+    y_test = test[TARGET].values if TARGET in test else None
     train_feat = pipeline.transform(train)
     test_feat = pipeline.transform(test)
 
-    return train_feat, test_feat
+    return train_feat, test_feat, y_train, y_test
 
 
-def train_lgbm(train_feat: pd.DataFrame) -> lgb.LGBMRegressor:
+def train_lgbm(train_feat: pd.DataFrame,
+               y_train: np.ndarray) -> lgb.LGBMRegressor:
     X_train = train_feat[ENGINEERED_FEATURES]
-    y_train = train_feat[TARGET] if TARGET in train_feat else None
 
     model = lgb.LGBMRegressor(
         objective="regression",
@@ -78,15 +84,16 @@ def train_lgbm(train_feat: pd.DataFrame) -> lgb.LGBMRegressor:
     return model
 
 
-def evaluate(model: lgb.LGBMRegressor, test_feat: pd.DataFrame) -> dict:
+def evaluate(model: lgb.LGBMRegressor,
+             test_feat: pd.DataFrame,
+             y_test: np.ndarray) -> dict:
     X_test = test_feat[ENGINEERED_FEATURES]
-    y_test = test_feat[TARGET]
     preds = model.predict(X_test)
 
     mae = mean_absolute_error(y_test, preds)
     rmse = np.sqrt(mean_squared_error(y_test, preds))
 
-    tail_mask = y_test >= y_test.quantile(QUANTILE_TAIL)
+    tail_mask = y_test >= np.quantile(y_test, QUANTILE_TAIL)
     tail_mae = mean_absolute_error(y_test[tail_mask], preds[tail_mask])
 
     return {"mae": mae, "rmse": rmse, "tail_mae_p90": tail_mae}
@@ -102,13 +109,13 @@ def _print_feature_importance(model: lgb.LGBMRegressor) -> None:
 
 def main() -> None:
     print("Loading data with time-based split...")
-    train_feat, test_feat = load_and_split()
+    train_feat, test_feat, y_train, y_test = load_and_split()
 
     print("\nTraining LightGBM baseline...")
-    model = train_lgbm(train_feat)
+    model = train_lgbm(train_feat, y_train)
 
     print("\n=== Holdout performance (time-based split) ===")
-    metrics = evaluate(model, test_feat)
+    metrics = evaluate(model, test_feat, y_test)
     for k, v in metrics.items():
         print(f"{k}: {v:.3f}")
 

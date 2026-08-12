@@ -2,16 +2,9 @@
 Step 1: Load training_data.parquet with Spark and get a feel for it.
 Run with: python learning/stats/01_load_data.py
 """
-from pyspark.sql import SparkSession
+from _config import DATA_PATH, get_spark_session
 
-from _config import DATA_PATH
-
-spark = (
-    SparkSession.builder
-    .appName("stats-learning")
-    .master("local[*]")          # run locally using all cores, no cluster needed
-    .getOrCreate()
-)
+spark = get_spark_session()
 
 df = spark.read.parquet(DATA_PATH)
 

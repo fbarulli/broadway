@@ -40,36 +40,25 @@ from statsmodels.stats.stattools import durbin_watson, jarque_bera
 import matplotlib.pyplot as plt
 import scipy.stats as stats
 
-from _config import DATA_PATH, LOOKUP_PATH, SAMPLE_FRACTION
-
-SAMPLE_SIZE = 200_000
-RANDOM_STATE = 42
+from _config import (
+    RANDOM_STATE, SAMPLE_SIZE, PICKUP_BOROUGH_COL, TARGET_COL,
+    TRIP_DISTANCE_COL, load_boroughs_pandas,
+)
 
 
 def load_sample() -> pd.DataFrame:
     """Load processed training data + borough labels, stratified sample."""
-    df = pd.read_parquet(DATA_PATH)
-    zones = pd.read_csv(LOOKUP_PATH)
+    df = load_boroughs_pandas()
 
-    df = df.merge(
-        zones[["LocationID", "Borough"]],
-        left_on="pickup_location_id",
-        right_on="LocationID",
-        how="left",
-    ).rename(columns={"Borough": "pickup_borough"})
-
-    # Stratified sample so small groups (Bronx, Staten Island) aren't
-    # drowned out by Manhattan's volume -- we want the variance structure
-    # from the ANOVA work to actually show up in this sample.
     frac = min(1.0, SAMPLE_SIZE / len(df))
-    sample = df.groupby("pickup_borough").sample(frac=frac, random_state=RANDOM_STATE)
+    sample = df.groupby(PICKUP_BOROUGH_COL).sample(frac=frac, random_state=RANDOM_STATE)
     return sample.reset_index(drop=True)
 
 
 def fit_baseline_ols(df: pd.DataFrame):
     """Fit trip_duration_minutes ~ trip_distance + C(pickup_borough)."""
     model = smf.ols(
-        "trip_duration_minutes ~ trip_distance + C(pickup_borough)",
+        f"{TARGET_COL} ~ {TRIP_DISTANCE_COL} + C({PICKUP_BOROUGH_COL})",
         data=df,
     ).fit()
     return model
@@ -133,7 +122,7 @@ def run_formal_tests(model, df: pd.DataFrame) -> None:
     # actually track the borough variance structure from Levene's test?
     print("\n=== Residual std by borough (compare to Levene's test) ===")
     resid_df = df.assign(resid=resid.values)
-    print(resid_df.groupby("pickup_borough")["resid"].std().sort_values())
+    print(resid_df.groupby(PICKUP_BOROUGH_COL)["resid"].std().sort_values())
 
 
 def main():
@@ -141,7 +130,7 @@ def main():
     df = load_sample()
     print(f"Sample size: {len(df)}\n")
 
-    print("Fitting baseline OLS: trip_duration_minutes ~ trip_distance + C(pickup_borough)")
+    print(f"Fitting baseline OLS: {TARGET_COL} ~ {TRIP_DISTANCE_COL} + C({PICKUP_BOROUGH_COL})")
     model = fit_baseline_ols(df)
     print(model.summary())
     print()
