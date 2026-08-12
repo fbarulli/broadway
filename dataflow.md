@@ -24,12 +24,14 @@ broadway/
       time_series.py        # durbin_watson_test, plot_acf
       baseline.py           # train_lgbm, evaluate
       module.py             # pipeline step: build groups → run_anova → save_plan
-    features/               # feature transforms + generic schema generation
+    features/               # generic feature machinery + the config-driven pipeline step
       schema.py             # FeatureSpec, build_engineered_schema
-      ml_pipeline.py        # FeaturePipeline (taxi orchestration; moves to projects in Phase 3)
-      basic.py, boroughs.py, ml_encodings.py, frequency.py
+      ml_encodings.py, frequency.py   # generic target/frequency encodings
+      pipeline.py, builders.py, encodings.py, module.py, contracts.py  # ds-pipeline features step
   projects/taxi/
     features.py             # FEATURE_SPECS registry → ENGINEERED_FEATURES/types/schema
+    ml_pipeline.py          # FeaturePipeline (taxi orchestration)
+    basic.py, boroughs.py   # taxi datetime features + zone join
     data.py                 # loaders, constants, mode system, streaming cache
     STATS.md                # script index (what each numbered script does)
     scripts/                # numbered experiment scripts (01..12)

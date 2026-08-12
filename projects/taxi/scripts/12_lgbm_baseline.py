@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 
 from projects.taxi import data
-from broadway.features.ml_pipeline import FeaturePipeline
+from projects.taxi.ml_pipeline import FeaturePipeline
 from broadway.features.schema import TARGET
 from projects.taxi.features import ENGINEERED_FEATURES
 from broadway.stats import baseline
