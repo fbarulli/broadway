@@ -243,6 +243,11 @@ class EvaluateStep(BaseModel):
     output_file: str
 
 
+class BaselineStep(BaseModel):
+    output_dir: str
+    output_file: str
+
+
 class FullStep(BaseModel):
     steps: list[str]
 
@@ -250,6 +255,7 @@ class FullStep(BaseModel):
 class PipelineConfig(BaseModel):
     analysis: AnalysisContract | None = None
     dataset: DatasetContract | None = None
+    baseline: BaselineStep | None = None
     environment: EnvironmentConfig
     experiment: ExperimentConfig | None = None
     discover: DiscoverStep | None = None

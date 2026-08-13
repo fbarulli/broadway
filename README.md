@@ -84,6 +84,7 @@ Every step except `discover` takes the same three flags.
 | features | `ds-pipeline features …` | fitted feature pipeline | works |
 | stats | `ds-pipeline stats …` | `AnalysisPlan` JSON | works (uses stats library) |
 | causal | `ds-pipeline causal --dataset <d> --experiment <e>` | `ExperimentDesign` (power analysis) | separate mode (not in `full`) |
+| baseline | `ds-pipeline baseline --dataset <d> --analysis <a>` | `BaselineResult` → `artifacts/baseline/` | works |
 | train | `ds-pipeline train …` | `TrainingResult` → MLflow model/artifacts | works |
 | evaluate | `ds-pipeline evaluate …` | `EvaluationResult` + promotion decision | works |
 | full | `ds-pipeline full …` | all steps in `configs/step/full.yaml` | works |
@@ -91,6 +92,9 @@ Every step except `discover` takes the same three flags.
 `causal` is a separate analysis mode, run on its own — it is not part of
 `full`. `configs/step/full.yaml` runs discover, etl, contracts, eda, features,
 stats, train, evaluate.
+
+`baseline` is guidance (a naive result to beat), not a hard gate — it is not
+part of `full`.
 
 ---
 

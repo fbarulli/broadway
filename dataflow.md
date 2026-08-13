@@ -28,6 +28,15 @@ stats, train, evaluate. Run causal explicitly:
 ds-pipeline causal --dataset <d> --experiment <e>
 ```
 
+`baseline` is guidance, not a hard gate: it dispatches on
+`AnalysisContract.mode` (prediction/hypothesis/causal), persists a
+`BaselineResult` to `artifacts/baseline/`, and is not yet part of `full.yaml`
+(ordering deferred). Run it explicitly:
+
+```
+ds-pipeline baseline --dataset <d> --analysis <a>
+```
+
 ## Directory tree
 
 ```
@@ -58,8 +67,14 @@ broadway/
       assignment.py         # assign_randomly, assign_stratified
       analysis.py           # analyze_two_groups (Welch's t-test, Cohen's d, 95% CI)
       multiple.py           # correct_pvalues (bonferroni, fdr_bh)
-      sequential.py, hte.py # out-of-scope docstring stubs
-      module.py             # pipeline step: reads cfg.causal, persists ExperimentDesign to artifacts/causal/
+       sequential.py, hte.py # out-of-scope docstring stubs
+       module.py             # pipeline step: reads cfg.causal, persists ExperimentDesign to artifacts/causal/
+    baseline/               # guidance baseline, dispatched on AnalysisContract.mode
+       contracts.py          # BaselineResult (Pydantic) + save/load
+       prediction.py         # majority-class / mean baselines (sklearn accuracy/MAE)
+       hypothesis.py         # naive effect = range of group means
+       causal.py             # power-analysis sample size (reuses design_experiment)
+       module.py             # pipeline step: dispatches on mode, persists BaselineResult to artifacts/baseline/
     features/               # generic feature machinery + the config-driven pipeline step
       schema.py             # FeatureSpec, build_engineered_schema
       ml_encodings.py, frequency.py   # generic target/frequency encodings
@@ -186,6 +201,7 @@ Analysis intent is authored separately via `configs/analysis/<name>.yaml` → `A
 | AnalysisPlan | Pydantic | `broadway/stats/plan.py` |
 | ExperimentDesign | Pydantic | `broadway/causal/contracts.py` |
 | ExperimentResult | Pydantic | `broadway/causal/contracts.py` |
+| BaselineResult | Pydantic | `broadway/baseline/contracts.py` |
 | EvaluationResult | Pydantic | `broadway/evaluate/contracts.py` |
 | TrainingResult | Pydantic | `broadway/training/contracts.py` |
 | DatasetProfile / ColumnProfile | Pydantic | `broadway/discover/profile.py` |

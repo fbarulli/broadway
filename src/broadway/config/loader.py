@@ -11,6 +11,7 @@ import yaml
 from broadway.analysis.contracts import AnalysisContract
 from broadway.config.resolver import resolve_values
 from broadway.config.schema import (
+    BaselineStep,
     CausalStep,
     ContractsStep,
     DatasetContract,
@@ -42,6 +43,7 @@ STEP_MODELS = {
     "causal": CausalStep,
     "train": TrainStep,
     "evaluate": EvaluateStep,
+    "baseline": BaselineStep,
     "full": FullStep,
 }
 
@@ -55,6 +57,7 @@ STEP_MODULES = {
     "causal": "broadway.causal.module",
     "train": "broadway.training.module",
     "evaluate": "broadway.evaluate.module",
+    "baseline": "broadway.baseline.module",
 }
 
 
