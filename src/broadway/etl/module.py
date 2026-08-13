@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import re
 from pathlib import Path
 
@@ -15,7 +16,7 @@ from broadway.data.loader import canonical_path, load
 from broadway.data.splitter import split
 from broadway.lineage.ids import node_id
 from broadway.lineage.models import TransformAudit
-from broadway.lineage.records import enforce_drop_fraction, write_record
+from broadway.lineage.records import enforce_drop_fraction, records_dir, write_record
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +42,7 @@ def run(cfg: PipelineConfig) -> None:
 
     reasons: list[str] = []
     rs = cfg.experiment.random_state if cfg.experiment else cfg.etl.random_state
-    if cfg.etl.ci_sample_size > 0:
+    if cfg.etl.ci_sample_size > 0 and os.getenv("CI") == "true":
         n_before = len(df)
         df = df.sample(n=min(cfg.etl.ci_sample_size, len(df)), random_state=rs)
         if len(df) < n_before:
@@ -104,10 +105,16 @@ def run(cfg: PipelineConfig) -> None:
     result_path.write_text(result.model_dump_json(indent=2), encoding="utf-8")
     logger.info(f"saved structural clean result to {result_path}")
 
+    ingest_id = node_id("ingest", dataset.name)
+    parent = (
+        [ingest_id]
+        if (records_dir() / f"{ingest_id.replace(':', '_')}.json").exists()
+        else [node_id("dataset", dataset.name)]
+    )
     write_record(
         node_id("etl", dataset.name),
         "etl",
         str(canonical_path_),
-        [node_id("dataset", dataset.name)],
+        parent,
         audit=audit,
     )

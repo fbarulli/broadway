@@ -1,16 +1,15 @@
 """Config for etl/process.py — reads taxi knobs from configs/project/taxi.yaml
 and generic etl knobs from configs/step/etl.yaml."""
 
-from pathlib import Path
-
 import yaml
 
+from broadway.config.loader import CONFIGS_DIR
 from broadway.config.schema import EtlStep, ProjectConfig
 
-_PROJECT_YAML = Path("configs/project/taxi.yaml")
+_PROJECT_YAML = CONFIGS_DIR / "project" / "taxi.yaml"
 _project = ProjectConfig(**yaml.safe_load(_PROJECT_YAML.read_text()))
 
-_ETL_YAML = Path("configs/step/etl.yaml")
+_ETL_YAML = CONFIGS_DIR / "step" / "etl.yaml"
 _etl = EtlStep(**yaml.safe_load(_ETL_YAML.read_text()))
 
 raw_dir: str = _project.raw_dir

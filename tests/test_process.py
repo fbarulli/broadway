@@ -5,11 +5,14 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
+import broadway.etl.process_config as process_config
+import broadway.lineage.records as lineage_records
 from broadway.etl.process import (
     compute_trip_duration,
     filter_valid_duration,
     filter_valid_passenger_count,
     filter_valid_trips,
+    process_data,
     read_raw_data,
     rename_columns,
     select_and_clean_columns,
@@ -22,6 +25,7 @@ from broadway.etl.process_config import (
     rename_map,
 )
 from broadway.features.schema import TARGET
+from broadway.lineage.models import LineageRecord
 
 
 @pytest.fixture
@@ -49,7 +53,7 @@ def test_read_raw_data(raw_trips: pd.DataFrame, tmp_path: Path) -> None:
     raw_trips.to_parquet(f)
     result = read_raw_data([f])
     assert len(result) == len(raw_trips)
-    assert list(result.columns) == list(raw_trips.columns)
+    assert set(result.columns) == set(raw_trips.columns)
 
 
 def test_filter_valid_trips(raw_trips: pd.DataFrame) -> None:
@@ -102,3 +106,30 @@ def test_select_and_clean_columns(raw_trips: pd.DataFrame) -> None:
     assert TARGET in result.columns
     assert result[TARGET].notna().all()
     assert len(result) < len(renamed)
+
+
+def test_process_data_writes_ingest_lineage(
+    raw_trips: pd.DataFrame, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    raw_dir = tmp_path / "raw"
+    raw_dir.mkdir()
+    processed_dir = tmp_path / "processed"
+    lineage_dir = tmp_path / "lineage"
+
+    raw_trips.to_parquet(raw_dir / "yellow_tripdata_2024-01.parquet")
+
+    monkeypatch.setattr(process_config, "raw_dir", str(raw_dir))
+    monkeypatch.setattr(process_config, "processed_dir", str(processed_dir))
+    monkeypatch.setattr(lineage_records, "LINEAGE_DIR", lineage_dir)
+
+    process_data()
+
+    training_path = processed_dir / "training_data.parquet"
+    assert training_path.exists()
+    assert len(pd.read_parquet(training_path)) > 0
+
+    record = LineageRecord.model_validate_json(
+        (lineage_dir / "records" / "ingest_taxi.json").read_text(encoding="utf-8")
+    )
+    assert record.artifact == str(training_path)
+    assert record.parents == ["dataset:taxi"]

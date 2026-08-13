@@ -20,6 +20,7 @@ KIND_LABELS = {
     "dataset": "Dataset",
     "profile": "Profile",
     "etl": "ETL",
+    "ingest": "Ingest",
     "analysis": "AnalysisContract",
     "baseline": "Baseline",
     "stats": "Stats",

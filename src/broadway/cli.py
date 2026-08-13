@@ -35,6 +35,8 @@ def _build_parser() -> argparse.ArgumentParser:
     profile = sub.add_parser("profile")
     profile.add_argument("--dataset", type=str, required=True)
 
+    sub.add_parser("ingest")
+
     init = sub.add_parser("init")
     init.add_argument("csv")
     init.add_argument("--name", required=True)
@@ -81,6 +83,10 @@ def main() -> None:
         from broadway.discover.module import profile
 
         profile(args.dataset)
+    elif args.step == "ingest":
+        from broadway.etl.process import process_data
+
+        process_data()
     elif args.step == "init":
         from broadway.onboard.module import init
 

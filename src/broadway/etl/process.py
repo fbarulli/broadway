@@ -3,10 +3,13 @@ import os
 from pathlib import Path
 
 import pandas as pd
+import polars as pl
 
 from broadway.etl import process_config as cfg
 from broadway.features.contracts import validate_raw_schema
 from broadway.features.schema import RAW_FEATURES, TARGET
+from broadway.lineage.ids import node_id
+from broadway.lineage.records import write_record
 
 logger = logging.getLogger(__name__)
 
@@ -20,12 +23,8 @@ def get_raw_files() -> list[Path]:
 
 
 def read_raw_data(files: list[Path]) -> pd.DataFrame:
-    dfs = []
-    for f in files:
-        logger.info(f"Reading {f.name}...")
-        dfs.append(pd.read_parquet(f))
-
-    df = pd.concat(dfs, ignore_index=True)
+    lf = pl.scan_parquet([str(f) for f in files])
+    df = lf.collect().to_pandas()
     logger.info(f"Combined raw rows: {len(df)}")
     return df
 
@@ -119,6 +118,15 @@ def process_data() -> None:
     validate_raw_schema(df)
 
     save_processed_data(df)
+
+    processed_path = Path(cfg.processed_dir) / cfg.processed_file
+    write_record(
+        node_id("ingest", "taxi"),
+        "ingest",
+        str(processed_path),
+        [node_id("dataset", "taxi")],
+    )
+    logger.info("ingest lineage record written")
 
 
 if __name__ == "__main__":

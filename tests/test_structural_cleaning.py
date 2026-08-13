@@ -12,6 +12,8 @@ from broadway.config.schema import ColumnRole, ColumnSchema
 from broadway.contracts.pandera import is_numeric_dtype
 from broadway.data.cleaner import canonicalize
 from broadway.lineage import records
+from broadway.lineage.ids import node_id
+from broadway.lineage.models import LineageRecord
 
 
 def test_parse_datetime_records_failures() -> None:
@@ -193,3 +195,95 @@ def test_etl_module_writes_canonical_and_result(
     assert result.audit.rows_out == 3
     assert result.canonical_path == str(canonical_path)
     assert result.parse_failures == []
+
+
+def _etl_record_path(tmp_path: Path) -> Path:
+    return tmp_path / "lineage" / "records" / "etl_test.json"
+
+
+def _simple_df() -> pd.DataFrame:
+    return pd.DataFrame(
+        {
+            "area": [100, 101],
+            "neighborhood": ["a", "b"],
+            "price": [10, 20],
+            "rooms": [2, 3],
+        }
+    )
+
+
+def test_etl_parent_defaults_to_dataset(tmp_path: Path, monkeypatch) -> None:
+    cfg = load_config("etl", dataset="test", experiment="baseline")
+    cfg = cfg.model_copy(
+        update={
+            "environment": cfg.environment.model_copy(update={"data_dir": str(tmp_path)})
+        }
+    )
+    monkeypatch.setattr(records, "LINEAGE_DIR", tmp_path / "lineage")
+    monkeypatch.setattr(etl_module, "load", lambda dataset: _simple_df().copy())
+
+    etl_module.run(cfg)
+
+    record = LineageRecord.model_validate_json(
+        _etl_record_path(tmp_path).read_text(encoding="utf-8")
+    )
+    assert record.parents == ["dataset:test"]
+
+
+def test_etl_parent_ingest_when_present(tmp_path: Path, monkeypatch) -> None:
+    cfg = load_config("etl", dataset="test", experiment="baseline")
+    cfg = cfg.model_copy(
+        update={
+            "environment": cfg.environment.model_copy(update={"data_dir": str(tmp_path)})
+        }
+    )
+    monkeypatch.setattr(records, "LINEAGE_DIR", tmp_path / "lineage")
+    records.write_record(
+        node_id("ingest", "test"),
+        "ingest",
+        "data/processed/training_data.parquet",
+        [node_id("dataset", "test")],
+    )
+    monkeypatch.setattr(etl_module, "load", lambda dataset: _simple_df().copy())
+
+    etl_module.run(cfg)
+
+    record = LineageRecord.model_validate_json(
+        _etl_record_path(tmp_path).read_text(encoding="utf-8")
+    )
+    assert record.parents == ["ingest:test"]
+
+
+def test_etl_ci_sampling_gated(tmp_path: Path, monkeypatch) -> None:
+    cfg = load_config("etl", dataset="test", experiment="baseline")
+    cfg = cfg.model_copy(
+        update={
+            "environment": cfg.environment.model_copy(update={"data_dir": str(tmp_path)}),
+            "etl": cfg.etl.model_copy(update={"ci_sample_size": 2}),
+        }
+    )
+    monkeypatch.setattr(records, "LINEAGE_DIR", tmp_path / "lineage")
+
+    df = pd.DataFrame(
+        {
+            "area": [100, 101, 102, 103, 104, 105],
+            "neighborhood": ["a", "b", "c", "d", "e", "f"],
+            "price": [10, 20, 30, 40, 50, 60],
+            "rooms": [2, 3, 2, 4, 3, 5],
+        }
+    )
+    monkeypatch.setattr(etl_module, "load", lambda dataset: df.copy())
+
+    canonical_path = (
+        Path(cfg.environment.data_dir)
+        / cfg.environment.processed_subdir
+        / "test_canonical.parquet"
+    )
+
+    monkeypatch.setenv("CI", "true")
+    etl_module.run(cfg)
+    assert len(pd.read_parquet(canonical_path)) == 2
+
+    monkeypatch.delenv("CI", raising=False)
+    etl_module.run(cfg)
+    assert len(pd.read_parquet(canonical_path)) == 6
