@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 
 from broadway.config.loader import DEFAULT_ENVIRONMENT, STEP_MODELS, load_config, resolve_full_steps
+from broadway.lineage.sample import load_sample
 
 STEPS = list(STEP_MODELS.keys())
 
@@ -58,7 +59,9 @@ def _build_parser() -> argparse.ArgumentParser:
     stats = sub.add_parser("stats")
     stats_sub = stats.add_subparsers(dest="stats_subcommand", required=True)
     for sc in ("run", "describe"):
-        _add_step_args(stats_sub.add_parser(sc))
+        p = stats_sub.add_parser(sc)
+        _add_step_args(p)
+        p.add_argument("--sample", required=True)
 
     return parser
 
@@ -90,11 +93,13 @@ def main() -> None:
         if args.stats_subcommand == "describe":
             from broadway.stats.describe import run as describe_run
 
-            describe_run(cfg)
+            sample = load_sample(args.sample)
+            describe_run(cfg, sample)
         else:  # "run"
-            from broadway.pipeline import run as run_pipeline
+            from broadway.stats.module import run as module_run
 
-            run_pipeline(cfg, ["stats"])
+            sample = load_sample(args.sample)
+            module_run(cfg, sample)
     else:
         from broadway.pipeline import run
 

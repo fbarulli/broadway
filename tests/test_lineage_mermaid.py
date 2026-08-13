@@ -18,3 +18,23 @@ def test_to_mermaid_renders_nodes_and_edges() -> None:
     assert output.startswith("flowchart LR")
     assert 'dataset_taxi["taxi"]' in output
     assert "dataset_taxi -->|produced_by| baseline_taxi" in output
+
+
+def test_to_mermaid_renders_sample_suffix() -> None:
+    graph = LineageGraph(
+        nodes=[
+            LineageNode(id="dataset:taxi", kind="dataset", label="taxi", status="produced"),
+            LineageNode(
+                id="describe:taxi",
+                kind="describe",
+                label="describe:taxi",
+                status="produced",
+                sample_name="taxi_diagnostic",
+                sample_role="diagnostic",
+            ),
+        ],
+        edges=[],
+    )
+    output = to_mermaid(graph)
+    assert "describe_taxi[\"describe:taxi (sample=taxi_diagnostic, role=diagnostic)\"]" in output
+    assert 'dataset_taxi["taxi"]' in output

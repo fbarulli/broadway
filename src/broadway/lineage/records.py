@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from broadway.lineage.models import LineageRecord, TransformAudit
+from broadway.lineage.models import LineageRecord, SampleRole, TransformAudit
 
 LINEAGE_DIR = Path(os.getenv("BROADWAY_LINEAGE_DIR", "artifacts/lineage"))
 
@@ -22,8 +22,18 @@ def write_record(
     artifact: str,
     parents: list[str],
     audit: TransformAudit | None = None,
+    sample_name: str | None = None,
+    sample_role: SampleRole | None = None,
 ) -> None:
-    record = LineageRecord(node_id=node_id, kind=kind, artifact=artifact, parents=parents, audit=audit)
+    record = LineageRecord(
+        node_id=node_id,
+        kind=kind,
+        artifact=artifact,
+        parents=parents,
+        audit=audit,
+        sample_name=sample_name,
+        sample_role=sample_role,
+    )
     out_dir = records_dir()
     out_dir.mkdir(parents=True, exist_ok=True)
     filename = node_id.replace(":", "_") + ".json"

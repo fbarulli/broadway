@@ -68,6 +68,18 @@ def test_build_graph_links_nodes_and_records(tmp_path: Path) -> None:
         missing_record.model_dump_json(), encoding="utf-8"
     )
 
+    describe_record = LineageRecord(
+        node_id="describe:taxi",
+        kind="describe",
+        artifact=str(tmp_path / "does_not_exist.json"),
+        parents=["analysis:taxi"],
+        sample_name="taxi_diagnostic",
+        sample_role="diagnostic",
+    )
+    (records_dir / "describe_taxi.json").write_text(
+        describe_record.model_dump_json(), encoding="utf-8"
+    )
+
     decisions_dir = lineage / "decisions"
     decisions_dir.mkdir(parents=True)
     decision = DecisionRecord(
@@ -91,6 +103,11 @@ def test_build_graph_links_nodes_and_records(tmp_path: Path) -> None:
     assert "baseline:taxi" in node_ids
     assert "decision:keep_outliers" in node_ids
     assert "stats:taxi" in node_ids
+    assert "describe:taxi" in node_ids
+
+    sample_by_id = {n.id: (n.sample_name, n.sample_role) for n in graph.nodes}
+    assert sample_by_id["describe:taxi"] == ("taxi_diagnostic", "diagnostic")
+    assert sample_by_id["stats:taxi"] == (None, None)
 
     status_by_id = {n.id: n.status for n in graph.nodes}
     assert status_by_id["baseline:taxi"] == "produced"

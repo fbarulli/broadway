@@ -1,0 +1,4 @@
+name: taxi_diagnostic
+role: diagnostic
+path: results/joined_sample_live.parquet
+description: stratified live sample — diagnostic population

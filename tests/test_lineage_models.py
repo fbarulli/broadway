@@ -11,6 +11,7 @@ from broadway.lineage.models import (
     LineageGraph,
     LineageNode,
     LineageRecord,
+    SampleSpec,
     TransformAudit,
 )
 
@@ -105,3 +106,44 @@ def test_transform_audit_and_lineage_record_round_trip() -> None:
     )
     parsed = LineageRecord.model_validate_json(without_audit.model_dump_json())
     assert parsed.audit is None
+
+
+def test_sample_spec_requires_name_role_path() -> None:
+    spec = SampleSpec(name="taxi", role="diagnostic", path="results/sample.parquet")
+    assert spec.role == "diagnostic"
+    assert spec.description is None
+    with pytest.raises(ValidationError):
+        SampleSpec(name="taxi", path="results/sample.parquet")
+    with pytest.raises(ValidationError):
+        SampleSpec(name="taxi", role="bogus", path="results/sample.parquet")
+
+
+def test_lineage_node_and_record_carry_sample() -> None:
+    node = LineageNode(
+        id="describe:taxi",
+        kind="describe",
+        label="describe:taxi",
+        status="produced",
+        sample_name="taxi_diagnostic",
+        sample_role="diagnostic",
+    )
+    assert node.sample_name == "taxi_diagnostic"
+    assert node.sample_role == "diagnostic"
+
+    rec = LineageRecord(
+        node_id="describe:taxi",
+        kind="describe",
+        artifact="describe.json",
+        parents=[],
+        sample_name="taxi_diagnostic",
+        sample_role="diagnostic",
+    )
+    assert rec.sample_name == "taxi_diagnostic"
+    assert rec.sample_role == "diagnostic"
+
+    bare_node = LineageNode(id="a:b", kind="b", label="b", status="produced")
+    assert bare_node.sample_name is None
+    assert bare_node.sample_role is None
+    bare_rec = LineageRecord(node_id="a:b", kind="b", artifact="x", parents=[])
+    assert bare_rec.sample_name is None
+    assert bare_rec.sample_role is None

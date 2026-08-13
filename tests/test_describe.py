@@ -9,7 +9,7 @@ import pytest
 from broadway.config import loader
 from broadway.config.loader import load_config
 from broadway.lineage import records
-from broadway.stats import describe as describe_module
+from broadway.lineage.models import SampleSpec
 from broadway.stats.describe import (
     GroupSummary,
     describe,
@@ -23,7 +23,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 def test_describe_groups_and_absent() -> None:
     df = pd.DataFrame({"g": ["a", "a", "b", "c", "c"], "t": [1, 2, 10, 3, 4]})
-    summary = describe(df, "g", ["a", "b", "d"], "t", "path")
+    summary = describe(df, "g", ["a", "b", "d"], "t", "path", "s", "diagnostic")
     assert summary.total_n == 5
     assert summary.groups["a"].n == 2
     assert summary.groups["b"].n == 1
@@ -37,18 +37,21 @@ def test_describe_groups_and_absent() -> None:
 def test_describe_no_verdict() -> None:
     for banned in ("balanced", "unbalanced", "verdict"):
         assert banned not in GroupSummary.model_fields
+    assert "canonical_path" not in GroupSummary.model_fields
+    for field in ("sample_name", "sample_role", "source_path"):
+        assert field in GroupSummary.model_fields
 
 
 def test_describe_imbalance_ratio_present_only() -> None:
     df = pd.DataFrame({"g": ["a", "a", "b", "b", "b"], "t": [1, 2, 3, 4, 5]})
-    summary = describe(df, "g", ["a", "b", "z"], "t", "path")
+    summary = describe(df, "g", ["a", "b", "z"], "t", "path", "s", "diagnostic")
     assert summary.groups["z"].n == 0
     assert summary.imbalance_ratio == 1.5
 
 
 def test_plot_functions_write_files(tmp_path: Path) -> None:
     df = pd.DataFrame({"g": ["a", "a", "b"], "t": [1.0, 2.0, 3.0]})
-    summary = describe(df, "g", ["a", "b"], "t", "path")
+    summary = describe(df, "g", ["a", "b"], "t", "path", "s", "diagnostic")
     box_path = tmp_path / "box.png"
     sizes_path = tmp_path / "sizes.png"
     plot_group_distribution(df, "g", ["a", "b"], "t", box_path)
@@ -98,22 +101,20 @@ def test_describe_run_writes_artifacts(
     pd.DataFrame(
         {"neighborhood": ["A", "A", "B", "B", "B"], "price": [100, 110, 200, 210, 220]}
     ).to_parquet(canonical, index=False)
-    monkeypatch.setattr(
-        describe_module, "canonical_path", lambda dataset, environment: canonical
-    )
+    sample = SampleSpec(name="test_diagnostic", role="diagnostic", path=str(canonical))
 
     cfg = cfg.model_copy(
         update={"stats": cfg.stats.model_copy(update={"output_dir": str(tmp_path)})}
     )
 
-    run(cfg)
+    run(cfg, sample)
 
     assert (tmp_path / "describe.json").exists()
     assert (tmp_path / "describe_boxplot.png").exists()
     assert (tmp_path / "describe_group_sizes.png").exists()
 
 
-def test_describe_run_missing_canonical_raises(
+def test_describe_run_missing_sample_raises(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _setup_test_cfg(tmp_path, monkeypatch)
@@ -123,10 +124,8 @@ def test_describe_run_missing_canonical_raises(
     cfg = cfg.model_copy(
         update={"stats": cfg.stats.model_copy(update={"output_dir": str(tmp_path)})}
     )
-    missing = tmp_path / "does_not_exist_canonical.parquet"
-    monkeypatch.setattr(
-        describe_module, "canonical_path", lambda dataset, environment: missing
-    )
+    missing = tmp_path / "does_not_exist_sample.parquet"
+    sample = SampleSpec(name="test_diagnostic", role="diagnostic", path=str(missing))
 
     with pytest.raises(FileNotFoundError):
-        run(cfg)
+        run(cfg, sample)

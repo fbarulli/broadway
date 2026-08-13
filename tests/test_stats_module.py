@@ -10,6 +10,7 @@ import pytest
 from broadway.config.loader import load_config
 from broadway.config.schema import PipelineConfig
 from broadway.lineage import records
+from broadway.lineage.models import SampleSpec
 from broadway.stats import module
 
 
@@ -75,3 +76,45 @@ def test_stats_missing_canonical_raises(
 
     with pytest.raises(FileNotFoundError):
         module.run(cfg)
+
+
+def test_stats_run_with_sample_stamps_plan(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    cfg = load_config("stats", dataset="taxi", experiment="taxi", analysis="taxi_hypothesis")
+    assert cfg.stats is not None
+    assert cfg.dataset is not None
+
+    cfg = cfg.model_copy(
+        update={"stats": cfg.stats.model_copy(update={"output_dir": str(tmp_path)})}
+    )
+
+    group_col = cfg.analysis.hypothesis.group_column
+    target_col = cfg.dataset.target
+
+    def _fake_df() -> pd.DataFrame:
+        rng = np.random.default_rng(42)
+        frames = [
+            pd.DataFrame(
+                {
+                    group_col: [group] * 5,
+                    target_col: rng.normal(mean, 2.0, 5),
+                }
+            )
+            for group, mean in zip(cfg.analysis.hypothesis.group_values, (10.0, 15.0, 20.0, 12.0, 18.0))
+        ]
+        return pd.concat(frames, ignore_index=True)
+
+    sample_path = tmp_path / "taxi_sample.parquet"
+    _fake_df().to_parquet(sample_path, index=False)
+    monkeypatch.setattr(records, "LINEAGE_DIR", tmp_path / "lineage")
+
+    sample = SampleSpec(name="taxi_estimation", role="estimation", path=str(sample_path))
+    module.run(cfg, sample)
+
+    plan_path = tmp_path / cfg.stats.output_file
+    assert plan_path.exists()
+
+    plan = json.loads(plan_path.read_text())
+    assert plan.get("sample_name") == "taxi_estimation"
+    assert plan.get("sample_role") == "estimation"

@@ -110,6 +110,8 @@ def build_graph(configs_dir: Path, lineage_dir: Path) -> LineageGraph:
                 label=rec.node_id,
                 artifact=rec.artifact,
                 status=status,
+                sample_name=rec.sample_name,
+                sample_role=rec.sample_role,
             )
             nodes[node.id] = node
             for parent in rec.parents:

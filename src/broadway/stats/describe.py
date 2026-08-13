@@ -13,8 +13,8 @@ from pydantic import BaseModel, ConfigDict
 
 from broadway.analysis.contracts import AnalysisMode, require_mode
 from broadway.config.schema import PipelineConfig
-from broadway.data.loader import canonical_path
 from broadway.lineage.ids import node_id
+from broadway.lineage.models import SampleRole, SampleSpec
 from broadway.lineage.records import write_record
 
 logger = logging.getLogger(__name__)
@@ -32,7 +32,9 @@ class GroupSummary(BaseModel):
     group_column: str
     target: str
     total_n: int
-    canonical_path: str
+    source_path: str
+    sample_name: str
+    sample_role: SampleRole
     groups: dict[str, GroupStat]      # ALL configured groups, incl. n=0
     absent_groups: list[str]
     imbalance_ratio: float            # evidence only — NO balanced/unbalanced verdict
@@ -40,7 +42,7 @@ class GroupSummary(BaseModel):
     warnings: list[str]
 
 
-def describe(df: pd.DataFrame, group_column: str, group_values: list[str], target: str, canonical_path_str: str) -> GroupSummary:
+def describe(df: pd.DataFrame, group_column: str, group_values: list[str], target: str, source_path: str, sample_name: str, sample_role: SampleRole) -> GroupSummary:
     total_n = int(len(df))
     groups: dict[str, GroupStat] = {}
     absent: list[str] = []
@@ -55,10 +57,11 @@ def describe(df: pd.DataFrame, group_column: str, group_values: list[str], targe
     present_n = [s.n for s in groups.values() if s.n > 0]
     imbalance_ratio = (max(present_n) / min(present_n)) if len(present_n) >= 2 else 0.0
     proportions = {g: (s.n / total_n if total_n else 0.0) for g, s in groups.items()}
-    warnings = ["walkthrough is running on the sampled canonical dataset, not the full taxi data"]
+    warnings: list[str] = []
     return GroupSummary(
         group_column=group_column, target=target, total_n=total_n,
-        canonical_path=canonical_path_str, groups=groups, absent_groups=absent,
+        source_path=source_path, sample_name=sample_name, sample_role=sample_role,
+        groups=groups, absent_groups=absent,
         imbalance_ratio=round(imbalance_ratio, 4), proportions=proportions, warnings=warnings,
     )
 
@@ -97,21 +100,21 @@ def plot_group_sizes(summary: GroupSummary, out_path: Path) -> None:
     plt.close(fig)
 
 
-def run(cfg: PipelineConfig) -> None:
+def run(cfg: PipelineConfig, sample: SampleSpec) -> None:
     if not cfg.dataset or not cfg.stats:
         raise ValueError("stats describe requires dataset and stats config")
     analysis = require_mode(cfg.analysis, AnalysisMode.HYPOTHESIS)
     if analysis.hypothesis is None:
         raise ValueError("hypothesis mode requires a 'hypothesis' block (group_column, group_values)")
-    canonical = canonical_path(cfg.dataset, cfg.environment)
-    if not canonical.exists():
-        raise FileNotFoundError(f"canonical dataset not found: {canonical} — run the etl step first")
-    df = pd.read_parquet(canonical)
+    sample_path = Path(sample.path)
+    if not sample_path.exists():
+        raise FileNotFoundError(f"sample dataset not found: {sample_path}")
+    df = pd.read_parquet(sample_path)
     group_column = analysis.hypothesis.group_column
     group_values = analysis.hypothesis.group_values
     if group_column not in df.columns:
-        raise ValueError(f"group column '{group_column}' not found in canonical data")
-    summary = describe(df, group_column, group_values, cfg.dataset.target, str(canonical))
+        raise ValueError(f"group column '{group_column}' not found in sample data")
+    summary = describe(df, group_column, group_values, cfg.dataset.target, str(sample.path), sample.name, sample.role)
     out_dir = Path(cfg.stats.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     json_path = out_dir / "describe.json"
@@ -122,4 +125,5 @@ def run(cfg: PipelineConfig) -> None:
     write_record(
         node_id("describe", analysis.name), "describe", str(json_path),
         [node_id("etl", cfg.dataset.name), node_id("analysis", analysis.name)],
+        sample_name=sample.name, sample_role=sample.role,
     )
