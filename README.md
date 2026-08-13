@@ -93,6 +93,7 @@ Every step except `discover` takes the same three flags.
 | train | `ds-pipeline train --dataset <d> --analysis <a>` | `TrainingResult` → MLflow model/artifacts | works |
 | evaluate | `ds-pipeline evaluate --dataset <d> --analysis <a>` | `EvaluationResult` + promotion decision | works |
 | full | `ds-pipeline full …` | dispatches to the mode flow (prediction/hypothesis/causal) based on `--analysis` | works |
+| lineage | `ds-pipeline lineage --analysis <a> --dataset <d>` | `artifacts/lineage/graph.json` + `graph.md` + run-state summary | works (reporting, not a pipeline step) |
 
 `causal` is a separate analysis mode, run on its own — it is not part of
 `full`. `full` is a thin dispatcher that reads `AnalysisContract.mode` and
@@ -102,6 +103,22 @@ resolves one of `configs/flow/{prediction,hypothesis,causal}.yaml`.
 of each mode flow's prefix.
 
 `stats`, `causal`, `train`, and `evaluate` now require `--analysis <name>`; `train`/`evaluate` report improvement over the persisted baseline.
+
+### Decision + Lineage
+
+Broadway generates a run graph from persisted artifacts + decisions rather than
+hand-maintaining a diagram:
+
+```bash
+ds-pipeline lineage --analysis taxi --dataset taxi
+# → artifacts/lineage/graph.json + graph.md (Mermaid) + run-state summary
+```
+
+Each step writes a `LineageRecord` sidecar under `artifacts/lineage/records/`
+after saving its result; the `lineage` command assembles them into the chain
+`dataset → profile → analysis → baseline → … → decision`. `DatasetSlice`s are
+authored config (`configs/slice/`); `DecisionRecord`s are runtime events
+(`artifacts/lineage/decisions/`).
 
 ---
 
@@ -197,6 +214,7 @@ Typed step outputs follow `artifacts/<step>/` and reports follow
 | Architecture map | `dataflow.md` |
 | Status / what works | `HANDOFF.md` |
 | Stats library (agnostic) | `src/broadway/stats/` (+ `API.md` contract) |
+| Decision + lineage graph | `src/broadway/lineage/` (records/graph/mermaid/state) |
 | Dataset loaders + constants | `project/data.py` |
 | Script index | `project/STATS.md` |
 | Config schema | `src/broadway/config/schema.py` |

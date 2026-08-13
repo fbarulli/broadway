@@ -107,6 +107,14 @@ broadway/
         lightgbm.py         # LGBMRegressor factory
         registry.py         # get_model(name, **params)
         pyfunc_wrapper.py   # ModelPyFunc (MLflow PyFunc over a pickled model)
+    lineage/                # decision + lineage graph (sidecar records, Mermaid, run state)
+      models.py             # DatasetRef, DatasetSlice, DecisionRecord, LineageRecord, LineageNode/Edge, LineageGraph, RunState
+      ids.py                # node_id(kind, name) -> "kind:name"
+      records.py            # write_record() sidecars under artifacts/lineage/records/
+      graph.py              # build_graph(configs_dir, lineage_dir) -> LineageGraph
+      mermaid.py            # to_mermaid(graph) -> mermaid source
+      state.py              # current_state(graph, mode, goal, decisions) -> RunState
+      module.py             # ds-pipeline lineage command
   project/
     features.py             # FEATURE_SPECS registry → ENGINEERED_FEATURES/types/schema
     ml_pipeline.py          # FeaturePipeline (taxi orchestration)
@@ -207,6 +215,11 @@ Analysis intent is authored separately via `configs/analysis/<name>.yaml` → `A
 | Configuration | Pydantic | `broadway/config/schema.py` |
 | FullStep / FlowConfig | Pydantic | `broadway/config/schema.py` |
 | AnalysisContract | Pydantic | `broadway/analysis/contracts.py` |
+| DatasetSlice | Pydantic | `broadway/lineage/models.py` |
+| DecisionRecord | Pydantic | `broadway/lineage/models.py` |
+| LineageRecord | Pydantic | `broadway/lineage/models.py` |
+| LineageGraph | Pydantic | `broadway/lineage/models.py` |
+| RunState | Pydantic | `broadway/lineage/models.py` |
 | AnalysisPlan | Pydantic | `broadway/stats/plan.py` |
 | ExperimentDesign | Pydantic | `broadway/causal/contracts.py` |
 | ExperimentResult | Pydantic | `broadway/causal/contracts.py` |
@@ -231,6 +244,34 @@ Analysis intent is authored separately via `configs/analysis/<name>.yaml` → `A
 The declared analytical intent (`AnalysisContract.mode`) determines which steps are valid: `stats` requires `mode == "hypothesis"`, `causal` requires `"causal"`, and `train`/`evaluate` require `"prediction"`. `baseline` dispatches on mode (prediction/hypothesis/causal). Mismatches fail early via `broadway/analysis/contracts.py::require_mode`, which also errors when the `--analysis` contract is missing. `full` resolves the mode-specific flow (`configs/flow/{prediction,hypothesis,causal}.yaml`) via `resolve_full_steps`, so each mode runs only its valid tail.
 
 `train` and `evaluate` read the persisted `BaselineResult` (from `artifacts/baseline/`) and report improvement over the baseline (`improvement_vs_baseline` in `broadway/baseline/improvement.py`). `BaselineResult` carries an `ArtifactTrace` (commit/dataset/analysis_goal) for lineage.
+
+## Decision + Lineage
+
+Broadway builds a run graph from persisted artifacts + decisions rather than a
+hand-maintained diagram. Step modules write a `LineageRecord` sidecar after
+saving their result; the `lineage` command assembles them into a graph and a
+run-state summary.
+
+The node chain runs `DatasetRef → DatasetProfile → AnalysisContract →
+BaselineResult → DatasetSlice → DecisionRecord`, with `stats`/`causal`/
+`training`/`evaluation` nodes joining as their sidecar records are produced.
+
+- Sidecars: after saving its artifact, each step module calls `write_record`
+  (`broadway/lineage/records.py`) to write a `LineageRecord {node_id, kind,
+  artifact, parents}` under `artifacts/lineage/records/`. Domain contracts
+  carry no lineage fields.
+- Node ids are `kind:name` (`broadway/lineage/ids.py::node_id`), e.g.
+  `baseline:taxi`, keyed by `AnalysisContract.name`.
+- `DatasetSlice` is authored config (`configs/slice/<name>.yaml`);
+  `DecisionRecord` is a runtime event in `artifacts/lineage/decisions/<id>.json`.
+- `ds-pipeline lineage --analysis <n> --dataset <d>` builds the graph
+  (`broadway/lineage/graph.py::build_graph`), writes `artifacts/lineage/graph.json`
+  + `graph.md` (Mermaid), and prints a run-state summary (goal, stage,
+  open/resolved decisions, `not_yet_produced`).
+- `not_yet_produced` is derived only from lineage-emitting steps
+  (`profile`/`baseline`/`stats`/`causal`/`training`/`evaluation`) for the
+  active mode flow (`broadway/lineage/state.py::LINEAGE_STEPS`);
+  `etl`/`contracts`/`eda`/`features` are never listed.
 
 ## Where to make changes
 
