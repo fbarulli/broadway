@@ -14,6 +14,12 @@ DatasetContract → FeatureSpec → TrainingConfig → Optuna → TrainingResult
   → champion model → prediction
 ```
 
+## Artifacts
+
+Typed execution outputs live under `artifacts/<step>/` (training/, evaluation/,
+stats/, causal/), human-facing HTML reports live under `artifacts/reports/`,
+and processed data stays under `data/processed/`.
+
 `causal` is a separate analysis mode, not part of this flow and not part of
 `full`. `configs/step/full.yaml` = discover, etl, contracts, eda, features,
 stats, train, evaluate. Run causal explicitly:
@@ -50,7 +56,7 @@ broadway/
       analysis.py           # analyze_two_groups (Welch's t-test, Cohen's d, 95% CI)
       multiple.py           # correct_pvalues (bonferroni, fdr_bh)
       sequential.py, hte.py # out-of-scope docstring stubs
-      module.py             # pipeline step: reads cfg.causal, logs ExperimentDesign
+      module.py             # pipeline step: reads cfg.causal, persists ExperimentDesign to artifacts/causal/
     features/               # generic feature machinery + the config-driven pipeline step
       schema.py             # FeatureSpec, build_engineered_schema
       ml_encodings.py, frequency.py   # generic target/frequency encodings

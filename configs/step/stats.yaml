@@ -6,7 +6,7 @@ group_values:
   - Bronx
   - Staten Island
 sample_fraction: 0.1
-output_dir: artifacts/reports
+output_dir: artifacts/stats
 output_file: stats.json
 min_rows_for_sampling: 10000
 per_group_sample_fraction: 0.02

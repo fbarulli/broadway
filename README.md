@@ -167,6 +167,9 @@ configs/
 YAML → Pydantic (`src/broadway/config/schema.py`) → `load_config()`. No
 defaults, no `get(key, default)`, no hardcoded values anywhere.
 
+Typed step outputs follow `artifacts/<step>/` and reports follow
+`artifacts/reports/`.
+
 ---
 
 ## 6. Where everything lives

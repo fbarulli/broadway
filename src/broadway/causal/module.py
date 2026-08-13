@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 
+from broadway.causal.contracts import save_design
 from broadway.causal.design import design_experiment
 from broadway.config.schema import PipelineConfig
 
@@ -21,4 +23,8 @@ def run(cfg: PipelineConfig) -> None:
         treatment_column=causal.treatment_column,
         outcome_column=causal.outcome_column,
     )
-    logger.info("causal design: %s", design.model_dump_json(indent=2))
+    out_dir = Path(causal.output_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out_path = out_dir / causal.output_file
+    save_design(design, out_path)
+    logger.info("causal design written to %s", out_path)

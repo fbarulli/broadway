@@ -3,3 +3,5 @@ outcome_column: price
 power: 0.8
 alpha: 0.05
 effect_size: 0.5
+output_dir: artifacts/causal
+output_file: design.json

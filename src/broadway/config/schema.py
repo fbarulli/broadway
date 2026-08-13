@@ -215,6 +215,8 @@ class CausalStep(BaseModel):
     power: float
     alpha: float
     effect_size: float = Field(gt=0.0)
+    output_dir: str
+    output_file: str
 
 
 class TrainStep(BaseModel):
