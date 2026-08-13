@@ -9,6 +9,8 @@ from broadway.analysis.contracts import AnalysisMode, require_mode
 from broadway.causal.contracts import save_design
 from broadway.causal.design import design_experiment
 from broadway.config.schema import PipelineConfig
+from broadway.lineage.ids import node_id
+from broadway.lineage.records import write_record
 
 logger = logging.getLogger(__name__)
 
@@ -32,3 +34,9 @@ def run(cfg: PipelineConfig) -> None:
     out_path = out_dir / causal.output_file
     save_design(design, out_path)
     logger.info("causal design written to %s", out_path)
+    write_record(
+        node_id("causal", analysis.name),
+        "causal",
+        str(out_path),
+        [node_id("baseline", analysis.name), node_id("analysis", analysis.name)],
+    )

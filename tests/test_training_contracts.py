@@ -23,6 +23,7 @@ from broadway.config.schema import (
     TaskType,
     TrainStep,
 )
+from broadway.lineage import records
 from broadway.training import module
 from broadway.training.contracts import TrainingResult
 from broadway.training.mlflow_utils import log_metrics, log_model, setup_mlflow
@@ -182,6 +183,7 @@ def _make_config(tmp_path: Path) -> PipelineConfig:
         etl=etl,
         train=train_step,
         analysis=AnalysisContract(
+            name="taxi",
             mode=AnalysisMode.PREDICTION,
             goal="predict price",
             row_definition="one row",
@@ -193,8 +195,9 @@ def _make_config(tmp_path: Path) -> PipelineConfig:
     )
 
 
-def test_module_run_writes_training_result(tmp_path: Path) -> None:
+def test_module_run_writes_training_result(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     cfg = _make_config(tmp_path)
+    monkeypatch.setattr(records, "LINEAGE_DIR", tmp_path / "lineage")
     out_dir = Path(cfg.environment.data_dir) / cfg.environment.processed_subdir
     out_dir.mkdir(parents=True, exist_ok=True)
     df = pd.DataFrame(

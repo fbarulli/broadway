@@ -27,6 +27,10 @@ def _build_parser() -> argparse.ArgumentParser:
     discover.add_argument("--datetime-column", type=str, default=None)
     discover.add_argument("--ignore-columns", nargs="*", default=[])
 
+    lineage = sub.add_parser("lineage")
+    lineage.add_argument("--analysis", type=str, required=True)
+    lineage.add_argument("--dataset", type=str, required=True)
+
     for step in STEPS:
         if step == "discover":
             continue
@@ -42,6 +46,10 @@ def main() -> None:
         from broadway.discover.module import run
 
         run(args.csv, args.target, args.task, args.datetime_column, args.ignore_columns)
+    elif args.step == "lineage":
+        from broadway.lineage.module import run
+
+        run(args.analysis, args.dataset)
     else:
         from broadway.pipeline import run
 

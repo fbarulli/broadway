@@ -12,6 +12,8 @@ import yaml
 from broadway.config.loader import CONFIGS_DIR
 from broadway.config.schema import ColumnRole, ColumnSchema, DatasetContract, TaskType
 from broadway.discover.profile import DatasetProfile, build_profile
+from broadway.lineage.ids import node_id
+from broadway.lineage.records import write_record
 
 logger = logging.getLogger(__name__)
 
@@ -92,3 +94,9 @@ def run(
     profile_path.write_text(profile.model_dump_json(indent=2), encoding="utf-8")
     logger.info(f"discover: wrote {len(profile.columns)} column profiles to {profile_path}")
     _log_identifier_recommendations(contract, profile)
+    write_record(
+        node_id("profile", contract.name),
+        "profile",
+        str(profile_path),
+        [node_id("dataset", contract.name)],
+    )

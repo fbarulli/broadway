@@ -35,6 +35,7 @@ def test_full_dispatch_unknown_mode_raises() -> None:
     cfg = cfg.model_copy(
         update={
             "analysis": AnalysisContract(
+                name="taxi",
                 mode=AnalysisMode.HYPOTHESIS,
                 goal="g",
                 row_definition="r",

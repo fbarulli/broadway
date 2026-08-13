@@ -10,6 +10,8 @@ import numpy as np
 from broadway.analysis.contracts import AnalysisMode, require_mode
 from broadway.config.schema import PipelineConfig
 from broadway.data.loader import load
+from broadway.lineage.ids import node_id
+from broadway.lineage.records import write_record
 from broadway.stats.anova import run_anova
 from broadway.stats.plan import save_plan
 
@@ -39,4 +41,10 @@ def run(cfg: PipelineConfig) -> None:
     logger.info(
         f"stats: {plan.test_name} p={plan.statistics['p_value']:.4f}, "
         f"plan written to {out_path}"
+    )
+    write_record(
+        node_id("stats", analysis.name),
+        "stats",
+        str(out_path),
+        [node_id("baseline", analysis.name), node_id("analysis", analysis.name)],
     )

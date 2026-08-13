@@ -15,6 +15,8 @@ from broadway.baseline.module import load_persisted
 from broadway.config.schema import PipelineConfig
 from broadway.data.splitter import split
 from broadway.evaluate.metrics import compute_metrics
+from broadway.lineage.ids import node_id
+from broadway.lineage.records import write_record
 from broadway.training.contracts import TrainingResult
 from broadway.training.mlflow_utils import log_metrics, log_model, log_params, setup_mlflow
 from broadway.training.optuna import run_study
@@ -119,3 +121,9 @@ def run(cfg: PipelineConfig) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / cfg.train.output_file).write_text(result.model_dump_json(indent=2), encoding="utf-8")
     logger.info(f"training result written to {out_dir / cfg.train.output_file}")
+    write_record(
+        node_id("training", cfg.dataset.name),
+        "training",
+        str(out_dir / cfg.train.output_file),
+        [node_id("baseline", cfg.analysis.name), node_id("analysis", cfg.analysis.name)],
+    )

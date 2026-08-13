@@ -7,15 +7,17 @@ import pytest
 from broadway.causal import module
 from broadway.causal.contracts import load_design
 from broadway.config.loader import load_config
+from broadway.lineage import records
 
 
-def test_causal_run_persists_design(tmp_path: Path) -> None:
+def test_causal_run_persists_design(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     cfg = load_config("causal", analysis="taxi_causal")
     assert cfg.causal is not None
 
     cfg = cfg.model_copy(
         update={"causal": cfg.causal.model_copy(update={"output_dir": str(tmp_path)})}
     )
+    monkeypatch.setattr(records, "LINEAGE_DIR", tmp_path / "lineage")
 
     module.run(cfg)
 

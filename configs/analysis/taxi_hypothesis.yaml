@@ -1,3 +1,4 @@
+name: taxi_hypothesis
 mode: hypothesis
 goal: test whether trip duration differs across pickup boroughs
 row_definition: one completed taxi trip

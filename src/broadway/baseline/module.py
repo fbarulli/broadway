@@ -10,6 +10,8 @@ from broadway.baseline import causal, hypothesis, prediction
 from broadway.baseline.contracts import BaselineResult, load_result, save_result
 from broadway.config.schema import PipelineConfig
 from broadway.data.loader import load
+from broadway.lineage.ids import node_id
+from broadway.lineage.records import write_record
 from broadway.trace import ArtifactTrace
 
 logger = logging.getLogger(__name__)
@@ -76,3 +78,9 @@ def run(cfg: PipelineConfig) -> None:
     out_path = out_dir / cfg.baseline.output_file
     save_result(result, out_path)
     logger.info(f"baseline: {result.strategy} {result.metric}={result.value:.4f} -> {out_path}")
+    parents = (
+        [node_id("analysis", cfg.analysis.name), node_id("profile", cfg.dataset.name)]
+        if cfg.dataset is not None
+        else [node_id("analysis", cfg.analysis.name)]
+    )
+    write_record(node_id("baseline", cfg.analysis.name), "baseline", str(out_path), parents)

@@ -1,3 +1,4 @@
+name: taxi
 mode: prediction
 goal: predict trip duration
 row_definition: one completed taxi trip

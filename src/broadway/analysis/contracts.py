@@ -14,6 +14,7 @@ class AnalysisMode(str, Enum):
 class AnalysisContract(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    name: str
     mode: AnalysisMode
     goal: str
     row_definition: str
@@ -24,7 +25,7 @@ class AnalysisContract(BaseModel):
 
     @model_validator(mode="after")
     def _reject_empty_strings(self) -> "AnalysisContract":
-        for field in ("goal", "row_definition", "decision_moment", "success_criterion"):
+        for field in ("name", "goal", "row_definition", "decision_moment", "success_criterion"):
             if not getattr(self, field).strip():
                 raise ValueError(f"'{field}' must be non-empty")
         if not self.available_info:

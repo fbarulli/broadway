@@ -12,6 +12,7 @@ from broadway.baseline.contracts import BaselineResult, load_result, save_result
 from broadway.baseline.improvement import improvement_vs_baseline
 from broadway.config.loader import load_config
 from broadway.config.schema import CausalStep, TaskType
+from broadway.lineage import records
 
 
 def test_contract_round_trip(tmp_path: Path) -> None:
@@ -83,6 +84,7 @@ def test_module_dispatch_prediction(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     cfg = cfg.model_copy(
         update={"baseline": cfg.baseline.model_copy(update={"output_dir": str(tmp_path)})}
     )
+    monkeypatch.setattr(records, "LINEAGE_DIR", tmp_path / "lineage")
     monkeypatch.setattr(
         module, "load", lambda dataset: pd.DataFrame({"trip_duration_minutes": [10.0, 20.0, 30.0]})
     )

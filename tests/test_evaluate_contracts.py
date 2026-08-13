@@ -31,6 +31,7 @@ from broadway.evaluate.comparison import compare_models
 from broadway.evaluate.contracts import EvaluationResult, ModelComparison
 from broadway.evaluate.promotion import should_promote
 from broadway.evaluate.validation import cross_validate, residual_summary
+from broadway.lineage import records
 from broadway.training import module as training_module
 
 
@@ -260,6 +261,7 @@ def _make_config(tmp_path: Path) -> PipelineConfig:
         evaluate=evaluate_step,
         baseline=baseline_step,
         analysis=AnalysisContract(
+            name="taxi",
             mode=AnalysisMode.PREDICTION,
             goal="predict price",
             row_definition="one row",
@@ -271,8 +273,9 @@ def _make_config(tmp_path: Path) -> PipelineConfig:
     )
 
 
-def test_module_run_writes_evaluation_result(tmp_path: Path) -> None:
+def test_module_run_writes_evaluation_result(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     cfg = _make_config(tmp_path)
+    monkeypatch.setattr(records, "LINEAGE_DIR", tmp_path / "lineage")
     out_dir = Path(cfg.environment.data_dir) / cfg.environment.processed_subdir
     out_dir.mkdir(parents=True, exist_ok=True)
     df = pd.DataFrame(
@@ -298,8 +301,9 @@ def test_module_run_writes_evaluation_result(tmp_path: Path) -> None:
     assert isinstance(evaluation.promote, bool)
 
 
-def test_module_run_writes_baseline_comparison(tmp_path: Path) -> None:
+def test_module_run_writes_baseline_comparison(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     cfg = _make_config(tmp_path)
+    monkeypatch.setattr(records, "LINEAGE_DIR", tmp_path / "lineage")
     out_dir = Path(cfg.environment.data_dir) / cfg.environment.processed_subdir
     out_dir.mkdir(parents=True, exist_ok=True)
     df = pd.DataFrame(

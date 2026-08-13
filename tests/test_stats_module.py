@@ -9,6 +9,7 @@ import pytest
 
 from broadway.config.loader import load_config
 from broadway.config.schema import DatasetContract, PipelineConfig
+from broadway.lineage import records
 from broadway.stats import module
 
 
@@ -40,6 +41,7 @@ def test_stats_run_writes_plan_file(
         return pd.concat(frames, ignore_index=True)
 
     monkeypatch.setattr(module, "load", _fake_load)
+    monkeypatch.setattr(records, "LINEAGE_DIR", tmp_path / "lineage")
 
     module.run(cfg)
 

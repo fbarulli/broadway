@@ -23,6 +23,8 @@ from broadway.evaluate.contracts import BaselineComparison, EvaluationResult
 from broadway.evaluate.metrics import compute_metrics
 from broadway.evaluate.promotion import should_promote
 from broadway.evaluate.validation import cross_validate, residual_summary
+from broadway.lineage.ids import node_id
+from broadway.lineage.records import write_record
 from broadway.training.contracts import TrainingResult
 from broadway.training.mlflow_utils import get_champion, promote_candidate, setup_mlflow
 from broadway.training.models.registry import get_model
@@ -141,6 +143,12 @@ def run(cfg: PipelineConfig) -> None:
     eval_dir = Path(cfg.evaluate.output_dir)
     eval_dir.mkdir(parents=True, exist_ok=True)
     (eval_dir / cfg.evaluate.output_file).write_text(evaluation.model_dump_json(indent=2), encoding="utf-8")
+    write_record(
+        node_id("evaluation", cfg.dataset.name),
+        "evaluation",
+        str(eval_dir / cfg.evaluate.output_file),
+        [node_id("training", cfg.dataset.name)],
+    )
 
     if promote:
         try:
