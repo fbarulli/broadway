@@ -34,6 +34,9 @@ ds-pipeline causal --dataset <d> --experiment <e>
 broadway/
   src/broadway/
     config/schema.py        # Pydantic models (DatasetContract, StatsStep, TrainStep, FeaturesStep, ...)
+    discover/               # read CSV/parquet → infer contract + observed profile
+      module.py             # run(): writes configs/dataset/<name>.yaml + artifacts/discover/profile.json
+      profile.py            # DatasetProfile / ColumnProfile (observed facts; identifier_score is descriptive only)
     contracts/              # contract-generated schema + role selectors
       pandera.py            # build_raw_schema(contract) -> pa.DataFrameSchema (generated)
       selectors.py          # feature/datetime/target column selectors over DatasetContract
@@ -185,6 +188,7 @@ Analysis intent is authored separately via `configs/analysis/<name>.yaml` → `A
 | ExperimentResult | Pydantic | `broadway/causal/contracts.py` |
 | EvaluationResult | Pydantic | `broadway/evaluate/contracts.py` |
 | TrainingResult | Pydantic | `broadway/training/contracts.py` |
+| DatasetProfile / ColumnProfile | Pydantic | `broadway/discover/profile.py` |
 | Raw DataFrame | Pandera | `broadway/contracts/pandera.py::build_raw_schema(contract)` (generated) |
 | Engineered features | Pandera | `project/features.py` (`FEATURE_SPECS`) → `broadway/features/schema.py::build_engineered_schema` |
 | Python interfaces | type hints | throughout |
@@ -193,6 +197,7 @@ Analysis intent is authored separately via `configs/analysis/<name>.yaml` → `A
 - Role-based column selection is `broadway/contracts/selectors.py` (`feature_columns`, `datetime_columns`, `target_columns`) — pure functions over the contract, no hardcoded names.
 - Engineered features are defined ONCE in `project/features.py::FEATURE_SPECS`; `ENGINEERED_FEATURES`, `ENGINEERED_FEATURE_TYPES`, and `ENGINEERED_SCHEMA` are all derived from that registry (no parallel hand-maintained list).
 - Enforcement points: `read_training_data()` validates the raw frame via `build_raw_schema`; `FeaturePipeline.transform()` validates against `ENGINEERED_SCHEMA`.
+- `DatasetContract` is the accepted schema (authored/authoritative); `DatasetProfile` / `ColumnProfile` describe observed facts computed at discover time. `identifier_score` is purely descriptive — discover only logs a recommendation, it never mutates roles or the contract.
 
 ## Where to make changes
 

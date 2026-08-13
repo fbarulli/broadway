@@ -77,7 +77,7 @@ Every step except `discover` takes the same three flags.
 
 | Step | Command | Produces | Status |
 |------|---------|----------|--------|
-| discover | `ds-pipeline discover --csv … --target … --task …` | `configs/dataset/<name>.yaml` | works |
+| discover | `ds-pipeline discover --csv … --target … --task …` | `configs/dataset/<name>.yaml` + `artifacts/discover/profile.json` | works |
 | etl | `ds-pipeline etl --dataset <d> --experiment <e>` | cleaned + split parquet | works |
 | contracts | `ds-pipeline contracts …` | pass/fail validation | works |
 | eda | `ds-pipeline eda …` | `artifacts/reports/eda.html` | works |
