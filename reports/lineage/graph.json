@@ -1,0 +1,299 @@
+{
+  "nodes": [
+    {
+      "id": "analysis:taxi",
+      "kind": "analysis",
+      "label": "taxi",
+      "artifact": "configs/analysis/taxi.yaml",
+      "status": "produced",
+      "sample_name": null,
+      "sample_role": null
+    },
+    {
+      "id": "analysis:taxi_causal",
+      "kind": "analysis",
+      "label": "taxi_causal",
+      "artifact": "configs/analysis/taxi_causal.yaml",
+      "status": "produced",
+      "sample_name": null,
+      "sample_role": null
+    },
+    {
+      "id": "analysis:taxi_hypothesis",
+      "kind": "analysis",
+      "label": "taxi_hypothesis",
+      "artifact": "configs/analysis/taxi_hypothesis.yaml",
+      "status": "produced",
+      "sample_name": null,
+      "sample_role": null
+    },
+    {
+      "id": "dataset:taxi",
+      "kind": "dataset",
+      "label": "taxi",
+      "artifact": "data/processed/training_data.parquet",
+      "status": "produced",
+      "sample_name": null,
+      "sample_role": null
+    },
+    {
+      "id": "dataset:test",
+      "kind": "dataset",
+      "label": "test",
+      "artifact": "/tmp/test.csv",
+      "status": "produced",
+      "sample_name": null,
+      "sample_role": null
+    },
+    {
+      "id": "decision:cast_and_bound_passenger_count",
+      "kind": "decision",
+      "label": "cast_and_bound_passenger_count",
+      "artifact": null,
+      "status": "produced",
+      "sample_name": null,
+      "sample_role": null
+    },
+    {
+      "id": "decision:distance_duration_is_flat_rate",
+      "kind": "decision",
+      "label": "distance_duration_is_flat_rate",
+      "artifact": null,
+      "status": "produced",
+      "sample_name": null,
+      "sample_role": null
+    },
+    {
+      "id": "decision:drop_invalid_datetime",
+      "kind": "decision",
+      "label": "drop_invalid_datetime",
+      "artifact": null,
+      "status": "produced",
+      "sample_name": null,
+      "sample_role": null
+    },
+    {
+      "id": "describe:taxi_hypothesis",
+      "kind": "describe",
+      "label": "describe:taxi_hypothesis",
+      "artifact": "artifacts/stats/describe.json",
+      "status": "produced",
+      "sample_name": "taxi_diagnostic",
+      "sample_role": "diagnostic"
+    },
+    {
+      "id": "etl:taxi",
+      "kind": "etl",
+      "label": "etl:taxi",
+      "artifact": "data/processed/taxi_canonical.parquet",
+      "status": "produced",
+      "sample_name": null,
+      "sample_role": null
+    },
+    {
+      "id": "etl:test",
+      "kind": "etl",
+      "label": "etl:test",
+      "artifact": "data/processed/test_canonical.parquet",
+      "status": "produced",
+      "sample_name": null,
+      "sample_role": null
+    },
+    {
+      "id": "ingest:taxi",
+      "kind": "ingest",
+      "label": "ingest:taxi",
+      "artifact": "data/processed/training_data.parquet",
+      "status": "produced",
+      "sample_name": null,
+      "sample_role": null
+    },
+    {
+      "id": "join:taxi",
+      "kind": "join",
+      "label": "join:taxi",
+      "artifact": "data/processed/taxi_join_audit.json",
+      "status": "produced",
+      "sample_name": null,
+      "sample_role": null
+    },
+    {
+      "id": "lookup_value:taxi",
+      "kind": "lookup_value",
+      "label": "lookup_value:taxi",
+      "artifact": "data/processed/taxi_lookup_value_audit.json",
+      "status": "produced",
+      "sample_name": null,
+      "sample_role": null
+    },
+    {
+      "id": "profile:data",
+      "kind": "profile",
+      "label": "profile:data",
+      "artifact": "/tmp/pytest-of-opc/pytest-202/test_run_writes_profile0/artifacts/discover/profile.json",
+      "status": "produced",
+      "sample_name": null,
+      "sample_role": null
+    },
+    {
+      "id": "profile:taxi",
+      "kind": "profile",
+      "label": "profile:taxi",
+      "artifact": "artifacts/discover/profile.json",
+      "status": "produced",
+      "sample_name": null,
+      "sample_role": null
+    },
+    {
+      "id": "profile:test_data",
+      "kind": "profile",
+      "label": "profile:test_data",
+      "artifact": "artifacts/discover/profile.json",
+      "status": "produced",
+      "sample_name": null,
+      "sample_role": null
+    },
+    {
+      "id": "slice:airport",
+      "kind": "slice",
+      "label": "airport",
+      "artifact": "configs/slice/airport.yaml",
+      "status": "produced",
+      "sample_name": null,
+      "sample_role": null
+    },
+    {
+      "id": "slice:distance_duration_inconsistent",
+      "kind": "slice",
+      "label": "distance_duration_inconsistent",
+      "artifact": "configs/slice/distance_duration_inconsistent.yaml",
+      "status": "produced",
+      "sample_name": null,
+      "sample_role": null
+    },
+    {
+      "id": "slice:passenger_out_of_range",
+      "kind": "slice",
+      "label": "passenger_out_of_range",
+      "artifact": "configs/slice/passenger_out_of_range.yaml",
+      "status": "produced",
+      "sample_name": null,
+      "sample_role": null
+    },
+    {
+      "id": "slice:pre_2024",
+      "kind": "slice",
+      "label": "pre_2024",
+      "artifact": "configs/slice/pre_2024.yaml",
+      "status": "produced",
+      "sample_name": null,
+      "sample_role": null
+    },
+    {
+      "id": "stats:taxi_hypothesis",
+      "kind": "stats",
+      "label": "stats:taxi_hypothesis",
+      "artifact": "artifacts/stats/stats.json",
+      "status": "produced",
+      "sample_name": null,
+      "sample_role": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "analysis:taxi_hypothesis",
+      "target": "describe:taxi_hypothesis",
+      "relation": "produced_by"
+    },
+    {
+      "source": "analysis:taxi_hypothesis",
+      "target": "stats:taxi_hypothesis",
+      "relation": "produced_by"
+    },
+    {
+      "source": "baseline:taxi_hypothesis",
+      "target": "stats:taxi_hypothesis",
+      "relation": "produced_by"
+    },
+    {
+      "source": "dataset:data",
+      "target": "profile:data",
+      "relation": "produced_by"
+    },
+    {
+      "source": "dataset:taxi",
+      "target": "ingest:taxi",
+      "relation": "produced_by"
+    },
+    {
+      "source": "dataset:taxi",
+      "target": "profile:taxi",
+      "relation": "produced_by"
+    },
+    {
+      "source": "dataset:test",
+      "target": "etl:test",
+      "relation": "produced_by"
+    },
+    {
+      "source": "dataset:test_data",
+      "target": "profile:test_data",
+      "relation": "produced_by"
+    },
+    {
+      "source": "etl:taxi",
+      "target": "describe:taxi_hypothesis",
+      "relation": "produced_by"
+    },
+    {
+      "source": "ingest:taxi",
+      "target": "join:taxi",
+      "relation": "produced_by"
+    },
+    {
+      "source": "join:taxi",
+      "target": "etl:taxi",
+      "relation": "produced_by"
+    },
+    {
+      "source": "join:taxi",
+      "target": "lookup_value:taxi",
+      "relation": "produced_by"
+    },
+    {
+      "source": "slice:airport",
+      "target": "dataset:taxi",
+      "relation": "filters"
+    },
+    {
+      "source": "slice:distance_duration_inconsistent",
+      "target": "dataset:taxi",
+      "relation": "filters"
+    },
+    {
+      "source": "slice:distance_duration_inconsistent",
+      "target": "decision:distance_duration_is_flat_rate",
+      "relation": "raises"
+    },
+    {
+      "source": "slice:passenger_out_of_range",
+      "target": "dataset:taxi",
+      "relation": "filters"
+    },
+    {
+      "source": "slice:passenger_out_of_range",
+      "target": "decision:cast_and_bound_passenger_count",
+      "relation": "raises"
+    },
+    {
+      "source": "slice:pre_2024",
+      "target": "dataset:taxi",
+      "relation": "filters"
+    },
+    {
+      "source": "slice:pre_2024",
+      "target": "decision:drop_invalid_datetime",
+      "relation": "raises"
+    }
+  ]
+}
