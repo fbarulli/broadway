@@ -44,14 +44,16 @@ def _build_contract(
     dt_col: str | None,
     ignore_cols: list[str],
 ) -> DatasetContract:
-    columns = {
-        col: ColumnSchema(
-            dtype=str(df[col].dtype),
+    columns = {}
+    for col in df.columns:
+        role = _assign_role(col, target, dt_col, ignore_cols)
+        columns[col] = ColumnSchema(
+            dtype=(
+                "datetime64[us]" if role == ColumnRole.DATETIME else str(df[col].dtype)
+            ),
             null_count=int(df[col].isna().sum()),
-            role=_assign_role(col, target, dt_col, ignore_cols),
+            role=role,
         )
-        for col in df.columns
-    }
     return DatasetContract(
         name=Path(csv_path).stem,
         path=csv_path,

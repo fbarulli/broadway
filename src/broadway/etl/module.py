@@ -7,7 +7,7 @@ import re
 from pathlib import Path
 
 from broadway.cleaning.models import StructuralCleanResult
-from broadway.config.schema import ColumnRole, DatasetContract, PipelineConfig
+from broadway.config.schema import PipelineConfig
 from broadway.contracts.pandera import build_raw_schema
 from broadway.contracts.selectors import datetime_columns
 from broadway.data.cleaner import canonicalize
@@ -18,23 +18,6 @@ from broadway.lineage.models import TransformAudit
 from broadway.lineage.records import enforce_drop_fraction, write_record
 
 logger = logging.getLogger(__name__)
-
-
-def _canonical_contract(dataset: DatasetContract) -> DatasetContract:
-    """Return a contract whose DATETIME columns are typed as ``datetime64``.
-
-    The raw contract may describe a DATETIME column as ``object`` (e.g. dates
-    stored as strings in the source CSV). After structural cleaning those
-    columns are canonical ``datetime64``, so the strict schema must expect a
-    datetime dtype rather than the raw string dtype.
-    """
-    columns = {
-        name: col.model_copy(update={"dtype": "datetime64[us]"})
-        if col.role == ColumnRole.DATETIME
-        else col
-        for name, col in dataset.columns.items()
-    }
-    return dataset.model_copy(update={"columns": columns})
 
 
 def _explained_rows(reasons: list[str]) -> int:
@@ -75,7 +58,7 @@ def run(cfg: PipelineConfig) -> None:
     out_dir = Path(cfg.environment.data_dir) / cfg.environment.processed_subdir
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    build_raw_schema(_canonical_contract(dataset)).validate(df)
+    build_raw_schema(dataset).validate(df)
 
     canonical_path = out_dir / f"{dataset.name}_canonical.parquet"
     df.to_parquet(canonical_path, index=False)

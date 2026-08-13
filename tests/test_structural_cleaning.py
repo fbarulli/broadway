@@ -94,7 +94,7 @@ def test_etl_module_writes_canonical_and_result(
 
     columns = dict(cfg.dataset.columns)
     columns["listed_at"] = ColumnSchema(
-        dtype="object", null_count=0, role=ColumnRole.DATETIME
+        dtype="datetime64[us]", null_count=0, role=ColumnRole.DATETIME
     )
     cfg = cfg.model_copy(
         update={"dataset": cfg.dataset.model_copy(update={"columns": columns})}

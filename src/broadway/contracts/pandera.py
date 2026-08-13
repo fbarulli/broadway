@@ -44,12 +44,13 @@ def build_raw_schema(contract: DatasetContract) -> pa.DataFrameSchema:
 
     Columns come directly from ``contract.columns``; join-derived columns
     (e.g. ``pickup_borough``) are not part of the raw contract. Dtypes are
-    checked strictly (``coerce=False``) and nullability is left at Pandera's
-    default — the contract's ``null_count`` is observed, not an invariant.
+    checked strictly (``coerce=False``) and nulls are permitted
+    (``nullable=True``) — the contract's ``null_count`` is observed, not an
+    invariant.
     """
     return pa.DataFrameSchema(
         {
-            name: pa.Column(pandera_dtype(col.dtype))
+            name: pa.Column(pandera_dtype(col.dtype), nullable=True)
             for name, col in contract.columns.items()
         }
     )

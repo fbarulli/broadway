@@ -77,7 +77,7 @@ def build_dataset_contract(
         else:
             role = ColumnRole.FEATURE
         columns[col] = ColumnSchema(
-            dtype=hint.dtype,
+            dtype="datetime64[us]" if role == ColumnRole.DATETIME else hint.dtype,
             null_count=round(hint.null_rate * row_count),
             role=role,
         )
