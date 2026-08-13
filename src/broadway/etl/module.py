@@ -14,6 +14,7 @@ from broadway.contracts.selectors import datetime_columns, numeric_columns
 from broadway.data.cleaner import canonicalize
 from broadway.data.join_audit import JoinAuditReport
 from broadway.data.loader import canonical_path, load_with_audit
+from broadway.data.lookup_value_audit import LookupValueAuditReport
 from broadway.data.splitter import split
 from broadway.lineage.ids import node_id
 from broadway.lineage.models import TransformAudit
@@ -37,7 +38,7 @@ def run(cfg: PipelineConfig) -> None:
     if not cfg.etl:
         raise ValueError("etl step requires an etl config")
     dataset = cfg.dataset
-    df, join_audits = load_with_audit(dataset)
+    df, join_audits, value_audits = load_with_audit(dataset)
     rows_in = len(df)
     columns_before = list(df.columns)
 
@@ -118,6 +119,11 @@ def run(cfg: PipelineConfig) -> None:
             JoinAuditReport(joins=join_audits).model_dump_json(indent=2), encoding="utf-8"
         )
         write_record(node_id("join", dataset.name), "join", str(join_audit_path), upstream)
+        value_audit_path = out_dir / f"{dataset.name}_lookup_value_audit.json"
+        value_audit_path.write_text(
+            LookupValueAuditReport(lookups=value_audits).model_dump_json(indent=2), encoding="utf-8"
+        )
+        write_record(node_id("lookup_value", dataset.name), "lookup_value", str(value_audit_path), [node_id("join", dataset.name)])
         etl_parent = [node_id("join", dataset.name)]
     else:
         etl_parent = upstream

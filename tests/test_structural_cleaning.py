@@ -175,7 +175,7 @@ def test_etl_module_writes_canonical_and_result(
             ],
         }
     )
-    monkeypatch.setattr(etl_module, "load_with_audit", lambda dataset: (df.copy(), []))
+    monkeypatch.setattr(etl_module, "load_with_audit", lambda dataset: (df.copy(), [], []))
 
     etl_module.run(cfg)
 
@@ -220,7 +220,7 @@ def test_etl_parent_defaults_to_dataset(tmp_path: Path, monkeypatch) -> None:
         }
     )
     monkeypatch.setattr(records, "LINEAGE_DIR", tmp_path / "lineage")
-    monkeypatch.setattr(etl_module, "load_with_audit", lambda dataset: (_simple_df().copy(), []))
+    monkeypatch.setattr(etl_module, "load_with_audit", lambda dataset: (_simple_df().copy(), [], []))
 
     etl_module.run(cfg)
 
@@ -244,7 +244,7 @@ def test_etl_parent_ingest_when_present(tmp_path: Path, monkeypatch) -> None:
         "data/processed/training_data.parquet",
         [node_id("dataset", "test")],
     )
-    monkeypatch.setattr(etl_module, "load_with_audit", lambda dataset: (_simple_df().copy(), []))
+    monkeypatch.setattr(etl_module, "load_with_audit", lambda dataset: (_simple_df().copy(), [], []))
 
     etl_module.run(cfg)
 
@@ -272,7 +272,7 @@ def test_etl_ci_sampling_gated(tmp_path: Path, monkeypatch) -> None:
             "rooms": [2, 3, 2, 4, 3, 5],
         }
     )
-    monkeypatch.setattr(etl_module, "load_with_audit", lambda dataset: (df.copy(), []))
+    monkeypatch.setattr(etl_module, "load_with_audit", lambda dataset: (df.copy(), [], []))
 
     canonical_path = (
         Path(cfg.environment.data_dir)
@@ -336,6 +336,14 @@ def test_etl_with_lookups_writes_join_audit(tmp_path: Path, monkeypatch) -> None
         (tmp_path / "lineage" / "records" / "join_test.json").read_text(encoding="utf-8")
     )
     assert join_record.parents == ["dataset:test"]
+
+    value_audit_path = out_dir / "test_lookup_value_audit.json"
+    assert value_audit_path.exists()
+
+    lookup_value_record = LineageRecord.model_validate_json(
+        (tmp_path / "lineage" / "records" / "lookup_value_test.json").read_text(encoding="utf-8")
+    )
+    assert lookup_value_record.parents == ["join:test"]
 
     etl_record = LineageRecord.model_validate_json(
         _etl_record_path(tmp_path).read_text(encoding="utf-8")

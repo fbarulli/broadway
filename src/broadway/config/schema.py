@@ -3,7 +3,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from broadway.analysis.contracts import AnalysisContract, AnalysisMode
 
@@ -35,9 +35,15 @@ class ColumnSchema(BaseModel):
         return normalize_dtype(v) if isinstance(v, str) else v
 
 
+class LookupValuePolicy(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    sentinel_values: list[str] = []
+
+
 class LookupSpec(BaseModel):
     path: str
     key: str
+    value_policies: dict[str, LookupValuePolicy] = {}
 
 
 class DatasetContract(BaseModel):

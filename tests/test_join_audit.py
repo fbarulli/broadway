@@ -80,10 +80,11 @@ def test_load_with_audit_returns_df_and_audits(tmp_path: Path) -> None:
     lookup_csv = tmp_path / "lookup.csv"
     pd.DataFrame({"LocationID": [1, 2], "zone": ["a", "b"]}).to_csv(lookup_csv, index=False)
 
-    df, audits = load_with_audit(_dataset(str(raw_path), str(lookup_csv)))
+    df, audits, value_audits = load_with_audit(_dataset(str(raw_path), str(lookup_csv)))
 
     assert "zone" in df.columns
     assert len(audits) == 1
+    assert len(value_audits) == 1
     audit = audits[0]
     assert audit.rows_attempted == 3
     assert audit.matched == 2
@@ -108,7 +109,7 @@ def test_join_audit_report_round_trip(tmp_path: Path) -> None:
     lookup_csv = tmp_path / "lookup.csv"
     pd.DataFrame({"LocationID": [1, 2], "zone": ["a", "b"]}).to_csv(lookup_csv, index=False)
 
-    _, audits = load_with_audit(_dataset(str(raw_path), str(lookup_csv)))
+    _, audits, _ = load_with_audit(_dataset(str(raw_path), str(lookup_csv)))
     report = JoinAuditReport(joins=audits)
     parsed = JoinAuditReport.model_validate_json(report.model_dump_json())
     assert parsed == report

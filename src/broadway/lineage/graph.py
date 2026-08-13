@@ -22,6 +22,7 @@ KIND_LABELS = {
     "etl": "ETL",
     "ingest": "Ingest",
     "join": "JoinAudit",
+    "lookup_value": "LookupValueAudit",
     "analysis": "AnalysisContract",
     "baseline": "Baseline",
     "stats": "Stats",

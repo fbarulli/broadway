@@ -28,9 +28,17 @@ lookup_tables:
   pickup_location_id:
     path: data/raw/taxi_zone_lookup.csv
     key: LocationID
+    value_policies:
+      Borough:
+        sentinel_values:
+          - "Unknown"
   dropoff_location_id:
     path: data/raw/taxi_zone_lookup.csv
     key: LocationID
+    value_policies:
+      Borough:
+        sentinel_values:
+          - "Unknown"
 name: taxi
 path: data/processed/training_data.parquet
 target: trip_duration_minutes

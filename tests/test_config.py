@@ -11,6 +11,7 @@ from broadway.config.schema import (
     ExperimentConfig,
     FeatureConfig,
     HPOConfig,
+    LookupSpec,
     ModelConfig,
     ProjectConfig,
     SplitConfig,
@@ -119,3 +120,22 @@ def test_hpo_search_space_valid_for_lgbm() -> None:
 def test_hpo_search_space_invalid_for_linear_raises() -> None:
     with pytest.raises(ValidationError):
         _experiment_config("linear", {"max_depth": [3, 10]})
+
+
+def test_lookup_spec_value_policies_parse() -> None:
+    spec = LookupSpec(**yaml.safe_load(
+        """
+        path: lookup.csv
+        key: LocationID
+        value_policies:
+          Borough:
+            sentinel_values:
+              - Unknown
+        """
+    ))
+    assert spec.value_policies["Borough"].sentinel_values == ["Unknown"]
+
+
+def test_lookup_spec_value_policies_default_empty() -> None:
+    spec = LookupSpec(path="lookup.csv", key="LocationID")
+    assert spec.value_policies == {}
