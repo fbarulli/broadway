@@ -50,3 +50,27 @@ Evidence → Ramification:
 Covariate structure / DAG → plausible confounding remains → the OLS coefficient may not identify the intended effect → adjust for appropriate pre-treatment confounders or explicitly frame the estimate as associational.
 
 That gives you a new category: not "did an OLS assumption fail?" but "does the coefficient answer the question we think it answers?"
+
+
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+1- Is the mean relationship correctly specified?
+        after fitting OLS, are the residuals vs fitted value, do the model's systematic errors show a pattern.
+
+Do the residuals look randomly scattered around zero, or do they contain systematic structure?
+
+Random cloud around 0                   = Functional form is reasonably specified
+U-shape / ∩-shape                       = Missing quadratic/nonlinear relationship
+S-shape	                                = More complex nonlinear relationship
+Clear trend	                            = Mean relationship is misspecified
+Separate curves/groups                  = Missing interaction or group-specific relationship
+Systematic pattern against a predictor  = Relationship with that predictor may be incorrectly specified
+
+
+The important point is that this is not primarily a test of whether residuals are "good." You're looking for remaining predictable structure.
+
+Is the mean relationship correctly specified?
+Residual-vs-predictor/fitted plots show systematic structure → OLS's assumed mean function is inadequate → modify the functional form (e.g., polynomial term, transformation, spline, interaction) and refit.
+
+Don't use a significant p-value from a nonlinear-term test as the sole diagnostic. The residual plot tells you what kind of misspecification exists and whether the proposed remediation makes substantive sense.

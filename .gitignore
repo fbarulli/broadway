@@ -13,3 +13,4 @@ data/processed/
 artifacts/
 results/
 *.png
+graphify-out/

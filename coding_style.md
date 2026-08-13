@@ -68,4 +68,4 @@ Single responsibility, ~25 lines max. If a function is approaching that, split i
 
 ### No Noise
 
-No functions that exist just to exist. Before writing anything, ask: does this produce something the user sees, a decision they act on, or a transformation the pipeline depends on? If not, it's noise — don't write it. No vanity metrics, no infrastructure peeking out at the user, no dead wrappers.
+Empty files that arent implemented yet are to be ignored. No functions that exist just to exist. Before writing anything, ask: does this produce something the user sees, a decision they act on, or a transformation the pipeline depends on? If not, it's noise — don't write it. No vanity metrics, no infrastructure peeking out at the user, no dead wrappers.
