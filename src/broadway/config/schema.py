@@ -137,13 +137,16 @@ class DiscoverStep(BaseModel):
 
 class EtlStep(BaseModel):
     ci_sample_size: int = Field(ge=0)
-    max_drop_fraction: float = Field(ge=0.0, le=1.0)
     random_state: int
     train_file: str
     val_file: str
     training_data_file: str
     train_features_file: str
     val_features_file: str
+    max_drop_fraction: float = Field(ge=0.0, le=1.0)
+
+
+class ProjectConfig(BaseModel):
     raw_dir: str
     processed_dir: str
     processed_file: str
@@ -154,16 +157,16 @@ class EtlStep(BaseModel):
     min_pickup_datetime: str
     min_passenger_count: int
     max_passenger_count: int
-    batch_size: int
     rename_map: dict[str, str]
-    taxi_urls: list[str]
-    lookup_url: str
-    lookup_filename: str
-    training_table: str
-    target: str
-    validation_cutoff: str
-    encoding_smoothing: int
-    frequency_fill: float
+    borough_column: str
+    borough_lookup_column: str
+    lookup_path: str
+    rush_hour_morning_start: int
+    rush_hour_morning_end: int
+    rush_hour_evening_start: int
+    rush_hour_evening_end: int
+    night_start: int
+    night_end: int
 
 
 class ContractsStep(BaseModel):
@@ -179,24 +182,13 @@ class EdaStep(BaseModel):
 
 
 class FeaturesStep(BaseModel):
-    max_drop_fraction: float = Field(ge=0.0, le=1.0)
     encoding_smoothing: int
     frequency_fill: float
     pipeline_file: str
-    borough_column: str
-    borough_lookup_column: str
-    lookup_path: str
-    rush_hour_morning_start: int
-    rush_hour_morning_end: int
-    rush_hour_evening_start: int
-    rush_hour_evening_end: int
-    night_start: int
-    night_end: int
+    max_drop_fraction: float = Field(ge=0.0, le=1.0)
 
 
 class StatsStep(BaseModel):
-    group_column: str
-    group_values: list[str]
     sample_fraction: float
     output_dir: str
     output_file: str

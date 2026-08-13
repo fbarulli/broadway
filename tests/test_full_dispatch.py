@@ -43,6 +43,7 @@ def test_full_dispatch_unknown_mode_raises() -> None:
                 available_info=["a"],
                 leakage_notes=[],
                 success_criterion="s",
+                hypothesis={"group_column": "Borough", "group_values": ["Manhattan"]},
             ),
             "full": FullStep(flows={"prediction": "prediction"}),
         }

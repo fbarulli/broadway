@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
+import yaml
 from pydantic import ValidationError
 
 from broadway.config.loader import load_config
@@ -9,6 +12,7 @@ from broadway.config.schema import (
     FeatureConfig,
     HPOConfig,
     ModelConfig,
+    ProjectConfig,
     SplitConfig,
 )
 from broadway.etl.process_config import (
@@ -59,11 +63,17 @@ def test_load_evaluate_config(evaluate_cfg) -> None:
 
 
 def test_load_etl_with_pipeline_fields(etl_cfg) -> None:
-    assert etl_cfg.min_trip_distance == min_trip_distance
-    assert etl_cfg.max_trip_distance == max_trip_distance
-    assert etl_cfg.min_trip_duration_minutes == min_trip_duration_minutes
-    assert etl_cfg.max_trip_duration_minutes == max_trip_duration_minutes
-    assert etl_cfg.rename_map == rename_map
+    assert etl_cfg.train_file
+    assert etl_cfg.max_drop_fraction >= 0.0
+
+
+def test_project_config_matches_process_constants() -> None:
+    project = ProjectConfig(**yaml.safe_load(Path("configs/project/taxi.yaml").read_text()))
+    assert project.min_trip_distance == min_trip_distance
+    assert project.max_trip_distance == max_trip_distance
+    assert project.min_trip_duration_minutes == min_trip_duration_minutes
+    assert project.max_trip_duration_minutes == max_trip_duration_minutes
+    assert project.rename_map == rename_map
 
 
 def test_missing_dataset_raises() -> None:
@@ -83,7 +93,7 @@ def test_invalid_step_raises() -> None:
 
 def test_stats_config_fields(stats_cfg) -> None:
     assert stats_cfg.min_rows_for_sampling
-    assert stats_cfg.group_values
+    assert stats_cfg.per_group_sample_fraction
 
 
 def _experiment_config(model_type: str, search_space: dict[str, list[float | int]]) -> ExperimentConfig:

@@ -9,3 +9,11 @@ available_info:
 leakage_notes:
   - post-hoc grouping; no out-of-sample prediction so no train/test leakage
 success_criterion: report effect size (eta-squared) alongside significance, not the p-value alone
+hypothesis:
+  group_column: Borough
+  group_values:
+    - Manhattan
+    - Brooklyn
+    - Queens
+    - Bronx
+    - Staten Island

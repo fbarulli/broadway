@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import subprocess
+from pathlib import Path
 
 import pytest
+import yaml
 
 from broadway.config.loader import load_config
-from broadway.config.schema import FeaturesStep
+from broadway.config.schema import FeaturesStep, ProjectConfig
 
 
 @pytest.fixture
@@ -13,6 +15,11 @@ def features_cfg() -> FeaturesStep:
     cfg = load_config("features", dataset="taxi", experiment="taxi")
     assert cfg.features is not None
     return cfg.features
+
+
+@pytest.fixture
+def project_cfg() -> ProjectConfig:
+    return ProjectConfig(**yaml.safe_load(Path("configs/project/taxi.yaml").read_text()))
 
 
 def test_core_imports() -> None:
@@ -25,7 +32,7 @@ def test_core_imports() -> None:
     assert callable(main)
 
 
-def test_features_imports(features_cfg) -> None:
+def test_features_imports(features_cfg, project_cfg) -> None:
     from broadway.features.schema import RAW_FEATURES, TARGET
     from project.ml_pipeline import FeaturePipeline
     from project.features import ENGINEERED_FEATURES
@@ -34,15 +41,15 @@ def test_features_imports(features_cfg) -> None:
     assert isinstance(RAW_FEATURES, list)
     assert isinstance(TARGET, str)
     pipeline = FeaturePipeline(
-        lookup_path=features_cfg.lookup_path,
+        lookup_path=project_cfg.lookup_path,
         encoding_smoothing=features_cfg.encoding_smoothing,
         frequency_fill=features_cfg.frequency_fill,
-        rush_hour_morning_start=features_cfg.rush_hour_morning_start,
-        rush_hour_morning_end=features_cfg.rush_hour_morning_end,
-        rush_hour_evening_start=features_cfg.rush_hour_evening_start,
-        rush_hour_evening_end=features_cfg.rush_hour_evening_end,
-        night_start=features_cfg.night_start,
-        night_end=features_cfg.night_end,
+        rush_hour_morning_start=project_cfg.rush_hour_morning_start,
+        rush_hour_morning_end=project_cfg.rush_hour_morning_end,
+        rush_hour_evening_start=project_cfg.rush_hour_evening_start,
+        rush_hour_evening_end=project_cfg.rush_hour_evening_end,
+        night_start=project_cfg.night_start,
+        night_end=project_cfg.night_end,
     )
     assert not pipeline.fitted
 

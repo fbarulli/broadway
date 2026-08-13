@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
 
 import pandas as pd
 import pytest
+import yaml
 
 from broadway.config.loader import load_config
-from broadway.config.schema import FeaturesStep
+from broadway.config.schema import FeaturesStep, ProjectConfig
 from project.ml_pipeline import FeaturePipeline
 from broadway.features.schema import TARGET
 from project.features import ENGINEERED_FEATURES
@@ -18,6 +18,11 @@ def features_cfg() -> FeaturesStep:
     cfg = load_config("features", dataset="taxi", experiment="taxi")
     assert cfg.features is not None
     return cfg.features
+
+
+@pytest.fixture
+def project_cfg() -> ProjectConfig:
+    return ProjectConfig(**yaml.safe_load(Path("configs/project/taxi.yaml").read_text()))
 
 
 @pytest.fixture
@@ -47,11 +52,20 @@ def taxi_data() -> pd.DataFrame:
 
 
 @pytest.fixture
-def pipeline(features_cfg: FeaturesStep, lookup_csv: str) -> FeaturePipeline:
-    kwargs: dict[str, Any] = features_cfg.model_dump(
-        exclude={"pipeline_file", "borough_column", "borough_lookup_column", "lookup_path", "max_drop_fraction", "passenger_count_min", "passenger_count_max"}
+def pipeline(
+    features_cfg: FeaturesStep, project_cfg: ProjectConfig, lookup_csv: str
+) -> FeaturePipeline:
+    return FeaturePipeline(
+        lookup_path=lookup_csv,
+        encoding_smoothing=features_cfg.encoding_smoothing,
+        frequency_fill=features_cfg.frequency_fill,
+        rush_hour_morning_start=project_cfg.rush_hour_morning_start,
+        rush_hour_morning_end=project_cfg.rush_hour_morning_end,
+        rush_hour_evening_start=project_cfg.rush_hour_evening_start,
+        rush_hour_evening_end=project_cfg.rush_hour_evening_end,
+        night_start=project_cfg.night_start,
+        night_end=project_cfg.night_end,
     )
-    return FeaturePipeline(lookup_path=lookup_csv, **kwargs)
 
 
 def test_fit_learns_encodings(pipeline: FeaturePipeline, taxi_data: pd.DataFrame) -> None:

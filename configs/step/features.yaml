@@ -1,13 +1,4 @@
-max_drop_fraction: 0.0
 encoding_smoothing: 20
 frequency_fill: -1.0
 pipeline_file: feature_pipeline.pkl
-borough_column: Borough
-borough_lookup_column: Borough_lookup
-lookup_path: data/raw/taxi_zone_lookup.csv
-rush_hour_morning_start: 7
-rush_hour_morning_end: 9
-rush_hour_evening_start: 16
-rush_hour_evening_end: 19
-night_start: 22
-night_end: 5
+max_drop_fraction: 0.0

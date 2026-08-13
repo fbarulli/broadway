@@ -158,3 +158,51 @@ def test_require_mode_mismatch_raises() -> None:
 def test_require_mode_none_raises() -> None:
     with pytest.raises(ValueError):
         require_mode(None, AnalysisMode.PREDICTION)
+
+
+def test_hypothesis_mode_requires_hypothesis_block() -> None:
+    with pytest.raises(ValidationError, match="hypothesis"):
+        AnalysisContract(
+            name="taxi",
+            mode="hypothesis",
+            goal="g",
+            row_definition="r",
+            decision_moment="d",
+            available_info=["a"],
+            leakage_notes=[],
+            success_criterion="s",
+        )
+
+
+def test_hypothesis_mode_with_block_parses() -> None:
+    contract = AnalysisContract(
+        name="taxi",
+        mode="hypothesis",
+        goal="g",
+        row_definition="r",
+        decision_moment="d",
+        available_info=["a"],
+        leakage_notes=[],
+        success_criterion="s",
+        hypothesis={
+            "group_column": "Borough",
+            "group_values": ["Manhattan", "Brooklyn"],
+        },
+    )
+    assert contract.mode == AnalysisMode.HYPOTHESIS
+    assert contract.hypothesis.group_column == "Borough"
+    assert contract.hypothesis.group_values == ["Manhattan", "Brooklyn"]
+
+
+def test_prediction_mode_allows_omitted_hypothesis() -> None:
+    contract = AnalysisContract(
+        name="taxi",
+        mode="prediction",
+        goal="g",
+        row_definition="r",
+        decision_moment="d",
+        available_info=["a"],
+        leakage_notes=[],
+        success_criterion="s",
+    )
+    assert contract.hypothesis is None

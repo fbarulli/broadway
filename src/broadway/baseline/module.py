@@ -55,10 +55,15 @@ def _compute_baseline(cfg: PipelineConfig) -> BaselineResult:
     if mode == AnalysisMode.HYPOTHESIS:
         if not cfg.dataset:
             raise ValueError("hypothesis baseline requires a dataset config")
-        if not cfg.stats:
-            raise ValueError("hypothesis baseline requires stats config (group_column/group_values)")
+        if cfg.analysis is None or cfg.analysis.hypothesis is None:
+            raise ValueError("hypothesis baseline requires an analysis contract with a hypothesis group")
         df = load(cfg.dataset)
-        return hypothesis.run(df, cfg.dataset.target, cfg.stats.group_column, cfg.stats.group_values)
+        return hypothesis.run(
+            df,
+            cfg.dataset.target,
+            cfg.analysis.hypothesis.group_column,
+            cfg.analysis.hypothesis.group_values,
+        )
     if mode == AnalysisMode.CAUSAL:
         if not cfg.causal:
             raise ValueError("causal baseline requires causal config")

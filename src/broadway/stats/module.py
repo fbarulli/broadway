@@ -23,13 +23,15 @@ def run(cfg: PipelineConfig) -> None:
         raise ValueError("stats step requires dataset and stats config")
     analysis = require_mode(cfg.analysis, AnalysisMode.HYPOTHESIS)
     logger.info("stats: goal — %s", analysis.goal)
+    if analysis.hypothesis is None:
+        raise ValueError("hypothesis mode requires a 'hypothesis' block (group_column, group_values)")
     df = load(cfg.dataset)
-    group_col = cfg.stats.group_column
+    group_col = analysis.hypothesis.group_column
     if group_col not in df.columns:
         raise ValueError(f"group column '{group_col}' not found in data")
     groups: dict[str, np.ndarray] = {
         g: df[df[group_col] == g][cfg.dataset.target].dropna().to_numpy()
-        for g in cfg.stats.group_values
+        for g in analysis.hypothesis.group_values
         if not df[df[group_col] == g].empty
     }
     plan = run_anova(groups)

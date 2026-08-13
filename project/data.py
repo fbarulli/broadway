@@ -14,9 +14,11 @@ import pandas as pd
 import pyarrow.parquet as pq
 import yaml
 
+from broadway.analysis.contracts import AnalysisContract
 from broadway.config.schema import (
     DatasetContract,
     FeaturesStep,
+    ProjectConfig,
     StatsStep,
     TrainStep,
 )
@@ -28,14 +30,24 @@ logger = logging.getLogger(__name__)
 _DATASET_YAML = Path("configs/dataset/taxi.yaml")
 _contract = DatasetContract(**yaml.safe_load(_DATASET_YAML.read_text()))
 
+_ANALYSIS_YAML = Path("configs/analysis/taxi_hypothesis.yaml")
+_analysis = AnalysisContract(**yaml.safe_load(_ANALYSIS_YAML.read_text()))
+
 _STATS_YAML = Path("configs/step/stats.yaml")
 _stats = StatsStep(**yaml.safe_load(_STATS_YAML.read_text()))
 
 _TRAIN_YAML = Path("configs/step/train.yaml")
 _train = TrainStep(**yaml.safe_load(_TRAIN_YAML.read_text()))
 
+_PROJECT_YAML = Path("configs/project/taxi.yaml")
+_project = ProjectConfig(**yaml.safe_load(_PROJECT_YAML.read_text()))
+
 _FEATURES_YAML = Path("configs/step/features.yaml")
 _features = FeaturesStep(**yaml.safe_load(_FEATURES_YAML.read_text()))
+
+_hypothesis = _analysis.hypothesis
+if _hypothesis is None:
+    raise ValueError("taxi_hypothesis analysis must include a hypothesis block")
 
 
 def _lookup_path(contract: DatasetContract) -> Path:
@@ -44,21 +56,21 @@ def _lookup_path(contract: DatasetContract) -> Path:
 
 DATA_PATH = Path(_contract.path)
 LOOKUP_PATH = Path(_lookup_path(_contract))
-BOROUGHS = _stats.group_values
+BOROUGHS = _hypothesis.group_values
 MIN_ROWS_FOR_SAMPLING = _stats.min_rows_for_sampling
 SAMPLE_FRACTION = _stats.per_group_sample_fraction
 TIME_SPLIT_CUTOFF = _stats.time_split_cutoff
 ACF_LAGS = _stats.acf_lags
 
-FEATURE_LOOKUP_PATH = _features.lookup_path
+FEATURE_LOOKUP_PATH = _project.lookup_path
 FEATURE_ENCODING_SMOOTHING = _features.encoding_smoothing
 FEATURE_FREQUENCY_FILL = _features.frequency_fill
-FEATURE_RUSH_HOUR_MORNING_START = _features.rush_hour_morning_start
-FEATURE_RUSH_HOUR_MORNING_END = _features.rush_hour_morning_end
-FEATURE_RUSH_HOUR_EVENING_START = _features.rush_hour_evening_start
-FEATURE_RUSH_HOUR_EVENING_END = _features.rush_hour_evening_end
-FEATURE_NIGHT_START = _features.night_start
-FEATURE_NIGHT_END = _features.night_end
+FEATURE_RUSH_HOUR_MORNING_START = _project.rush_hour_morning_start
+FEATURE_RUSH_HOUR_MORNING_END = _project.rush_hour_morning_end
+FEATURE_RUSH_HOUR_EVENING_START = _project.rush_hour_evening_start
+FEATURE_RUSH_HOUR_EVENING_END = _project.rush_hour_evening_end
+FEATURE_NIGHT_START = _project.night_start
+FEATURE_NIGHT_END = _project.night_end
 
 def _resolve_mode(mode: str | None = None) -> str:
     m = mode or os.getenv("DATA_MODE", "dev")

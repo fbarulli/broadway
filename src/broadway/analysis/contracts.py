@@ -11,6 +11,11 @@ class AnalysisMode(str, Enum):
     CAUSAL = "causal"
 
 
+class HypothesisConfig(BaseModel):
+    group_column: str
+    group_values: list[str]
+
+
 class AnalysisContract(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -22,6 +27,7 @@ class AnalysisContract(BaseModel):
     available_info: list[str]
     leakage_notes: list[str]
     success_criterion: str
+    hypothesis: HypothesisConfig | None = None
 
     @model_validator(mode="after")
     def _reject_empty_strings(self) -> "AnalysisContract":
@@ -30,6 +36,12 @@ class AnalysisContract(BaseModel):
                 raise ValueError(f"'{field}' must be non-empty")
         if not self.available_info:
             raise ValueError("available_info must not be empty")
+        return self
+
+    @model_validator(mode="after")
+    def _require_hypothesis_group(self) -> "AnalysisContract":
+        if self.mode == AnalysisMode.HYPOTHESIS and self.hypothesis is None:
+            raise ValueError("hypothesis mode requires a 'hypothesis' block (group_column, group_values)")
         return self
 
 
