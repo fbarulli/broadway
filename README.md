@@ -148,7 +148,7 @@ done when `results/<step>.md` exists and points to the next pending test.
 ### Git-track policy
 
 - Tracked: `reports/**` (index.md, results/*.md, figures/*.png, lineage/graph.md + graph.json).
-- Ignored: `artifacts/`, `data/raw/`, `data/processed/`, `/results/` (machine evidence + caches).
+- Ignored: `artifacts/`, `data/raw/`, `data/processed/` (machine evidence + caches).
 
 ---
 
@@ -173,7 +173,7 @@ uv run python -c "from project import data; data.generate_sample_cache()"
 | # | Module | What it does |
 |---|--------|--------------|
 | 01 | `01_load_data` | inspect schema, row count, sample rows |
-| 02 | `02_join_boroughs` | join zone lookup, write `results/quality_report.json` |
+| 02 | `02_join_boroughs` | join zone lookup, write `data/processed/quality_report.json` |
 | 04 | `04_anova_boroughs` | one-way ANOVA: F, p, eta²/omega² |
 | 05 | `05_anova_assumptions` | Levene's test + skew/kurtosis/Shapiro |
 | 06 | `06_anova_comparison` | standard vs log vs Welch's vs Kruskal-Wallis |
@@ -195,7 +195,7 @@ uv run python -c "from project import data; data.generate_sample_cache()"
 | `dev` (default) | 2000 rows | 1 day | does the pipeline run |
 | `live` | 200K + small groups in full | 1 month | real, accurate results |
 
-- Cache files are mode-keyed: `results/joined_sample_{MODE}.parquet`.
+- Cache files are mode-keyed: `data/processed/joined_sample_{MODE}.parquet`.
 - Small groups (Staten Island 84, EWR 77) are always kept in full — never sampled away.
 - Two sampling strategies, both mode-aware: `load_stratified_sample()` (random, stratified — scripts 04-09, 11, 12) and `load_time_slice()` (contiguous, time-sorted, filter pushdown — script 10). Never randomly sample the time slice.
 

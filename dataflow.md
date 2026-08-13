@@ -160,7 +160,6 @@ broadway/
   configs/sample/<name>.yaml  # SampleSpec (role/path/column_mapping) for `stats --sample`
   configs/analysis/<name>.yaml  # authored analytical intent (AnalysisContract)
   tests/                    # test_base.py, test_anova.py, ... (pytest)
-  results/                  # mode-keyed caches + reports (gitignored artifacts)
 ```
 
 ## Module → function → file
@@ -205,16 +204,16 @@ data/processed/training_data.parquet   (raw, 8.6M rows)
         ▼
 generate_sample_cache()   ── merge zone lookup (pickup_borough)
         │                     incremental per-borough stratified sample
-        ├──▶ results/joined_sample_{MODE}.parquet   (≈ SAMPLE_SIZE rows)
-        ├──▶ results/sample_meta_{MODE}.json        (params_hash)
-        └──▶ results/quality_report.json            (exact group sizes/means)
+        ├──▶ data/processed/joined_sample_{MODE}.parquet   (≈ SAMPLE_SIZE rows)
+        ├──▶ data/processed/sample_meta_{MODE}.json        (params_hash)
+        └──▶ data/processed/quality_report.json            (exact group sizes/means)
         │
         ▼
 scripts (01..12)
         │  load_stratified_sample()  → random stratified groups
         │  load_time_slice()         → contiguous, time-sorted slice (filter pushdown)
         ▼
-results/*.json / *.png  (AnalysisPlan JSON, residual plots, ACF plot)
+data/processed/*.json / *.png  (AnalysisPlan JSON, residual plots, ACF plot)
 ```
 
 The pipeline CLI (`ds-pipeline`) runs a separate data flow, from raw parquet

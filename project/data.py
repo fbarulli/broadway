@@ -122,7 +122,7 @@ TARGET_COL = _contract.target
 PICKUP_BOROUGH_COL = "pickup_borough"
 DURATION_COL = "trip_duration_minutes"
 
-RESULTS_DIR = Path("results")
+RESULTS_DIR = Path("data/processed")
 
 
 def _quality_report_path() -> Path:

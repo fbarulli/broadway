@@ -1,6 +1,6 @@
 | # | Script | What it does |
 |---|---|---|---|
-| 00 | data.generate_sample_cache() | Generate deterministic cached sample (results/joined_sample_{MODE}.parquet) used by scripts 04-12 |
+| 00 | data.generate_sample_cache() | Generate deterministic cached sample (data/processed/joined_sample_{MODE}.parquet) used by scripts 04-12 |
 | 01 | load_data.py | Load training_data.parquet with Spark, inspect schema |
 | 02 | join_boroughs.py | Join taxi_zone_lookup.csv for pickup borough, show group sizes and mean durations |
 | 04 | anova_boroughs.py | One-way ANOVA testing whether trip duration differs across boroughs |

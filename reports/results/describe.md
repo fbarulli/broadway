@@ -8,7 +8,7 @@ whether trip duration differs across pickup boroughs
 
 - sample_name: taxi_diagnostic
 - sample_role: diagnostic
-- source_path: results/joined_sample_live.parquet
+- source_path: data/processed/joined_sample_live.parquet
 - source_group_column: pickup_borough
 - group_column: Borough
 
