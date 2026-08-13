@@ -85,7 +85,7 @@ Every step except `discover` takes the same three flags.
 | discover | `ds-pipeline discover --csv … --target … --task …` | `configs/dataset/<name>.yaml` + `artifacts/discover/profile.json` | works |
 | etl | `ds-pipeline etl --dataset <d> --experiment <e>` | cleaned + split parquet | works |
 | contracts | `ds-pipeline contracts …` | pass/fail validation | works |
-| eda | `ds-pipeline eda …` | `artifacts/reports/eda.html` | works |
+| eda | `ds-pipeline eda …` | `reports/eda.html` | works |
 | features | `ds-pipeline features …` | fitted feature pipeline | works |
 | stats | `ds-pipeline stats --dataset <d> --analysis <a>` | `AnalysisPlan` JSON | works (uses stats library) |
 | causal | `ds-pipeline causal --dataset <d> --analysis <a>` | `ExperimentDesign` (power analysis) | separate mode (not in `full`) |
@@ -93,7 +93,7 @@ Every step except `discover` takes the same three flags.
 | train | `ds-pipeline train --dataset <d> --analysis <a>` | `TrainingResult` → MLflow model/artifacts | works |
 | evaluate | `ds-pipeline evaluate --dataset <d> --analysis <a>` | `EvaluationResult` + promotion decision | works |
 | full | `ds-pipeline full …` | dispatches to the mode flow (prediction/hypothesis/causal) based on `--analysis` | works |
-| lineage | `ds-pipeline lineage --analysis <a> --dataset <d>` | `artifacts/lineage/graph.json` + `graph.md` + run-state summary | works (reporting, not a pipeline step) |
+| lineage | `ds-pipeline lineage --analysis <a> --dataset <d>` | `reports/graph.json` + `graph.md` + run-state summary | works (reporting, not a pipeline step) |
 
 `causal` is a separate analysis mode, run on its own — it is not part of
 `full`. `full` is a thin dispatcher that reads `AnalysisContract.mode` and
@@ -111,7 +111,7 @@ hand-maintaining a diagram:
 
 ```bash
 ds-pipeline lineage --analysis taxi --dataset taxi
-# → artifacts/lineage/graph.json + graph.md (Mermaid) + run-state summary
+# → reports/graph.json + graph.md (Mermaid) + run-state summary
 ```
 
 Each step writes a `LineageRecord` sidecar under `artifacts/lineage/records/`
@@ -207,7 +207,7 @@ and `na_values` (authored NA tokens) — both owned by the config, not inferred
 from pandas defaults.
 
 Typed step outputs follow `artifacts/<step>/` and reports follow
-`artifacts/reports/`.
+`reports/`.
 
 ---
 

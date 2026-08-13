@@ -17,8 +17,11 @@ DatasetContract → FeatureSpec → TrainingConfig → Optuna → TrainingResult
 ## Artifacts
 
 Typed execution outputs live under `artifacts/<step>/` (training/, evaluation/,
-stats/, causal/), human-facing HTML reports live under `artifacts/reports/`,
+stats/, causal/), human-facing HTML reports live under `reports/`,
 and processed data stays under `data/processed/`.
+
+`artifacts/` holds machine-readable evidence/provenance; `reports/` holds
+human-facing derived views (regenerable from records + configs).
 
 `causal` is a separate analysis mode, not part of this flow and not part of
 `full`. `full` is a thin dispatcher: it reads `AnalysisContract.mode` and
@@ -266,7 +269,7 @@ BaselineResult → DatasetSlice → DecisionRecord`, with `stats`/`causal`/
 - `DatasetSlice` is authored config (`configs/slice/<name>.yaml`);
   `DecisionRecord` is a runtime event in `artifacts/lineage/decisions/<id>.json`.
 - `ds-pipeline lineage --analysis <n> --dataset <d>` builds the graph
-  (`broadway/lineage/graph.py::build_graph`), writes `artifacts/lineage/graph.json`
+  (`broadway/lineage/graph.py::build_graph`), writes `reports/graph.json`
   + `graph.md` (Mermaid), and prints a run-state summary (goal, stage,
   open/resolved decisions, `not_yet_run`, `ran_but_output_missing`).
 - `not_yet_run` is derived only from lineage-emitting steps

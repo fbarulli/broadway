@@ -6,10 +6,11 @@ import json
 from pathlib import Path
 
 import plotly.graph_objects as go
+import plotly.io
 
 
 def build_report(summary_data: dict, quality_data: dict, missing_data: dict, figures: list[go.Figure], output_path: Path) -> None:
-    plotly_divs = "\n".join(fig.to_html(full_html=False) for fig in figures)
+    plotly_divs = plotly.io.to_html(figures, full_html=False, include_plotlyjs=True)
     html = f"""<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"><title>EDA Report</title></head>
