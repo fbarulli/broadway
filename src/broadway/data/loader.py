@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from broadway.config.schema import DatasetContract
+from broadway.config.schema import DatasetContract, EnvironmentConfig
 
 READERS = {
     ".csv": pd.read_csv,
@@ -16,6 +16,14 @@ READERS = {
 }
 
 MERGE_HOW = "left"
+
+
+def canonical_path(dataset: DatasetContract, environment: EnvironmentConfig) -> Path:
+    return (
+        Path(environment.data_dir)
+        / environment.processed_subdir
+        / f"{dataset.name}_canonical.parquet"
+    )
 
 
 def load(dataset: DatasetContract) -> pd.DataFrame:

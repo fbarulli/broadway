@@ -11,7 +11,7 @@ from broadway.config.schema import PipelineConfig
 from broadway.contracts.pandera import build_raw_schema
 from broadway.contracts.selectors import datetime_columns
 from broadway.data.cleaner import canonicalize
-from broadway.data.loader import load
+from broadway.data.loader import canonical_path, load
 from broadway.data.splitter import split
 from broadway.lineage.ids import node_id
 from broadway.lineage.models import TransformAudit
@@ -60,9 +60,9 @@ def run(cfg: PipelineConfig) -> None:
 
     build_raw_schema(dataset).validate(df)
 
-    canonical_path = out_dir / f"{dataset.name}_canonical.parquet"
-    df.to_parquet(canonical_path, index=False)
-    logger.info(f"saved canonical ({len(df)} rows) to {canonical_path}")
+    canonical_path_ = canonical_path(dataset, cfg.environment)
+    df.to_parquet(canonical_path_, index=False)
+    logger.info(f"saved canonical ({len(df)} rows) to {canonical_path_}")
 
     split_cfg = cfg.experiment.split if cfg.experiment else None
     if split_cfg:
@@ -96,7 +96,7 @@ def run(cfg: PipelineConfig) -> None:
         audit=audit,
         parse_failures=parse_failures,
         missing_encodings=observed_missing,
-        canonical_path=str(canonical_path),
+        canonical_path=str(canonical_path_),
     )
     result_path = out_dir / f"{dataset.name}_clean.json"
     result_path.write_text(result.model_dump_json(indent=2), encoding="utf-8")
@@ -105,7 +105,7 @@ def run(cfg: PipelineConfig) -> None:
     write_record(
         node_id("etl", dataset.name),
         "etl",
-        str(canonical_path),
+        str(canonical_path_),
         [node_id("dataset", dataset.name)],
         audit=audit,
     )

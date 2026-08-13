@@ -6,10 +6,11 @@ import logging
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 
 from broadway.analysis.contracts import AnalysisMode, require_mode
 from broadway.config.schema import PipelineConfig
-from broadway.data.loader import load
+from broadway.data.loader import canonical_path
 from broadway.lineage.ids import node_id
 from broadway.lineage.records import write_record
 from broadway.stats.anova import run_anova
@@ -25,7 +26,10 @@ def run(cfg: PipelineConfig) -> None:
     logger.info("stats: goal — %s", analysis.goal)
     if analysis.hypothesis is None:
         raise ValueError("hypothesis mode requires a 'hypothesis' block (group_column, group_values)")
-    df = load(cfg.dataset)
+    canonical = canonical_path(cfg.dataset, cfg.environment)
+    if not canonical.exists():
+        raise FileNotFoundError(f"canonical dataset not found: {canonical} — run the etl step first")
+    df = pd.read_parquet(canonical)
     group_col = analysis.hypothesis.group_column
     if group_col not in df.columns:
         raise ValueError(f"group column '{group_col}' not found in data")
