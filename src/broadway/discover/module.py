@@ -48,9 +48,7 @@ def _build_contract(
     for col in df.columns:
         role = _assign_role(col, target, dt_col, ignore_cols)
         columns[col] = ColumnSchema(
-            dtype=(
-                "datetime64[us]" if role == ColumnRole.DATETIME else str(df[col].dtype)
-            ),
+            dtype=("datetime64" if role == ColumnRole.DATETIME else str(df[col].dtype)),
             null_count=int(df[col].isna().sum()),
             role=role,
         )
@@ -62,7 +60,6 @@ def _build_contract(
         datetime_column=dt_col,
         columns=columns,
         lookup_tables={},
-        row_count=len(df),
     )
 
 

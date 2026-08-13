@@ -8,7 +8,7 @@ columns:
     null_count: 0
     role: feature
   pickup_datetime:
-    dtype: datetime64[us]
+    dtype: datetime64
     null_count: 0
     role: datetime
   pickup_location_id:
@@ -33,6 +33,5 @@ lookup_tables:
     key: LocationID
 name: taxi
 path: data/processed/training_data.parquet
-row_count: 8647673
 target: trip_duration_minutes
 task: regression

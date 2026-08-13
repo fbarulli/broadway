@@ -3,7 +3,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from broadway.analysis.contracts import AnalysisContract, AnalysisMode
 
@@ -20,10 +20,19 @@ class ColumnRole(str, Enum):
     IGNORE = "ignore"
 
 
+def normalize_dtype(dtype: str) -> str:
+    return "datetime64" if dtype.startswith("datetime64") else dtype
+
+
 class ColumnSchema(BaseModel):
     dtype: str
     null_count: int
     role: ColumnRole
+
+    @field_validator("dtype", mode="before")
+    @classmethod
+    def _normalize_dtype(cls, v: object) -> object:
+        return normalize_dtype(v) if isinstance(v, str) else v
 
 
 class LookupSpec(BaseModel):
@@ -39,7 +48,6 @@ class DatasetContract(BaseModel):
     datetime_column: str | None
     columns: dict[str, ColumnSchema]
     lookup_tables: dict[str, LookupSpec]
-    row_count: int
 
 
 class EnvironmentConfig(BaseModel):

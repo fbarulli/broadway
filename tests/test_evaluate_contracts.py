@@ -196,7 +196,6 @@ def _make_config(tmp_path: Path) -> PipelineConfig:
             "price": ColumnSchema(dtype="float64", null_count=0, role=ColumnRole.TARGET),
         },
         lookup_tables={},
-        row_count=40,
     )
     experiment = ExperimentConfig(
         features=FeatureConfig(include=["rooms", "area"], exclude=[], derived=[], encodings=[]),

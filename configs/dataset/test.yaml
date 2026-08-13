@@ -19,6 +19,5 @@ datetime_column: null
 lookup_tables: {}
 name: test
 path: /tmp/test.csv
-row_count: 10
 target: price
 task: regression

@@ -12,7 +12,8 @@ from broadway.config.schema import PipelineConfig
 from broadway.contracts.pandera import build_raw_schema
 from broadway.contracts.selectors import datetime_columns, numeric_columns
 from broadway.data.cleaner import canonicalize
-from broadway.data.loader import canonical_path, load
+from broadway.data.join_audit import JoinAuditReport
+from broadway.data.loader import canonical_path, load_with_audit
 from broadway.data.splitter import split
 from broadway.lineage.ids import node_id
 from broadway.lineage.models import TransformAudit
@@ -36,7 +37,7 @@ def run(cfg: PipelineConfig) -> None:
     if not cfg.etl:
         raise ValueError("etl step requires an etl config")
     dataset = cfg.dataset
-    df = load(dataset)
+    df, join_audits = load_with_audit(dataset)
     rows_in = len(df)
     columns_before = list(df.columns)
 
@@ -106,15 +107,24 @@ def run(cfg: PipelineConfig) -> None:
     logger.info(f"saved structural clean result to {result_path}")
 
     ingest_id = node_id("ingest", dataset.name)
-    parent = (
+    upstream = (
         [ingest_id]
         if (records_dir() / f"{ingest_id.replace(':', '_')}.json").exists()
         else [node_id("dataset", dataset.name)]
     )
+    if join_audits:
+        join_audit_path = out_dir / f"{dataset.name}_join_audit.json"
+        join_audit_path.write_text(
+            JoinAuditReport(joins=join_audits).model_dump_json(indent=2), encoding="utf-8"
+        )
+        write_record(node_id("join", dataset.name), "join", str(join_audit_path), upstream)
+        etl_parent = [node_id("join", dataset.name)]
+    else:
+        etl_parent = upstream
     write_record(
         node_id("etl", dataset.name),
         "etl",
         str(canonical_path_),
-        parent,
+        etl_parent,
         audit=audit,
     )

@@ -44,9 +44,7 @@ def raw_frame(contract: DatasetContract) -> pd.DataFrame:
     frames: dict[str, pd.Series] = {}
     for name, col in contract.columns.items():
         if col.dtype.startswith("datetime"):
-            frames[name] = pd.Series(pd.date_range("2024-01-01", periods=n, freq="h")).astype(
-                col.dtype
-            )
+            frames[name] = pd.Series(pd.date_range("2024-01-01", periods=n, freq="h"))
         elif col.dtype.startswith("int"):
             frames[name] = pd.Series(rng.integers(1, 4, n), dtype=col.dtype)
         else:

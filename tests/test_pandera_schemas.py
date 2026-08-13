@@ -41,7 +41,6 @@ def _contract() -> DatasetContract:
         datetime_column="pickup_datetime",
         columns=_RAW_COLUMNS,
         lookup_tables={},
-        row_count=1,
     )
 
 

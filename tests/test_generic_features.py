@@ -79,7 +79,6 @@ def test_build_generic_feature_specs() -> None:
             "hood": ColumnSchema(dtype="object", null_count=0, role=ColumnRole.FEATURE),
         },
         lookup_tables={},
-        row_count=10,
     )
     features = FeatureConfig(
         include=["rooms"],

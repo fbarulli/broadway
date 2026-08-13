@@ -8,7 +8,7 @@ import broadway.etl.module as etl_module
 from broadway.cleaning.models import StructuralCleanResult
 from broadway.cleaning.structural import parse_datetime, parse_numeric, standardize_missing
 from broadway.config.loader import load_config
-from broadway.config.schema import ColumnRole, ColumnSchema
+from broadway.config.schema import ColumnRole, ColumnSchema, LookupSpec
 from broadway.contracts.pandera import is_numeric_dtype
 from broadway.data.cleaner import canonicalize
 from broadway.lineage import records
@@ -175,7 +175,7 @@ def test_etl_module_writes_canonical_and_result(
             ],
         }
     )
-    monkeypatch.setattr(etl_module, "load", lambda dataset: df.copy())
+    monkeypatch.setattr(etl_module, "load_with_audit", lambda dataset: (df.copy(), []))
 
     etl_module.run(cfg)
 
@@ -220,7 +220,7 @@ def test_etl_parent_defaults_to_dataset(tmp_path: Path, monkeypatch) -> None:
         }
     )
     monkeypatch.setattr(records, "LINEAGE_DIR", tmp_path / "lineage")
-    monkeypatch.setattr(etl_module, "load", lambda dataset: _simple_df().copy())
+    monkeypatch.setattr(etl_module, "load_with_audit", lambda dataset: (_simple_df().copy(), []))
 
     etl_module.run(cfg)
 
@@ -244,7 +244,7 @@ def test_etl_parent_ingest_when_present(tmp_path: Path, monkeypatch) -> None:
         "data/processed/training_data.parquet",
         [node_id("dataset", "test")],
     )
-    monkeypatch.setattr(etl_module, "load", lambda dataset: _simple_df().copy())
+    monkeypatch.setattr(etl_module, "load_with_audit", lambda dataset: (_simple_df().copy(), []))
 
     etl_module.run(cfg)
 
@@ -272,7 +272,7 @@ def test_etl_ci_sampling_gated(tmp_path: Path, monkeypatch) -> None:
             "rooms": [2, 3, 2, 4, 3, 5],
         }
     )
-    monkeypatch.setattr(etl_module, "load", lambda dataset: df.copy())
+    monkeypatch.setattr(etl_module, "load_with_audit", lambda dataset: (df.copy(), []))
 
     canonical_path = (
         Path(cfg.environment.data_dir)
@@ -287,3 +287,62 @@ def test_etl_ci_sampling_gated(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.delenv("CI", raising=False)
     etl_module.run(cfg)
     assert len(pd.read_parquet(canonical_path)) == 6
+
+
+def test_etl_with_lookups_writes_join_audit(tmp_path: Path, monkeypatch) -> None:
+    cfg = load_config("etl", dataset="test", experiment="baseline")
+    cfg = cfg.model_copy(
+        update={
+            "environment": cfg.environment.model_copy(update={"data_dir": str(tmp_path)})
+        }
+    )
+    monkeypatch.setattr(records, "LINEAGE_DIR", tmp_path / "lineage")
+
+    raw_path = tmp_path / "raw.csv"
+    pd.DataFrame(
+        {
+            "area": [100, 150, 200, 999],
+            "neighborhood": ["a", "b", "c", "d"],
+            "price": [10, 20, 30, 40],
+            "rooms": [2, 3, 4, 5],
+        }
+    ).to_csv(raw_path, index=False)
+
+    lookup_path = tmp_path / "lookup.csv"
+    pd.DataFrame(
+        {
+            "LocationID": [100, 150, 200],
+            "zone": ["Alpha", "Beta", "Gamma"],
+        }
+    ).to_csv(lookup_path, index=False)
+
+    dataset = cfg.dataset.model_copy(
+        update={
+            "path": str(raw_path),
+            "lookup_tables": {
+                "area": LookupSpec(path=str(lookup_path), key="LocationID")
+            },
+        }
+    )
+    cfg = cfg.model_copy(update={"dataset": dataset})
+
+    etl_module.run(cfg)
+
+    out_dir = Path(cfg.environment.data_dir) / cfg.environment.processed_subdir
+    join_audit_path = out_dir / "test_join_audit.json"
+    assert join_audit_path.exists()
+
+    join_record = LineageRecord.model_validate_json(
+        (tmp_path / "lineage" / "records" / "join_test.json").read_text(encoding="utf-8")
+    )
+    assert join_record.parents == ["dataset:test"]
+
+    etl_record = LineageRecord.model_validate_json(
+        _etl_record_path(tmp_path).read_text(encoding="utf-8")
+    )
+    assert etl_record.parents == ["join:test"]
+
+
+def test_column_schema_normalizes_datetime_dtype() -> None:
+    col = ColumnSchema(dtype="datetime64[us]", null_count=0, role=ColumnRole.DATETIME)
+    assert col.dtype == "datetime64"

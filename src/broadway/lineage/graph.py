@@ -21,6 +21,7 @@ KIND_LABELS = {
     "profile": "Profile",
     "etl": "ETL",
     "ingest": "Ingest",
+    "join": "JoinAudit",
     "analysis": "AnalysisContract",
     "baseline": "Baseline",
     "stats": "Stats",
