@@ -40,8 +40,6 @@ def add_basic_features(
     rush_hour_evening_end: int,
     night_start: int,
     night_end: int,
-    passenger_count_min: int,
-    passenger_count_max: int,
 ) -> pd.DataFrame:
     df = df.copy()
     df = _add_time_features(df)
@@ -50,8 +48,6 @@ def add_basic_features(
         rush_hour_evening_start, rush_hour_evening_end,
     )
     df = _add_night(df, night_start, night_end)
-    df["passenger_count"] = df["passenger_count"].clip(
-        passenger_count_min, passenger_count_max
-    )
+    df["passenger_count"] = df["passenger_count"].astype("int64")
     df["log_distance"] = np.log1p(df["trip_distance"])
     return df

@@ -49,7 +49,7 @@ def taxi_data() -> pd.DataFrame:
 @pytest.fixture
 def pipeline(features_cfg: FeaturesStep, lookup_csv: str) -> FeaturePipeline:
     kwargs: dict[str, Any] = features_cfg.model_dump(
-        exclude={"pipeline_file", "borough_column", "borough_lookup_column", "lookup_path", "max_drop_fraction"}
+        exclude={"pipeline_file", "borough_column", "borough_lookup_column", "lookup_path", "max_drop_fraction", "passenger_count_min", "passenger_count_max"}
     )
     return FeaturePipeline(lookup_path=lookup_csv, **kwargs)
 

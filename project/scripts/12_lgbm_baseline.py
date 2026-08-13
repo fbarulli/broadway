@@ -34,8 +34,6 @@ def load_and_split() -> tuple[pd.DataFrame, pd.DataFrame, np.ndarray, np.ndarray
         rush_hour_evening_end=data.FEATURE_RUSH_HOUR_EVENING_END,
         night_start=data.FEATURE_NIGHT_START,
         night_end=data.FEATURE_NIGHT_END,
-        passenger_count_min=data.FEATURE_PASSENGER_COUNT_MIN,
-        passenger_count_max=data.FEATURE_PASSENGER_COUNT_MAX,
     )
     pipeline.fit(train)
     y_train = train[TARGET].values if TARGET in train else None

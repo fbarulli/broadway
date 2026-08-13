@@ -59,8 +59,6 @@ FEATURE_RUSH_HOUR_EVENING_START = _features.rush_hour_evening_start
 FEATURE_RUSH_HOUR_EVENING_END = _features.rush_hour_evening_end
 FEATURE_NIGHT_START = _features.night_start
 FEATURE_NIGHT_END = _features.night_end
-FEATURE_PASSENGER_COUNT_MIN = _features.passenger_count_min
-FEATURE_PASSENGER_COUNT_MAX = _features.passenger_count_max
 
 def _resolve_mode(mode: str | None = None) -> str:
     m = mode or os.getenv("DATA_MODE", "dev")

@@ -43,7 +43,8 @@ def filter_valid_trips(df: pd.DataFrame) -> pd.DataFrame:
     df = df[
         (df["trip_distance"] > cfg.min_trip_distance) &
         (df["trip_distance"] < cfg.max_trip_distance) &
-        (df["tpep_dropoff_datetime"] > df["tpep_pickup_datetime"])
+        (df["tpep_dropoff_datetime"] > df["tpep_pickup_datetime"]) &
+        (df["tpep_pickup_datetime"] >= pd.to_datetime(cfg.min_pickup_datetime))
     ].copy()
     logger.info(f"After distance/time filters: {len(df)} ({n_before - len(df)} dropped)")
     return df
@@ -63,6 +64,15 @@ def filter_valid_duration(df: pd.DataFrame) -> pd.DataFrame:
         (df[TARGET] <= cfg.max_trip_duration_minutes)
     ].copy()
     logger.info(f"After duration filter: {len(df)} ({n_before - len(df)} dropped)")
+    return df
+
+
+def filter_valid_passenger_count(df: pd.DataFrame) -> pd.DataFrame:
+    n_before = len(df)
+    pc = df["passenger_count"]
+    valid = (pc >= cfg.min_passenger_count) & (pc <= cfg.max_passenger_count) & (pc == pc.astype(int))
+    df = df[valid].copy()
+    logger.info(f"After passenger_count filter: {len(df)} ({n_before - len(df)} dropped)")
     return df
 
 
@@ -96,6 +106,7 @@ def process_data() -> None:
     df = filter_valid_trips(df)
     df = compute_trip_duration(df)
     df = filter_valid_duration(df)
+    df = filter_valid_passenger_count(df)
 
     df = rename_columns(df)
     df = select_and_clean_columns(df)

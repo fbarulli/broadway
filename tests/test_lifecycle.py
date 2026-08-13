@@ -91,8 +91,6 @@ def test_contract_driven_lifecycle(
         rush_hour_evening_end=data.FEATURE_RUSH_HOUR_EVENING_END,
         night_start=data.FEATURE_NIGHT_START,
         night_end=data.FEATURE_NIGHT_END,
-        passenger_count_min=data.FEATURE_PASSENGER_COUNT_MIN,
-        passenger_count_max=data.FEATURE_PASSENGER_COUNT_MAX,
     )
     engineered = pipeline.fit_transform(raw_frame)
     assert list(engineered.columns) == list(ENGINEERED_FEATURES)

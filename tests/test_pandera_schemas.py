@@ -63,7 +63,7 @@ _ENGINEERED_DTYPES = {
     "pickup_hour": "int32",
     "pickup_day_of_week": "int32",
     "pickup_month": "int32",
-    "passenger_count": "float64",
+    "passenger_count": "int64",
     "trip_distance": "float64",
     "pickup_location_id": "int32",
     "dropoff_location_id": "int32",

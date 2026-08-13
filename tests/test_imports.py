@@ -43,8 +43,6 @@ def test_features_imports(features_cfg) -> None:
         rush_hour_evening_end=features_cfg.rush_hour_evening_end,
         night_start=features_cfg.night_start,
         night_end=features_cfg.night_end,
-        passenger_count_min=features_cfg.passenger_count_min,
-        passenger_count_max=features_cfg.passenger_count_max,
     )
     assert not pipeline.fitted
 

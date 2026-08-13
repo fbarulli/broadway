@@ -11,5 +11,3 @@ rush_hour_evening_start: 16
 rush_hour_evening_end: 19
 night_start: 22
 night_end: 5
-passenger_count_min: 1
-passenger_count_max: 6

@@ -14,7 +14,7 @@ FEATURE_SPECS: dict[str, FeatureSpec] = {
     "pickup_hour": FeatureSpec("pickup_hour", "int32"),
     "pickup_day_of_week": FeatureSpec("pickup_day_of_week", "int32"),
     "pickup_month": FeatureSpec("pickup_month", "int32"),
-    "passenger_count": FeatureSpec("passenger_count", "float64"),
+    "passenger_count": FeatureSpec("passenger_count", "int64"),
     "trip_distance": FeatureSpec("trip_distance", "float64"),
     "pickup_location_id": FeatureSpec("pickup_location_id", "int32"),
     "dropoff_location_id": FeatureSpec("dropoff_location_id", "int32"),

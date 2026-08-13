@@ -22,8 +22,6 @@ class FeaturePipeline:
         rush_hour_evening_end: int,
         night_start: int,
         night_end: int,
-        passenger_count_min: int,
-        passenger_count_max: int,
     ) -> None:
         self.lookup_path = lookup_path
         self.encoding_smoothing = encoding_smoothing
@@ -34,8 +32,6 @@ class FeaturePipeline:
         self.rush_hour_evening_end = rush_hour_evening_end
         self.night_start = night_start
         self.night_end = night_end
-        self.passenger_count_min = passenger_count_min
-        self.passenger_count_max = passenger_count_max
         self.zones: pd.DataFrame | None = None
         self.route_stats: pd.DataFrame | None = None
         self.route_frequency: pd.DataFrame | None = None
@@ -105,8 +101,6 @@ class FeaturePipeline:
             rush_hour_evening_end=self.rush_hour_evening_end,
             night_start=self.night_start,
             night_end=self.night_end,
-            passenger_count_min=self.passenger_count_min,
-            passenger_count_max=self.passenger_count_max,
         )
         df = add_borough_features(df, self.zones)
         return df

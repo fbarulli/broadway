@@ -151,6 +151,9 @@ class EtlStep(BaseModel):
     max_trip_distance: float
     min_trip_duration_minutes: float
     max_trip_duration_minutes: float
+    min_pickup_datetime: str
+    min_passenger_count: int
+    max_passenger_count: int
     batch_size: int
     rename_map: dict[str, str]
     taxi_urls: list[str]
@@ -189,8 +192,6 @@ class FeaturesStep(BaseModel):
     rush_hour_evening_end: int
     night_start: int
     night_end: int
-    passenger_count_min: int
-    passenger_count_max: int
 
 
 class StatsStep(BaseModel):
