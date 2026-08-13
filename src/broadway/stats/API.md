@@ -3,8 +3,8 @@
 Public contract for `src/broadway/stats/`. Every function below is the source
 of truth for its signature — implementations must match exactly. No function
 in the library reads config or filesystem paths; it receives plain data
-(DataFrames, arrays) and returns plain results. Dataset specifics live in
-`project/data.py`.
+(DataFrames, arrays) and returns plain results. Dataset-specific loaders and
+constants live outside this library (see the `taxi` demo branch for an example).
 
 The library is **pandas/numpy only** — there is no Spark dependency anywhere
 in `src/broadway/stats/`.
