@@ -1,1204 +1,638 @@
-Broadway — LLM Handoff
+Broadway — Current Handoff
 
-Purpose of this handoff
+Repository state
 
-You are assisting on Broadway, an opinionated framework for reproducible, traceable tabular data science.
+Active development branch: taxi.
 
-The user wants help in the same style as the prior assistant:
+Latest verified Step 00.2 commit: 3aac481.
 
-reason about architecture before adding code,
+Latest verified suite at that point: 281 tests green.
 
-keep scope small and phased,
+Later doc inventory reported 293 effective tests after subsequent work; verify the current count with uv run pytest -q before relying on a number.
 
-avoid speculative abstractions,
+Keep scratch/untracked user files untouched unless explicitly asked.
 
-protect single sources of truth,
+What has been completed
 
-prioritize traceability and loud failure,
+1. Platform / ownership split
 
-distinguish authored intent from observed evidence and runtime results,
+main is the generic platform boundary.
 
-prefer mature external tools over reimplementing them,
+taxi is the demo + active dogfood branch.
 
-and use real dataset work to drive the next abstractions.
+Generic code must not require taxi-specific edits when dataset config changes.
 
-Do not treat Broadway as a generic AutoML system or model-serving framework.
+Authored intent, observed evidence, runtime decisions, and deterministic mechanics remain separate concepts.
 
-The current product thesis is:
+2. Onboarding / generic platform proof
 
-Broadway is a traceable workflow framework for tabular statistical analysis and predictive modeling that preserves the path from raw data and analytical intent through evidence, decisions, features, models, and results.
+Shipped before the current walkthrough:
 
-Operational principle:
+semantic inference hints,
 
-Automate the mechanics; facilitate the judgment; record the decision.
+ds-pipeline init,
 
-Maintainability litmus test:
+generic step schemas,
 
-If the dataset YAML were swapped tomorrow, files under src/broadway/** should generally not need editing.
+generic feature builders + explicit custom builder modules,
 
-That invariant is now demonstrated by a non-taxi end-to-end onboarding test.
+non-taxi end-to-end onboarding proof,
 
-Repository / branch state
+generic platform split to main.
 
-main
+3. Structural canonicalization
 
-main is now the proven generic platform.
+The generic ETL structural-cleaning boundary is implemented.
 
-Current state:
+Order:
 
-pushed to origin/main
+load input
+→ raw structural validation
+→ exact duplicate removal
+→ configured missing-value normalization
+→ datetime parsing
+→ numeric coercion
+→ target-null removal
+→ strict canonical validation
+→ canonical parquet
+→ typed cleaning evidence / audit
+→ lineage
 
-194 tests green
+Shipped behavior:
 
-contains generic src/broadway/**
+exact all-column duplicate removal,
 
-contains generic configs, tests, packaging, and public-facing platform docs
+configured missing encodings,
 
-contains no taxi residue in src/, configs/, or tests/
+datetime parse failures recorded as typed ParseFailure,
 
-the only remaining taxi string on main is descriptive text in a non-taxi onboarding test docstring
+numeric strings coerced according to contract dtype,
 
-Important split commits:
+numeric parse failures recorded as ParseFailure,
 
-49046f9 — removed taxi-owned files, genericized platform test fixtures, removed dead taxi feature code
+parse failures become NaT / NaN and are not silently dropped,
 
-7231a6e — removed dead ProjectConfig
+target-null rows are the deterministic null-driven row drop,
 
-b4758df — rewrote README / dataflow / HANDOFF around the platform boundary
+strict canonical validation remains authoritative,
 
-a618695 — fixed one stale project/data.py reference in stats docs
+no nullable-integer schema weakening unless explicitly supported,
 
-main should remain the clean abstraction boundary.
+no column renaming in structural cleaning,
 
-taxi
+no domain/outlier cleaning in the structural layer.
 
-taxi is the demo + active development branch.
+4. Raw ingest is now a real CLI step
 
-It remains the real NYC taxi application and the place where new abstractions are dogfooded before promotion to main.
-
-The branch was intentionally left untouched by the ownership split at:
-
-7be0dd3
-
-The stale broadway branch still exists and is intentionally untouched for now.
-
-Uncommitted/untracked user notes such as DATA_VALIDATION.md, BROADWAY.md, and EXTERNAL_HELP.md are outside branch history unless explicitly committed later.
-
-Core architectural principles
-
-1. One authoritative owner per concept
-
-Concept
-
-Owner
-
-Accepted raw/canonical dataset schema
-
-DatasetContract
-
-Observed dataset facts
-
-DatasetProfile / ColumnProfile
-
-Analytical intent
-
-AnalysisContract
-
-Naive reference result
-
-BaselineResult
-
-Engineered feature definition
-
-FeatureSpec / experiment feature config
-
-Runtime provenance
-
-ArtifactTrace / lineage sidecars
-
-Dataset slices
-
-authored config
-
-Actual analysis decisions
-
-runtime DecisionRecord artifacts
-
-Deterministic structural-cleaning policy
-
-step config + typed evidence + TransformAudit
-
-Never create parallel hand-maintained definitions if something can be derived from an authoritative contract.
-
-2. Distinguish authored intent, observed evidence, and execution outputs
-
-Authored / committed
-
-Examples:
-
-configs/dataset/*.yaml
-
-configs/analysis/*.yaml
-
-configs/experiment/*.yaml
-
-configs/slice/*.yaml
-
-step configs / policies
-
-optional project feature-builder declarations
-
-Observed / regenerated
-
-Examples:
-
-artifacts/discover/profile.json
-
-diagnostics
-
-statistics
-
-model evaluation
-
-lineage graph
-
-structural-cleaning evidence
-
-Runtime decisions
-
-Actual analytical decisions are events, not config:
-
-actor / source
-
-evidence
-
-reason
-
-outcome
-
-timestamp
-
-parents
-
-Store them under:
-
-artifacts/lineage/decisions/
-
-Do not use DecisionRecord for deterministic mechanics such as exact duplicate removal or configured missing-value normalization. Those belong to policy + typed evidence + audit.
-
-3. No silent branches
-
-Broadway distinguishes:
-
-Fact — e.g. variance ratio = 2.71
-
-Policy — e.g. configured missing encodings or a recommendation threshold
-
-Decision — e.g. analyst chooses Welch's t-test
-
-No automatic branch should exist without a clear reason/evidence trail.
-
-When automation is ambiguous, Broadway should recommend rather than pretend there is one universally correct answer.
-
-4. Loud failure
-
-Current policy includes:
-
-missing artifact → None only when absence is valid
-
-malformed artifact → raise
-
-missing required feature/config → raise
-
-non-finite metrics/objectives → raise
-
-unexplained row loss above configured threshold → fail
-
-missing expected output after a step ran → integrity error
-
-important warnings should be typed results, not log-only
-
-custom builder import / registry errors → fail where the builder is actually needed
-
-custom feature builders extend the generic registry; they do not silently override generic builders
-
-General step invariant:
-
-input validated → operation → output validated → artifact persisted → lineage sidecar persisted → invariants checked
-
-High-level lifecycle
-
-Broadway has three analysis modes:
-
-prediction
-
-hypothesis
-
-causal
-
-AnalysisContract.mode selects the workflow.
-
-Conceptually:
-
-AnalysisContract
-    ↓
-full dispatcher
-    ↓
-mode-specific flow
-
-Mode flows:
-
-prediction:
-discover → etl → contracts → eda → baseline → features → train → evaluate
-
-hypothesis:
-discover → etl → contracts → eda → baseline → stats
-
-causal:
-discover → etl → contracts → eda → baseline → causal
-
-Per-step require_mode(...) remains the final guardrail.
-
-Major shipped abstractions
-
-AnalysisContract
-
-Represents authored analytical intent.
-
-Key fields include:
-
-name
-
-mode
-
-goal
-
-row_definition
-
-decision_moment
-
-available_info
-
-leakage_notes
-
-success_criterion
-
-These remain author-owned. Discovery may generate hints, but must not mutate analytical intent.
-
-DatasetProfile / ColumnProfile
-
-Observed facts live outside DatasetContract.
-
-Includes things such as:
-
-dtype
-
-null count
-
-cardinality
-
-min/max
-
-datetime min/max
-
-identifier score
-
-Observed facts are evidence, not accepted truth.
-
-BaselineResult
-
-Mode-specific baselines:
-
-prediction → mean/median/majority-class
-
-hypothesis → descriptive stats + naive effect
-
-causal → estimand + power/MDE
-
-Persisted under artifacts/baseline/.
-
-TransformAudit
-
-Tracks:
-
-rows in/out
-
-total rows dropped
-
-unexplained rows dropped
-
-reasons
-
-columns before/after
-
-columns added/removed
-
-ETL/features emit audits.
-
-max_drop_fraction guards unexplained row loss.
-
-Lineage / decision system
-
-Core lineage concepts:
-
-DatasetRef
-
-DatasetSlice
-
-DecisionRecord
-
-LineageRecord
-
-LineageNode
-
-LineageEdge
-
-LineageGraph
-
-RunState
-
-Sidecars:
-
-artifacts/lineage/records/
-
-Decisions:
-
-artifacts/lineage/decisions/
-
-CLI:
-
-ds-pipeline lineage --analysis <name> --dataset <name>
-
-Graph generation uses only real persisted nodes and must never fabricate missing execution outputs.
-
-Onboarding abstraction — shipped P0 → P3
-
-The onboarding work was completed on taxi and proved before the main split.
-
-P0 — semantic inference hints
-
-Commit:
-
-7a2a112
-
-Package:
-
-src/broadway/onboard/
-
-Inference produces ephemeral hints such as:
-
-dtype
-
-null rate
-
-cardinality
-
-identifier score
-
-datetime candidate
-
-numeric vs categorical
-
-suggested role
-
-These are evidence only.
-
-They pre-fill onboarding questions but never become contract truth until confirmed.
-
-P1 — ds-pipeline init
-
-Commit:
-
-1041b3e
-
-init is the full onboarding/scaffolding command.
-
-It supports interactive questions plus flag overrides for CI/non-interactive use.
-
-It writes:
-
-configs/dataset/*.yaml
-
-configs/analysis/*.yaml
-
-configs/experiment/*.yaml
-
-artifacts/discover/profile.json
-
-profile lineage sidecar
-
-discover remains the raw contract proposer and is not replaced.
-
-Important UX rule:
-
-A datetime column does not automatically imply time-based split semantics. The relevant split datetime must be explicitly confirmed.
-
-P2a — ownership correction
-
-Commit:
-
-98dea62
-
-The generic step schemas were made genuinely dataset-agnostic.
-
-Taxi-specific ETL/features/stats config fields were removed from core step models and relocated to taxi-owned config.
-
-group_column / group_values moved to the appropriate analysis-level hypothesis structure rather than remaining generic step fields.
-
-P2b — generic feature default + extension hook
-
-Commit:
-
-badeab1
+Step 00 was extended so the walkthrough can start before training_data.parquet.
 
 Shipped:
 
-generic datetime builders
+Polars dependency added for the ingestion boundary only.
 
-FeatureConfig.builder_module
+ds-pipeline ingest calls taxi process_data().
 
-lazy builder-module import at feature execution
+raw multi-file parquet loading uses a Polars lazy scan and materializes to pandas at the existing processing boundary.
 
-loud failure on import / malformed registry / collisions
+All raw columns are read for now. Column projection is an authored-policy decision, not a hidden optimization.
 
-no silent overriding of generic builders
+process_config.py honors Broadway's config root instead of hardcoded configs/... paths.
 
-build_generic_feature_specs(contract, experiment)
+ETL's ci_sample_size is applied only when CI=true.
 
-contract-derived engineered output validation
+normal/local ETL no longer silently truncates the canonical dataset to 50K rows.
 
-Extension model:
+ingest CLI logging was fixed so the user sees progress.
 
-generic builder registry
-    +
-explicit experiment builder_module
-    ↓
-merged registry
+Observed full ingest run:
 
-Custom builders extend; they do not silently replace core behavior.
+raw rows: 9,554,778
 
-P3 — non-taxi end-to-end proof
+after taxi domain filters: 8,545,833
 
-Commit:
+row removals reported:
 
-7be0dd3
+distance/time: 217,392
 
-tests/test_onboarding_e2e.py proves that a synthetic non-taxi CSV can:
+duration: 40,195
 
-init
-→ etl
-→ contracts
-→ baseline
-→ features
-→ train
-→ evaluate
+passenger count: 751,358
 
-with:
+training_data.parquet contains the six downstream taxi columns:
 
-local MLflow file store
+pickup_datetime
 
-no taxi names
+passenger_count
 
-no if dataset != taxi
+trip_distance
 
-zero edits to src/broadway/**
+pickup_location_id
 
-This is the acceptance proof behind the main ownership split.
+dropoff_location_id
 
-Taxi dogfood findings already completed
+trip_duration_minutes
 
-The taxi dataset was used to prove evidence → decision → cleaning → re-profile → lineage.
+5. Ingest / ETL lineage
 
-Datetime anomaly
+Ingest now persists a real lineage record:
 
-Observed:
+{
+  "node_id": "ingest:taxi",
+  "kind": "ingest",
+  "artifact": "data/processed/training_data.parquet",
+  "parents": ["dataset:taxi"]
+}
 
-18 pre-2024 rows
+ETL chooses its parent from persisted evidence:
 
-Decision:
+if an ingest record exists: ingest:<dataset> is upstream,
 
-drop_invalid_datetime
+otherwise standalone ETL retains dataset:<dataset> as upstream.
 
-Outcome:
+This avoids fabricated lineage.
 
-filter before training
+6. Contract ownership cleanup — Step 00.1
 
-re-profile confirms zero pre-2024 rows
+Shipped in commit 415c7e0 with 272 tests green at that checkpoint.
 
-Passenger count anomaly
+row_count
 
-Observed:
+Removed from authoritative DatasetContract.
 
-101,802 rows with passenger count 0
+Actual row counts remain observed evidence in DatasetProfile / TransformAudit / runtime artifacts.
 
-20 rows above 6
+Datetime dtype
 
-raw accepted dtype remains float64
+Contract datetime representation is normalized to the semantic token datetime64.
 
-Decision:
+aliases such as datetime64[us] / datetime64[ns] normalize at the model boundary.
 
-cast_and_bound_passenger_count
+Pandera validation already treats datetime units semantically.
 
-Outcome:
+Join completeness
 
-filter to integer-valued 1–6 in ETL
+Added typed JoinAudit evidence.
 
-keep float64 at processed boundary
+The actual execution lineage when lookups exist is:
 
-cast to int64 in feature layer
+dataset → ingest → join → etl
 
-A real-data ETL rerun exposed a NaN casting bug; the NaN-safe filter fix proved the loud-failure hardening useful.
+The taxi full-data join audit showed:
 
-Distance-duration anomaly
+lookup keys matched 100%,
 
-Observed:
+unmatched=0,
 
-18 rows with:
+null_keys=0,
 
-trip_distance roughly 0.01–0.04 mi
+unmatched_rate=0.0.
 
-duration 63–171 min
+7. Lookup-value quality — Step 00.2
 
-Raw inspection showed they are mostly legitimate flat-rate / negotiated trips:
+Shipped in commit 3aac481 with 281 tests green at that checkpoint.
 
-ratecode 2 — JFK flat-rate
+Added typed LookupValueAudit evidence, deliberately separate from JoinAudit.
 
-ratecode 3 — Newark flat-rate
+Lineage:
 
-ratecode 5 — negotiated fare
+dataset → ingest → join → etl
+                    └→ lookup_value
 
-Decision:
+Important distinction:
 
-distance_duration_is_flat_rate
+JoinAudit asks whether keys matched.
 
-Outcome:
+LookupValueAudit asks whether matched enrichment values are usable / deficient.
 
-keep
+Full taxi evidence before canonical deduplication (8,545,833 rows):
 
-no cleaning change
+Enriched column
 
-trip_distance is unreliable for flat-rate regimes
+Null
 
-any ratecode/flat-rate handling is a future feature-design choice, not an ETL rule
+Sentinel
 
-The lineage now contains three useful semantic cases:
+Affected
 
-invalid → drop
-invalid domain values → filter/bound
-suspicious but legitimate → keep
+Affected lookup keys
 
-This is important: Broadway records analytical judgment, not merely cleaning actions.
+Borough
 
-Current active work — structural cleaning boundary
+1,093
 
-Before resuming the manual statistical walkthrough, the next concrete implementation is an explicit raw → validated canonical dataset stage inside ETL.
+Unknown: 27,053
 
-The purpose is to make representation cleanup explicit and traceable before statistical/domain cleaning.
+28,146
 
-Goal
+264, 265
 
-ETL's first responsibility becomes:
+Zone
 
-raw
-→ structural validation
-→ deterministic structural cleaning
-→ strict canonical validation
-→ canonical artifact
-→ split
+27,053
 
-No domain/outlier cleaning belongs here.
+—
 
-No DecisionRecord is created for deterministic mechanics.
+27,053
 
-Locked design decisions
+264
 
-Step structure
+service_zone
 
-Enhance the existing etl step.
+28,146
 
-Do not add a separate canonicalize pipeline step yet.
+—
 
-A separate step is only warranted later if canonicalization needs independent execution/reuse.
+28,146
 
-Raw preservation
+264, 265
 
-Record-only preservation.
+Ground truth in taxi_zone_lookup.csv:
 
-Do not add _raw shadow columns to the canonical dataset.
+LocationID 264 → Borough="Unknown", Zone="N/A", service_zone="N/A"
 
-The immutable source file preserves the original values; typed evidence + lineage carry what changed.
+LocationID 265 → Borough=NaN, Zone="Outside of NYC", service_zone=NaN
 
-Missing encodings
+The join is therefore structurally complete while the lookup values themselves contain deficient source values.
 
-Generic configured default:
+8. Lookup NA parsing gap identified — Step 00.3 is next in this area
 
-missing_encodings:
-  - ""
-  - "NA"
-  - "N/A"
-  - "null"
-  - "None"
-  - "?"
+Current lookup CSV loading uses pandas default NA recognition, so tokens such as "N/A" can become NaN before Broadway's authored missing-value policy applies.
 
-Do not include "-" globally because it can be legitimate data.
+Locked direction:
 
-Dataset-specific additions require actual evidence.
+add LookupSpec.na_values: list[str],
 
-Duplicate definition
+read lookup CSVs with keep_default_na=False,
 
-Only exact all-column duplicates:
+only explicitly authored na_values become null,
 
-df.duplicated()
+taxi lookup configs should explicitly list the desired missing tokens rather than inheriting pandas defaults,
 
-Do not use key-based deduplication at the structural layer; that requires domain identity semantics and belongs to authored judgment/policy.
+record the applied na_values policy in lookup-value evidence.
 
-Validation boundaries
+This is an ingestion/parsing ownership issue, not a domain-cleaning decision.
 
-There are two distinct validation points.
+9. Sample provenance / statistical sample roles
 
-Raw/input boundary
+The sampling discussion was resolved conceptually as:
 
-Validate structural expectations compatible with source representation:
+estimation sample → population/proportional interpretation,
 
-expected columns
+diagnostic sample → enough small-group coverage for diagnostics,
 
-allowed extra/missing columns according to contract policy
+do not silently treat these as interchangeable.
 
-null constraints that make sense before representation parsing
+A first-class SampleSpec was designed around:
 
-Do not apply the strict canonical dtype schema here because CSV date strings may legitimately represent a canonical datetime column.
+name,
 
-Canonical/output boundary
+role: diagnostic | estimation,
 
-Apply the authoritative full contract/Pandera validation after representation cleanup.
+path,
 
-Canonical dtype is authoritative here.
+optional description,
 
-Parse failures
+sample-specific column mapping when external materialized samples use different physical names.
 
-Parse failures:
+Important principle:
 
-become NaT / NaN
+the role belongs to the actual sample used by a result, not to the analysis contract itself.
 
-are recorded as typed evidence
+Result/lineage provenance should carry both sample_name and sample_role.
 
-are not automatically dropped
+Longer term, Broadway-produced samples should use the canonical schema; sample column mapping remains a bridge for external materialized samples.
 
-Only explicit null policy removes rows.
+10. Group-description walkthrough step
 
-Feature-column nulls, including failed datetime parses, remain unless another authored policy later addresses them.
+stats describe is the first formal statistical walkthrough step.
 
-Target-null rows
+It persists typed group evidence including:
 
-Target-null is currently the sole deterministic null-driven row drop.
+total N,
 
-It must be explicit and reflected in the audit.
+per-group N / mean / std,
 
-Structural-cleaning evidence models
+all configured groups including n=0,
 
-Planned package:
+absent groups,
 
-src/broadway/cleaning/
+proportions,
 
-ParseFailure
+imbalance_ratio as evidence only,
 
-Fields:
+sample/source provenance.
 
-column
+Dogfood on the earlier 50K sampled canonical surfaced severe imbalance and missing Staten Island. This was evidence that led to the later sample-role / sampling-boundary work.
 
-count
+The rule remains:
 
-examples: list[str]
+imbalance is surfaced now as evidence; reweighting / resampling / method choice is later analytical judgment.
 
-target_dtype
+11. Stats library already implemented
 
-Represents non-missing raw values that failed the requested representation parse.
+Existing statistical engine includes:
 
-StructuralCleanResult
+classical ANOVA,
 
-Fields:
+Welch ANOVA,
 
-audit: TransformAudit
+Kruskal-Wallis,
 
-parse_failures: list[ParseFailure]
+Levene,
 
-missing_encodings: dict[str, list[str]]
+normality diagnostics,
 
-canonical_path: str
+Games-Howell,
 
-Important:
+effect sizes,
 
-missing_encodings records only encodings actually observed in each column.
+group guards,
 
-The configured policy set remains in EtlStep.
+OLS,
 
-The result artifact records what happened, not the policy definition.
+HC3 robust SE,
 
-Structural-cleaning execution order
+residual diagnostics,
 
-The exact order matters.
+time-series helpers,
 
-Use:
+AnalysisPlan save/load.
 
-load raw
-→ raw structural validation
-→ drop exact raw duplicates
-→ standardize configured missing encodings
-→ parse datetime columns
-→ drop target-null rows
-→ strict canonical validation
-→ save canonical artifact
-→ persist StructuralCleanResult
-→ persist ETL lineage sidecar / TransformAudit
-→ split canonical into train / validation
+Most of these are library functions only; they are not yet first-class walkthrough steps.
 
-Why this order:
+12. OLS diagnostic direction
 
-duplicate means genuinely identical source rows
+The OLS diagnostic foundation is framed as:
 
-missing representations are normalized before parse-failure detection
+Question → Evidence → Ramification
 
-"NA" / "null" should not be falsely reported as datetime parse failures
+Diagnostic questions to eventually cover:
 
-parse failure is a genuine non-missing parse problem
+Is the mean relationship correctly specified?
 
-target-null policy runs after representation normalization
+Are observations independent?
 
-canonical contract validates the final accepted representation
+Is error variance constant?
 
-Planned structural functions
+Is the result driven by influential observations?
 
-src/broadway/cleaning/structural.py
+Is residual non-normality problematic for inference?
 
-standardize_missing(...)
+Is multicollinearity problematic?
 
-Maps only configured encodings to missing values.
+Is the sample sufficient for the intended inference?
 
-Returns:
+Is the estimated effect plausibly confounded / subject to omitted-variable bias?
 
-cleaned series
+The first diagnostic capability designed is mean specification:
 
-encodings actually observed
+residuals-vs-fitted evidence,
 
-No inferred missing semantics.
+later residuals-vs-predictor evidence,
 
-parse_datetime(...)
+no automated U/S-shape classifier yet,
 
-Parses with coercion, but explicitly detects:
+do not treat a p-value as the sole functional-form diagnostic.
 
-raw value was non-null
-AND
-value was not a configured missing representation
-AND
-parse produced NaT
+DiagnosticResult is intended to remain separate from generic AnalysisPlan.
 
-Returns parsed data + typed ParseFailure evidence.
+13. Results-first product surface
 
-No row drop.
+The product-surface decision was changed explicitly:
 
-remove_duplicates(...)
+Results are front and center. Machine evidence supports them.
 
-Exact all-column duplicate removal.
+Target layout:
 
-Adds an explicit audit reason.
+reports/
+  index.md
+  results/
+    describe.md
+    normality.md
+    levene.md
+    anova.md
+    welch.md
+    kruskal.md
+    effect_size.md
+    games_howell.md
+    ols_diagnostics.md
+  figures/
+  lineage/
+    graph.md
+    graph.json
+    areas/
+      data.md
+      inference.md
+      modeling.md
 
-remove_target_null(...)
+artifacts/          # machine-readable evidence / provenance
 
-Drops rows with null target only.
+data/processed/     # materialized datasets
+results/            # legacy caches / scratch outputs; phase out as things migrate
 
-Adds an explicit audit reason.
+Human-facing reports and figures should be tracked in git so a checkout contains inspectable results without rerunning the analysis.
 
-Existing ETL / contract pieces to reuse
+Machine JSON/parquet remain regenerable and out of the main human surface.
 
-Do not rebuild these:
+14. Results navigation / workflow direction
 
-data/cleaner.py::clean() already accounts for target-null + duplicate drops
+The earlier fixed sequence idea (describe → normality → Levene → ANOVA → Welch → ...) is not meant to become a universal router.
 
-etl/module.py already emits TransformAudit + lineage
+The more flexible target is a guided workflow with explicit gates:
 
-contracts/pandera.py::build_raw_schema(contract)
+automatic preparation
+→ automatic evidence gathering
+→ decision gate
+→ analyst-chosen principal method
+→ optional remediation / robustness / post-hoc branches
+→ conclusion
 
-contracts/checks.py
+Rule remains:
 
-lineage/models.py::TransformAudit
+automate mechanics; facilitate judgment; record the decision.
 
-enforce_drop_fraction
+For a group-comparison question, describe / normality / Levene can gather evidence before a method decision.
 
-The structural-cleaning work should refactor/reuse these pieces rather than establish parallel implementations.
+For an OLS-centered analysis, the principal path should instead be:
 
-Tests required for structural cleaning
+specify estimand / model question
+→ fit base OLS
+→ diagnostic bundle
+→ decision gate
+→ remediate / refit if warranted
+→ primary result
+→ supporting analyses only when useful
 
-At minimum:
+Do not force ANOVA/Welch/Kruskal to be the spine of an OLS analysis.
 
-datetime parsing records failures and produces NaT without dropping rows
+15. Documentation cleanup identified
 
-missing standardization maps only configured encodings and reports only observed encodings
+A docs-only cleanup was planned after inventorying drift.
 
-exact duplicate + target-null removal are visible in TransformAudit.reasons
+Known documentation fixes:
 
-raw boundary accepts a date represented as a string when the canonical contract expects datetime
+README: add missing CLI commands such as init / profile; name shipped audit / diagnostic types; correct SampleSpec; update config tree; note row-count ownership + datetime normalization.
 
-canonical boundary strictly validates the parsed dtype
+dataflow.md: fix package ownership / directory tree and AnalysisContract location.
 
-ETL persists StructuralCleanResult
+src/broadway/stats/API.md: document actual Pydantic AnalysisPlan, describe/guards, and truthful stats module behavior.
 
-canonical dataset is saved and validated before splitting
+tests/README.md: rewrite around capability groups rather than a stale exhaustive flat list.
 
-ETL lineage sidecar references the canonical transformation/audit
+FIX.md: reconcile completed vs superseded checklist items.
 
-parse failures do not become implicit row drops
+No behavioral changes should be mixed into that docs pass.
 
-No DecisionRecord should be emitted by these mechanics.
+Important unresolved architecture / design work
 
-Statistical work — next after structural cleaning
+A. First-class canonical multi-source assembly
 
-The user explicitly wants to perform statistical tests one by one manually first in order to understand the process before Broadway automates recommendations.
+A naming mismatch (Borough vs pickup_borough) exposed a deeper future need.
 
-Do not jump directly to the group-comparison router.
+Long-term direction:
 
-The intended manual group-comparison walkthrough is:
+one canonical dataset schema can be assembled from multiple physical sources,
 
-define groups and estimand
+canonical columns own semantic names regardless of origin,
 
-inspect sample sizes + descriptive statistics
+joins are an explicit authored join plan,
 
-run normality diagnostics
+multiple providers for one canonical field require explicit precedence/resolution,
 
-run Levene
+no silent provider choice,
 
-run classical ANOVA
+future taxi canonical naming should likely prefer semantic names such as pickup_borough so pickup/dropoff concepts are unambiguous.
 
-run Welch ANOVA
+This remains design-first, not an immediate refactor.
 
-run Kruskal-Wallis
+A future CANONICAL_SCHEMA.md should cover:
 
-compute effect size
+sources,
 
-if warranted, run Games-Howell
+join plan,
 
-compare conclusions
+canonical columns,
 
-record why a method would be chosen
+provider precedence,
 
-Broadway should calculate and expose evidence first.
+validation boundaries,
 
-The recommendation layer comes after real manual use.
+migration compatibility,
 
-Relevant statistical philosophy:
+at least one non-taxi example.
 
-AnalysisSpec
-    ↓
-Diagnostics
-    ↓
-Recommendation / method options
-    ↓
-Analyst decision
-    ↓
-Statistical execution
-    ↓
-typed result
-    ↓
-plots / reports
+B. Data execution / performance abstraction
 
-Rule:
+Current direction:
 
-Statistical methods calculate. Recommendation logic advises. Decisions record judgment. Renderers present.
+optimize physical access without changing analytical semantics,
 
-Do not encode:
+Polars at raw ingestion is already acceptable,
 
-if normal → method A
-else → method B
+pandas/NumPy remain the stats boundary,
 
-Normality tests, especially at large N, should be evidence rather than hard gates.
+PyArrow/Polars optimizations such as projection/predicate pushdown/batching are allowed when semantics are preserved,
 
-Consider:
+column selection must be authored, not silently inferred,
 
-estimand
+canonicalization remains normal global DataFrame semantics for now,
 
-sample size
+streaming/chunked canonicalization is a separate future initiative if memory pressure requires redesigned global invariants.
 
-dependence
+Possible future execution interface should be backend-neutral enough that Spark could be an optional distributed backend later, but Spark is not needed now.
 
-variance
+C. Lookup-value analytical decisions
 
-outliers
+The lookup audit has exposed real values requiring analyst/domain decisions, especially for borough analysis:
 
-effect size
+LocationID 264 → unknown borough,
 
-confidence intervals
+LocationID 265 → outside-NYC zone with no borough.
 
-robustness
+These should not be silently repaired in structural cleaning.
 
-Statistical capabilities already implemented
+A later borough-specific analysis may explicitly define an analytical population such as “resolved pickup borough is one of the five NYC boroughs” and record excluded counts/reasons in a DecisionRecord.
 
-src/broadway/stats/ already contains:
+Immediate next work
 
-classical ANOVA
+1. Finish Step 00.3 — explicit lookup NA parsing
 
-Welch ANOVA
+Implement explicit lookup na_values ownership so pandas defaults no longer silently determine lookup semantics.
 
-Kruskal-Wallis
+Then rerun the data-foundation path and inspect the resulting lookup-value evidence.
 
-Levene
+2. Finish the results surface infrastructure
 
-normality diagnostics
+The human-facing product surface should be populated from persisted typed results, not terminal scraping.
 
-Games-Howell
+Immediate first result should remain describe:
 
-effect sizes
+JSON machine evidence → artifacts/stats/,
 
-guards
+human Markdown → reports/results/describe.md,
 
-OLS
+plots → reports/figures/,
 
-HC3 robust SE
+reports/index.md should summarize the current question, latest result, strongest evidence, ramification/decision, and next available action,
 
-diagnostics
+lineage remains provenance, not the sole navigation UI.
 
-time-series helpers
+The report renderer must not become a second source of truth; it renders persisted evidence.
 
-AnalysisPlan
+3. Build the next analytical walkthrough step one at a time
 
-The current stats pipeline step still effectively runs a single ANOVA.
+Do not implement the full recommendation router yet.
 
-Missing recommendation-layer work includes:
+For group-comparison dogfooding, likely next formal step:
 
-Group-comparison router
+normality evidence + Q-Q plots,
 
-Future behavior should roughly:
+then Levene,
 
-inspect evidence
+then reach a decision gate before deciding which omnibus method is the principal analysis.
 
-default toward Welch where appropriate
+Do not automatically run every available test just because it exists.
 
-treat non-normality as a warning/evidence signal, not a hard gate
+4. OLS principal-analysis walkthrough
 
-combine omnibus result + effect size + diagnostics
+If the intended principal analysis is OLS, prioritize this path rather than treating the group-comparison sequence as universal:
 
-recommend Games-Howell when post-hoc comparison is warranted
+define estimand / outcome / predictor / unit / population / sample,
 
-record the eventual analyst choice
+fit base OLS,
 
-Do not implement this until the manual walkthrough has been dogfooded.
+run Question → Evidence → Ramification diagnostics,
 
-OLS remediation ladder
+decision gate,
 
-Future exploratory concept:
+remediate/refit only where warranted,
 
-base OLS
-→ inspect diagnostics
-→ transformation candidate
-→ robust SE
-→ interaction candidate
-→ escalate to nonlinear model only with logged evidence
+persist the primary result + limitations + decision trail.
 
-This is also deferred until the manual statistics flow is better understood.
+The first OLS diagnostic implementation should remain mean-specification evidence, not automated model selection.
 
-Feature / extension architecture
+5. Documentation-only reconciliation
 
-The generic feature path is the default platform path.
+Run the planned docs pass after the current behavior is stable. Keep it separate from code/refactors.
 
-Custom project extensions are explicit.
+Current working principles to preserve
 
-FeatureConfig.builder_module declares a custom module.
+One authoritative owner per concept.
 
-Import occurs lazily at feature execution.
+Authored intent ≠ observed evidence ≠ runtime decision.
 
-Requirements:
+No silent branches.
 
-import failures are loud
+Loud failure for malformed/missing required state.
 
-BUILDERS must exist and be valid
+Deterministic mechanics produce policy + evidence + audit, not DecisionRecord.
 
-custom names may not collide with generic names
+Analytical judgment is recorded as a decision.
 
-custom builders extend only
+Reports render evidence; they do not become truth themselves.
 
-no if dataset == ...
+Results are the primary human-facing product surface.
 
-no convention-only magic imports
+Lineage is provenance / execution history, not a substitute for analytical interpretation.
 
-Generic feature scope remains conservative:
-
-numeric passthrough
-
-datetime decomposition
-
-categorical encoding
-
-Do not automatically introduce:
-
-log transforms
-
-interactions
-
-clipping
-
-imputation
-
-feature selection
-
-semantic filters
-
-Those require evidence and/or authored intent.
-
-Cleaning boundary
-
-The intended boundary is now:
-
-raw source
-    ↓
-structural canonicalization
-    ↓
-validated canonical dataset
-    ↓
-profiling / EDA / slices
-    ↓
-analytical decisions
-    ↓
-domain cleaning / feature decisions
-    ↓
-modeling / inference
-
-Initial structural cleaning should correct representation problems, not hide analytical judgments.
-
-Hold off automatically on:
-
-outlier dropping
-
-imputation
-
-winsorization
-
-scaling
-
-rare-category merging
-
-feature selection
-
-leakage-sensitive removal
-
-semantic filters
-
-transformations that should be fit only on training data
-
-Training / external tools philosophy
-
-Broadway orchestrates mature tools rather than replacing them.
-
-Current stack:
-
-Pandera → dataframe validation
-
-Pydantic → configuration/contracts
-
-Optuna → HPO
-
-MLflow → experiment/model/artifact tracking
-
-Kubernetes → scalable execution
-
-sklearn / statsmodels / SciPy → modeling/statistics
-
-Broadway should own semantics and traceability:
-
-data contract
-
-feature contract
-
-analytical intent
-
-HPO configuration ownership
-
-evaluation/promotion policy
-
-decision lineage
-
-Avoid becoming “our wrapper around every library.”
-
-Testing philosophy
-
-Prefer:
-
-typed contracts
-
-scenario tests for decision/recommendation logic
-
-regression tests for silent-failure classes
-
-full-suite gates after each architectural phase
-
-real-data smoke checks after infrastructure changes
-
-non-taxi E2E tests for abstraction claims
-
-Fixture rule:
-
-Use contract-driven valid fixtures where useful, but also explicit malformed fixtures so tests do not become tautological.
-
-Git / execution style
-
-The user prefers:
-
-one coherent commit per phase
-
-tightly scoped agent contracts
-
-full suite green before moving on
-
-no scope creep
-
-docs updated with architecture changes
-
-checkpoints after meaningful real-data runs
-
-Current development pattern:
-
-build / dogfood on taxi
-
-prove the abstraction against non-taxi data
-
-promote only genuinely generic work to main
-
-Do not merge taxi-specific judgment into main.
-
-Immediate next task
-
-Implement the structural-cleaning boundary inside ETL exactly as locked above.
-
-Recommended phase shape:
-
-S0 — typed structural-cleaning evidence models
-S1 — structural functions + tests
-S2 — ETL wiring + raw/canonical validation split
-S3 — lineage/artifact integration + full-suite gate
-S4 — real taxi smoke run + inspect artifacts
-STOP
-
-Keep this pass narrow:
-
-representation cleanup only
-
-deterministic mechanics only
-
-typed evidence
-
-TransformAudit
-
-canonical output validation
-
-no outlier/domain cleaning
-
-no statistical recommendation router
-
-no DecisionRecords for deterministic operations
-
-After that passes on real taxi data, resume the manual statistical walkthrough one test at a time.
-
-One-sentence project description
-
-Broadway is a traceable workflow framework for tabular statistical analysis and predictive modeling that preserves the path from raw data and analytical intent through evidence, decisions, features, models, and results.
-
-Alternative framing:
-
-A golden-path framework for reproducible tabular data science where analytical judgment is facilitated rather than hidden, and every consequential decision remains traceable.
+Build/dogfood narrowly, inspect real artifacts, then promote abstractions.

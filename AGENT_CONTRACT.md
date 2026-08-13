@@ -1,7 +1,8 @@
 # AGENT_CONTRACT.md — operating rules (single source)
 
 This is the one file that defines how the main agent and its sub-agents operate.
-It replaces `MAIN_AGENT.md`, `coding_style.md`, and the previous `AGENT_CONTRACT.md`.
+Ask your questions in output, alongside the rest of your observations. always ask questions if you have them.
+Always commit all changes after every change.
 
 ## 1. What Broadway is
 
@@ -20,7 +21,7 @@ Working directory: `/home/opc/ONE/broad-way`.
 Development happens on `taxi`; the `main` split already happened, don't redo it.
 
 ## 3. Delegation (non-negotiable)
-
+- **ALWAYS present decisions to the user; NEVER decide unilaterally.**
 - **The main agent does NOT do work itself.** It delegates *everything*:
   coding, tests, data refresh, dogfood, verification, **and housekeeping**
   (file cleanup/moves, `.gitignore` edits, doc edits).
@@ -55,7 +56,7 @@ Development happens on `taxi`; the `main` split already happened, don't redo it.
 - **Project docs** — keep current in the SAME commit as any change: `README.md`,
   `dataflow.md`, `src/broadway/stats/API.md`, `tests/README.md`.
   `README.md` must be current at ALL times (test counts, commands, paths).
-- **Backlog** — `FIX.md` (mark items done / add items when asked).
+
 - **Scratch (NEVER touch)** — `01.md`, `TODO_*.md`, `GOALS.md`, `LEARN.md`,
   `trust.md`, `synth.md`, `SENIOR.md`, `project.md`, `HANDOFF.md`, `FEEDBACK.md`,
   `DATA_VALIDATION.md`, `GENERAL_TODO.md`, `project/STATS.md`.
