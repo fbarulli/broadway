@@ -8,6 +8,7 @@ import pytest
 from broadway.etl.process import (
     compute_trip_duration,
     filter_valid_duration,
+    filter_valid_passenger_count,
     filter_valid_trips,
     read_raw_data,
     rename_columns,
@@ -79,6 +80,12 @@ def test_filter_valid_duration() -> None:
     assert len(filtered) == 3
     assert float(filtered[TARGET].min()) >= min_trip_duration_minutes
     assert float(filtered[TARGET].max()) <= max_trip_duration_minutes
+
+
+def test_filter_valid_passenger_count_drops_nan_and_invalid() -> None:
+    df = pd.DataFrame({"passenger_count": [1.0, 2.0, 3.5, 0.0, 9.0, float("nan")]})
+    out = filter_valid_passenger_count(df)
+    assert set(out["passenger_count"].tolist()) == {1.0, 2.0}
 
 
 def test_rename_columns() -> None:

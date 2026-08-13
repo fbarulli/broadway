@@ -70,7 +70,12 @@ def filter_valid_duration(df: pd.DataFrame) -> pd.DataFrame:
 def filter_valid_passenger_count(df: pd.DataFrame) -> pd.DataFrame:
     n_before = len(df)
     pc = df["passenger_count"]
-    valid = (pc >= cfg.min_passenger_count) & (pc <= cfg.max_passenger_count) & (pc == pc.astype(int))
+    valid = (
+        pc.notna()
+        & (pc >= cfg.min_passenger_count)
+        & (pc <= cfg.max_passenger_count)
+        & (pc == pc.round())
+    )
     df = df[valid].copy()
     logger.info(f"After passenger_count filter: {len(df)} ({n_before - len(df)} dropped)")
     return df
