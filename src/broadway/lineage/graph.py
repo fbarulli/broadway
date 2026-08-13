@@ -23,6 +23,7 @@ KIND_LABELS = {
     "analysis": "AnalysisContract",
     "baseline": "Baseline",
     "stats": "Stats",
+    "describe": "Describe",
     "causal": "Causal",
     "training": "Training",
     "evaluation": "Evaluation",

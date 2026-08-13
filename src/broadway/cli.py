@@ -51,9 +51,14 @@ def _build_parser() -> argparse.ArgumentParser:
     init.add_argument("--success-criterion")
 
     for step in STEPS:
-        if step == "discover":
+        if step in ("discover", "stats"):
             continue
         _add_step_args(sub.add_parser(step))
+
+    stats = sub.add_parser("stats")
+    stats_sub = stats.add_subparsers(dest="stats_subcommand", required=True)
+    for sc in ("run", "describe"):
+        _add_step_args(stats_sub.add_parser(sc))
 
     return parser
 
@@ -77,6 +82,19 @@ def main() -> None:
         from broadway.onboard.module import init
 
         init(args.csv, args.name, args.target, args.task, args.datetime_columns, args.ignore_columns, args.split_column, args.mode, args.goal, args.row_definition, args.decision_moment, args.available_info, args.leakage_notes, args.success_criterion)
+    elif args.step == "stats":
+        cfg = load_config(
+            step="stats", dataset=args.dataset, experiment=args.experiment,
+            analysis=args.analysis, environment=args.environment,
+        )
+        if args.stats_subcommand == "describe":
+            from broadway.stats.describe import run as describe_run
+
+            describe_run(cfg)
+        else:  # "run"
+            from broadway.pipeline import run as run_pipeline
+
+            run_pipeline(cfg, ["stats"])
     else:
         from broadway.pipeline import run
 
