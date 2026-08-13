@@ -1,0 +1,11 @@
+name: test
+mode: prediction
+goal: predict price
+row_definition: one listing
+decision_moment: at listing time
+available_info:
+  - rooms
+  - area
+  - neighborhood
+leakage_notes: []
+success_criterion: beat mean baseline

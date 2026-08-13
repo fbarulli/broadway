@@ -1,0 +1,11 @@
+name: test_causal
+mode: causal
+goal: estimate the causal effect of a treatment on price
+row_definition: one listing
+decision_moment: before treatment assignment
+available_info:
+  - rooms
+  - area
+leakage_notes:
+  - outcome must be measured after treatment
+success_criterion: a powered design

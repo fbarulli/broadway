@@ -16,7 +16,7 @@ from broadway.stats import module
 def test_stats_run_writes_plan_file(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    cfg = load_config("stats", dataset="taxi", experiment="taxi", analysis="taxi_hypothesis")
+    cfg = load_config("stats", dataset="test", experiment="baseline", analysis="test_hypothesis")
     assert cfg.stats is not None
     assert cfg.dataset is not None
 
@@ -36,7 +36,7 @@ def test_stats_run_writes_plan_file(
                     target_col: rng.normal(mean, 2.0, 5),
                 }
             )
-            for group, mean in zip(cfg.analysis.hypothesis.group_values, (10.0, 15.0, 20.0, 12.0, 18.0))
+            for group, mean in zip(cfg.analysis.hypothesis.group_values, (10.0, 15.0))
         ]
         return pd.concat(frames, ignore_index=True)
 
@@ -53,4 +53,4 @@ def test_stats_run_writes_plan_file(
     assert "effect_sizes" in plan
     assert "passed" in plan
     assert "reason" in plan
-    assert plan.get("analysis_goal") == "test whether trip duration differs across pickup boroughs"
+    assert plan.get("analysis_goal") == "test whether price differs across neighborhoods"

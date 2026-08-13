@@ -48,9 +48,9 @@ def test_ran_but_output_missing_distinct_from_not_yet_run() -> None:
     graph = LineageGraph(
         nodes=[
             LineageNode(
-                id="baseline:taxi", kind="baseline", label="baseline:taxi", status="ran_but_output_missing"
+                id="baseline:test", kind="baseline", label="baseline:test", status="ran_but_output_missing"
             ),
-            LineageNode(id="profile:taxi", kind="profile", label="profile:taxi", status="produced"),
+            LineageNode(id="profile:test", kind="profile", label="profile:test", status="produced"),
         ],
         edges=[],
     )

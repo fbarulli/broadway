@@ -79,14 +79,14 @@ def test_module_requires_analysis() -> None:
 
 
 def test_module_dispatch_prediction(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    cfg = load_config("baseline", dataset="taxi", analysis="taxi")
+    cfg = load_config("baseline", dataset="test", analysis="test")
     assert cfg.analysis is not None
     cfg = cfg.model_copy(
         update={"baseline": cfg.baseline.model_copy(update={"output_dir": str(tmp_path)})}
     )
     monkeypatch.setattr(records, "LINEAGE_DIR", tmp_path / "lineage")
     monkeypatch.setattr(
-        module, "load", lambda dataset: pd.DataFrame({"trip_duration_minutes": [10.0, 20.0, 30.0]})
+        module, "load", lambda dataset: pd.DataFrame({"price": [10.0, 20.0, 30.0]})
     )
     module.run(cfg)
     p = tmp_path / cfg.baseline.output_file
@@ -94,8 +94,8 @@ def test_module_dispatch_prediction(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     r = load_result(p)
     assert r.mode == AnalysisMode.PREDICTION
     assert r.trace is not None
-    assert r.trace.dataset == "taxi"
-    assert r.trace.analysis_goal == "predict trip duration"
+    assert r.trace.dataset == "test"
+    assert r.trace.analysis_goal == "predict price"
     assert r.trace.commit
 
 

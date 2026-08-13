@@ -1,4 +1,0 @@
-name: passenger_out_of_range
-dataset: taxi
-description: trips with non-integer or out-of-range passenger count
-filter_expression: passenger_count < 1 or passenger_count > 6 or passenger_count != int(passenger_count)

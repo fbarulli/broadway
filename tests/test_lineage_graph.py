@@ -20,23 +20,23 @@ def test_build_graph_links_nodes_and_records(tmp_path: Path) -> None:
     (configs / "analysis").mkdir(parents=True)
     (configs / "slice").mkdir(parents=True)
 
-    (configs / "dataset" / "taxi.yaml").write_text(
+    (configs / "dataset" / "test.yaml").write_text(
         yaml.safe_dump(
-            {"name": "taxi", "path": "data/processed/training_data.parquet", "row_count": 100}
+            {"name": "test", "path": "data/processed/training_data.parquet", "row_count": 100}
         ),
         encoding="utf-8",
     )
-    (configs / "analysis" / "taxi.yaml").write_text(
-        yaml.safe_dump({"name": "taxi", "mode": "prediction"}),
+    (configs / "analysis" / "test.yaml").write_text(
+        yaml.safe_dump({"name": "test", "mode": "prediction"}),
         encoding="utf-8",
     )
     (configs / "slice" / "airport.yaml").write_text(
         yaml.safe_dump(
             {
                 "name": "airport",
-                "dataset": "taxi",
-                "description": "airport trips",
-                "filter_expression": "pickup_location_id == 132",
+                "dataset": "test",
+                "description": "large listings",
+                "filter_expression": "area > 100",
             }
         ),
         encoding="utf-8",
@@ -49,22 +49,22 @@ def test_build_graph_links_nodes_and_records(tmp_path: Path) -> None:
     records_dir = lineage / "records"
     records_dir.mkdir(parents=True)
     baseline_record = LineageRecord(
-        node_id="baseline:taxi",
+        node_id="baseline:test",
         kind="baseline",
         artifact=str(artifact),
-        parents=["analysis:taxi", "profile:taxi"],
+        parents=["analysis:test", "profile:test"],
     )
-    (records_dir / "baseline_taxi.json").write_text(
+    (records_dir / "baseline_test.json").write_text(
         baseline_record.model_dump_json(), encoding="utf-8"
     )
 
     missing_record = LineageRecord(
-        node_id="stats:taxi",
+        node_id="stats:test",
         kind="stats",
         artifact=str(tmp_path / "does_not_exist.json"),
-        parents=["baseline:taxi"],
+        parents=["baseline:test"],
     )
-    (records_dir / "stats_taxi.json").write_text(
+    (records_dir / "stats_test.json").write_text(
         missing_record.model_dump_json(), encoding="utf-8"
     )
 
@@ -85,19 +85,19 @@ def test_build_graph_links_nodes_and_records(tmp_path: Path) -> None:
     graph = build_graph(configs, lineage)
 
     node_ids = {n.id for n in graph.nodes}
-    assert "dataset:taxi" in node_ids
-    assert "analysis:taxi" in node_ids
+    assert "dataset:test" in node_ids
+    assert "analysis:test" in node_ids
     assert "slice:airport" in node_ids
-    assert "baseline:taxi" in node_ids
+    assert "baseline:test" in node_ids
     assert "decision:keep_outliers" in node_ids
-    assert "stats:taxi" in node_ids
+    assert "stats:test" in node_ids
 
     status_by_id = {n.id: n.status for n in graph.nodes}
-    assert status_by_id["baseline:taxi"] == "produced"
-    assert status_by_id["stats:taxi"] == "ran_but_output_missing"
+    assert status_by_id["baseline:test"] == "produced"
+    assert status_by_id["stats:test"] == "ran_but_output_missing"
 
     edges = {(e.source, e.target) for e in graph.edges}
-    assert ("slice:airport", "dataset:taxi") in edges
-    assert ("analysis:taxi", "baseline:taxi") in edges
+    assert ("slice:airport", "dataset:test") in edges
+    assert ("analysis:test", "baseline:test") in edges
     assert ("slice:airport", "decision:keep_outliers") in edges
-    assert ("baseline:taxi", "stats:taxi") in edges
+    assert ("baseline:test", "stats:test") in edges

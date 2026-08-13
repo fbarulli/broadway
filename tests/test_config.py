@@ -1,9 +1,6 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
-import yaml
 from pydantic import ValidationError
 
 from broadway.config.loader import load_config
@@ -12,42 +9,34 @@ from broadway.config.schema import (
     FeatureConfig,
     HPOConfig,
     ModelConfig,
-    ProjectConfig,
     SplitConfig,
-)
-from broadway.etl.process_config import (
-    min_trip_duration_minutes,
-    max_trip_duration_minutes,
-    min_trip_distance,
-    max_trip_distance,
-    rename_map,
 )
 
 
 @pytest.fixture
 def train_cfg():
-    cfg = load_config("train", dataset="taxi", experiment="taxi")
+    cfg = load_config("train", dataset="test", experiment="baseline")
     assert cfg.train is not None
     return cfg.train
 
 
 @pytest.fixture
 def evaluate_cfg():
-    cfg = load_config("evaluate", dataset="taxi", experiment="taxi")
+    cfg = load_config("evaluate", dataset="test", experiment="baseline")
     assert cfg.evaluate is not None
     return cfg.evaluate
 
 
 @pytest.fixture
 def etl_cfg():
-    cfg = load_config("etl", dataset="taxi", experiment="taxi")
+    cfg = load_config("etl", dataset="test", experiment="baseline")
     assert cfg.etl is not None
     return cfg.etl
 
 
 @pytest.fixture
 def stats_cfg():
-    cfg = load_config("stats", dataset="taxi", experiment="taxi")
+    cfg = load_config("stats", dataset="test", experiment="baseline")
     assert cfg.stats is not None
     return cfg.stats
 
@@ -67,23 +56,14 @@ def test_load_etl_with_pipeline_fields(etl_cfg) -> None:
     assert etl_cfg.max_drop_fraction >= 0.0
 
 
-def test_project_config_matches_process_constants() -> None:
-    project = ProjectConfig(**yaml.safe_load(Path("configs/project/taxi.yaml").read_text()))
-    assert project.min_trip_distance == min_trip_distance
-    assert project.max_trip_distance == max_trip_distance
-    assert project.min_trip_duration_minutes == min_trip_duration_minutes
-    assert project.max_trip_duration_minutes == max_trip_duration_minutes
-    assert project.rename_map == rename_map
-
-
 def test_missing_dataset_raises() -> None:
     with pytest.raises(FileNotFoundError):
-        load_config("train", dataset="nonexistent", experiment="taxi")
+        load_config("train", dataset="nonexistent", experiment="baseline")
 
 
 def test_missing_experiment_raises() -> None:
     with pytest.raises(FileNotFoundError):
-        load_config("full", dataset="taxi", experiment="nonexistent")
+        load_config("full", dataset="test", experiment="nonexistent")
 
 
 def test_invalid_step_raises() -> None:

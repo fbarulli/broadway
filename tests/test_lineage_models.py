@@ -16,21 +16,21 @@ from broadway.lineage.models import (
 
 
 def test_dataset_ref_requires_name_and_path() -> None:
-    ref = DatasetRef(name="taxi", path="data/processed/training_data.parquet")
-    assert ref.name == "taxi"
+    ref = DatasetRef(name="test", path="data/processed/training_data.parquet")
+    assert ref.name == "test"
     assert ref.path == "data/processed/training_data.parquet"
     assert ref.row_count is None
     with pytest.raises(ValidationError):
-        DatasetRef(name="taxi")
+        DatasetRef(name="test")
     with pytest.raises(ValidationError):
         DatasetRef(path="x.parquet")
 
 
 def test_dataset_slice_requires_name_dataset_description() -> None:
-    slice_ = DatasetSlice(name="airport", dataset="taxi", description="d")
+    slice_ = DatasetSlice(name="airport", dataset="test", description="d")
     assert slice_.filter_expression is None
     with pytest.raises(ValidationError):
-        DatasetSlice(name="airport", dataset="taxi")
+        DatasetSlice(name="airport", dataset="test")
 
 
 def test_decision_record_requires_fields() -> None:
@@ -60,8 +60,8 @@ def test_decision_record_rejects_bad_status() -> None:
 
 
 def test_lineage_record_requires_fields() -> None:
-    rec = LineageRecord(node_id="baseline:taxi", kind="baseline", artifact="a.json", parents=[])
-    assert rec.node_id == "baseline:taxi"
+    rec = LineageRecord(node_id="baseline:test", kind="baseline", artifact="a.json", parents=[])
+    assert rec.node_id == "baseline:test"
     with pytest.raises(ValidationError):
         LineageRecord(kind="baseline", artifact="a.json", parents=[])
 
@@ -69,9 +69,9 @@ def test_lineage_record_requires_fields() -> None:
 def test_lineage_graph_json_round_trip() -> None:
     graph = LineageGraph(
         nodes=[
-            LineageNode(id="dataset:taxi", kind="dataset", label="taxi", status="produced"),
+            LineageNode(id="dataset:test", kind="dataset", label="test", status="produced"),
         ],
-        edges=[LineageEdge(source="dataset:taxi", target="baseline:taxi", relation="produced_by")],
+        edges=[LineageEdge(source="dataset:test", target="baseline:test", relation="produced_by")],
     )
     loaded = LineageGraph.model_validate_json(graph.model_dump_json())
     assert loaded == graph
@@ -90,10 +90,10 @@ def test_transform_audit_and_lineage_record_round_trip() -> None:
         columns_removed=["c"],
     )
     rec = LineageRecord(
-        node_id="etl:taxi",
+        node_id="etl:test",
         kind="etl",
         artifact="data/processed/train.parquet",
-        parents=["dataset:taxi"],
+        parents=["dataset:test"],
         audit=audit,
     )
     loaded = LineageRecord.model_validate_json(rec.model_dump_json())
@@ -101,7 +101,7 @@ def test_transform_audit_and_lineage_record_round_trip() -> None:
     assert loaded.audit == audit
 
     without_audit = LineageRecord(
-        node_id="baseline:taxi", kind="baseline", artifact="a.json", parents=[]
+        node_id="baseline:test", kind="baseline", artifact="a.json", parents=[]
     )
     parsed = LineageRecord.model_validate_json(without_audit.model_dump_json())
     assert parsed.audit is None

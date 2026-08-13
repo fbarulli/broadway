@@ -18,7 +18,7 @@ def test_infer_basic() -> None:
             "date_str": ["2024-01-01", "2024-01-02", "2024-01-03", "2024-01-04"],
         }
     )
-    report = infer("taxi", df)
+    report = infer("test", df)
     assert isinstance(report, InferenceReport)
     assert report.row_count == 4
     assert report.columns["id"].suggested_role == "ignore"
@@ -31,7 +31,7 @@ def test_infer_basic() -> None:
 
 def test_infer_date_string_detection() -> None:
     df = pd.DataFrame({"d": ["2024-01-01", "2024-01-02", "2024-01-03"]})
-    report = infer("taxi", df)
+    report = infer("test", df)
     assert report.columns["d"].datetime_candidate is True
 
 
@@ -44,6 +44,6 @@ def test_infer_no_columns() -> None:
 
 def test_infer_non_date_string_not_datetime() -> None:
     df = pd.DataFrame({"s": ["a", "b", "c"]})
-    report = infer("taxi", df)
+    report = infer("test", df)
     assert report.columns["s"].datetime_candidate is False
     assert report.columns["s"].categorical is True

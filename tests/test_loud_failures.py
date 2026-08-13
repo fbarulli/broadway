@@ -63,7 +63,7 @@ def test_evaluation_result_malformed_raises() -> None:
 
 
 def test_load_persisted_missing_is_none(tmp_path) -> None:
-    cfg = load_config("baseline", dataset="taxi", analysis="taxi")
+    cfg = load_config("baseline", dataset="test", analysis="test")
     cfg = cfg.model_copy(
         update={"baseline": cfg.baseline.model_copy(update={"output_dir": str(tmp_path / "nope")})}
     )
