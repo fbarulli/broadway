@@ -93,6 +93,7 @@ broadway/
     stats.yaml              # stats SSOT
     train.yaml              # model hyperparams SSOT
     features.yaml           # feature-engineer params SSOT
+  configs/analysis/<name>.yaml  # authored analytical intent (AnalysisContract)
   tests/                    # test_base.py, test_anova.py, ... (pytest)
   results/                  # mode-keyed caches + reports (gitignored artifacts)
 ```
@@ -153,6 +154,8 @@ results/*.json / *.png  (AnalysisPlan JSON, residual plots, ACF plot)
 | rush-hour/night/passenger params | `configs/step/features.yaml` → `FeaturesStep` | `data.FEATURE_*` |
 | column names | module constants in `data.py` | scripts |
 
+Analysis intent is authored separately via `configs/analysis/<name>.yaml` → `AnalysisContract` (mode, goal, row_definition, decision_moment, available_info, leakage_notes, success_criterion), wired through the `--analysis <name>` CLI flag.
+
 ## Mode system
 
 | Env var | Default | `SAMPLE_SIZE` | time slice |
@@ -176,6 +179,7 @@ results/*.json / *.png  (AnalysisPlan JSON, residual plots, ACF plot)
 | Contract | Tool | Where |
 |---|---|---|
 | Configuration | Pydantic | `broadway/config/schema.py` |
+| AnalysisContract | Pydantic | `broadway/analysis/contracts.py` |
 | AnalysisPlan | Pydantic | `broadway/stats/plan.py` |
 | ExperimentDesign | Pydantic | `broadway/causal/contracts.py` |
 | ExperimentResult | Pydantic | `broadway/causal/contracts.py` |

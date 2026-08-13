@@ -1,0 +1,10 @@
+mode: prediction
+goal: predict trip duration
+row_definition: one completed taxi trip
+decision_moment: at pickup time
+available_info:
+  - pickup_datetime
+  - pickup_location_id
+leakage_notes:
+  - dropoff fields are unavailable at prediction time
+success_criterion: RMSE below the naive mean baseline

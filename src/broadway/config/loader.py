@@ -8,6 +8,7 @@ from typing import Any
 
 import yaml
 
+from broadway.analysis.contracts import AnalysisContract
 from broadway.config.resolver import resolve_values
 from broadway.config.schema import (
     CausalStep,
@@ -93,6 +94,7 @@ def _build_config(merged: dict, step: str) -> PipelineConfig:
     step_model = STEP_MODELS[step]
     merged = resolve_values(merged)
     config = PipelineConfig(
+        analysis=AnalysisContract(**merged["analysis"]) if "analysis" in merged else None,
         dataset=DatasetContract(**merged["dataset"]) if "dataset" in merged else None,
         environment=EnvironmentConfig(**merged["environment"]),
         experiment=ExperimentConfig(**merged["experiment"]) if "experiment" in merged else None,
@@ -112,17 +114,19 @@ def load_config(
     step: str,
     dataset: str | None = None,
     experiment: str | None = None,
+    analysis: str | None = None,
     environment: str = DEFAULT_ENVIRONMENT,
 ) -> PipelineConfig:
     if step not in STEP_MODELS:
         raise ValueError(f"unknown step '{step}'. valid: {list(STEP_MODELS)}")
     logger.info(
         f"loading config — step={step}, dataset={dataset}, "
-        f"experiment={experiment}, environment={environment}"
+        f"experiment={experiment}, analysis={analysis}, environment={environment}"
     )
     merged: dict = {}
     _merge_section(merged, "environment", environment, optional=False)
     _merge_section(merged, "dataset", dataset, optional=True)
     _merge_section(merged, "experiment", experiment, optional=True)
+    _merge_section(merged, "analysis", analysis, optional=True)
     _merge_section(merged, "step", step, optional=False)
     return _build_config(merged, step)

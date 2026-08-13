@@ -12,6 +12,7 @@ STEPS = list(STEP_MODELS.keys())
 def _add_step_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--dataset", type=str, default=None)
     parser.add_argument("--experiment", type=str, default=None)
+    parser.add_argument("--analysis", type=str, default=None)
     parser.add_argument("--environment", type=str, default=DEFAULT_ENVIRONMENT)
 
 
@@ -48,6 +49,7 @@ def main() -> None:
             step=args.step,
             dataset=args.dataset,
             experiment=args.experiment,
+            analysis=args.analysis,
             environment=args.environment,
         )
         steps = cfg.full.steps if cfg.full else [args.step]

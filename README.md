@@ -39,6 +39,7 @@ DatasetContract → FeatureSpec → TrainingConfig → Optuna → TrainingResult
 
 | Stage | What it is | Feeds |
 |-------|------------|-------|
+| `AnalysisContract` | authored intent (`configs/analysis/<name>.yaml`) | config |
 | `DatasetContract` | raw schema + target/task (`configs/dataset/<name>.yaml`) | etl, features, stats |
 | `FeatureSpec` | engineered schema + fitted pipeline | train |
 | `TrainingConfig` | model type + params (`configs/experiment/<name>.yaml`) | optuna, train |
@@ -59,6 +60,7 @@ Every step except `discover` takes the same three flags.
 |------|----------|---------|---------|
 | `--dataset <name>` | no | none | load `configs/dataset/<name>.yaml` |
 | `--experiment <name>` | no | none | load `configs/experiment/<name>.yaml` |
+| `--analysis <name>` | no | none | load `configs/analysis/<name>.yaml` |
 | `--environment <name>` | no | `development` | load `configs/environment/{development,staging,production}.yaml` |
 
 `discover` has its own flags:
@@ -162,6 +164,7 @@ configs/
   experiment/<name>.yaml   # features, model, split, metric
   environment/<name>.yaml  # development / staging / production
   step/<step>.yaml         # per-step knobs + stats/train/features SSOT
+  analysis/<name>.yaml     # authored analytical intent (--analysis <name>)
 ```
 
 YAML → Pydantic (`src/broadway/config/schema.py`) → `load_config()`. No

@@ -5,6 +5,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
 
+from broadway.analysis.contracts import AnalysisContract
+
 
 class TaskType(str, Enum):
     REGRESSION = "regression"
@@ -246,6 +248,7 @@ class FullStep(BaseModel):
 
 
 class PipelineConfig(BaseModel):
+    analysis: AnalysisContract | None = None
     dataset: DatasetContract | None = None
     environment: EnvironmentConfig
     experiment: ExperimentConfig | None = None
