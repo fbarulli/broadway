@@ -23,7 +23,7 @@ def _decisions() -> list[DecisionRecord]:
 def test_prediction_state() -> None:
     state = current_state(_graph({"profile", "baseline"}), "prediction", "g", _decisions())
     assert state.stage == "baseline"
-    assert state.not_yet_produced == ["training", "evaluation"]
+    assert state.not_yet_produced == ["etl", "features", "training", "evaluation"]
     assert state.open_decisions == ["a"]
     assert state.resolved_decisions == ["b"]
 
@@ -31,7 +31,7 @@ def test_prediction_state() -> None:
 def test_hypothesis_state() -> None:
     state = current_state(_graph({"profile", "baseline"}), "hypothesis", "g", [])
     assert state.stage == "baseline"
-    assert state.not_yet_produced == ["stats"]
+    assert state.not_yet_produced == ["etl", "stats"]
 
 
 def test_non_lineage_kinds_never_listed() -> None:

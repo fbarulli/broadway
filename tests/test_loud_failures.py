@@ -9,6 +9,8 @@ from broadway.causal.contracts import load_design
 from broadway.config.loader import load_config
 from broadway.evaluate.contracts import EvaluationResult
 from broadway.evaluate.metrics import compute_metrics
+from broadway.lineage.models import TransformAudit
+from broadway.lineage.records import enforce_drop_fraction
 from broadway.stats.plan import load_plan
 from broadway.training.contracts import TrainingResult
 from broadway.training.optuna import run_study
@@ -81,3 +83,30 @@ def test_compute_metrics_inf_raises() -> None:
 def test_optuna_all_invalid_raises() -> None:
     with pytest.raises(ValueError):
         run_study(lambda params: float("nan"), {"x": [0, 1]}, n_trials=2)
+
+
+def _audit(rows_in: int, rows_out: int, unexplained: int) -> TransformAudit:
+    dropped = rows_in - rows_out
+    return TransformAudit(
+        rows_in=rows_in,
+        rows_out=rows_out,
+        rows_dropped_total=dropped,
+        rows_dropped_unexplained=unexplained,
+        reasons=["unexpected row loss: 40 rows"],
+        columns_before=["a", "b"],
+        columns_after=["a", "b"],
+        columns_added=[],
+        columns_removed=[],
+    )
+
+
+def test_enforce_drop_fraction_raises() -> None:
+    audit = _audit(rows_in=100, rows_out=60, unexplained=40)
+    with pytest.raises(ValueError):
+        enforce_drop_fraction(audit, 0.1)
+    enforce_drop_fraction(audit, 0.5)
+
+
+def test_enforce_drop_fraction_zero_rows_ok() -> None:
+    audit = _audit(rows_in=0, rows_out=0, unexplained=0)
+    enforce_drop_fraction(audit, 0.0)

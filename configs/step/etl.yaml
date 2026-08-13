@@ -1,4 +1,5 @@
 ci_sample_size: 50000
+max_drop_fraction: 0.1
 random_state: 42
 train_file: train.parquet
 val_file: val.parquet

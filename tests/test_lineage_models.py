@@ -11,6 +11,7 @@ from broadway.lineage.models import (
     LineageGraph,
     LineageNode,
     LineageRecord,
+    TransformAudit,
 )
 
 
@@ -74,3 +75,33 @@ def test_lineage_graph_json_round_trip() -> None:
     )
     loaded = LineageGraph.model_validate_json(graph.model_dump_json())
     assert loaded == graph
+
+
+def test_transform_audit_and_lineage_record_round_trip() -> None:
+    audit = TransformAudit(
+        rows_in=100,
+        rows_out=95,
+        rows_dropped_total=5,
+        rows_dropped_unexplained=0,
+        reasons=["null target: -3 rows", "duplicates: -2 rows"],
+        columns_before=["a", "b", "c"],
+        columns_after=["a", "b", "d"],
+        columns_added=["d"],
+        columns_removed=["c"],
+    )
+    rec = LineageRecord(
+        node_id="etl:taxi",
+        kind="etl",
+        artifact="data/processed/train.parquet",
+        parents=["dataset:taxi"],
+        audit=audit,
+    )
+    loaded = LineageRecord.model_validate_json(rec.model_dump_json())
+    assert loaded == rec
+    assert loaded.audit == audit
+
+    without_audit = LineageRecord(
+        node_id="baseline:taxi", kind="baseline", artifact="a.json", parents=[]
+    )
+    parsed = LineageRecord.model_validate_json(without_audit.model_dump_json())
+    assert parsed.audit is None

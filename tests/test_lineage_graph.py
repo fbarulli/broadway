@@ -4,8 +4,12 @@ from pathlib import Path
 
 import yaml
 
-from broadway.lineage.graph import build_graph
+from broadway.lineage.graph import KIND_LABELS, build_graph
 from broadway.lineage.models import DecisionRecord, LineageRecord
+
+
+def test_kind_labels_include_etl() -> None:
+    assert KIND_LABELS["etl"] == "ETL"
 
 
 def test_build_graph_links_nodes_and_records(tmp_path: Path) -> None:

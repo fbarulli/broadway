@@ -1,4 +1,4 @@
-"""Null rate, cardinality, value range, duplicate row checks against thresholds."""
+"""Column presence, dtype, and null-rate checks against the contract."""
 
 from __future__ import annotations
 

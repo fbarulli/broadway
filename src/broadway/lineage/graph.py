@@ -19,6 +19,7 @@ from broadway.lineage.models import (
 KIND_LABELS = {
     "dataset": "Dataset",
     "profile": "Profile",
+    "etl": "ETL",
     "analysis": "AnalysisContract",
     "baseline": "Baseline",
     "stats": "Stats",

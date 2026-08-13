@@ -1,25 +1,20 @@
-"""Filter invalid rows, drop duplicates, enforce minimum row count."""
+"""Filter invalid rows and drop duplicates, returning the DataFrame and drop accounting."""
 
 from __future__ import annotations
-
-import logging
 
 import pandas as pd
 
 from broadway.config.schema import DatasetContract
 
-logger = logging.getLogger(__name__)
 
-
-def clean(df: pd.DataFrame, dataset: DatasetContract) -> pd.DataFrame:
+def clean(df: pd.DataFrame, dataset: DatasetContract) -> tuple[pd.DataFrame, list[tuple[str, int]]]:
+    drops: list[tuple[str, int]] = []
     before = len(df)
     df = df.dropna(subset=[dataset.target])
-    target_dropped = before - len(df)
+    if len(df) < before:
+        drops.append(("null target", before - len(df)))
     before = len(df)
     df = df.drop_duplicates()
-    dup_dropped = before - len(df)
-    if target_dropped:
-        logger.info(f"dropped {target_dropped} rows with null target")
-    if dup_dropped:
-        logger.info(f"dropped {dup_dropped} duplicate rows")
-    return df
+    if len(df) < before:
+        drops.append(("duplicates", before - len(df)))
+    return df, drops

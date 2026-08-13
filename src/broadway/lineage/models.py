@@ -30,12 +30,26 @@ class DecisionRecord(BaseModel):
     parents: list[str]
 
 
+class TransformAudit(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    rows_in: int
+    rows_out: int
+    rows_dropped_total: int
+    rows_dropped_unexplained: int
+    reasons: list[str]
+    columns_before: list[str]
+    columns_after: list[str]
+    columns_added: list[str]
+    columns_removed: list[str]
+
+
 class LineageRecord(BaseModel):
     model_config = ConfigDict(extra="forbid")
     node_id: str
     kind: str
     artifact: str
     parents: list[str]
+    audit: TransformAudit | None = None
 
 
 class LineageNode(BaseModel):

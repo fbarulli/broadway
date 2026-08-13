@@ -3,9 +3,9 @@ from __future__ import annotations
 from broadway.lineage.models import DecisionRecord, LineageGraph, RunState
 
 LINEAGE_STEPS = {
-    "prediction": ["profile", "baseline", "training", "evaluation"],
-    "hypothesis": ["profile", "baseline", "stats"],
-    "causal": ["profile", "baseline", "causal"],
+    "prediction": ["profile", "etl", "baseline", "features", "training", "evaluation"],
+    "hypothesis": ["profile", "etl", "baseline", "stats"],
+    "causal": ["profile", "etl", "baseline", "causal"],
 }
 
 

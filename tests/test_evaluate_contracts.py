@@ -204,6 +204,7 @@ def _make_config(tmp_path: Path) -> PipelineConfig:
     )
     etl = EtlStep(
         ci_sample_size=0,
+        max_drop_fraction=0.5,
         random_state=42,
         train_file="train.parquet",
         val_file="val.parquet",

@@ -137,6 +137,7 @@ class DiscoverStep(BaseModel):
 
 class EtlStep(BaseModel):
     ci_sample_size: int = Field(ge=0)
+    max_drop_fraction: float = Field(ge=0.0, le=1.0)
     random_state: int
     train_file: str
     val_file: str
@@ -175,6 +176,7 @@ class EdaStep(BaseModel):
 
 
 class FeaturesStep(BaseModel):
+    max_drop_fraction: float = Field(ge=0.0, le=1.0)
     encoding_smoothing: int
     frequency_fill: float
     pipeline_file: str
