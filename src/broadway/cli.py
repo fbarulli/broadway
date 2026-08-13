@@ -31,6 +31,9 @@ def _build_parser() -> argparse.ArgumentParser:
     lineage.add_argument("--analysis", type=str, required=True)
     lineage.add_argument("--dataset", type=str, required=True)
 
+    profile = sub.add_parser("profile")
+    profile.add_argument("--dataset", type=str, required=True)
+
     for step in STEPS:
         if step == "discover":
             continue
@@ -50,6 +53,10 @@ def main() -> None:
         from broadway.lineage.module import run
 
         run(args.analysis, args.dataset)
+    elif args.step == "profile":
+        from broadway.discover.module import profile
+
+        profile(args.dataset)
     else:
         from broadway.pipeline import run
 

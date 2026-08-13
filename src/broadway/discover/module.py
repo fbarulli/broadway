@@ -100,3 +100,24 @@ def run(
         str(profile_path),
         [node_id("dataset", contract.name)],
     )
+
+
+def profile(dataset_name: str) -> None:
+    contract_path = CONFIGS_DIR / DATASET_DIR / f"{dataset_name}.yaml"
+    if not contract_path.exists():
+        raise FileNotFoundError(f"dataset contract not found: {contract_path}")
+    with open(contract_path, encoding="utf-8") as f:
+        contract = DatasetContract(**yaml.safe_load(f))
+    df = _read(contract.path)
+    result = build_profile(contract.name, contract.path, df)
+    profile_dir = Path(ARTIFACTS_DIR) / "discover"
+    profile_dir.mkdir(parents=True, exist_ok=True)
+    profile_path = profile_dir / "profile.json"
+    profile_path.write_text(result.model_dump_json(indent=2), encoding="utf-8")
+    logger.info(f"profile: wrote {len(result.columns)} columns to {profile_path}")
+    write_record(
+        node_id("profile", contract.name),
+        "profile",
+        str(profile_path),
+        [node_id("dataset", contract.name)],
+    )

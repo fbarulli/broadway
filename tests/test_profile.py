@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import pandas as pd
 import pytest
+import yaml
 
 import broadway.discover.module as module
 from broadway.discover.profile import DatasetProfile, build_profile
+from broadway.lineage import records
 
 
 def test_build_profile_fields() -> None:
@@ -72,3 +74,38 @@ def test_run_writes_profile(tmp_path, monkeypatch) -> None:
     assert profile_path.exists()
     profile = DatasetProfile.model_validate_json(profile_path.read_text())
     assert profile.name == "data"
+
+
+def test_profile_command(tmp_path, monkeypatch) -> None:
+    data = pd.DataFrame({"a": [1, 2, 3], "t": [10.0, 20.0, 30.0]})
+    parquet = tmp_path / "data.parquet"
+    data.to_parquet(parquet)
+
+    monkeypatch.setattr(module, "CONFIGS_DIR", tmp_path / "configs")
+    monkeypatch.setattr(module, "ARTIFACTS_DIR", str(tmp_path / "artifacts"))
+    monkeypatch.setattr(module, "DATASET_DIR", "dataset")
+    monkeypatch.setattr(records, "LINEAGE_DIR", tmp_path / "lineage")
+
+    config_dir = tmp_path / "configs" / "dataset"
+    config_dir.mkdir(parents=True)
+    contract = {
+        "name": "mydata",
+        "path": str(parquet),
+        "target": "t",
+        "task": "regression",
+        "datetime_column": None,
+        "columns": {
+            "a": {"dtype": "int64", "null_count": 0, "role": "feature"},
+            "t": {"dtype": "float64", "null_count": 0, "role": "target"},
+        },
+        "lookup_tables": {},
+        "row_count": 3,
+    }
+    (config_dir / "mydata.yaml").write_text(
+        yaml.safe_dump(contract), encoding="utf-8"
+    )
+
+    module.profile("mydata")
+
+    assert (tmp_path / "artifacts" / "discover" / "profile.json").exists()
+    assert (tmp_path / "lineage" / "records" / "profile_mydata.json").exists()
