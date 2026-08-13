@@ -12,11 +12,16 @@ LINEAGE_STEPS = {
 def current_state(
     graph: LineageGraph, mode: str, goal: str, decisions: list[DecisionRecord]
 ) -> RunState:
-    present = {node.kind for node in graph.nodes}
     ordered = LINEAGE_STEPS.get(mode, [])
-    produced = [k for k in ordered if k in present]
+    status_by_kind: dict[str, list[str]] = {}
+    for node in graph.nodes:
+        status_by_kind.setdefault(node.kind, []).append(node.status)
+    produced = [k for k in ordered if "produced" in status_by_kind.get(k, [])]
     stage = produced[-1] if produced else None
-    not_yet = [k for k in ordered if k not in present]
+    not_yet_run = [k for k in ordered if k not in status_by_kind]
+    ran_but_output_missing = [
+        k for k in ordered if k in status_by_kind and "produced" not in status_by_kind[k]
+    ]
     open_decisions = sorted(d.id for d in decisions if d.status == "open")
     resolved_decisions = sorted(d.id for d in decisions if d.status == "resolved")
     return RunState(
@@ -24,5 +29,6 @@ def current_state(
         stage=stage,
         open_decisions=open_decisions,
         resolved_decisions=resolved_decisions,
-        not_yet_produced=not_yet,
+        not_yet_run=not_yet_run,
+        ran_but_output_missing=ran_but_output_missing,
     )

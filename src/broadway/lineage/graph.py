@@ -102,14 +102,13 @@ def build_graph(configs_dir: Path, lineage_dir: Path) -> LineageGraph:
     if records_path.is_dir():
         for path in sorted(records_path.glob("*.json")):
             rec = LineageRecord.model_validate_json(path.read_text(encoding="utf-8"))
-            if not Path(rec.artifact).exists():
-                continue
+            status = "produced" if Path(rec.artifact).exists() else "ran_but_output_missing"
             node = LineageNode(
                 id=rec.node_id,
                 kind=rec.kind,
                 label=rec.node_id,
                 artifact=rec.artifact,
-                status="produced",
+                status=status,
             )
             nodes[node.id] = node
             for parent in rec.parents:

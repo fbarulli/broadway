@@ -77,6 +77,7 @@ def run(cfg: PipelineConfig) -> None:
     if not cfg.dataset or not cfg.experiment or not cfg.evaluate or not cfg.etl or not cfg.train:
         raise ValueError("evaluate step requires dataset, experiment, evaluate, etl, and train config")
     require_mode(cfg.analysis, AnalysisMode.PREDICTION)
+    warnings: list[str] = []
 
     setup_mlflow(cfg.environment.mlflow_tracking_uri, cfg.dataset.name)
 
@@ -117,6 +118,14 @@ def run(cfg: PipelineConfig) -> None:
         cfg.evaluate.promotion_threshold,
     )
 
+    if champion_uri is None:
+        warnings.append("no champion model found — candidate compared against none")
+    if promote:
+        try:
+            promote_candidate(cfg.dataset.name, result.artifact_path)
+        except mlflow.exceptions.MlflowException as exc:
+            warnings.append(f"promotion skipped — model registry unavailable: {exc}")
+
     X_train, y_train = _load_train_features(cfg)
     cv_model = get_model(result.model_type, **result.params)
     cv_metrics = cross_validate(
@@ -138,6 +147,7 @@ def run(cfg: PipelineConfig) -> None:
         # so downstream consumers can trace champion-None (delta=None) values explicitly.
         comparison=comparison,
         baseline=baseline_comparison,
+        warnings=warnings,
     )
 
     eval_dir = Path(cfg.evaluate.output_dir)
@@ -149,11 +159,5 @@ def run(cfg: PipelineConfig) -> None:
         str(eval_dir / cfg.evaluate.output_file),
         [node_id("training", cfg.dataset.name)],
     )
-
-    if promote:
-        try:
-            promote_candidate(cfg.dataset.name, result.artifact_path)
-        except mlflow.exceptions.MlflowException as exc:
-            logger.warning("promotion skipped — model registry unavailable: %s", exc)
 
     logger.info(f"evaluate: {target_metric}={candidate_metrics[target_metric]:.4f}, promote={promote}")

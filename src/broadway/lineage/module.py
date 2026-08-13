@@ -30,4 +30,5 @@ def run(analysis: str, dataset: str) -> None:
     print(f"stage: {state.stage or 'not started'}")
     print(f"open decisions: {state.open_decisions}")
     print(f"resolved decisions: {state.resolved_decisions}")
-    print(f"not yet produced: {state.not_yet_produced}")
+    print(f"not yet run: {state.not_yet_run}")
+    print(f"ran but output missing: {state.ran_but_output_missing}")

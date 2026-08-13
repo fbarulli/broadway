@@ -267,11 +267,13 @@ BaselineResult → DatasetSlice → DecisionRecord`, with `stats`/`causal`/
 - `ds-pipeline lineage --analysis <n> --dataset <d>` builds the graph
   (`broadway/lineage/graph.py::build_graph`), writes `artifacts/lineage/graph.json`
   + `graph.md` (Mermaid), and prints a run-state summary (goal, stage,
-  open/resolved decisions, `not_yet_produced`).
-- `not_yet_produced` is derived only from lineage-emitting steps
+  open/resolved decisions, `not_yet_run`, `ran_but_output_missing`).
+- `not_yet_run` is derived only from lineage-emitting steps
   (`profile`/`baseline`/`stats`/`causal`/`training`/`evaluation`) for the
   active mode flow (`broadway/lineage/state.py::LINEAGE_STEPS`);
   `etl`/`contracts`/`eda`/`features` are never listed.
+- `ran_but_output_missing` flags steps whose sidecar record exists but whose
+  artifact file is absent — an integrity error, not a normal "not yet produced".
 
 ## Where to make changes
 

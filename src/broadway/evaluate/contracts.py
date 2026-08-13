@@ -40,3 +40,4 @@ class EvaluationResult(BaseModel):
     residuals: dict[str, float] | None = None
     comparison: ModelComparison | None = None
     baseline: BaselineComparison | None = None
+    warnings: list[str] = []

@@ -58,7 +58,7 @@ class LineageNode(BaseModel):
     kind: str
     label: str
     artifact: str | None = None
-    status: Literal["produced", "not_yet_produced"]
+    status: Literal["produced", "not_yet_produced", "ran_but_output_missing"]
 
 
 class LineageEdge(BaseModel):
@@ -80,4 +80,5 @@ class RunState(BaseModel):
     stage: str | None
     open_decisions: list[str]
     resolved_decisions: list[str]
-    not_yet_produced: list[str]
+    not_yet_run: list[str]
+    ran_but_output_missing: list[str]

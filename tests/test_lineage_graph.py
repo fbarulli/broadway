@@ -90,9 +90,14 @@ def test_build_graph_links_nodes_and_records(tmp_path: Path) -> None:
     assert "slice:airport" in node_ids
     assert "baseline:taxi" in node_ids
     assert "decision:keep_outliers" in node_ids
-    assert "stats:taxi" not in node_ids
+    assert "stats:taxi" in node_ids
+
+    status_by_id = {n.id: n.status for n in graph.nodes}
+    assert status_by_id["baseline:taxi"] == "produced"
+    assert status_by_id["stats:taxi"] == "ran_but_output_missing"
 
     edges = {(e.source, e.target) for e in graph.edges}
     assert ("slice:airport", "dataset:taxi") in edges
     assert ("analysis:taxi", "baseline:taxi") in edges
     assert ("slice:airport", "decision:keep_outliers") in edges
+    assert ("baseline:taxi", "stats:taxi") in edges

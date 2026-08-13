@@ -72,6 +72,7 @@ def test_evaluation_result_json_round_trip() -> None:
             }
         },
         "baseline": None,
+        "warnings": [],
     }
     assert EvaluationResult.model_validate_json(data) == result
 
@@ -85,10 +86,13 @@ def test_evaluation_result_optional_fields_default_to_none() -> None:
     assert result.cv_metrics is None
     assert result.residuals is None
     assert result.comparison is None
+    assert result.baseline is None
+    assert result.warnings == []
     loaded = EvaluationResult.model_validate_json(result.model_dump_json())
     assert loaded.cv_metrics is None
     assert loaded.residuals is None
     assert loaded.comparison is None
+    assert loaded.warnings == []
 
 
 def test_should_promote_no_champion() -> None:
