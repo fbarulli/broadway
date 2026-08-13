@@ -11,7 +11,7 @@ build/
 data/raw/
 data/processed/
 artifacts/
-results/
+/results/
 *.png
 !reports/figures/*.png
 graphify-out/

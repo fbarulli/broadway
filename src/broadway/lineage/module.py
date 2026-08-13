@@ -21,7 +21,7 @@ def run(analysis: str, dataset: str) -> None:
     decisions = load_decisions(LINEAGE_DIR)
     state = current_state(graph, mode, cfg.analysis.goal, decisions)
 
-    out_dir = REPORTS_DIR
+    out_dir = REPORTS_DIR / "lineage"
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "graph.json").write_text(graph.model_dump_json(indent=2), encoding="utf-8")
     (out_dir / "graph.md").write_text("```mermaid\n" + to_mermaid(graph) + "\n```\n", encoding="utf-8")
