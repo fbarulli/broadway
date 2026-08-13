@@ -145,6 +145,7 @@ class EtlStep(BaseModel):
     train_features_file: str
     val_features_file: str
     max_drop_fraction: float = Field(ge=0.0, le=1.0)
+    missing_encodings: list[str]
 
 
 class ProjectConfig(BaseModel):
