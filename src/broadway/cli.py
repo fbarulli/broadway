@@ -33,6 +33,10 @@ def _build_parser() -> argparse.ArgumentParser:
     lineage.add_argument("--analysis", type=str, required=True)
     lineage.add_argument("--dataset", type=str, required=True)
 
+    report = sub.add_parser("report")
+    report.add_argument("--analysis", required=True)
+    report.add_argument("--dataset", required=True)
+
     profile = sub.add_parser("profile")
     profile.add_argument("--dataset", type=str, required=True)
 
@@ -82,6 +86,19 @@ def main() -> None:
         from broadway.lineage.module import run
 
         run(args.analysis, args.dataset)
+    elif args.step == "report":
+        from pathlib import Path
+
+        from broadway.config.loader import load_config
+        from broadway.reports import index
+        from broadway.reports.paths import REPORTS_DIR
+
+        cfg = load_config("stats", dataset=args.dataset, analysis=args.analysis)
+        question = cfg.analysis.goal if cfg.analysis else "no analysis contract"
+        stats_dir = Path(cfg.stats.output_dir) if cfg.stats else Path("artifacts/stats")
+        REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+        (REPORTS_DIR / "index.md").write_text(index.render_index(question, stats_dir), encoding="utf-8")
+        print("wrote reports/index.md")
     elif args.step == "profile":
         from broadway.discover.module import profile
 

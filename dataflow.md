@@ -23,6 +23,14 @@ and processed data stays under `data/processed/`.
 `artifacts/` holds machine-readable evidence/provenance; `reports/` holds
 human-facing derived views (regenerable from records + configs).
 
+`reports/` is the human-facing product surface, owned by
+`src/broadway/reports/`: `index.md` (entry point), `results/*.md` (one markdown
+result per stats step), `figures/` (charts), and `lineage/` (run graph). The
+`report` command renders `index.md` from `configs/flow/stats_sequence.yaml`
+(`StatsSequence`) and the per-step renderers in
+`src/broadway/reports/registry.py`. Outputs are split by kind: machine JSON →
+`artifacts/`, markdown → `reports/results/`, images → `reports/figures/`.
+
 `causal` is a separate analysis mode, not part of this flow and not part of
 `full`. `full` is a thin dispatcher: it reads `AnalysisContract.mode` and
 resolves one of `configs/flow/{prediction,hypothesis,causal}.yaml`. Run causal
@@ -118,6 +126,13 @@ broadway/
       mermaid.py            # to_mermaid(graph) -> mermaid source
       state.py              # current_state(graph, mode, goal, decisions) -> RunState
       module.py             # ds-pipeline lineage command
+    reports/                # human-facing product surface (index + per-step markdown + figures)
+      paths.py              # REPORTS_DIR / RESULTS_DIR / FIGURES_DIR (owns the surface paths)
+      markdown.py           # render_result(title, sections) -> markdown
+      sequence.py           # StatsSequence (configs/flow/stats_sequence.yaml)
+      describe.py           # load_artifact / render / headline for the describe result
+      registry.py           # RESULT_RENDERERS = {"describe": describe, ...}
+      index.py              # render_index(question, stats_dir) -> reports/index.md
   project/
     features.py             # FEATURE_SPECS registry → ENGINEERED_FEATURES/types/schema
     ml_pipeline.py          # FeaturePipeline (taxi orchestration)
@@ -130,6 +145,7 @@ broadway/
     train.yaml              # model hyperparams SSOT
     features.yaml           # feature-engineer params SSOT
   configs/flow/<mode>.yaml  # mode-specific step lists (prediction/hypothesis/causal)
+  configs/flow/stats_sequence.yaml  # ordered stats-step list for reports/index.md (StatsSequence)
   configs/analysis/<name>.yaml  # authored analytical intent (AnalysisContract)
   tests/                    # test_base.py, test_anova.py, ... (pytest)
   results/                  # mode-keyed caches + reports (gitignored artifacts)

@@ -11,6 +11,7 @@ from broadway.config import loader
 from broadway.config.loader import load_config
 from broadway.lineage import records
 from broadway.lineage.models import SampleSpec
+from broadway.reports import paths
 from broadway.stats.describe import (
     GroupSummary,
     describe,
@@ -88,6 +89,8 @@ def _setup_test_cfg(
     )
     monkeypatch.setattr(loader, "CONFIGS_DIR", configs_dir)
     monkeypatch.setattr(records, "LINEAGE_DIR", tmp_path / "lineage")
+    monkeypatch.setattr(paths, "RESULTS_DIR", tmp_path / "reports" / "results")
+    monkeypatch.setattr(paths, "FIGURES_DIR", tmp_path / "reports" / "figures")
 
 
 def test_describe_run_writes_artifacts(
@@ -111,8 +114,9 @@ def test_describe_run_writes_artifacts(
     run(cfg, sample)
 
     assert (tmp_path / "describe.json").exists()
-    assert (tmp_path / "describe_boxplot.png").exists()
-    assert (tmp_path / "describe_group_sizes.png").exists()
+    assert (tmp_path / "reports" / "results" / "describe.md").exists()
+    assert (tmp_path / "reports" / "figures" / "describe_boxplot.png").exists()
+    assert (tmp_path / "reports" / "figures" / "describe_group_sizes.png").exists()
 
 
 def test_describe_run_missing_sample_raises(
@@ -160,6 +164,8 @@ def test_describe_run_column_mapping(
     )
     monkeypatch.setattr(loader, "CONFIGS_DIR", configs_dir)
     monkeypatch.setattr(records, "LINEAGE_DIR", tmp_path / "lineage")
+    monkeypatch.setattr(paths, "RESULTS_DIR", tmp_path / "reports" / "results")
+    monkeypatch.setattr(paths, "FIGURES_DIR", tmp_path / "reports" / "figures")
 
     cfg = load_config("stats", dataset="test", analysis="borough_hypothesis")
     assert cfg.dataset is not None

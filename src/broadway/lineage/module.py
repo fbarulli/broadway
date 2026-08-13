@@ -5,8 +5,9 @@ import logging
 from broadway.config.loader import CONFIGS_DIR, load_config
 from broadway.lineage.graph import build_graph, load_decisions
 from broadway.lineage.mermaid import to_mermaid
-from broadway.lineage.records import LINEAGE_DIR, REPORTS_DIR
+from broadway.lineage.records import LINEAGE_DIR
 from broadway.lineage.state import current_state
+from broadway.reports.paths import REPORTS_DIR
 
 logger = logging.getLogger(__name__)
 

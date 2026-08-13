@@ -16,6 +16,7 @@ from broadway.config.schema import PipelineConfig
 from broadway.lineage.ids import node_id
 from broadway.lineage.models import SampleRole, SampleSpec
 from broadway.lineage.records import write_record
+from broadway.reports import paths
 
 logger = logging.getLogger(__name__)
 
@@ -121,8 +122,16 @@ def run(cfg: PipelineConfig, sample: SampleSpec) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     json_path = out_dir / "describe.json"
     json_path.write_text(summary.model_dump_json(indent=2), encoding="utf-8")
-    plot_group_distribution(df, source_group_column, group_column, group_values, cfg.dataset.target, out_dir / "describe_boxplot.png")
-    plot_group_sizes(summary, out_dir / "describe_group_sizes.png")
+
+    from broadway.reports.describe import render as render_describe
+
+    paths.RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    (paths.RESULTS_DIR / "describe.md").write_text(render_describe(summary), encoding="utf-8")
+
+    paths.FIGURES_DIR.mkdir(parents=True, exist_ok=True)
+    plot_group_distribution(df, source_group_column, group_column, group_values, cfg.dataset.target, paths.FIGURES_DIR / "describe_boxplot.png")
+    plot_group_sizes(summary, paths.FIGURES_DIR / "describe_group_sizes.png")
+
     logger.info("describe: %d groups, total_n=%d, imbalance=%.2f -> %s", len(group_values), summary.total_n, summary.imbalance_ratio, json_path)
     write_record(
         node_id("describe", analysis.name), "describe", str(json_path),

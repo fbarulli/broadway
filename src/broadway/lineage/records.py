@@ -6,7 +6,6 @@ from pathlib import Path
 from broadway.lineage.models import LineageRecord, SampleRole, TransformAudit
 
 LINEAGE_DIR = Path(os.getenv("BROADWAY_LINEAGE_DIR", "artifacts/lineage"))
-REPORTS_DIR = Path(os.getenv("BROADWAY_REPORTS_DIR", "reports"))
 
 
 def records_dir() -> Path:

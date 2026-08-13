@@ -87,13 +87,14 @@ Every step except `discover` takes the same three flags.
 | contracts | `ds-pipeline contracts …` | pass/fail validation | works |
 | eda | `ds-pipeline eda …` | `reports/eda.html` | works |
 | features | `ds-pipeline features …` | fitted feature pipeline | works |
-| stats | `ds-pipeline stats --dataset <d> --analysis <a>` | `AnalysisPlan` JSON | works (uses stats library) |
+| stats | `ds-pipeline stats --dataset <d> --analysis <a>` | `AnalysisPlan` JSON + `reports/results/describe.md` + figures | works (uses stats library) |
 | causal | `ds-pipeline causal --dataset <d> --analysis <a>` | `ExperimentDesign` (power analysis) | separate mode (not in `full`) |
 | baseline | `ds-pipeline baseline --dataset <d> --analysis <a>` | `BaselineResult` → `artifacts/baseline/` | works |
 | train | `ds-pipeline train --dataset <d> --analysis <a>` | `TrainingResult` → MLflow model/artifacts | works |
 | evaluate | `ds-pipeline evaluate --dataset <d> --analysis <a>` | `EvaluationResult` + promotion decision | works |
 | full | `ds-pipeline full …` | dispatches to the mode flow (prediction/hypothesis/causal) based on `--analysis` | works |
 | lineage | `ds-pipeline lineage --analysis <a> --dataset <d>` | `reports/graph.json` + `graph.md` + run-state summary | works (reporting, not a pipeline step) |
+| report | `ds-pipeline report --analysis <a> --dataset <d>` | `reports/index.md` (navigable results hierarchy) | works (reporting, not a pipeline step) |
 
 `causal` is a separate analysis mode, run on its own — it is not part of
 `full`. `full` is a thin dispatcher that reads `AnalysisContract.mode` and
@@ -119,6 +120,34 @@ after saving its result; the `lineage` command assembles them into the chain
 `dataset → profile → analysis → baseline → … → decision`. `DatasetSlice`s are
 authored config (`configs/slice/`); `DecisionRecord`s are runtime events
 (`artifacts/lineage/decisions/`).
+
+### Results reports — `reports/`
+
+`reports/` is the human-facing product surface: a navigable, git-tracked
+hierarchy built from the machine evidence in `artifacts/`.
+
+```bash
+ds-pipeline report --analysis taxi_hypothesis --dataset taxi
+# → reports/index.md (entry point) + results/<step>.md + figures/
+```
+
+```text
+reports/
+  index.md            # entry point: question, latest result, next test, status table
+  results/<step>.md   # one markdown result per stats step (describe, anova, ...)
+  figures/*.png       # charts (describe_boxplot.png, describe_group_sizes.png)
+  lineage/graph.md    # run graph (from the lineage command)
+```
+
+The step order is authored once in `configs/flow/stats_sequence.yaml`
+(`StatsSequence`). Each step's result renderer lives in
+`src/broadway/reports/` (`registry.RESULT_RENDERERS`); `index.md` marks a step
+done when `results/<step>.md` exists and points to the next pending test.
+
+### Git-track policy
+
+- Tracked: `reports/*.md` and `reports/figures/*.png` (the human-facing surface).
+- Ignored: `artifacts/`, `data/processed/`, `data/raw/`, `results/` (machine evidence + caches).
 
 ---
 
