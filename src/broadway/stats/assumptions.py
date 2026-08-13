@@ -5,15 +5,23 @@ from __future__ import annotations
 import numpy as np
 from scipy import stats
 
+from broadway.stats.guards import validate_groups
+
 _SHAPIRO_MAX_N = 5000
 
 
 def run_levene(groups: dict[str, np.ndarray]) -> dict[str, float]:
+    warnings = validate_groups(groups)
+    if any("zero variance" in w for w in warnings):
+        raise ValueError("Levene's test requires non-zero variance in every group")
     statistic, p_value = stats.levene(*groups.values())
     return {"statistic": float(statistic), "p_value": float(p_value)}
 
 
 def check_normality(groups: dict[str, np.ndarray]) -> dict[str, dict[str, float]]:
+    warnings = validate_groups(groups)
+    if any("zero variance" in w for w in warnings):
+        raise ValueError("normality checks require non-constant groups")
     result: dict[str, dict[str, float]] = {}
     for name, vals in groups.items():
         arr = np.asarray(vals, dtype=float)

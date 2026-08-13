@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+import numpy as np
 import optuna
 
 
@@ -25,7 +26,13 @@ def run_study(
                 params[name] = trial.suggest_int(name, low, high)
             else:
                 params[name] = trial.suggest_float(name, low, high)
-        return objective(params)
+        value = float(objective(params))
+        if not np.isfinite(value):
+            raise optuna.TrialPruned()
+        return value
 
     study.optimize(_objective, n_trials=n_trials)
-    return study.best_params
+    try:
+        return study.best_params
+    except ValueError as exc:
+        raise ValueError(f"HPO study produced no valid trial ({n_trials} trials): {exc}") from exc

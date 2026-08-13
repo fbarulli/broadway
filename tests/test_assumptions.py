@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
 from broadway.stats.assumptions import check_normality, run_levene
 
@@ -33,7 +34,20 @@ def test_check_normality_returns_per_group_stats() -> None:
 
 def test_check_normality_caps_subsample() -> None:
     rng = np.random.default_rng(1)
-    groups = {"big": rng.normal(0.0, 1.0, 6000)}
+    groups = {
+        "big": rng.normal(0.0, 1.0, 6000),
+        "other": rng.normal(0.0, 1.0, 6000),
+    }
     result = check_normality(groups)
     assert "big" in result
     assert "shapiro_p" in result["big"]
+
+
+def test_levene_zero_variance_raises() -> None:
+    with pytest.raises(ValueError):
+        run_levene({"a": np.array([1.0, 1.0, 1.0]), "b": np.array([1.0, 2.0, 3.0])})
+
+
+def test_check_normality_empty_group_raises() -> None:
+    with pytest.raises(ValueError):
+        check_normality({"a": np.array([]), "b": np.array([1.0, 2.0, 3.0])})

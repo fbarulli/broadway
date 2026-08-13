@@ -63,3 +63,31 @@ def test_run_kruskal_valid_plan() -> None:
     assert "p_value" in plan.statistics
     assert "eta_squared" in plan.effect_sizes
     assert "omega_squared" in plan.effect_sizes
+
+
+def test_anova_empty_group_raises() -> None:
+    with pytest.raises(ValueError):
+        run_anova({"a": np.array([]), "b": np.array([1.0, 2.0, 3.0])})
+
+
+def test_anova_zero_variance_group_warns() -> None:
+    plan = run_anova(
+        {"a": np.array([1.0, 1.0, 1.0]), "b": np.array([1.0, 2.0, 3.0, 4.0])}
+    )
+    assert any("zero variance" in w for w in plan.warnings)
+    assert isinstance(plan.passed, bool)
+
+
+def test_anova_all_zero_variance_raises() -> None:
+    with pytest.raises(ValueError):
+        run_anova({"a": np.array([1.0, 1.0, 1.0]), "b": np.array([2.0, 2.0, 2.0])})
+
+
+def test_anova_non_finite_raises() -> None:
+    with pytest.raises(ValueError):
+        run_anova({"a": np.array([1.0, np.nan, 3.0]), "b": np.array([1.0, 2.0, 3.0])})
+
+
+def test_welch_zero_variance_raises() -> None:
+    with pytest.raises(ValueError):
+        run_welch({"a": np.array([1.0, 1.0, 1.0]), "b": np.array([1.0, 2.0, 3.0])})

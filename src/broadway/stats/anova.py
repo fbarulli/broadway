@@ -6,6 +6,7 @@ import numpy as np
 from scipy import stats
 
 from broadway.stats.effect_size import eta_squared, group_imbalance, omega_squared
+from broadway.stats.guards import validate_groups
 from broadway.stats.plan import AnalysisPlan
 
 _SMALL_GROUP_THRESHOLD = 30
@@ -75,8 +76,7 @@ def _build_plan(
 
 
 def run_anova(groups: dict[str, np.ndarray], alpha: float = 0.05) -> AnalysisPlan:
-    if len(groups) < 2:
-        raise ValueError(f"at least two groups required, got {len(groups)}")
+    warnings = validate_groups(groups)
     sizes = _group_sizes(groups)
     n_total = sum(sizes.values())
     k = len(groups)
@@ -91,7 +91,6 @@ def run_anova(groups: dict[str, np.ndarray], alpha: float = 0.05) -> AnalysisPla
         f"F({df1}, {df2})={f_stat:.3f}, p={p_value:.4e}",
         "reject H0: at least one group mean differs" if passed else "fail to reject H0: no mean difference",
     ]
-    warnings = []
     if any(s < _SMALL_GROUP_THRESHOLD for s in sizes.values()):
         warnings.append("underpowered: small group(s)")
     if group_imbalance(sizes) > 1.5:
@@ -112,8 +111,10 @@ def run_anova(groups: dict[str, np.ndarray], alpha: float = 0.05) -> AnalysisPla
 
 
 def run_welch(groups: dict[str, np.ndarray], alpha: float = 0.05) -> AnalysisPlan:
-    if len(groups) < 2:
-        raise ValueError(f"at least two groups required, got {len(groups)}")
+    warnings = validate_groups(groups)
+    if any("zero variance" in w for w in warnings):
+        raise ValueError("Welch's ANOVA requires non-zero within-group variance in every group")
+    warnings.append("does not assume equal variance")
     sizes = _group_sizes(groups)
     n_total = sum(sizes.values())
     k = len(groups)
@@ -126,7 +127,6 @@ def run_welch(groups: dict[str, np.ndarray], alpha: float = 0.05) -> AnalysisPla
         f"F({df1:.0f}, {df2:.2f})={f_stat:.3f}, p={p_value:.4e}",
         "reject H0: at least one group mean differs" if passed else "fail to reject H0: no mean difference",
     ]
-    warnings = ["does not assume equal variance"]
     if any(s < _SMALL_GROUP_THRESHOLD for s in sizes.values()):
         warnings.append("underpowered: small group(s)")
     if group_imbalance(sizes) > 1.5:
@@ -147,8 +147,8 @@ def run_welch(groups: dict[str, np.ndarray], alpha: float = 0.05) -> AnalysisPla
 
 
 def run_kruskal(groups: dict[str, np.ndarray], alpha: float = 0.05) -> AnalysisPlan:
-    if len(groups) < 2:
-        raise ValueError(f"at least two groups required, got {len(groups)}")
+    warnings = validate_groups(groups)
+    warnings.append("non-parametric; no normality/variance assumptions")
     sizes = _group_sizes(groups)
     n_total = sum(sizes.values())
     k = len(groups)
@@ -163,7 +163,6 @@ def run_kruskal(groups: dict[str, np.ndarray], alpha: float = 0.05) -> AnalysisP
         f"H({df1})={h_stat:.3f}, p={p_value:.4e}",
         "reject H0: group distributions differ" if passed else "fail to reject H0: distributions equal",
     ]
-    warnings = ["non-parametric; no normality/variance assumptions"]
     if any(s < _SMALL_GROUP_THRESHOLD for s in sizes.values()):
         warnings.append("underpowered: small group(s)")
 
