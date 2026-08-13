@@ -52,6 +52,9 @@ DatasetContract → FeatureSpec → TrainingConfig → Optuna → TrainingResult
 
 Declared intent (`AnalysisContract`) gates which steps are valid: stats→hypothesis, causal→causal, train/evaluate→prediction.
 
+Pipelines are mode-specific; `full` is a dispatcher that reads
+`AnalysisContract.mode` and resolves the matching `configs/flow/{prediction,hypothesis,causal}.yaml`.
+
 ---
 
 ## 1. Pipeline CLI — `ds-pipeline`
@@ -89,14 +92,14 @@ Every step except `discover` takes the same three flags.
 | baseline | `ds-pipeline baseline --dataset <d> --analysis <a>` | `BaselineResult` → `artifacts/baseline/` | works |
 | train | `ds-pipeline train --dataset <d> --analysis <a>` | `TrainingResult` → MLflow model/artifacts | works |
 | evaluate | `ds-pipeline evaluate --dataset <d> --analysis <a>` | `EvaluationResult` + promotion decision | works |
-| full | `ds-pipeline full …` | all steps in `configs/step/full.yaml` | works |
+| full | `ds-pipeline full …` | dispatches to the mode flow (prediction/hypothesis/causal) based on `--analysis` | works |
 
 `causal` is a separate analysis mode, run on its own — it is not part of
-`full`. `configs/step/full.yaml` runs discover, etl, contracts, eda, features,
-stats, train, evaluate.
+`full`. `full` is a thin dispatcher that reads `AnalysisContract.mode` and
+resolves one of `configs/flow/{prediction,hypothesis,causal}.yaml`.
 
-`baseline` is guidance (a naive result to beat), not a hard gate — it is not
-part of `full`.
+`baseline` is guidance (a naive result to beat), not a hard gate — it is part
+of each mode flow's prefix.
 
 `stats`, `causal`, `train`, and `evaluate` now require `--analysis <name>`; `train`/`evaluate` report improvement over the persisted baseline.
 
@@ -172,6 +175,7 @@ configs/
   experiment/<name>.yaml   # features, model, split, metric
   environment/<name>.yaml  # development / staging / production
   step/<step>.yaml         # per-step knobs + stats/train/features SSOT
+  flow/<mode>.yaml         # mode-specific step lists (prediction/hypothesis/causal)
   analysis/<name>.yaml     # authored analytical intent (--analysis <name>)
 ```
 

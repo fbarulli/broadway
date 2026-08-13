@@ -31,7 +31,7 @@ def tmp_dataset(tmp_path: Path) -> Path:
 
 
 def test_pipeline_on_synthetic_data(tmp_dataset: Path) -> None:
-    cfg = load_config("full", dataset="taxi", experiment="taxi")
+    cfg = load_config("full", dataset="taxi", experiment="taxi", analysis="taxi")
     df = clean(pd.read_parquet(tmp_dataset), cfg.dataset)
     target = cfg.dataset.target
     assert not df[target].isna().any()
@@ -53,7 +53,7 @@ def test_pipeline_on_synthetic_data(tmp_dataset: Path) -> None:
 
 
 def test_linear_model_coefficients(tmp_dataset: Path) -> None:
-    cfg = load_config("full", dataset="taxi", experiment="taxi")
+    cfg = load_config("full", dataset="taxi", experiment="taxi", analysis="taxi")
     df = clean(pd.read_parquet(tmp_dataset), cfg.dataset)
     target = cfg.dataset.target
     dt_col = cfg.dataset.datetime_column

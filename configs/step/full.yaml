@@ -1,9 +1,4 @@
-steps:
-  - discover
-  - etl
-  - contracts
-  - eda
-  - features
-  - stats
-  - train
-  - evaluate
+flows:
+  prediction: prediction
+  hypothesis: hypothesis
+  causal: causal

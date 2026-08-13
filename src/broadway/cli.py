@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import argparse
 
-from broadway.config.loader import DEFAULT_ENVIRONMENT, STEP_MODELS, load_config
+from broadway.config.loader import DEFAULT_ENVIRONMENT, STEP_MODELS, load_config, resolve_full_steps
 
 STEPS = list(STEP_MODELS.keys())
 
@@ -52,5 +52,5 @@ def main() -> None:
             analysis=args.analysis,
             environment=args.environment,
         )
-        steps = cfg.full.steps if cfg.full else [args.step]
+        steps = resolve_full_steps(cfg) if cfg.full else [args.step]
         run(cfg, steps)

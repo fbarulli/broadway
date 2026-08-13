@@ -22,6 +22,7 @@ from broadway.config.schema import (
     EvaluateStep,
     ExperimentConfig,
     FeaturesStep,
+    FlowConfig,
     FullStep,
     PipelineConfig,
     StatsStep,
@@ -104,13 +105,37 @@ def _build_config(merged: dict, step: str) -> PipelineConfig:
         **{step: step_model(**merged["step"])},
     )
     if step == "full" and config.full:
-        for sub_step in config.full.steps:
+        for sub_step in resolve_full_steps(config):
             if sub_step not in STEP_MODELS or sub_step == "full" or sub_step == "discover":
                 continue
             raw = _load_yaml(f"step/{sub_step}.yaml")
             resolved = resolve_values(raw)
             setattr(config, sub_step, STEP_MODELS[sub_step](**resolved))
     return config
+
+
+def resolve_full_steps(cfg: PipelineConfig) -> list[str]:
+    if cfg.analysis is None:
+        raise ValueError("full step requires an analysis contract (--analysis)")
+    if cfg.full is None:
+        raise ValueError("full config missing")
+    mode = cfg.analysis.mode.value
+    if mode not in cfg.full.flows:
+        raise ValueError(
+            f"no flow defined for analysis mode '{mode}'. valid modes: {sorted(cfg.full.flows)}"
+        )
+    flow_name = cfg.full.flows[mode]
+    try:
+        raw = _load_yaml(f"flow/{flow_name}.yaml")
+    except FileNotFoundError as exc:
+        raise ValueError(f"flow '{flow_name}' not found for mode '{mode}': {exc}") from exc
+    flow = FlowConfig(**raw)
+    unknown = [s for s in flow.steps if s not in STEP_MODELS]
+    if unknown:
+        raise ValueError(
+            f"flow '{flow_name}' lists unknown step(s) {unknown}. valid steps: {sorted(STEP_MODELS)}"
+        )
+    return flow.steps
 
 
 def load_config(

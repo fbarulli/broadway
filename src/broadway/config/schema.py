@@ -5,7 +5,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
 
-from broadway.analysis.contracts import AnalysisContract
+from broadway.analysis.contracts import AnalysisContract, AnalysisMode
 
 
 class TaskType(str, Enum):
@@ -249,6 +249,20 @@ class BaselineStep(BaseModel):
 
 
 class FullStep(BaseModel):
+    flows: dict[str, str]
+
+    @model_validator(mode="after")
+    def _validate_flow_modes(self) -> "FullStep":
+        valid = {mode.value for mode in AnalysisMode}
+        invalid = sorted(set(self.flows) - valid)
+        if invalid:
+            raise ValueError(
+                f"invalid flow mode(s) {invalid}. valid modes: {sorted(valid)}"
+            )
+        return self
+
+
+class FlowConfig(BaseModel):
     steps: list[str]
 
 

@@ -1,0 +1,7 @@
+steps:
+  - discover
+  - etl
+  - contracts
+  - eda
+  - baseline
+  - stats

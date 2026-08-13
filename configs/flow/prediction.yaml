@@ -1,0 +1,9 @@
+steps:
+  - discover
+  - etl
+  - contracts
+  - eda
+  - baseline
+  - features
+  - train
+  - evaluate

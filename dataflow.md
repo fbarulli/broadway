@@ -21,17 +21,24 @@ stats/, causal/), human-facing HTML reports live under `artifacts/reports/`,
 and processed data stays under `data/processed/`.
 
 `causal` is a separate analysis mode, not part of this flow and not part of
-`full`. `configs/step/full.yaml` = discover, etl, contracts, eda, features,
-stats, train, evaluate. Run causal explicitly:
+`full`. `full` is a thin dispatcher: it reads `AnalysisContract.mode` and
+resolves one of `configs/flow/{prediction,hypothesis,causal}.yaml`. Run causal
+explicitly:
 
 ```
 ds-pipeline causal --dataset <d> --experiment <e>
 ```
 
+### Mode-specific pipelines
+
+The three flows share the prefix `discover → etl → contracts → eda → baseline`
+and diverge on the mode tail: prediction appends `features → train → evaluate`,
+hypothesis appends `stats`, and causal appends `causal`.
+
 `baseline` is guidance, not a hard gate: it dispatches on
 `AnalysisContract.mode` (prediction/hypothesis/causal), persists a
-`BaselineResult` to `artifacts/baseline/`, and is not yet part of `full.yaml`
-(ordering deferred). Run it explicitly:
+`BaselineResult` to `artifacts/baseline/`, and is included in each mode flow.
+Run it explicitly:
 
 ```
 ds-pipeline baseline --dataset <d> --analysis <a>
@@ -42,7 +49,7 @@ ds-pipeline baseline --dataset <d> --analysis <a>
 ```
 broadway/
   src/broadway/
-    config/schema.py        # Pydantic models (DatasetContract, StatsStep, TrainStep, FeaturesStep, ...)
+    config/schema.py        # Pydantic models (DatasetContract, StatsStep, TrainStep, FeaturesStep, FullStep, FlowConfig, ...)
     discover/               # read CSV/parquet → infer contract + observed profile
       module.py             # run(): writes configs/dataset/<name>.yaml + artifacts/discover/profile.json
       profile.py            # DatasetProfile / ColumnProfile (observed facts; identifier_score is descriptive only)
@@ -111,6 +118,7 @@ broadway/
     stats.yaml              # stats SSOT
     train.yaml              # model hyperparams SSOT
     features.yaml           # feature-engineer params SSOT
+  configs/flow/<mode>.yaml  # mode-specific step lists (prediction/hypothesis/causal)
   configs/analysis/<name>.yaml  # authored analytical intent (AnalysisContract)
   tests/                    # test_base.py, test_anova.py, ... (pytest)
   results/                  # mode-keyed caches + reports (gitignored artifacts)
@@ -197,6 +205,7 @@ Analysis intent is authored separately via `configs/analysis/<name>.yaml` → `A
 | Contract | Tool | Where |
 |---|---|---|
 | Configuration | Pydantic | `broadway/config/schema.py` |
+| FullStep / FlowConfig | Pydantic | `broadway/config/schema.py` |
 | AnalysisContract | Pydantic | `broadway/analysis/contracts.py` |
 | AnalysisPlan | Pydantic | `broadway/stats/plan.py` |
 | ExperimentDesign | Pydantic | `broadway/causal/contracts.py` |
@@ -219,7 +228,7 @@ Analysis intent is authored separately via `configs/analysis/<name>.yaml` → `A
 
 ## Mode enforcement
 
-The declared analytical intent (`AnalysisContract.mode`) determines which steps are valid: `stats` requires `mode == "hypothesis"`, `causal` requires `"causal"`, and `train`/`evaluate` require `"prediction"`. `baseline` dispatches on mode (prediction/hypothesis/causal). Mismatches fail early via `broadway/analysis/contracts.py::require_mode`, which also errors when the `--analysis` contract is missing. This makes `full.yaml` (which chains stats→train→evaluate across modes) temporarily non-runnable; step ordering is deferred to a later phase.
+The declared analytical intent (`AnalysisContract.mode`) determines which steps are valid: `stats` requires `mode == "hypothesis"`, `causal` requires `"causal"`, and `train`/`evaluate` require `"prediction"`. `baseline` dispatches on mode (prediction/hypothesis/causal). Mismatches fail early via `broadway/analysis/contracts.py::require_mode`, which also errors when the `--analysis` contract is missing. `full` resolves the mode-specific flow (`configs/flow/{prediction,hypothesis,causal}.yaml`) via `resolve_full_steps`, so each mode runs only its valid tail.
 
 `train` and `evaluate` read the persisted `BaselineResult` (from `artifacts/baseline/`) and report improvement over the baseline (`improvement_vs_baseline` in `broadway/baseline/improvement.py`). `BaselineResult` carries an `ArtifactTrace` (commit/dataset/analysis_goal) for lineage.
 
