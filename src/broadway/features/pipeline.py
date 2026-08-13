@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 import pandas as pd
 
 from broadway.config.schema import EncodingConfig, FeatureConfig
-from broadway.features.builders import build_derived
+from broadway.features.builders import build_derived, load_custom_builders
 from broadway.features.encodings import (
     fit_frequency_encoding,
     fit_target_encoding,
@@ -33,7 +33,7 @@ class FeaturePipeline:
 
     def transform(self, df: pd.DataFrame, cfg: FeatureConfig, target: str, freq_fill: float) -> pd.DataFrame:
         result = df.copy()
-        result = build_derived(result, cfg.derived, target)
+        result = build_derived(result, cfg.derived, target, extra_builders=load_custom_builders(cfg.builder_module))
         for col, mapping in self._freq_mappings.items():
             result = transform_frequency_encoding(result, col, mapping, freq_fill)
         for col, mapping in self._target_mappings.items():

@@ -79,6 +79,7 @@ class FeatureConfig(BaseModel):
     exclude: list[str]
     derived: list[DerivedFeature]
     encodings: list[EncodingConfig]
+    builder_module: str | None = None
 
 
 class ModelConfig(BaseModel):

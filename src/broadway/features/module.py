@@ -9,7 +9,9 @@ from pathlib import Path
 import pandas as pd
 
 from broadway.config.schema import PipelineConfig
+from broadway.features.generic import build_generic_feature_specs
 from broadway.features.pipeline import FeaturePipeline
+from broadway.features.schema import build_engineered_schema
 from broadway.lineage.ids import node_id
 from broadway.lineage.models import TransformAudit
 from broadway.lineage.records import enforce_drop_fraction, write_record
@@ -34,6 +36,8 @@ def run(cfg: PipelineConfig) -> None:
     rows_in = len(train)
     columns_before = list(train.columns)
     train_out = pipeline.transform(train, cfg.experiment.features, cfg.dataset.target, cfg.features.frequency_fill)
+    specs = build_generic_feature_specs(cfg.dataset, cfg.experiment.features)
+    build_engineered_schema(specs).validate(train_out)
     rows_out = len(train_out)
     columns_after = list(train_out.columns)
     out_dir = Path(cfg.environment.data_dir) / cfg.environment.processed_subdir
@@ -41,6 +45,7 @@ def run(cfg: PipelineConfig) -> None:
     logger.info(f"train features written ({len(train_out)} rows)")
     if val is not None:
         val_out = pipeline.transform(val, cfg.experiment.features, cfg.dataset.target, cfg.features.frequency_fill)
+        build_engineered_schema(specs).validate(val_out)
         val_out.to_parquet(out_dir / cfg.etl.val_features_file, index=False)
         logger.info(f"val features written ({len(val_out)} rows)")
     pipeline_path = out_dir / cfg.features.pipeline_file
