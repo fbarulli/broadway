@@ -1,5 +1,5 @@
-| Question                                                            | What we're trying to learn                                                           | If problem exists                                                                   |
-| ------------------------------------------------------------------- | ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------- |
+| Question                                                            | What we're trying to learn                                                           | If  problem exists                                  
+
 | **1. Is the mean relationship correctly specified?**                | Is OLS capturing the underlying relationship between X and Y?                        | Transform variables, add nonlinear terms/splines, or change model                   |
 | **2. Are the observations independent?**                            | Are we treating correlated observations as if they're independent?                   | Clustered SE, mixed model, GEE, time-series/panel approach                          |
 | **3. Is the error variance constant?**                              | Are conventional SEs, p-values and CIs reliable?                                     | Use HC3/robust SE; potentially model variance                                       |
