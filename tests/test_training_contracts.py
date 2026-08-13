@@ -8,6 +8,7 @@ import pandas as pd
 import pytest
 from sklearn.linear_model import LinearRegression
 
+from broadway.analysis.contracts import AnalysisContract, AnalysisMode
 from broadway.config.schema import (
     ColumnRole,
     ColumnSchema,
@@ -180,6 +181,15 @@ def _make_config(tmp_path: Path) -> PipelineConfig:
         experiment=experiment,
         etl=etl,
         train=train_step,
+        analysis=AnalysisContract(
+            mode=AnalysisMode.PREDICTION,
+            goal="predict price",
+            row_definition="one row",
+            decision_moment="now",
+            available_info=["rooms"],
+            leakage_notes=[],
+            success_criterion="beat baseline",
+        ),
     )
 
 

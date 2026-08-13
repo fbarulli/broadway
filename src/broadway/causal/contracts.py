@@ -18,6 +18,7 @@ class ExperimentDesign(BaseModel):
     effect_size: float
     sample_size: int
     mde: float
+    analysis_goal: str | None = None
 
 
 class ExperimentResult(BaseModel):

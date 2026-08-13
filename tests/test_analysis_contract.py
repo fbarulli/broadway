@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from broadway.analysis.contracts import AnalysisContract, AnalysisMode
+from broadway.analysis.contracts import AnalysisContract, AnalysisMode, require_mode
 from broadway.config.loader import load_config
 
 
@@ -90,3 +90,35 @@ def test_loader_wires_analysis() -> None:
     assert cfg.analysis is not None
     assert cfg.analysis.mode == AnalysisMode.PREDICTION
     assert cfg.analysis.goal
+
+
+def test_require_mode_ok() -> None:
+    contract = AnalysisContract(
+        mode="prediction",
+        goal="g",
+        row_definition="r",
+        decision_moment="d",
+        available_info=["a"],
+        leakage_notes=[],
+        success_criterion="s",
+    )
+    assert require_mode(contract, AnalysisMode.PREDICTION) == contract
+
+
+def test_require_mode_mismatch_raises() -> None:
+    contract = AnalysisContract(
+        mode="prediction",
+        goal="g",
+        row_definition="r",
+        decision_moment="d",
+        available_info=["a"],
+        leakage_notes=[],
+        success_criterion="s",
+    )
+    with pytest.raises(ValueError):
+        require_mode(contract, AnalysisMode.HYPOTHESIS)
+
+
+def test_require_mode_none_raises() -> None:
+    with pytest.raises(ValueError):
+        require_mode(None, AnalysisMode.PREDICTION)

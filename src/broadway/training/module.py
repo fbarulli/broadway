@@ -9,6 +9,9 @@ from typing import Callable
 import mlflow
 import pandas as pd
 
+from broadway.analysis.contracts import AnalysisMode, require_mode
+from broadway.baseline.improvement import improvement_vs_baseline
+from broadway.baseline.module import load_persisted
 from broadway.config.schema import PipelineConfig
 from broadway.data.splitter import split
 from broadway.evaluate.metrics import compute_metrics
@@ -82,6 +85,7 @@ def _resolve_params(
 def run(cfg: PipelineConfig) -> None:
     if not cfg.dataset or not cfg.experiment or not cfg.train or not cfg.etl:
         raise ValueError("training step requires dataset, experiment, train, and etl config")
+    require_mode(cfg.analysis, AnalysisMode.PREDICTION)
 
     train_df, val_df = _load_features(cfg)
     target = cfg.dataset.target
@@ -101,6 +105,12 @@ def run(cfg: PipelineConfig) -> None:
         log_params(params)
         metrics = compute_metrics(y_val.to_numpy(), model.predict(X_val))
         log_metrics(metrics)
+        baseline_result = load_persisted(cfg)
+        if baseline_result is not None and baseline_result.metric in metrics:
+            improvement = improvement_vs_baseline(metrics[baseline_result.metric], baseline_result, cfg.dataset.task)
+            if improvement is not None:
+                mlflow.log_metric("baseline_improvement", improvement)
+                logger.info(f"train: improvement over {baseline_result.strategy} baseline = {improvement:.1%}")
         artifact_path = log_model(model, "model")
 
     result = result.model_copy(update={"artifact_path": artifact_path})

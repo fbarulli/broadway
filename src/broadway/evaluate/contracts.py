@@ -20,6 +20,16 @@ class ModelComparison(BaseModel):
     metrics: dict[str, MetricComparison]
 
 
+class BaselineComparison(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    metric: str
+    baseline_value: float
+    candidate_value: float
+    delta: float
+    improvement: float | None
+
+
 class EvaluationResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -29,3 +39,4 @@ class EvaluationResult(BaseModel):
     cv_metrics: dict[str, float] | None = None
     residuals: dict[str, float] | None = None
     comparison: ModelComparison | None = None
+    baseline: BaselineComparison | None = None

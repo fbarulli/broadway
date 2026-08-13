@@ -21,6 +21,7 @@ class AnalysisPlan(BaseModel):
     warnings: list[str]
     passed: bool
     next_step: str | None
+    analysis_goal: str | None = None
 
 
 def save_plan(plan: AnalysisPlan, path: Path) -> None:

@@ -1,15 +1,46 @@
 from __future__ import annotations
 
 import logging
+import subprocess
+from datetime import datetime, timezone
 from pathlib import Path
 
 from broadway.analysis.contracts import AnalysisMode
 from broadway.baseline import causal, hypothesis, prediction
-from broadway.baseline.contracts import BaselineResult, save_result
+from broadway.baseline.contracts import BaselineResult, load_result, save_result
 from broadway.config.schema import PipelineConfig
 from broadway.data.loader import load
+from broadway.trace import ArtifactTrace
 
 logger = logging.getLogger(__name__)
+
+
+def _git_commit() -> str:
+    try:
+        proc = subprocess.run(
+            ["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True
+        )
+        return proc.stdout.strip()
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return "unknown"
+
+
+def _build_trace(cfg: PipelineConfig) -> ArtifactTrace:
+    return ArtifactTrace(
+        created_at=datetime.now(timezone.utc),
+        commit=_git_commit(),
+        dataset=cfg.dataset.name if cfg.dataset else None,
+        analysis_goal=cfg.analysis.goal if cfg.analysis else None,
+    )
+
+
+def load_persisted(cfg: PipelineConfig) -> BaselineResult | None:
+    if cfg.baseline is None:
+        return None
+    path = Path(cfg.baseline.output_dir) / cfg.baseline.output_file
+    if not path.exists():
+        return None
+    return load_result(path)
 
 
 def _compute_baseline(cfg: PipelineConfig) -> BaselineResult:
@@ -39,6 +70,7 @@ def run(cfg: PipelineConfig) -> None:
     if not cfg.baseline:
         raise ValueError("baseline step requires baseline config")
     result = _compute_baseline(cfg)
+    result = result.model_copy(update={"trace": _build_trace(cfg)})
     out_dir = Path(cfg.baseline.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / cfg.baseline.output_file

@@ -15,7 +15,7 @@ from broadway.stats import module
 def test_stats_run_writes_plan_file(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    cfg = load_config("stats", dataset="taxi", experiment="taxi")
+    cfg = load_config("stats", dataset="taxi", experiment="taxi", analysis="taxi_hypothesis")
     assert cfg.stats is not None
     assert cfg.dataset is not None
 
@@ -51,3 +51,4 @@ def test_stats_run_writes_plan_file(
     assert "effect_sizes" in plan
     assert "passed" in plan
     assert "reason" in plan
+    assert plan.get("analysis_goal") == "test whether trip duration differs across pickup boroughs"

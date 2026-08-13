@@ -8,7 +8,10 @@ import pandas as pd
 import pytest
 from sklearn.linear_model import LinearRegression
 
+from broadway.analysis.contracts import AnalysisContract, AnalysisMode
+from broadway.baseline.contracts import BaselineResult, save_result
 from broadway.config.schema import (
+    BaselineStep,
     ColumnRole,
     ColumnSchema,
     DatasetContract,
@@ -67,6 +70,7 @@ def test_evaluation_result_json_round_trip() -> None:
                 }
             }
         },
+        "baseline": None,
     }
     assert EvaluationResult.model_validate_json(data) == result
 
@@ -243,6 +247,10 @@ def _make_config(tmp_path: Path) -> PipelineConfig:
         output_dir=str(tmp_path / "artifacts" / "evaluation"),
         output_file="metrics.json",
     )
+    baseline_step = BaselineStep(
+        output_dir=str(tmp_path / "artifacts" / "baseline"),
+        output_file="baseline.json",
+    )
     return PipelineConfig(
         dataset=dataset,
         environment=environment,
@@ -250,6 +258,16 @@ def _make_config(tmp_path: Path) -> PipelineConfig:
         etl=etl,
         train=train_step,
         evaluate=evaluate_step,
+        baseline=baseline_step,
+        analysis=AnalysisContract(
+            mode=AnalysisMode.PREDICTION,
+            goal="predict price",
+            row_definition="one row",
+            decision_moment="now",
+            available_info=["rooms"],
+            leakage_notes=[],
+            success_criterion="beat baseline",
+        ),
     )
 
 
@@ -278,3 +296,39 @@ def test_module_run_writes_evaluation_result(tmp_path: Path) -> None:
     assert set(evaluation.cv_metrics) == {"mae", "rmse", "r2"}
     assert evaluation.residuals is not None
     assert isinstance(evaluation.promote, bool)
+
+
+def test_module_run_writes_baseline_comparison(tmp_path: Path) -> None:
+    cfg = _make_config(tmp_path)
+    out_dir = Path(cfg.environment.data_dir) / cfg.environment.processed_subdir
+    out_dir.mkdir(parents=True, exist_ok=True)
+    df = pd.DataFrame(
+        {
+            "rooms": np.arange(1, 41),
+            "area": np.arange(40, 80),
+            "price": np.arange(1, 41) * 100.0,
+        }
+    )
+    df.to_parquet(out_dir / cfg.etl.train_features_file, index=False)
+    df.tail(10).to_parquet(out_dir / cfg.etl.val_features_file, index=False)
+
+    baseline = BaselineResult(
+        mode=AnalysisMode.PREDICTION,
+        strategy="mean",
+        metric="mae",
+        value=10000.0,
+        details={"mean": 2000.0},
+        notes=["n"],
+    )
+    baseline_dir = Path(cfg.baseline.output_dir)
+    baseline_dir.mkdir(parents=True, exist_ok=True)
+    save_result(baseline, baseline_dir / cfg.baseline.output_file)
+
+    training_module.run(cfg)
+    evaluate_module.run(cfg)
+
+    result_path = Path(cfg.evaluate.output_dir) / cfg.evaluate.output_file
+    evaluation = EvaluationResult.model_validate_json(result_path.read_text(encoding="utf-8"))
+    assert evaluation.baseline is not None
+    assert evaluation.baseline.metric == "mae"
+    assert evaluation.baseline.improvement is not None

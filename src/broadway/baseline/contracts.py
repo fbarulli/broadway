@@ -7,6 +7,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict
 
 from broadway.analysis.contracts import AnalysisMode
+from broadway.trace import ArtifactTrace
 
 
 class BaselineResult(BaseModel):
@@ -18,6 +19,7 @@ class BaselineResult(BaseModel):
     value: float
     details: dict[str, Any]
     notes: list[str]
+    trace: ArtifactTrace | None = None
 
 
 def save_result(result: BaselineResult, path: Path) -> None:

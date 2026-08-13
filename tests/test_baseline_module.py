@@ -9,6 +9,7 @@ import pytest
 from broadway.analysis.contracts import AnalysisMode
 from broadway.baseline import causal, hypothesis, prediction, module
 from broadway.baseline.contracts import BaselineResult, load_result, save_result
+from broadway.baseline.improvement import improvement_vs_baseline
 from broadway.config.loader import load_config
 from broadway.config.schema import CausalStep, TaskType
 
@@ -90,3 +91,44 @@ def test_module_dispatch_prediction(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     assert p.exists()
     r = load_result(p)
     assert r.mode == AnalysisMode.PREDICTION
+    assert r.trace is not None
+    assert r.trace.dataset == "taxi"
+    assert r.trace.analysis_goal == "predict trip duration"
+    assert r.trace.commit
+
+
+def test_improvement_regression_lower_is_better() -> None:
+    b = BaselineResult(
+        mode=AnalysisMode.PREDICTION,
+        strategy="mean",
+        metric="mae",
+        value=10.0,
+        details={},
+        notes=[],
+    )
+    assert improvement_vs_baseline(8.0, b, TaskType.REGRESSION) == pytest.approx(0.2)
+    assert improvement_vs_baseline(12.0, b, TaskType.REGRESSION) == pytest.approx(-0.2)
+
+
+def test_improvement_classification_higher_is_better() -> None:
+    b = BaselineResult(
+        mode=AnalysisMode.PREDICTION,
+        strategy="majority_class",
+        metric="accuracy",
+        value=0.5,
+        details={},
+        notes=[],
+    )
+    assert improvement_vs_baseline(0.6, b, TaskType.CLASSIFICATION) == pytest.approx(0.2)
+
+
+def test_improvement_zero_baseline_returns_none() -> None:
+    b = BaselineResult(
+        mode=AnalysisMode.PREDICTION,
+        strategy="mean",
+        metric="mae",
+        value=0.0,
+        details={},
+        notes=[],
+    )
+    assert improvement_vs_baseline(1.0, b, TaskType.REGRESSION) is None

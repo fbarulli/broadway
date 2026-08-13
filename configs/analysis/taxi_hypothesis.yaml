@@ -1,0 +1,10 @@
+mode: hypothesis
+goal: test whether trip duration differs across pickup boroughs
+row_definition: one completed taxi trip
+decision_moment: post-hoc analysis of historical trips
+available_info:
+  - pickup_borough
+  - trip_duration_minutes
+leakage_notes:
+  - post-hoc grouping; no out-of-sample prediction so no train/test leakage
+success_criterion: report effect size (eta-squared) alongside significance, not the p-value alone

@@ -14,9 +14,12 @@ from typing import Any
 import mlflow
 import pandas as pd
 
+from broadway.analysis.contracts import AnalysisMode, require_mode
+from broadway.baseline.improvement import improvement_vs_baseline
+from broadway.baseline.module import load_persisted
 from broadway.config.schema import PipelineConfig
 from broadway.evaluate.comparison import compare_models
-from broadway.evaluate.contracts import EvaluationResult
+from broadway.evaluate.contracts import BaselineComparison, EvaluationResult
 from broadway.evaluate.metrics import compute_metrics
 from broadway.evaluate.promotion import should_promote
 from broadway.evaluate.validation import cross_validate, residual_summary
@@ -71,6 +74,7 @@ def _load_champion(model_uri: str) -> Any:
 def run(cfg: PipelineConfig) -> None:
     if not cfg.dataset or not cfg.experiment or not cfg.evaluate or not cfg.etl or not cfg.train:
         raise ValueError("evaluate step requires dataset, experiment, evaluate, etl, and train config")
+    require_mode(cfg.analysis, AnalysisMode.PREDICTION)
 
     setup_mlflow(cfg.environment.mlflow_tracking_uri, cfg.dataset.name)
 
@@ -81,6 +85,18 @@ def run(cfg: PipelineConfig) -> None:
     y_true = y_val.to_numpy()
     y_pred = candidate.predict(X_val)
     candidate_metrics = compute_metrics(y_true, y_pred)
+
+    baseline_result = load_persisted(cfg)
+    baseline_comparison: BaselineComparison | None = None
+    if baseline_result is not None and baseline_result.metric in candidate_metrics:
+        candidate_value = candidate_metrics[baseline_result.metric]
+        baseline_comparison = BaselineComparison(
+            metric=baseline_result.metric,
+            baseline_value=baseline_result.value,
+            candidate_value=candidate_value,
+            delta=candidate_value - baseline_result.value,
+            improvement=improvement_vs_baseline(candidate_value, baseline_result, cfg.dataset.task),
+        )
 
     champion_uri = get_champion(cfg.dataset.name)
     champion_metrics: dict[str, float] | None = None
@@ -119,6 +135,7 @@ def run(cfg: PipelineConfig) -> None:
         # persist the candidate-vs-champion comparison even when champion is None,
         # so downstream consumers can trace champion-None (delta=None) values explicitly.
         comparison=comparison,
+        baseline=baseline_comparison,
     )
 
     eval_dir = Path(cfg.evaluate.output_dir)

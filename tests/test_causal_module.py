@@ -10,7 +10,7 @@ from broadway.config.loader import load_config
 
 
 def test_causal_run_persists_design(tmp_path: Path) -> None:
-    cfg = load_config("causal")
+    cfg = load_config("causal", analysis="taxi_causal")
     assert cfg.causal is not None
 
     cfg = cfg.model_copy(
@@ -24,3 +24,4 @@ def test_causal_run_persists_design(tmp_path: Path) -> None:
 
     design = load_design(design_path)
     assert design.treatment_column == cfg.causal.treatment_column
+    assert design.analysis_goal == "estimate the causal effect of a treatment on trip duration"

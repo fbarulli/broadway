@@ -30,3 +30,13 @@ class AnalysisContract(BaseModel):
         if not self.available_info:
             raise ValueError("available_info must not be empty")
         return self
+
+
+def require_mode(analysis: AnalysisContract | None, expected: AnalysisMode) -> AnalysisContract:
+    if analysis is None:
+        raise ValueError(f"step requires an analysis contract (--analysis) with mode '{expected.value}'")
+    if analysis.mode != expected:
+        raise ValueError(
+            f"analysis mode mismatch: expected '{expected.value}', got '{analysis.mode.value}'"
+        )
+    return analysis
