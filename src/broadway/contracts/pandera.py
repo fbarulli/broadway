@@ -27,6 +27,10 @@ _DATETIME_DTYPES = {"datetime64[us]", "datetime64[ns]", "datetime64"}
 _STRING_DTYPES = {"object", "str", "string"}
 
 
+def is_numeric_dtype(dtype: str) -> bool:
+    return dtype in _INT_DTYPES or dtype in _FLOAT_DTYPES
+
+
 def pandera_dtype(dtype: str) -> type[pa.DataType]:
     if dtype in _INT_DTYPES:
         return _INT_DTYPES[dtype]

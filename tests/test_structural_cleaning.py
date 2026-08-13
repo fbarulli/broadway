@@ -6,9 +6,10 @@ import pandas as pd
 
 import broadway.etl.module as etl_module
 from broadway.cleaning.models import StructuralCleanResult
-from broadway.cleaning.structural import parse_datetime, standardize_missing
+from broadway.cleaning.structural import parse_datetime, parse_numeric, standardize_missing
 from broadway.config.loader import load_config
 from broadway.config.schema import ColumnRole, ColumnSchema
+from broadway.contracts.pandera import is_numeric_dtype
 from broadway.data.cleaner import canonicalize
 from broadway.lineage import records
 
@@ -36,6 +37,60 @@ def test_standardize_missing_observed_only() -> None:
     assert observed == ["NA", ""]
 
 
+def test_is_numeric_dtype() -> None:
+    assert is_numeric_dtype("int64") is True
+    assert is_numeric_dtype("float64") is True
+    assert is_numeric_dtype("object") is False
+    assert is_numeric_dtype("datetime64[us]") is False
+
+
+def test_parse_numeric_records_failures() -> None:
+    series = pd.Series(["1", "2", "abc", "3"])
+    coerced, failure = parse_numeric(series, "num", "int64")
+    assert coerced.isna().tolist() == [False, False, True, False]
+    assert failure is not None
+    assert failure.column == "num"
+    assert failure.count == 1
+    assert failure.examples == ["abc"]
+    assert len(coerced) == len(series)
+
+
+def test_parse_numeric_clean_int_stays_int() -> None:
+    series = pd.Series(["1", "2", "3"])
+    coerced, failure = parse_numeric(series, "num", "int64")
+    assert coerced.dtype == "int64"
+    assert failure is None
+
+
+def test_parse_numeric_failure_stays_float() -> None:
+    series = pd.Series(["1", "x", "3"])
+    coerced, failure = parse_numeric(series, "num", "int64")
+    assert coerced.dtype.kind == "f"
+    assert failure is not None
+
+
+def test_canonicalize_coerces_numeric() -> None:
+    df = pd.DataFrame(
+        {
+            "rooms": ["1", "2", "x", "4"],
+            "price": [10.0, 20.0, 30.0, 40.0],
+        }
+    )
+    out, _, parse_failures, _ = canonicalize(
+        df,
+        target="price",
+        datetime_columns=[],
+        numeric_columns={"rooms": "int64"},
+        missing_encodings=[],
+    )
+    assert len(parse_failures) == 1
+    assert parse_failures[0].column == "rooms"
+    assert parse_failures[0].count == 1
+    assert parse_failures[0].examples == ["x"]
+    assert pd.api.types.is_numeric_dtype(out["rooms"])
+    assert out["rooms"].isna().tolist() == [False, False, True, False]
+
+
 def test_canonicalize_order() -> None:
     df = pd.DataFrame(
         {
@@ -44,7 +99,11 @@ def test_canonicalize_order() -> None:
         }
     )
     out, _, parse_failures, observed = canonicalize(
-        df, target="target", datetime_columns=["dt"], missing_encodings=["NA", ""]
+        df,
+        target="target",
+        datetime_columns=["dt"],
+        missing_encodings=["NA", ""],
+        numeric_columns={},
     )
     assert parse_failures == []
     assert observed == {"dt": ["NA"]}
@@ -59,7 +118,7 @@ def test_canonicalize_duplicates_before_normalization() -> None:
         }
     )
     out, reasons, _, _ = canonicalize(
-        df, target="target", datetime_columns=[], missing_encodings=[""]
+        df, target="target", datetime_columns=[], missing_encodings=[""], numeric_columns={}
     )
     assert len(out) == 2
     assert any("duplicates" in r for r in reasons)
@@ -73,7 +132,7 @@ def test_canonicalize_target_null() -> None:
         }
     )
     out, reasons, _, _ = canonicalize(
-        df, target="target", datetime_columns=[], missing_encodings=["NA"]
+        df, target="target", datetime_columns=[], missing_encodings=["NA"], numeric_columns={}
     )
     assert len(out) == 2
     assert any("null target" in r for r in reasons)

@@ -9,7 +9,7 @@ from pathlib import Path
 from broadway.cleaning.models import StructuralCleanResult
 from broadway.config.schema import PipelineConfig
 from broadway.contracts.pandera import build_raw_schema
-from broadway.contracts.selectors import datetime_columns
+from broadway.contracts.selectors import datetime_columns, numeric_columns
 from broadway.data.cleaner import canonicalize
 from broadway.data.loader import canonical_path, load
 from broadway.data.splitter import split
@@ -47,10 +47,12 @@ def run(cfg: PipelineConfig) -> None:
         if len(df) < n_before:
             reasons.append(f"CI sampling: -{n_before - len(df)} rows")
 
+    numeric_map = {col: dataset.columns[col].dtype for col in numeric_columns(dataset)}
     df, clean_reasons, parse_failures, observed_missing = canonicalize(
         df,
         target=dataset.target,
         datetime_columns=datetime_columns(dataset),
+        numeric_columns=numeric_map,
         missing_encodings=cfg.etl.missing_encodings,
     )
     reasons.extend(clean_reasons)
