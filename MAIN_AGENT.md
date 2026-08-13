@@ -22,7 +22,7 @@ Rule: development happens on `taxi`. The `main` split already happened; don't re
 
 From `AGENT_CONTRACT.md`:
 1. Only perform actions explicitly agreed with the user.
-2. **Never write code yourself — spin an agent** (via the Task tool, `general` subagent) with a precise contract.
+2. **Never code or verify yourself — delegate everything to agents** (via the Task tool, `general` subagent) with a precise contract. All coding, test-running, data refresh, dogfood, and verification is done by agents; the main agent only delegates, splits work for parallelism, and navigates decisions.
 3. Write agent contracts with specific roles/files; dispatch the right number of agents.
 4. Agents commit + push, run the full suite, and fix failures.
 5. Reuse/adapt static contract templates to minimize tokens.
