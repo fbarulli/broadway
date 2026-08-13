@@ -13,6 +13,7 @@ class SampleSpec(BaseModel):
     role: SampleRole
     path: str
     description: str | None = None
+    column_mapping: dict[str, str] = {}
 
 
 class DatasetRef(BaseModel):

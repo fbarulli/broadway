@@ -38,6 +38,8 @@ def run(cfg: PipelineConfig, sample: SampleSpec | None = None) -> None:
             raise FileNotFoundError(f"sample dataset not found: {sample_path}")
         df = pd.read_parquet(sample_path)
     group_col = analysis.hypothesis.group_column
+    if sample is not None:
+        group_col = sample.column_mapping.get(analysis.hypothesis.group_column, analysis.hypothesis.group_column)
     if group_col not in df.columns:
         raise ValueError(f"group column '{group_col}' not found in data")
     groups: dict[str, np.ndarray] = {

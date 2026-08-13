@@ -30,6 +30,7 @@ class GroupStat(BaseModel):
 class GroupSummary(BaseModel):
     model_config = ConfigDict(extra="forbid")
     group_column: str
+    source_group_column: str
     target: str
     total_n: int
     source_path: str
@@ -42,12 +43,12 @@ class GroupSummary(BaseModel):
     warnings: list[str]
 
 
-def describe(df: pd.DataFrame, group_column: str, group_values: list[str], target: str, source_path: str, sample_name: str, sample_role: SampleRole) -> GroupSummary:
+def describe(df: pd.DataFrame, group_column: str, source_group_column: str, group_values: list[str], target: str, source_path: str, sample_name: str, sample_role: SampleRole) -> GroupSummary:
     total_n = int(len(df))
     groups: dict[str, GroupStat] = {}
     absent: list[str] = []
     for g in group_values:
-        vals = df[df[group_column] == g][target].dropna()
+        vals = df[df[source_group_column] == g][target].dropna()
         n = int(len(vals))
         if n == 0:
             absent.append(g)
@@ -59,16 +60,16 @@ def describe(df: pd.DataFrame, group_column: str, group_values: list[str], targe
     proportions = {g: (s.n / total_n if total_n else 0.0) for g, s in groups.items()}
     warnings: list[str] = []
     return GroupSummary(
-        group_column=group_column, target=target, total_n=total_n,
+        group_column=group_column, source_group_column=source_group_column, target=target, total_n=total_n,
         source_path=source_path, sample_name=sample_name, sample_role=sample_role,
         groups=groups, absent_groups=absent,
         imbalance_ratio=round(imbalance_ratio, 4), proportions=proportions, warnings=warnings,
     )
 
 
-def plot_group_distribution(df: pd.DataFrame, group_column: str, group_values: list[str], target: str, out_path: Path) -> None:
+def plot_group_distribution(df: pd.DataFrame, source_group_column: str, group_column: str, group_values: list[str], target: str, out_path: Path) -> None:
     # boxplot of target by group, present groups only (absent groups have no data)
-    data = [df[df[group_column] == g][target].dropna().to_numpy() for g in group_values]
+    data = [df[df[source_group_column] == g][target].dropna().to_numpy() for g in group_values]
     labels = [f"{g} (n={len(v)})" for g, v in zip(group_values, data)]
     fig, ax = plt.subplots(figsize=(10, 5))
     ax.boxplot(data, tick_labels=labels)
@@ -111,15 +112,16 @@ def run(cfg: PipelineConfig, sample: SampleSpec) -> None:
         raise FileNotFoundError(f"sample dataset not found: {sample_path}")
     df = pd.read_parquet(sample_path)
     group_column = analysis.hypothesis.group_column
+    source_group_column = sample.column_mapping.get(group_column, group_column)
     group_values = analysis.hypothesis.group_values
-    if group_column not in df.columns:
-        raise ValueError(f"group column '{group_column}' not found in sample data")
-    summary = describe(df, group_column, group_values, cfg.dataset.target, str(sample.path), sample.name, sample.role)
+    if source_group_column not in df.columns:
+        raise ValueError(f"group column '{source_group_column}' not found in sample data")
+    summary = describe(df, group_column, source_group_column, group_values, cfg.dataset.target, str(sample.path), sample.name, sample.role)
     out_dir = Path(cfg.stats.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     json_path = out_dir / "describe.json"
     json_path.write_text(summary.model_dump_json(indent=2), encoding="utf-8")
-    plot_group_distribution(df, group_column, group_values, cfg.dataset.target, out_dir / "describe_boxplot.png")
+    plot_group_distribution(df, source_group_column, group_column, group_values, cfg.dataset.target, out_dir / "describe_boxplot.png")
     plot_group_sizes(summary, out_dir / "describe_group_sizes.png")
     logger.info("describe: %d groups, total_n=%d, imbalance=%.2f -> %s", len(group_values), summary.total_n, summary.imbalance_ratio, json_path)
     write_record(

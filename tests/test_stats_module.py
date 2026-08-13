@@ -118,3 +118,44 @@ def test_stats_run_with_sample_stamps_plan(
     plan = json.loads(plan_path.read_text())
     assert plan.get("sample_name") == "taxi_estimation"
     assert plan.get("sample_role") == "estimation"
+
+
+def test_stats_run_with_sample_column_mapping(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    cfg = load_config("stats", dataset="taxi", experiment="taxi", analysis="taxi_hypothesis")
+    assert cfg.stats is not None
+    assert cfg.dataset is not None
+
+    cfg = cfg.model_copy(
+        update={"stats": cfg.stats.model_copy(update={"output_dir": str(tmp_path)})}
+    )
+
+    target_col = cfg.dataset.target
+
+    rng = np.random.default_rng(42)
+    df = pd.DataFrame(
+        {
+            "pickup_borough": ["Manhattan"] * 5 + ["Brooklyn"] * 5,
+            target_col: rng.normal(0.0, 2.0, 10),
+        }
+    )
+
+    sample_path = tmp_path / "taxi_sample.parquet"
+    df.to_parquet(sample_path, index=False)
+    monkeypatch.setattr(records, "LINEAGE_DIR", tmp_path / "lineage")
+
+    sample = SampleSpec(
+        name="taxi_diagnostic",
+        role="diagnostic",
+        path=str(sample_path),
+        column_mapping={"Borough": "pickup_borough"},
+    )
+    module.run(cfg, sample)
+
+    plan_path = tmp_path / cfg.stats.output_file
+    assert plan_path.exists()
+
+    plan = json.loads(plan_path.read_text())
+    assert plan.get("sample_name") == "taxi_diagnostic"
+    assert plan.get("sample_role") == "diagnostic"

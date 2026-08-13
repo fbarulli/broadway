@@ -23,6 +23,7 @@ def test_sample_spec_validation() -> None:
     assert spec.name == "taxi"
     assert spec.role == "estimation"
     assert spec.description is None
+    assert spec.column_mapping == {}
 
     with pytest.raises(ValidationError):
         SampleSpec(name="taxi", role="bogus", path="data/x.parquet")
@@ -52,6 +53,27 @@ def test_load_sample_round_trip(
     assert spec.role == "diagnostic"
     assert spec.path == "results/foo.parquet"
     assert spec.description == "a diagnostic sample"
+
+
+def test_load_sample_column_mapping_round_trip(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sample_dir = tmp_path / "sample"
+    sample_dir.mkdir(parents=True)
+    (sample_dir / "foo.yaml").write_text(
+        "name: foo\n"
+        "role: diagnostic\n"
+        "path: results/foo.parquet\n"
+        "description: a diagnostic sample\n"
+        "column_mapping:\n"
+        "  Borough: pickup_borough\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(loader, "CONFIGS_DIR", tmp_path)
+
+    spec = load_sample("foo")
+
+    assert spec.column_mapping == {"Borough": "pickup_borough"}
 
 
 def _setup_test_cfg(
