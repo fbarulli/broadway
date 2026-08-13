@@ -202,6 +202,8 @@ Analysis intent is authored separately via `configs/analysis/<name>.yaml` → `A
 | ExperimentDesign | Pydantic | `broadway/causal/contracts.py` |
 | ExperimentResult | Pydantic | `broadway/causal/contracts.py` |
 | BaselineResult | Pydantic | `broadway/baseline/contracts.py` |
+| ArtifactTrace | Pydantic | `broadway/trace.py` |
+| BaselineComparison | Pydantic | `broadway/evaluate/contracts.py` |
 | EvaluationResult | Pydantic | `broadway/evaluate/contracts.py` |
 | TrainingResult | Pydantic | `broadway/training/contracts.py` |
 | DatasetProfile / ColumnProfile | Pydantic | `broadway/discover/profile.py` |
@@ -214,6 +216,12 @@ Analysis intent is authored separately via `configs/analysis/<name>.yaml` → `A
 - Engineered features are defined ONCE in `project/features.py::FEATURE_SPECS`; `ENGINEERED_FEATURES`, `ENGINEERED_FEATURE_TYPES`, and `ENGINEERED_SCHEMA` are all derived from that registry (no parallel hand-maintained list).
 - Enforcement points: `read_training_data()` validates the raw frame via `build_raw_schema`; `FeaturePipeline.transform()` validates against `ENGINEERED_SCHEMA`.
 - `DatasetContract` is the accepted schema (authored/authoritative); `DatasetProfile` / `ColumnProfile` describe observed facts computed at discover time. `identifier_score` is purely descriptive — discover only logs a recommendation, it never mutates roles or the contract.
+
+## Mode enforcement
+
+The declared analytical intent (`AnalysisContract.mode`) determines which steps are valid: `stats` requires `mode == "hypothesis"`, `causal` requires `"causal"`, and `train`/`evaluate` require `"prediction"`. `baseline` dispatches on mode (prediction/hypothesis/causal). Mismatches fail early via `broadway/analysis/contracts.py::require_mode`, which also errors when the `--analysis` contract is missing. This makes `full.yaml` (which chains stats→train→evaluate across modes) temporarily non-runnable; step ordering is deferred to a later phase.
+
+`train` and `evaluate` read the persisted `BaselineResult` (from `artifacts/baseline/`) and report improvement over the baseline (`improvement_vs_baseline` in `broadway/baseline/improvement.py`). `BaselineResult` carries an `ArtifactTrace` (commit/dataset/analysis_goal) for lineage.
 
 ## Where to make changes
 

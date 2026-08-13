@@ -144,3 +144,45 @@ def test_contract_driven_lifecycle(
     assert result.reason
     assert result.cv_metrics is not None
     assert result.residuals is not None
+
+
+def test_contracts_coexist_without_duplicate_ownership() -> None:
+    """All five contracts coexist because each field has exactly one owner."""
+    from broadway.analysis.contracts import AnalysisContract
+    from broadway.baseline.contracts import BaselineResult
+    from broadway.config.schema import ColumnSchema, DatasetContract
+    from broadway.discover.profile import ColumnProfile, DatasetProfile
+
+    # accepted schema vs observed profile: role is contract-only, cardinality/identifier are profile-only
+    assert "role" in ColumnSchema.model_fields
+    assert "role" not in ColumnProfile.model_fields
+    assert "cardinality" in ColumnProfile.model_fields
+    assert "cardinality" not in ColumnSchema.model_fields
+    assert "identifier_score" in ColumnProfile.model_fields
+    assert "identifier_score" not in ColumnSchema.model_fields
+
+    # contract declares target/task/datetime; profile only observes
+    assert {"target", "task", "datetime_column"} <= set(DatasetContract.model_fields)
+    assert {"target", "task", "datetime_column"}.isdisjoint(set(DatasetProfile.model_fields))
+
+    # authored intent lives only in AnalysisContract
+    intent_fields = {
+        "goal", "row_definition", "decision_moment",
+        "available_info", "leakage_notes", "success_criterion",
+    }
+    assert intent_fields <= set(AnalysisContract.model_fields)
+    for owner in (DatasetContract, DatasetProfile, BaselineResult):
+        assert intent_fields.isdisjoint(set(owner.model_fields))
+
+    # result lives only in BaselineResult
+    result_fields = {"strategy", "metric", "value"}
+    assert result_fields <= set(BaselineResult.model_fields)
+    for owner in (DatasetContract, DatasetProfile, AnalysisContract):
+        assert result_fields.isdisjoint(set(owner.model_fields))
+
+    # feature engineering owns its own derived columns; FEATURE_SPECS is the single registry
+    from project.features import ENGINEERED_FEATURES, FEATURE_SPECS
+    contract = DatasetContract(**yaml.safe_load(_DATASET_YAML.read_text()))
+    assert tuple(FEATURE_SPECS) == ENGINEERED_FEATURES
+    derived = set(ENGINEERED_FEATURES) - set(contract.columns)
+    assert derived  # feature engineering genuinely adds columns beyond the raw contract

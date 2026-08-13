@@ -50,6 +50,8 @@ DatasetContract → FeatureSpec → TrainingConfig → Optuna → TrainingResult
 | promotion decision | candidate vs champion verdict | champion model |
 | champion model | promoted artifact | prediction |
 
+Declared intent (`AnalysisContract`) gates which steps are valid: stats→hypothesis, causal→causal, train/evaluate→prediction.
+
 ---
 
 ## 1. Pipeline CLI — `ds-pipeline`
@@ -82,11 +84,11 @@ Every step except `discover` takes the same three flags.
 | contracts | `ds-pipeline contracts …` | pass/fail validation | works |
 | eda | `ds-pipeline eda …` | `artifacts/reports/eda.html` | works |
 | features | `ds-pipeline features …` | fitted feature pipeline | works |
-| stats | `ds-pipeline stats …` | `AnalysisPlan` JSON | works (uses stats library) |
-| causal | `ds-pipeline causal --dataset <d> --experiment <e>` | `ExperimentDesign` (power analysis) | separate mode (not in `full`) |
+| stats | `ds-pipeline stats --dataset <d> --analysis <a>` | `AnalysisPlan` JSON | works (uses stats library) |
+| causal | `ds-pipeline causal --dataset <d> --analysis <a>` | `ExperimentDesign` (power analysis) | separate mode (not in `full`) |
 | baseline | `ds-pipeline baseline --dataset <d> --analysis <a>` | `BaselineResult` → `artifacts/baseline/` | works |
-| train | `ds-pipeline train …` | `TrainingResult` → MLflow model/artifacts | works |
-| evaluate | `ds-pipeline evaluate …` | `EvaluationResult` + promotion decision | works |
+| train | `ds-pipeline train --dataset <d> --analysis <a>` | `TrainingResult` → MLflow model/artifacts | works |
+| evaluate | `ds-pipeline evaluate --dataset <d> --analysis <a>` | `EvaluationResult` + promotion decision | works |
 | full | `ds-pipeline full …` | all steps in `configs/step/full.yaml` | works |
 
 `causal` is a separate analysis mode, run on its own — it is not part of
@@ -95,6 +97,8 @@ stats, train, evaluate.
 
 `baseline` is guidance (a naive result to beat), not a hard gate — it is not
 part of `full`.
+
+`stats`, `causal`, `train`, and `evaluate` now require `--analysis <name>`; `train`/`evaluate` report improvement over the persisted baseline.
 
 ---
 
@@ -170,6 +174,9 @@ configs/
   step/<step>.yaml         # per-step knobs + stats/train/features SSOT
   analysis/<name>.yaml     # authored analytical intent (--analysis <name>)
 ```
+
+`configs/analysis/` holds one YAML per analytical use case (e.g. `taxi.yaml`,
+`taxi_hypothesis.yaml`, `taxi_causal.yaml`).
 
 YAML → Pydantic (`src/broadway/config/schema.py`) → `load_config()`. No
 defaults, no `get(key, default)`, no hardcoded values anywhere.
