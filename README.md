@@ -83,17 +83,18 @@ Every step except `discover` takes the same three flags.
 | Step | Command | Produces | Status |
 |------|---------|----------|--------|
 | discover | `ds-pipeline discover --csv … --target … --task …` | `configs/dataset/<name>.yaml` + `artifacts/discover/profile.json` | works |
-| etl | `ds-pipeline etl --dataset <d> --experiment <e>` | cleaned + split parquet | works |
+| ingest | `ds-pipeline ingest` | `data/processed/training_data.parquet` (~8.5M rows, 6 cols) + `ingest:taxi` lineage record | works (Polars; CI-gated) |
+| etl | `ds-pipeline etl --dataset <d> --experiment <e>` | cleaned + split parquet + `join`/`lookup_value` audits | works |
 | contracts | `ds-pipeline contracts …` | pass/fail validation | works |
 | eda | `ds-pipeline eda …` | `reports/eda.html` | works |
 | features | `ds-pipeline features …` | fitted feature pipeline | works |
-| stats | `ds-pipeline stats --dataset <d> --analysis <a>` | `AnalysisPlan` JSON + `reports/results/describe.md` + figures | works (uses stats library) |
+| stats | `ds-pipeline stats {run,describe} --dataset <d> --analysis <a> --sample <name>` | `AnalysisPlan` JSON + `reports/results/describe.md` + figures | works (requires `--sample`) |
 | causal | `ds-pipeline causal --dataset <d> --analysis <a>` | `ExperimentDesign` (power analysis) | separate mode (not in `full`) |
 | baseline | `ds-pipeline baseline --dataset <d> --analysis <a>` | `BaselineResult` → `artifacts/baseline/` | works |
 | train | `ds-pipeline train --dataset <d> --analysis <a>` | `TrainingResult` → MLflow model/artifacts | works |
 | evaluate | `ds-pipeline evaluate --dataset <d> --analysis <a>` | `EvaluationResult` + promotion decision | works |
 | full | `ds-pipeline full …` | dispatches to the mode flow (prediction/hypothesis/causal) based on `--analysis` | works |
-| lineage | `ds-pipeline lineage --analysis <a> --dataset <d>` | `reports/graph.json` + `graph.md` + run-state summary | works (reporting, not a pipeline step) |
+| lineage | `ds-pipeline lineage --analysis <a> --dataset <d>` | `reports/lineage/graph.json` + `graph.md` + run-state summary | works (reporting, not a pipeline step) |
 | report | `ds-pipeline report --analysis <a> --dataset <d>` | `reports/index.md` (navigable results hierarchy) | works (reporting, not a pipeline step) |
 
 `causal` is a separate analysis mode, run on its own — it is not part of
@@ -103,7 +104,7 @@ resolves one of `configs/flow/{prediction,hypothesis,causal}.yaml`.
 `baseline` is guidance (a naive result to beat), not a hard gate — it is part
 of each mode flow's prefix.
 
-`stats`, `causal`, `train`, and `evaluate` now require `--analysis <name>`; `train`/`evaluate` report improvement over the persisted baseline.
+`stats` takes a `run`/`describe` subcommand and requires `--sample <name>`; `causal`, `train`, and `evaluate` require `--analysis <name>`; `train`/`evaluate` report improvement over the persisted baseline.
 
 ### Decision + Lineage
 
@@ -112,14 +113,14 @@ hand-maintaining a diagram:
 
 ```bash
 ds-pipeline lineage --analysis taxi --dataset taxi
-# → reports/graph.json + graph.md (Mermaid) + run-state summary
+# → reports/lineage/graph.json + graph.md (Mermaid) + run-state summary
 ```
 
 Each step writes a `LineageRecord` sidecar under `artifacts/lineage/records/`
 after saving its result; the `lineage` command assembles them into the chain
-`dataset → profile → analysis → baseline → … → decision`. `DatasetSlice`s are
-authored config (`configs/slice/`); `DecisionRecord`s are runtime events
-(`artifacts/lineage/decisions/`).
+`dataset → ingest → join → {etl, lookup_value} → analysis → baseline → … → decision`.
+`DatasetSlice`s are authored config (`configs/slice/`); `DecisionRecord`s are
+runtime events (`artifacts/lineage/decisions/`).
 
 ### Results reports — `reports/`
 
@@ -136,7 +137,7 @@ reports/
   index.md            # entry point: question, latest result, next test, status table
   results/<step>.md   # one markdown result per stats step (describe, anova, ...)
   figures/*.png       # charts (describe_boxplot.png, describe_group_sizes.png)
-  lineage/graph.md    # run graph (from the lineage command)
+  lineage/graph.{md,json}  # run graph (from the lineage command)
 ```
 
 The step order is authored once in `configs/flow/stats_sequence.yaml`
@@ -146,8 +147,8 @@ done when `results/<step>.md` exists and points to the next pending test.
 
 ### Git-track policy
 
-- Tracked: `reports/*.md` and `reports/figures/*.png` (the human-facing surface).
-- Ignored: `artifacts/`, `data/processed/`, `data/raw/`, `results/` (machine evidence + caches).
+- Tracked: `reports/**` (index.md, results/*.md, figures/*.png, lineage/graph.md + graph.json).
+- Ignored: `artifacts/`, `data/raw/`, `data/processed/`, `/results/` (machine evidence + caches).
 
 ---
 
@@ -208,7 +209,7 @@ DATA_MODE=live uv run python -m project.scripts.12_lgbm_baseline
 ## 4. Tests
 
 ```bash
-uv run pytest              # 82 tests: library (synthetic) + data layer (real .head(1000)/cache)
+uv run pytest              # 293 tests: library (synthetic) + data layer (real .head(1000)/cache)
 ```
 
 ---
@@ -222,6 +223,8 @@ configs/
   environment/<name>.yaml  # development / staging / production
   step/<step>.yaml         # per-step knobs + stats/train/features SSOT
   flow/<mode>.yaml         # mode-specific step lists (prediction/hypothesis/causal)
+  flow/stats_sequence.yaml # ordered stats-step list rendered into reports/index.md
+  sample/<name>.yaml       # SampleSpec (role, path, column_mapping) for `stats --sample`
   analysis/<name>.yaml     # authored analytical intent (--analysis <name>)
 ```
 

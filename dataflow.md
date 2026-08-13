@@ -17,8 +17,8 @@ DatasetContract → FeatureSpec → TrainingConfig → Optuna → TrainingResult
 ## Artifacts
 
 Typed execution outputs live under `artifacts/<step>/` (training/, evaluation/,
-stats/, causal/), human-facing HTML reports live under `reports/`,
-and processed data stays under `data/processed/`.
+stats/, causal/), human-facing reports (markdown + figures) live under
+`reports/`, and processed data stays under `data/processed/`.
 
 `artifacts/` holds machine-readable evidence/provenance; `reports/` holds
 human-facing derived views (regenerable from records + configs).
@@ -29,7 +29,7 @@ result per stats step), `figures/` (charts), and `lineage/` (run graph). The
 `report` command renders `index.md` from `configs/flow/stats_sequence.yaml`
 (`StatsSequence`) and the per-step renderers in
 `src/broadway/reports/registry.py`. Outputs are split by kind: machine JSON →
-`artifacts/`, markdown → `reports/results/`, images → `reports/figures/`.
+`artifacts/stats/`, markdown → `reports/results/`, images → `reports/figures/`.
 
 `causal` is a separate analysis mode, not part of this flow and not part of
 `full`. `full` is a thin dispatcher: it reads `AnalysisContract.mode` and
@@ -67,6 +67,16 @@ broadway/
     contracts/              # contract-generated schema + role selectors
       pandera.py            # build_raw_schema(contract) -> pa.DataFrameSchema (generated)
       selectors.py          # feature/datetime/target column selectors over DatasetContract
+    data/                   # data layer: format detection, joins, canonicalization, splits
+      loader.py             # load() / load_with_audit(): csv/parquet/excel → left-join lookups + audits
+      join_audit.py         # JoinAudit / audit_join(): key-match completeness
+      lookup_value_audit.py # LookupValueAudit / audit_lookup_values(): matched-value quality (sentinel/na_values)
+      cleaner.py            # clean() / canonicalize(): duplicates, missing encodings, datetime/numeric parsing
+      splitter.py           # split(): time/random/stratified train/val split
+    etl/                    # ingest (raw → processed) + config-driven etl pipeline step
+      process.py            # process_data(): yellow_tripdata_*.parquet → training_data.parquet (ingest step)
+      process_config.py     # reads configs/project/taxi.yaml + configs/step/etl.yaml
+      module.py             # etl step: load_with_audit → canonicalize → validate → split → join/lookup_value lineage
     stats/                  # pandas/numpy stats library (no Spark)
       base.py               # stratified_sample
       plan.py               # AnalysisPlan (Pydantic model) + save/load
@@ -75,7 +85,8 @@ broadway/
       anova.py              # run_anova, run_welch, run_kruskal
       post_hoc.py           # games_howell
       regression.py         # fit_ols, fit_robust, bp_jb
-      diagnostics.py        # bp_test, jb_test, durbin_watson, plot_residuals
+      diagnostic_models.py  # DiagnosticResult (question → evidence → ramification)
+      diagnostics.py        # bp_test, jb_test, durbin_watson, plot_residuals, plot_residuals_vs_fitted, mean_specification_diagnostic
       time_series.py        # durbin_watson_test, plot_acf
       baseline.py           # train_lgbm, evaluate
       module.py             # pipeline step: build groups → run_anova → save_plan
@@ -146,6 +157,7 @@ broadway/
     features.yaml           # feature-engineer params SSOT
   configs/flow/<mode>.yaml  # mode-specific step lists (prediction/hypothesis/causal)
   configs/flow/stats_sequence.yaml  # ordered stats-step list for reports/index.md (StatsSequence)
+  configs/sample/<name>.yaml  # SampleSpec (role/path/column_mapping) for `stats --sample`
   configs/analysis/<name>.yaml  # authored analytical intent (AnalysisContract)
   tests/                    # test_base.py, test_anova.py, ... (pytest)
   results/                  # mode-keyed caches + reports (gitignored artifacts)
@@ -161,6 +173,11 @@ broadway/
 | `data.generate_sample_cache()` | `generate_sample_cache` (streaming) | `project/data.py` |
 | `data.inspect_schema()` | `inspect_schema` | `project/data.py` |
 | `data.write_quality_report()` | `write_quality_report` | `project/data.py` |
+| `loader.load(dataset)` | `load` | `src/broadway/data/loader.py` |
+| `loader.load_with_audit(dataset)` | `load_with_audit` | `src/broadway/data/loader.py` |
+| `join_audit.audit_join(df, ...)` | `audit_join` | `src/broadway/data/join_audit.py` |
+| `lookup_value_audit.audit_lookup_values(...)` | `audit_lookup_values` | `src/broadway/data/lookup_value_audit.py` |
+| `sample.load_sample(name)` | `load_sample` | `src/broadway/lineage/sample.py` |
 | `anova.run_anova(groups)` | `run_anova` | `src/broadway/stats/anova.py` |
 | `anova.run_welch(groups)` | `run_welch` | `src/broadway/stats/anova.py` |
 | `anova.run_kruskal(groups)` | `run_kruskal` | `src/broadway/stats/anova.py` |
@@ -170,9 +187,15 @@ broadway/
 | `regression.fit_ols(df, formula)` | `fit_ols` | `src/broadway/stats/regression.py` |
 | `regression.bp_jb(model)` | `bp_jb` | `src/broadway/stats/regression.py` |
 | `diagnostics.durbin_watson(resid)` | `durbin_watson` | `src/broadway/stats/diagnostics.py` |
+| `diagnostics.plot_residuals_vs_fitted(model, out)` | `plot_residuals_vs_fitted` | `src/broadway/stats/diagnostics.py` |
+| `diagnostics.mean_specification_diagnostic(model, out)` | `mean_specification_diagnostic` | `src/broadway/stats/diagnostics.py` |
 | `time_series.plot_acf(resid, ...)` | `plot_acf` | `src/broadway/stats/time_series.py` |
 | `baseline.train_lgbm(X, y, ...)` | `train_lgbm` | `src/broadway/stats/baseline.py` |
 | `baseline.evaluate(model, ...)` | `evaluate` | `src/broadway/stats/baseline.py` |
+| `etl.process.process_data()` | `process_data` | `src/broadway/etl/process.py` |
+| `reports.describe.render(summary)` | `render` | `src/broadway/reports/describe.py` |
+| `reports.describe.headline(summary)` | `headline` | `src/broadway/reports/describe.py` |
+| `reports.index.render_index(question, stats_dir)` | `render_index` | `src/broadway/reports/index.py` |
 
 ## Data flow
 
@@ -193,6 +216,24 @@ scripts (01..12)
         ▼
 results/*.json / *.png  (AnalysisPlan JSON, residual plots, ACF plot)
 ```
+
+The pipeline CLI (`ds-pipeline`) runs a separate data flow, from raw parquet
+through ingest and the etl step:
+
+```
+data/raw/yellow_tripdata_*.parquet
+        │  ingest (process_data: Polars scan → CI-gated sample → clean → save)
+        ▼
+data/processed/training_data.parquet     (~8.5M rows, 6 cols)
+        │  etl (load_with_audit → canonicalize → validate → split)
+        ├──▶ data/processed/<name>_join_audit.json           (JoinAudit)
+        ├──▶ data/processed/<name>_lookup_value_audit.json   (LookupValueAudit)
+        ├──▶ data/processed/<name>_canonical.parquet         (canonical dataset)
+        └──▶ data/processed/train.parquet / val.parquet      (or training_data.parquet)
+```
+
+`ingest` and `etl` sample only when `CI=true` (`ci_sample_size`, gated via
+`sample_for_ci` / the etl step); local runs canonicalize the full dataset.
 
 ## Config SSOT
 
@@ -257,6 +298,7 @@ Analysis intent is authored separately via `configs/analysis/<name>.yaml` → `A
 - Engineered features are defined ONCE in `project/features.py::FEATURE_SPECS`; `ENGINEERED_FEATURES`, `ENGINEERED_FEATURE_TYPES`, and `ENGINEERED_SCHEMA` are all derived from that registry (no parallel hand-maintained list).
 - Enforcement points: `read_training_data()` validates the raw frame via `build_raw_schema`; `FeaturePipeline.transform()` validates against `ENGINEERED_SCHEMA`.
 - `DatasetContract` is the accepted schema (authored/authoritative); `DatasetProfile` / `ColumnProfile` describe observed facts computed at discover time. `identifier_score` is purely descriptive — discover only logs a recommendation, it never mutates roles or the contract.
+- `DatasetContract` carries no `row_count` — observed counts live in `DatasetProfile` (discover) and `TransformAudit` (etl lineage). Datetime dtypes are normalized to canonical `datetime64` (`schema.py::normalize_dtype`).
 - Lookup ingestion reads lookups with `keep_default_na=False` plus a per-lookup `na_values` policy, so nulls are attributable to the authored config. `JoinAudit` measures key completeness, while `LookupValueAudit` measures matched-value quality and records the `na_values` evidence.
 
 ## Mode enforcement
@@ -272,8 +314,8 @@ hand-maintained diagram. Step modules write a `LineageRecord` sidecar after
 saving their result; the `lineage` command assembles them into a graph and a
 run-state summary.
 
-The node chain runs `DatasetRef → DatasetProfile → AnalysisContract →
-BaselineResult → DatasetSlice → DecisionRecord`, with `stats`/`causal`/
+The node chain begins `dataset → ingest → join → {etl, lookup_value}`, then
+`analysis → baseline → … → decision`, with `describe`/`stats`/`causal`/
 `training`/`evaluation` nodes joining as their sidecar records are produced.
 
 - Sidecars: after saving its artifact, each step module calls `write_record`
@@ -285,13 +327,12 @@ BaselineResult → DatasetSlice → DecisionRecord`, with `stats`/`causal`/
 - `DatasetSlice` is authored config (`configs/slice/<name>.yaml`);
   `DecisionRecord` is a runtime event in `artifacts/lineage/decisions/<id>.json`.
 - `ds-pipeline lineage --analysis <n> --dataset <d>` builds the graph
-  (`broadway/lineage/graph.py::build_graph`), writes `reports/graph.json`
+  (`broadway/lineage/graph.py::build_graph`), writes `reports/lineage/graph.json`
   + `graph.md` (Mermaid), and prints a run-state summary (goal, stage,
   open/resolved decisions, `not_yet_run`, `ran_but_output_missing`).
-- `not_yet_run` is derived only from lineage-emitting steps
-  (`profile`/`baseline`/`stats`/`causal`/`training`/`evaluation`) for the
-  active mode flow (`broadway/lineage/state.py::LINEAGE_STEPS`);
-  `etl`/`contracts`/`eda`/`features` are never listed.
+- `not_yet_run` is derived only from lineage-emitting steps for the active
+  mode flow (`broadway/lineage/state.py::LINEAGE_STEPS`), e.g. hypothesis =
+  `profile`/`etl`/`baseline`/`stats`; `contracts`/`eda` are never listed.
 - `ran_but_output_missing` flags steps whose sidecar record exists but whose
   artifact file is absent — an integrity error, not a normal "not yet produced".
 
