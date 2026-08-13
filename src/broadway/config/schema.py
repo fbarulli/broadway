@@ -44,6 +44,7 @@ class LookupSpec(BaseModel):
     path: str
     key: str
     value_policies: dict[str, LookupValuePolicy] = {}
+    na_values: list[str] = []
 
 
 class DatasetContract(BaseModel):

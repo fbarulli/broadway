@@ -42,7 +42,7 @@ def load_with_audit(dataset: DatasetContract) -> tuple[pd.DataFrame, list[JoinAu
     value_audits: list[LookupValueAudit] = []
     for col, lookup in dataset.lookup_tables.items():
         right_on = lookup.key
-        lookup_df = pd.read_csv(lookup.path)
+        lookup_df = pd.read_csv(lookup.path, keep_default_na=False, na_values=lookup.na_values)
         audit = audit_join(df, col, lookup, lookup_df)
         audits.append(audit)
         merged_names = {c: (c if c not in df.columns else c + "_lookup") for c in lookup_df.columns}

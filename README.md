@@ -202,6 +202,10 @@ configs/
 YAML → Pydantic (`src/broadway/config/schema.py`) → `load_config()`. No
 defaults, no `get(key, default)`, no hardcoded values anywhere.
 
+`lookup_tables` entries support `value_policies` (per-column sentinel values)
+and `na_values` (authored NA tokens) — both owned by the config, not inferred
+from pandas defaults.
+
 Typed step outputs follow `artifacts/<step>/` and reports follow
 `artifacts/reports/`.
 

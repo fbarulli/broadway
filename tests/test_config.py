@@ -139,3 +139,21 @@ def test_lookup_spec_value_policies_parse() -> None:
 def test_lookup_spec_value_policies_default_empty() -> None:
     spec = LookupSpec(path="lookup.csv", key="LocationID")
     assert spec.value_policies == {}
+
+
+def test_lookup_spec_na_values_parse() -> None:
+    spec = LookupSpec(**yaml.safe_load(
+        """
+        path: lookup.csv
+        key: LocationID
+        na_values:
+          - ""
+          - N/A
+        """
+    ))
+    assert spec.na_values == ["", "N/A"]
+
+
+def test_lookup_spec_na_values_default_empty() -> None:
+    spec = LookupSpec(path="lookup.csv", key="LocationID")
+    assert spec.na_values == []

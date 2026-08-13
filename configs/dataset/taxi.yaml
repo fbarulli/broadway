@@ -32,6 +32,13 @@ lookup_tables:
       Borough:
         sentinel_values:
           - "Unknown"
+    na_values:
+      - ""
+      - NA
+      - N/A
+      - "null"
+      - "None"
+      - "?"
   dropoff_location_id:
     path: data/raw/taxi_zone_lookup.csv
     key: LocationID
@@ -39,6 +46,13 @@ lookup_tables:
       Borough:
         sentinel_values:
           - "Unknown"
+    na_values:
+      - ""
+      - NA
+      - N/A
+      - "null"
+      - "None"
+      - "?"
 name: taxi
 path: data/processed/training_data.parquet
 target: trip_duration_minutes

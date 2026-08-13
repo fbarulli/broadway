@@ -1,9 +1,19 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pandas as pd
 import pytest
 
-from broadway.config.schema import LookupSpec, LookupValuePolicy
+from broadway.config.schema import (
+    ColumnRole,
+    ColumnSchema,
+    DatasetContract,
+    LookupSpec,
+    LookupValuePolicy,
+    TaskType,
+)
+from broadway.data.loader import load_with_audit
 from broadway.data.lookup_value_audit import audit_lookup_values
 
 
@@ -87,3 +97,45 @@ def test_no_sentinels_yields_empty_counts() -> None:
 def test_every_non_key_column_gets_an_entry() -> None:
     audit = _audit()
     assert {c.column for c in audit.columns} == {"Borough", "Zone"}
+
+
+def _na_dataset(tmp_path: Path, na_values: list[str]) -> tuple[DatasetContract, Path]:
+    lookup_csv = tmp_path / "lookup.csv"
+    lookup_csv.write_text(
+        "LocationID,Borough,Zone\n1,N/A,\n2,,N/A\n",
+        encoding="utf-8",
+    )
+    raw_csv = tmp_path / "raw.csv"
+    pd.DataFrame({"area": [1, 2]}).to_csv(raw_csv, index=False)
+    dataset = DatasetContract(
+        name="test",
+        path=str(raw_csv),
+        target="area",
+        task=TaskType.REGRESSION,
+        datetime_column=None,
+        columns={"area": ColumnSchema(dtype="int64", null_count=0, role=ColumnRole.FEATURE)},
+        lookup_tables={
+            "area": LookupSpec(path=str(lookup_csv), key="LocationID", na_values=na_values)
+        },
+    )
+    return dataset, lookup_csv
+
+
+def test_keep_default_na_false_preserves_literal_tokens(tmp_path: Path) -> None:
+    dataset, _ = _na_dataset(tmp_path, na_values=[])
+    _, _, value_audits = load_with_audit(dataset)
+    audit = value_audits[0]
+
+    assert audit.na_values == []
+    assert _column(audit, "Borough").null_count == 0
+    assert _column(audit, "Zone").null_count == 0
+
+
+def test_na_values_only_converts_authored_tokens(tmp_path: Path) -> None:
+    dataset, _ = _na_dataset(tmp_path, na_values=["N/A"])
+    _, _, value_audits = load_with_audit(dataset)
+    audit = value_audits[0]
+
+    assert audit.na_values == ["N/A"]
+    assert _column(audit, "Borough").null_count == 1
+    assert _column(audit, "Zone").null_count == 1

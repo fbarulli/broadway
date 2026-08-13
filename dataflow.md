@@ -238,6 +238,7 @@ Analysis intent is authored separately via `configs/analysis/<name>.yaml` → `A
 - Engineered features are defined ONCE in `project/features.py::FEATURE_SPECS`; `ENGINEERED_FEATURES`, `ENGINEERED_FEATURE_TYPES`, and `ENGINEERED_SCHEMA` are all derived from that registry (no parallel hand-maintained list).
 - Enforcement points: `read_training_data()` validates the raw frame via `build_raw_schema`; `FeaturePipeline.transform()` validates against `ENGINEERED_SCHEMA`.
 - `DatasetContract` is the accepted schema (authored/authoritative); `DatasetProfile` / `ColumnProfile` describe observed facts computed at discover time. `identifier_score` is purely descriptive — discover only logs a recommendation, it never mutates roles or the contract.
+- Lookup ingestion reads lookups with `keep_default_na=False` plus a per-lookup `na_values` policy, so nulls are attributable to the authored config. `JoinAudit` measures key completeness, while `LookupValueAudit` measures matched-value quality and records the `na_values` evidence.
 
 ## Mode enforcement
 

@@ -21,6 +21,7 @@ class LookupValueAudit(BaseModel):
     lookup: str                      # left key, e.g. "pickup_location_id"
     lookup_path: str
     matched: int
+    na_values: list[str]
     columns: list[LookupColumnValueAudit]
 
 
@@ -66,5 +67,6 @@ def audit_lookup_values(
         lookup=left_key,
         lookup_path=lookup.path,
         matched=matched,
+        na_values=lookup.na_values,
         columns=columns,
     )
