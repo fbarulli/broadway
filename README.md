@@ -83,8 +83,10 @@ Every step except `discover` takes the same three flags.
 | Step | Command | Produces | Status |
 |------|---------|----------|--------|
 | discover | `ds-pipeline discover --csv … --target … --task …` | `configs/dataset/<name>.yaml` + `artifacts/discover/profile.json` | works |
+| init | `ds-pipeline init <csv> --name <n> …` | `configs/{dataset,analysis,experiment}/<n>.yaml` + `artifacts/discover/profile.json` + profile lineage sidecar | works (interactive or flag-driven) |
+| profile | `ds-pipeline profile --dataset <d>` | `artifacts/discover/profile.json` (re-profile observed facts) | works |
 | ingest | `ds-pipeline ingest` | `data/processed/training_data.parquet` (~8.5M rows, 6 cols) + `ingest:taxi` lineage record | works (Polars; CI-gated) |
-| etl | `ds-pipeline etl --dataset <d> --experiment <e>` | cleaned + split parquet + `join`/`lookup_value` audits | works |
+| etl | `ds-pipeline etl --dataset <d> --experiment <e>` | cleaned + split parquet + `JoinAudit`/`LookupValueAudit` (`join`/`lookup_value` lineage nodes) | works |
 | contracts | `ds-pipeline contracts …` | pass/fail validation | works |
 | eda | `ds-pipeline eda …` | `reports/eda.html` | works |
 | features | `ds-pipeline features …` | fitted feature pipeline | works |
@@ -186,6 +188,11 @@ uv run python -c "from project import data; data.generate_sample_cache()"
 
 (There is no `03` — it was a superseded IQR experiment, deliberately dropped.)
 
+The OLS diagnostics surface is typed: `DiagnosticResult`
+(`src/broadway/stats/diagnostic_models.py`) plus
+`plot_residuals_vs_fitted` and `mean_specification_diagnostic`
+(`src/broadway/stats/diagnostics.py`) — see `src/broadway/stats/API.md`.
+
 ---
 
 ## 3. Mode system — `DATA_MODE`
@@ -224,8 +231,10 @@ configs/
   step/<step>.yaml         # per-step knobs + stats/train/features SSOT
   flow/<mode>.yaml         # mode-specific step lists (prediction/hypothesis/causal)
   flow/stats_sequence.yaml # ordered stats-step list rendered into reports/index.md
-  sample/<name>.yaml       # SampleSpec (role, path, column_mapping) for `stats --sample`
+  sample/<name>.yaml       # SampleSpec (name, role, path, description, column_mapping) for `stats --sample`
   analysis/<name>.yaml     # authored analytical intent (--analysis <name>)
+  project/<name>.yaml      # dataset ingest knobs (configs/project/taxi.yaml)
+  slice/<name>.yaml        # authored DatasetSlice (configs/slice/)
 ```
 
 `configs/analysis/` holds one YAML per analytical use case (e.g. `taxi.yaml`,
@@ -233,6 +242,11 @@ configs/
 
 YAML → Pydantic (`src/broadway/config/schema.py`) → `load_config()`. No
 defaults, no `get(key, default)`, no hardcoded values anywhere.
+
+`DatasetContract` carries no `row_count` — observed counts live in
+`DatasetProfile` (discover) and `TransformAudit` (etl). Datetime dtypes are
+normalized to canonical `datetime64` at the schema boundary
+(`schema.py::normalize_dtype`).
 
 `lookup_tables` entries support `value_policies` (per-column sentinel values)
 and `na_values` (authored NA tokens) — both owned by the config, not inferred

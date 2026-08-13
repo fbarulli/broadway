@@ -61,9 +61,15 @@ ds-pipeline baseline --dataset <d> --analysis <a>
 broadway/
   src/broadway/
     config/schema.py        # Pydantic models (DatasetContract, StatsStep, TrainStep, FeaturesStep, FullStep, FlowConfig, ...)
+    analysis/               # authored analytical intent + mode enforcement
+      contracts.py          # AnalysisContract / HypothesisConfig / AnalysisMode + require_mode
     discover/               # read CSV/parquet → infer contract + observed profile
       module.py             # run(): writes configs/dataset/<name>.yaml + artifacts/discover/profile.json
       profile.py            # DatasetProfile / ColumnProfile (observed facts; identifier_score is descriptive only)
+    onboard/                # onboarding/scaffolding (ds-pipeline init) + semantic inference hints
+      infer.py              # dtype/null/cardinality/identifier/datetime hints (evidence only)
+      models.py             # InferenceReport (typed hints)
+      module.py             # init(): writes configs/{dataset,analysis,experiment} + profile sidecar
     contracts/              # contract-generated schema + role selectors
       pandera.py            # build_raw_schema(contract) -> pa.DataFrameSchema (generated)
       selectors.py          # feature/datetime/target column selectors over DatasetContract
@@ -73,6 +79,9 @@ broadway/
       lookup_value_audit.py # LookupValueAudit / audit_lookup_values(): matched-value quality (sentinel/na_values)
       cleaner.py            # clean() / canonicalize(): duplicates, missing encodings, datetime/numeric parsing
       splitter.py           # split(): time/random/stratified train/val split
+    cleaning/               # deterministic structural cleaning (representation only, no domain cleaning)
+      models.py             # ParseFailure / StructuralCleanResult (typed evidence)
+      structural.py         # standardize_missing / parse_datetime / parse_numeric
     etl/                    # ingest (raw → processed) + config-driven etl pipeline step
       process.py            # process_data(): yellow_tripdata_*.parquet → training_data.parquet (ingest step)
       process_config.py     # reads configs/project/taxi.yaml + configs/step/etl.yaml
@@ -96,14 +105,14 @@ broadway/
       assignment.py         # assign_randomly, assign_stratified
       analysis.py           # analyze_two_groups (Welch's t-test, Cohen's d, 95% CI)
       multiple.py           # correct_pvalues (bonferroni, fdr_bh)
-       sequential.py, hte.py # out-of-scope docstring stubs
-       module.py             # pipeline step: reads cfg.causal, persists ExperimentDesign to artifacts/causal/
+      sequential.py, hte.py # out-of-scope docstring stubs
+      module.py             # pipeline step: reads cfg.causal, persists ExperimentDesign to artifacts/causal/
     baseline/               # guidance baseline, dispatched on AnalysisContract.mode
-       contracts.py          # BaselineResult (Pydantic) + save/load
-       prediction.py         # majority-class / mean baselines (sklearn accuracy/MAE)
-       hypothesis.py         # naive effect = range of group means
-       causal.py             # power-analysis sample size (reuses design_experiment)
-       module.py             # pipeline step: dispatches on mode, persists BaselineResult to artifacts/baseline/
+      contracts.py          # BaselineResult (Pydantic) + save/load
+      prediction.py         # majority-class / mean baselines (sklearn accuracy/MAE)
+      hypothesis.py         # naive effect = range of group means
+      causal.py             # power-analysis sample size (reuses design_experiment)
+      module.py             # pipeline step: dispatches on mode, persists BaselineResult to artifacts/baseline/
     features/               # generic feature machinery + the config-driven pipeline step
       schema.py             # FeatureSpec, build_engineered_schema
       ml_encodings.py, frequency.py   # generic target/frequency encodings

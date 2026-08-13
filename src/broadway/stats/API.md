@@ -26,21 +26,31 @@ def stratified_sample(df: pd.DataFrame, group_col: str, frac: float, random_stat
     # stratified sample preserving per-group proportions; returns reset-index frame
 ```
 
+## guards.py
+
+```python
+def validate_groups(groups: dict[str, np.ndarray]) -> list[str]
+    # fail loudly on empty / non-finite / zero-variance / fewer-than-2 groups;
+    # returns non-fatal warnings (e.g. "group 'x' has zero variance")
+```
+
 ## plan.py
 
 ```python
-@dataclass
-class AnalysisPlan:
+class AnalysisPlan(BaseModel):
     script: str                    # e.g. "04_anova"
     analysis_type: str             # "group_comparison" | "regression" | "timeseries"
     test_name: str                 # "one-way ANOVA", "Welch's ANOVA", ...
-    statistics: dict               # {"p_value": ..., "statistic": ..., ...}
-    effect_sizes: dict             # {"eta_squared": ..., "omega_squared": ...} | {"cohens_d": ..., "hedges_g": ...}
-    threshold_context: dict        # {"imbalance_ratio": ..., "any_small_group": ...}
+    statistics: dict[str, float]   # {"p_value": ..., "statistic": ..., ...}
+    effect_sizes: dict[str, float] # {"eta_squared": ..., "omega_squared": ...} | {"cohens_d": ..., "hedges_g": ...}
+    threshold_context: dict[str, float | bool]  # {"imbalance_ratio": ..., "any_small_group": ...}
     reason: list[str]              # human-readable evidence trail
     warnings: list[str]            # "underpowered", "n imbalance", ...
     passed: bool                   # omnibus test passed at alpha
     next_step: str | None          # which analysis follows from this one
+    analysis_goal: str | None = None     # from the AnalysisContract
+    sample_name: str | None = None       # SampleSpec name (when run with --sample)
+    sample_role: SampleRole | None = None
 
 def save_plan(plan: AnalysisPlan, path: Path) -> None
 def load_plan(path: Path) -> AnalysisPlan
@@ -153,8 +163,45 @@ def evaluate(model, X: pd.DataFrame, y: np.ndarray, tail_quantile: float) -> dic
     # {"mae": ..., "rmse": ..., "tail_mae": ...}
 ```
 
+## describe.py (pipeline step)
+
+```python
+class GroupStat(BaseModel):
+    n: int
+    mean: float | None
+    std: float | None
+
+class GroupSummary(BaseModel):
+    group_column: str
+    source_group_column: str     # column actually present in the sample (after column_mapping)
+    target: str
+    total_n: int
+    source_path: str
+    sample_name: str
+    sample_role: SampleRole
+    groups: dict[str, GroupStat]  # ALL configured groups, incl. n=0
+    absent_groups: list[str]
+    imbalance_ratio: float        # evidence only — NO balanced/unbalanced verdict
+    proportions: dict[str, float]
+    warnings: list[str]
+
+def describe(df: pd.DataFrame, group_column: str, source_group_column: str, group_values: list[str], target: str, source_path: str, sample_name: str, sample_role: SampleRole) -> GroupSummary
+
+def plot_group_distribution(df: pd.DataFrame, source_group_column: str, group_column: str, group_values: list[str], target: str, out_path: Path) -> None
+    # boxplot of target by group → save PNG
+
+def plot_group_sizes(summary: GroupSummary, out_path: Path) -> None
+    # bar chart of group sizes (imbalance evidence) → save PNG
+
+def run(cfg: PipelineConfig, sample: SampleSpec) -> None
+    # requires a hypothesis block; writes describe.json + reports/results/describe.md
+    # + figures + a describe lineage sidecar
+```
+
 ## module.py (pipeline step)
 
-`run(cfg: PipelineConfig) -> None` — orchestrates the library against the
-configured dataset: build groups, run ANOVA (+ assumptions + post-hoc when
-applicable), save an `AnalysisPlan` JSON to `cfg.stats.output_dir`.
+`run(cfg: PipelineConfig, sample: SampleSpec | None = None) -> None` — requires a
+`hypothesis` block (`group_column`, `group_values`); builds groups from the
+canonical dataset (or a `--sample` parquet with `column_mapping` applied), runs
+`run_anova`, saves an `AnalysisPlan` JSON to `cfg.stats.output_dir`, and writes a
+`stats` lineage sidecar.
