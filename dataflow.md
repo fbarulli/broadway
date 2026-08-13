@@ -1,287 +1,181 @@
 # dataflow
 
-Architecture map for the taxi stats learning project. LLM-friendly: read
-top-to-bottom, use the tables to locate code.
+Architecture map for the Broadway platform. LLM-friendly: read top-to-bottom,
+use the tables to locate code. `main` holds the generic platform only — the
+demo/dataset-specific example lives on the `taxi` branch.
 
 ## Lifecycle
 
-One coherent platform flow (pipeline CLI), from dataset contract to champion
-model:
+One coherent flow, from dataset contract to evaluation, with a lineage sidecar
+annotating every transition:
 
 ```
-DatasetContract → FeatureSpec → TrainingConfig → Optuna → TrainingResult
-  → MLflow model/artifacts → EvaluationResult → promotion decision
-  → champion model → prediction
+DatasetContract → DatasetProfile → AnalysisContract → BaselineResult
+  → FeatureSpec → TrainingResult → EvaluationResult
 ```
 
-## Artifacts
+Each step writes a `LineageRecord` sidecar after saving its artifact; the
+`lineage` command assembles them into a graph. `ArtifactTrace` (commit, dataset,
+analysis goal) stamps the baseline, and `TransformAudit` (rows in/out, dropped,
+columns added/removed) annotates the transforming steps (`etl`, `features`).
 
-Typed execution outputs live under `artifacts/<step>/` (training/, evaluation/,
-stats/, causal/), human-facing HTML reports live under `artifacts/reports/`,
-and processed data stays under `data/processed/`.
-
-`causal` is a separate analysis mode, not part of this flow and not part of
-`full`. `full` is a thin dispatcher: it reads `AnalysisContract.mode` and
-resolves one of `configs/flow/{prediction,hypothesis,causal}.yaml`. Run causal
-explicitly:
-
-```
-ds-pipeline causal --dataset <d> --experiment <e>
-```
-
-### Mode-specific pipelines
-
-The three flows share the prefix `discover → etl → contracts → eda → baseline`
-and diverge on the mode tail: prediction appends `features → train → evaluate`,
-hypothesis appends `stats`, and causal appends `causal`.
-
-`baseline` is guidance, not a hard gate: it dispatches on
-`AnalysisContract.mode` (prediction/hypothesis/causal), persists a
-`BaselineResult` to `artifacts/baseline/`, and is included in each mode flow.
-Run it explicitly:
-
-```
-ds-pipeline baseline --dataset <d> --analysis <a>
-```
+`full` is a thin dispatcher: it reads `AnalysisContract.mode` and resolves one
+of `configs/flow/{prediction,hypothesis,causal}.yaml`.
 
 ## Directory tree
 
 ```
 broadway/
   src/broadway/
-    config/schema.py        # Pydantic models (DatasetContract, StatsStep, TrainStep, FeaturesStep, FullStep, FlowConfig, ...)
-    discover/               # read CSV/parquet → infer contract + observed profile
-      module.py             # run(): writes configs/dataset/<name>.yaml + artifacts/discover/profile.json
-      profile.py            # DatasetProfile / ColumnProfile (observed facts; identifier_score is descriptive only)
-    contracts/              # contract-generated schema + role selectors
+    config/schema.py        # Pydantic models (DatasetContract, ExperimentConfig, FeatureConfig, step models, ...)
+    config/loader.py        # load_config, resolve_full_steps, STEP_MODELS
+    contracts/              # contract-generated schema + role selectors + checks
       pandera.py            # build_raw_schema(contract) -> pa.DataFrameSchema (generated)
       selectors.py          # feature/datetime/target column selectors over DatasetContract
-    stats/                  # pandas/numpy stats library (no Spark)
-      base.py               # stratified_sample
-      plan.py               # AnalysisPlan (Pydantic model) + save/load
-      effect_size.py        # eta², omega², Cohen's d, Hedges' g, group_imbalance
-      assumptions.py        # Levene, skew/kurtosis/Shapiro
-      anova.py              # run_anova, run_welch, run_kruskal
-      post_hoc.py           # games_howell
-      regression.py         # fit_ols, fit_robust, bp_jb
-      diagnostics.py        # bp_test, jb_test, durbin_watson, plot_residuals
-      time_series.py        # durbin_watson_test, plot_acf
-      baseline.py           # train_lgbm, evaluate
-      module.py             # pipeline step: build groups → run_anova → save_plan
-    causal/                 # experiment design + causal analysis (statsmodels/scipy)
-      contracts.py          # ExperimentDesign, ExperimentResult (Pydantic) + save/load
-      design.py             # design_experiment, minimum_detectable_effect (TTestIndPower)
-      assignment.py         # assign_randomly, assign_stratified
-      analysis.py           # analyze_two_groups (Welch's t-test, Cohen's d, 95% CI)
-      multiple.py           # correct_pvalues (bonferroni, fdr_bh)
-       sequential.py, hte.py # out-of-scope docstring stubs
-       module.py             # pipeline step: reads cfg.causal, persists ExperimentDesign to artifacts/causal/
-    baseline/               # guidance baseline, dispatched on AnalysisContract.mode
-       contracts.py          # BaselineResult (Pydantic) + save/load
-       prediction.py         # majority-class / mean baselines (sklearn accuracy/MAE)
-       hypothesis.py         # naive effect = range of group means
-       causal.py             # power-analysis sample size (reuses design_experiment)
-       module.py             # pipeline step: dispatches on mode, persists BaselineResult to artifacts/baseline/
-    features/               # generic feature machinery + the config-driven pipeline step
+      checks.py, module.py  # contracts step: columns / dtypes / nulls vs contract
+    data/                   # loader, cleaner, splitter, download, db
+    discover/               # read CSV/parquet → infer contract + observed profile
+      module.py             # discover + profile commands; writes configs/dataset/<name>.yaml + profile.json
+      profile.py            # DatasetProfile / ColumnProfile (observed facts; identifier_score is descriptive only)
+    onboard/                # interactive init scaffolder (CSV → contracts/config)
+      module.py             # init(): infer hints → build dataset/analysis/experiment configs
+      infer.py, models.py   # InferenceReport / ColumnHint
+    etl/                    # load → clean → split → parquet (+ TransformAudit)
+    eda/                    # missingness, quality, summary, visualization, HTML report
+    features/               # generic feature machinery + config-driven step
       schema.py             # FeatureSpec, build_engineered_schema
-      ml_encodings.py, frequency.py   # generic target/frequency encodings
-      pipeline.py, builders.py, encodings.py, module.py, contracts.py  # ds-pipeline features step
-    evaluate/               # model evaluation + promotion decision
-      contracts.py          # EvaluationResult (Pydantic model)
-      metrics.py            # compute_metrics (mae/rmse/r2)
-      comparison.py         # compare_models (candidate vs champion)
-      validation.py         # cross_validate, residual_summary
-      promotion.py          # should_promote
-      module.py             # pipeline step: load model → evaluate → promotion
+      generic.py            # build_generic_feature_specs (numeric passthrough + derived + encodings)
+      builders.py           # datetime_hour/dayofweek/month + builder_module hook
+      encodings.py, ml_encodings.py, frequency.py   # target/frequency encodings
+      pipeline.py, module.py   # FeaturePipeline + ds-pipeline features step
+    stats/                  # pandas/numpy stats library (ANOVA, Welch, Kruskal, assumptions, post-hoc, regression)
+      guards.py             # validate_groups — fail loudly on empty/non-finite/zero-variance groups
+      module.py             # stats step (hypothesis mode)
+    causal/                 # experiment design + power analysis (statsmodels/scipy)
+      contracts.py          # ExperimentDesign, ExperimentResult
+      design.py, analysis.py, multiple.py, assignment.py, module.py
+    baseline/               # guidance baseline, dispatched on AnalysisContract.mode
+      contracts.py          # BaselineResult (Pydantic) + save/load
+      prediction.py, hypothesis.py, causal.py   # per-mode naive references
+      improvement.py        # improvement_vs_baseline
+      module.py             # baseline step: dispatch on mode, persist BaselineResult + ArtifactTrace
     training/               # model training + HPO + MLflow tracking
-      contracts.py          # TrainingResult (Pydantic model)
-      trainer.py            # train(model_type, X, y, **params) -> (model, elapsed)
-      module.py             # pipeline step: load data → train → pickle to disk
-      optuna.py             # run_study(objective, n_trials, ...) -> best_params
-      mlflow_utils.py       # setup_mlflow, log_metrics, log_model
-      models/               # model factories + ABC
-        base.py             # BaseModel ABC (fit/predict/feature_importance/get_params/set_params)
-        linear.py           # LinearRegression factory
-        random_forest.py    # RandomForestRegressor factory
-        xgboost.py          # XGBRegressor factory
-        lightgbm.py         # LGBMRegressor factory
-        registry.py         # get_model(name, **params)
-        pyfunc_wrapper.py   # ModelPyFunc (MLflow PyFunc over a pickled model)
-    lineage/                # decision + lineage graph (sidecar records, Mermaid, run state)
-      models.py             # DatasetRef, DatasetSlice, DecisionRecord, LineageRecord, LineageNode/Edge, LineageGraph, RunState
-      ids.py                # node_id(kind, name) -> "kind:name"
-      records.py            # write_record() sidecars under artifacts/lineage/records/
-      graph.py              # build_graph(configs_dir, lineage_dir) -> LineageGraph
-      mermaid.py            # to_mermaid(graph) -> mermaid source
-      state.py              # current_state(graph, mode, goal, decisions) -> RunState
-      module.py             # ds-pipeline lineage command
-  project/
-    features.py             # FEATURE_SPECS registry → ENGINEERED_FEATURES/types/schema
-    ml_pipeline.py          # FeaturePipeline (taxi orchestration)
-    basic.py, boroughs.py   # taxi datetime features + zone join
-    data.py                 # loaders, constants, mode system, streaming cache
-    STATS.md                # script index (what each numbered script does)
-    scripts/                # numbered experiment scripts (01..12)
-  configs/step/
-    stats.yaml              # stats SSOT
-    train.yaml              # model hyperparams SSOT
-    features.yaml           # feature-engineer params SSOT
-  configs/flow/<mode>.yaml  # mode-specific step lists (prediction/hypothesis/causal)
-  configs/analysis/<name>.yaml  # authored analytical intent (AnalysisContract)
-  tests/                    # test_base.py, test_anova.py, ... (pytest)
-  results/                  # mode-keyed caches + reports (gitignored artifacts)
+      contracts.py          # TrainingResult
+      trainer.py, optuna.py, mlflow_utils.py, models/, module.py
+    evaluate/               # evaluation + promotion decision
+      contracts.py          # EvaluationResult, ModelComparison, BaselineComparison
+      metrics.py            # compute_metrics (mae/rmse/r2; rejects non-finite)
+      comparison.py, validation.py, promotion.py, module.py
+    lineage/                # decision + lineage graph (sidecars, Mermaid, run state)
+      models.py             # DatasetRef, DatasetSlice, DecisionRecord, LineageRecord, LineageNode/Edge, LineageGraph, RunState, TransformAudit
+      ids.py, records.py, graph.py, mermaid.py, state.py, module.py
+    analysis/contracts.py   # AnalysisContract, AnalysisMode, HypothesisConfig, require_mode
+    trace.py                # ArtifactTrace (created_at, commit, dataset, analysis_goal)
+    cli.py                  # ds-pipeline argument parsing + dispatch
+    pipeline.py             # step orchestrator (imports step module, calls run(cfg))
+    utils.py                # feature_columns helper
+    inference/, monitoring/, selection/, trust/, unsupervised/   # docstring stubs (not wired)
+  configs/
+    dataset/<name>.yaml     # per-dataset schema (columns, dtypes, roles, target, task)
+    analysis/<name>.yaml    # authored analytical intent (AnalysisContract)
+    experiment/<name>.yaml  # features, model, split, metric, hpo
+    environment/<name>.yaml # development / staging / production
+    step/<step>.yaml        # per-step knobs (etl, contracts, eda, features, stats, causal, train, evaluate, baseline, full)
+    flow/<mode>.yaml        # mode-specific step lists (prediction / hypothesis / causal)
+  tests/                    # pytest suite (library + CLI + onboarding E2E)
 ```
 
-## Module → function → file
+## `ds-pipeline` commands
 
-| Call site (script) | Function | File |
-|---|---|---|
-| `data.load_stratified_sample()` | `load_stratified_sample` | `project/data.py` |
-| `data.load_time_slice()` | `load_time_slice` | `project/data.py` |
-| `data.load_borough_durations()` | `load_borough_durations` | `project/data.py` |
-| `data.generate_sample_cache()` | `generate_sample_cache` (streaming) | `project/data.py` |
-| `data.inspect_schema()` | `inspect_schema` | `project/data.py` |
-| `data.write_quality_report()` | `write_quality_report` | `project/data.py` |
-| `anova.run_anova(groups)` | `run_anova` | `src/broadway/stats/anova.py` |
-| `anova.run_welch(groups)` | `run_welch` | `src/broadway/stats/anova.py` |
-| `anova.run_kruskal(groups)` | `run_kruskal` | `src/broadway/stats/anova.py` |
-| `assumptions.run_levene(groups)` | `run_levene` | `src/broadway/stats/assumptions.py` |
-| `assumptions.check_normality(groups)` | `check_normality` | `src/broadway/stats/assumptions.py` |
-| `post_hoc.games_howell(df, ...)` | `games_howell` | `src/broadway/stats/post_hoc.py` |
-| `regression.fit_ols(df, formula)` | `fit_ols` | `src/broadway/stats/regression.py` |
-| `regression.bp_jb(model)` | `bp_jb` | `src/broadway/stats/regression.py` |
-| `diagnostics.durbin_watson(resid)` | `durbin_watson` | `src/broadway/stats/diagnostics.py` |
-| `time_series.plot_acf(resid, ...)` | `plot_acf` | `src/broadway/stats/time_series.py` |
-| `baseline.train_lgbm(X, y, ...)` | `train_lgbm` | `src/broadway/stats/baseline.py` |
-| `baseline.evaluate(model, ...)` | `evaluate` | `src/broadway/stats/baseline.py` |
+Every step except `discover`/`profile`/`lineage`/`init` takes the same flags.
 
-## Data flow
-
-```
-data/processed/training_data.parquet   (raw, 8.6M rows)
-        │  pyarrow ParquetFile.iter_batches(batch_size=100_000)
-        ▼
-generate_sample_cache()   ── merge zone lookup (pickup_borough)
-        │                     incremental per-borough stratified sample
-        ├──▶ results/joined_sample_{MODE}.parquet   (≈ SAMPLE_SIZE rows)
-        ├──▶ results/sample_meta_{MODE}.json        (params_hash)
-        └──▶ results/quality_report.json            (exact group sizes/means)
-        │
-        ▼
-scripts (01..12)
-        │  load_stratified_sample()  → random stratified groups
-        │  load_time_slice()         → contiguous, time-sorted slice (filter pushdown)
-        ▼
-results/*.json / *.png  (AnalysisPlan JSON, residual plots, ACF plot)
-```
-
-## Config SSOT
-
-| Value | Owned by | Consumer |
-|---|---|---|
-| `sample_size_dev` / `sample_size_live` | `configs/step/stats.yaml` → `StatsStep` | `data.SAMPLE_SIZE` |
-| `time_slice_start_{mode}` / `time_slice_end_{mode}` | `configs/step/stats.yaml` → `StatsStep` | `data.TIME_SLICE_START/END` |
-| `time_split_cutoff` | `configs/step/stats.yaml` → `StatsStep` | `data.TIME_SPLIT_CUTOFF` |
-| `min_rows_for_sampling`, `per_group_sample_fraction`, `group_values` | `configs/step/stats.yaml` | `data.MIN_ROWS_FOR_SAMPLING`, `data.BOROUGHS` |
-| `data_path`, `lookup_path` (from `path` / `lookup_tables`) | `configs/dataset/taxi.yaml` → `DatasetContract` | `data.DATA_PATH`, `data.LOOKUP_PATH` (`project/data.py`) |
-| `n_estimators`, `learning_rate`, `num_leaves`, ... | `configs/step/train.yaml` → `TrainStep` | `data.N_ESTIMATORS`, ... |
-| rush-hour/night/passenger params | `configs/step/features.yaml` → `FeaturesStep` | `data.FEATURE_*` |
-| column names | module constants in `data.py` | scripts |
-
-Analysis intent is authored separately via `configs/analysis/<name>.yaml` → `AnalysisContract` (mode, goal, row_definition, decision_moment, available_info, leakage_notes, success_criterion), wired through the `--analysis <name>` CLI flag.
-
-## Mode system
-
-| Env var | Default | `SAMPLE_SIZE` | time slice |
+| Flag | Required | Default | Meaning |
 |---|---|---|---|
-| `DATA_MODE=dev` | ✓ | `sample_size_dev` (2000) | `time_slice_start_dev` → `time_slice_end_dev` (1 day) |
-| `DATA_MODE=live` | | `sample_size_live` (200000) | `time_slice_start_live` → `time_slice_end_live` (1 month) |
+| `--dataset <name>` | no | none | load `configs/dataset/<name>.yaml` |
+| `--experiment <name>` | no | none | load `configs/experiment/<name>.yaml` |
+| `--analysis <name>` | no | none | load `configs/analysis/<name>.yaml` |
+| `--environment <name>` | no | `development` | load `configs/environment/{development,staging,production}.yaml` |
 
-- Cache files are mode-keyed: `joined_sample_{MODE}.parquet`, `sample_meta_{MODE}.json`.
-- `mode` is a per-call parameter on the loaders (`load_stratified_sample(mode=None)`, `generate_sample_cache(mode=None)`, `load_time_slice(mode=None)`, `load_borough_durations(mode=None)`). `mode=None` falls back to `os.getenv("DATA_MODE", "dev")` via `_resolve_mode`; any value other than `dev`/`live` raises.
-- The module constants `MODE`, `SAMPLE_SIZE`, `TIME_SLICE_START`, `TIME_SLICE_END`, `SAMPLE_CACHE`, `SAMPLE_META` are still resolved at import (from `_resolve_mode()`) as defaults, because scripts read `data.TIME_SLICE_START`/`TIME_SLICE_END` and `data.SAMPLE_SIZE`.
+| Command | Produces |
+|---|---|
+| `ds-pipeline init <csv> --name … [--target --task --mode --goal --row-definition --decision-moment --success-criterion …]` | `configs/{dataset,analysis,experiment}/<name>.yaml` + profile |
+| `ds-pipeline discover --csv … --target … --task … [--datetime-column --ignore-columns]` | `configs/dataset/<name>.yaml` + `artifacts/discover/profile.json` |
+| `ds-pipeline profile --dataset <d>` | observed `DatasetProfile` → `artifacts/discover/profile.json` |
+| `ds-pipeline etl --dataset <d> [--experiment <e>]` | cleaned + split parquet |
+| `ds-pipeline contracts --dataset <d>` | pass/fail validation vs contract |
+| `ds-pipeline eda …` | `artifacts/reports/eda.html` |
+| `ds-pipeline baseline --dataset <d> --analysis <a>` | `BaselineResult` → `artifacts/baseline/` |
+| `ds-pipeline features --dataset <d> --experiment <e>` | fitted feature pipeline + engineered parquet |
+| `ds-pipeline stats --dataset <d> --analysis <a>` | `AnalysisPlan` → `artifacts/stats/` |
+| `ds-pipeline causal --dataset <d> --analysis <a>` | `ExperimentDesign` → `artifacts/causal/` |
+| `ds-pipeline train --dataset <d> --analysis <a>` | `TrainingResult` → MLflow model/artifacts |
+| `ds-pipeline evaluate --dataset <d> --analysis <a>` | `EvaluationResult` + promotion decision |
+| `ds-pipeline full --dataset <d> --analysis <a>` | dispatches to the mode flow |
+| `ds-pipeline lineage --analysis <a> --dataset <d>` | `artifacts/lineage/graph.json` + `graph.md` + run-state summary |
 
-## Sampling strategies
+### Mode flows
 
-| Strategy | Loader | Guarantees | Used by |
-|---|---|---|---|
-| Stratified random | `load_stratified_sample` | per-borough proportions preserved; deterministic (`RANDOM_STATE`) | 08, 09, 11, 07 (games-howell), 04–06 (ANOVA groups via `load_borough_durations`) |
-| Contiguous time slice | `load_time_slice` | rows sorted by `pickup_datetime`, no random sampling (filter pushdown) | 10 (Durbin-Watson / ACF) |
+The three flows share the prefix `discover → etl → contracts → eda → baseline`
+and diverge on the mode tail, resolved by `full` from
+`configs/step/full.yaml` (`flows: {prediction, hypothesis, causal}`):
+
+| Mode | Tail | Flow file |
+|---|---|---|
+| `prediction` | `features → train → evaluate` | `configs/flow/prediction.yaml` |
+| `hypothesis` | `stats` | `configs/flow/hypothesis.yaml` |
+| `causal` | `causal` | `configs/flow/causal.yaml` |
+
+`causal` is a separate analysis mode, run on its own — it is not part of the
+prediction flow. `baseline` is guidance (a naive result to beat), not a hard
+gate; it dispatches on `AnalysisContract.mode` and is included in every flow.
 
 ## Contracts
 
-| Contract | Tool | Where |
-|---|---|---|
-| Configuration | Pydantic | `broadway/config/schema.py` |
-| FullStep / FlowConfig | Pydantic | `broadway/config/schema.py` |
-| AnalysisContract | Pydantic | `broadway/analysis/contracts.py` |
-| DatasetSlice | Pydantic | `broadway/lineage/models.py` |
-| DecisionRecord | Pydantic | `broadway/lineage/models.py` |
-| LineageRecord | Pydantic | `broadway/lineage/models.py` |
-| LineageGraph | Pydantic | `broadway/lineage/models.py` |
-| RunState | Pydantic | `broadway/lineage/models.py` |
-| AnalysisPlan | Pydantic | `broadway/stats/plan.py` |
-| ExperimentDesign | Pydantic | `broadway/causal/contracts.py` |
-| ExperimentResult | Pydantic | `broadway/causal/contracts.py` |
-| BaselineResult | Pydantic | `broadway/baseline/contracts.py` |
-| ArtifactTrace | Pydantic | `broadway/trace.py` |
-| BaselineComparison | Pydantic | `broadway/evaluate/contracts.py` |
-| EvaluationResult | Pydantic | `broadway/evaluate/contracts.py` |
-| TrainingResult | Pydantic | `broadway/training/contracts.py` |
-| DatasetProfile / ColumnProfile | Pydantic | `broadway/discover/profile.py` |
-| Raw DataFrame | Pandera | `broadway/contracts/pandera.py::build_raw_schema(contract)` (generated) |
-| Engineered features | Pandera | `project/features.py` (`FEATURE_SPECS`) → `broadway/features/schema.py::build_engineered_schema` |
-| Python interfaces | type hints | throughout |
+| Contract | Where |
+|---|---|
+| `DatasetContract` / `ColumnSchema` / `ColumnRole` | `src/broadway/config/schema.py` |
+| `DatasetProfile` / `ColumnProfile` | `src/broadway/discover/profile.py` |
+| `AnalysisContract` / `AnalysisMode` / `HypothesisConfig` | `src/broadway/analysis/contracts.py` |
+| `BaselineResult` | `src/broadway/baseline/contracts.py` |
+| `FeatureSpec` | `src/broadway/features/schema.py` |
+| `TrainingResult` | `src/broadway/training/contracts.py` |
+| `EvaluationResult` / `ModelComparison` / `BaselineComparison` | `src/broadway/evaluate/contracts.py` |
+| `ArtifactTrace` | `src/broadway/trace.py` |
+| `DecisionRecord` / `LineageRecord` / `LineageNode` / `LineageEdge` / `LineageGraph` / `RunState` / `TransformAudit` | `src/broadway/lineage/models.py` |
 
-- The raw schema is generated at runtime from `DatasetContract.columns` — one `pa.Column` per contract entry (the raw 6 columns, not join-derived `pickup_borough`/`LocationID`). Dtypes are checked strictly (`coerce=False`); `null_count` is observed, not an invariant, so nullability is left at Pandera's default.
-- Role-based column selection is `broadway/contracts/selectors.py` (`feature_columns`, `datetime_columns`, `target_columns`) — pure functions over the contract, no hardcoded names.
-- Engineered features are defined ONCE in `project/features.py::FEATURE_SPECS`; `ENGINEERED_FEATURES`, `ENGINEERED_FEATURE_TYPES`, and `ENGINEERED_SCHEMA` are all derived from that registry (no parallel hand-maintained list).
-- Enforcement points: `read_training_data()` validates the raw frame via `build_raw_schema`; `FeaturePipeline.transform()` validates against `ENGINEERED_SCHEMA`.
-- `DatasetContract` is the accepted schema (authored/authoritative); `DatasetProfile` / `ColumnProfile` describe observed facts computed at discover time. `identifier_score` is purely descriptive — discover only logs a recommendation, it never mutates roles or the contract.
+`DatasetContract` is the accepted schema (authored/authoritative);
+`DatasetProfile` describes observed facts computed at discover time — its
+`identifier_score` is purely descriptive (discover logs a recommendation, never
+mutates roles).
 
-## Mode enforcement
+## Config SSOT
 
-The declared analytical intent (`AnalysisContract.mode`) determines which steps are valid: `stats` requires `mode == "hypothesis"`, `causal` requires `"causal"`, and `train`/`evaluate` require `"prediction"`. `baseline` dispatches on mode (prediction/hypothesis/causal). Mismatches fail early via `broadway/analysis/contracts.py::require_mode`, which also errors when the `--analysis` contract is missing. `full` resolves the mode-specific flow (`configs/flow/{prediction,hypothesis,causal}.yaml`) via `resolve_full_steps`, so each mode runs only its valid tail.
-
-`train` and `evaluate` read the persisted `BaselineResult` (from `artifacts/baseline/`) and report improvement over the baseline (`improvement_vs_baseline` in `broadway/baseline/improvement.py`). `BaselineResult` carries an `ArtifactTrace` (commit/dataset/analysis_goal) for lineage.
+YAML is the single source of truth; it is loaded through Pydantic
+(`src/broadway/config/schema.py`) with no defaults and no `get(key, default)`.
+A missing or wrong value raises at load/validation time.
 
 ## Decision + Lineage
 
-Broadway builds a run graph from persisted artifacts + decisions rather than a
-hand-maintained diagram. Step modules write a `LineageRecord` sidecar after
-saving their result; the `lineage` command assembles them into a graph and a
-run-state summary.
+Step modules write a `LineageRecord` sidecar under `artifacts/lineage/records/`
+after saving their artifact; the `lineage` command assembles them into
+`graph.json` + `graph.md` (Mermaid) and prints a run state:
 
-The node chain runs `DatasetRef → DatasetProfile → AnalysisContract →
-BaselineResult → DatasetSlice → DecisionRecord`, with `stats`/`causal`/
-`training`/`evaluation` nodes joining as their sidecar records are produced.
-
-- Sidecars: after saving its artifact, each step module calls `write_record`
-  (`broadway/lineage/records.py`) to write a `LineageRecord {node_id, kind,
-  artifact, parents}` under `artifacts/lineage/records/`. Domain contracts
-  carry no lineage fields.
-- Node ids are `kind:name` (`broadway/lineage/ids.py::node_id`), e.g.
-  `baseline:taxi`, keyed by `AnalysisContract.name`.
+- node ids are `kind:name` (`src/broadway/lineage/ids.py::node_id`)
 - `DatasetSlice` is authored config (`configs/slice/<name>.yaml`);
-  `DecisionRecord` is a runtime event in `artifacts/lineage/decisions/<id>.json`.
-- `ds-pipeline lineage --analysis <n> --dataset <d>` builds the graph
-  (`broadway/lineage/graph.py::build_graph`), writes `artifacts/lineage/graph.json`
-  + `graph.md` (Mermaid), and prints a run-state summary (goal, stage,
-  open/resolved decisions, `not_yet_run`, `ran_but_output_missing`).
+  `DecisionRecord` is a runtime event (`artifacts/lineage/decisions/<id>.json`)
+- run state: `goal`, `stage`, `open_decisions`, `resolved_decisions`,
+  `not_yet_run`, `ran_but_output_missing`
 - `not_yet_run` is derived only from lineage-emitting steps
-  (`profile`/`baseline`/`stats`/`causal`/`training`/`evaluation`) for the
-  active mode flow (`broadway/lineage/state.py::LINEAGE_STEPS`);
-  `etl`/`contracts`/`eda`/`features` are never listed.
-- `ran_but_output_missing` flags steps whose sidecar record exists but whose
-  artifact file is absent — an integrity error, not a normal "not yet produced".
+  (`profile`/`baseline`/`stats`/`causal`/`training`/`evaluation`) for the active
+  mode (`src/broadway/lineage/state.py::LINEAGE_STEPS`)
+- `ran_but_output_missing` flags a sidecar whose artifact file is absent — an
+  integrity error, not "not yet produced"
 
-## Where to make changes
+## Mode enforcement
 
-| Goal | Change |
-|---|---|
-| New config knob | `configs/step/stats.yaml` + matching field in `StatsStep` (`schema.py`) + constant in `data.py` |
-| New DataFrame contract | add the column to `configs/dataset/taxi.yaml` — `build_raw_schema` regenerates the raw schema; call `Schema.validate(df)` at the stage boundary |
-| New loader | add function in `project/data.py`; reuse `read_training_data` / `_join_boroughs` |
-| New statistical test | add function in `src/broadway/stats/` (pandas/numpy only) + document in `API.md` |
-| New experiment script | add `project/scripts/NN_*.py`; import from `project.data` and `broadway.stats` |
-| Change sample behavior | edit `generate_sample_cache` / `_params_hash` in `data.py`; bump stale `params_hash` by regenerating |
+`AnalysisContract.mode` determines which steps are valid: `stats` requires
+`hypothesis`, `causal` requires `causal`, `train`/`evaluate` require
+`prediction`. Mismatches fail early via
+`src/broadway/analysis/contracts.py::require_mode`. `train`/`evaluate` read the
+persisted `BaselineResult` and report improvement over it
+(`src/broadway/baseline/improvement.py::improvement_vs_baseline`).
