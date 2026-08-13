@@ -89,7 +89,6 @@ def main() -> None:
     elif args.step == "report":
         from pathlib import Path
 
-        from broadway.config.loader import load_config
         from broadway.reports import index
         from broadway.reports.paths import REPORTS_DIR
 
