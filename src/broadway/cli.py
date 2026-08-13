@@ -34,6 +34,22 @@ def _build_parser() -> argparse.ArgumentParser:
     profile = sub.add_parser("profile")
     profile.add_argument("--dataset", type=str, required=True)
 
+    init = sub.add_parser("init")
+    init.add_argument("csv")
+    init.add_argument("--name", required=True)
+    init.add_argument("--target")
+    init.add_argument("--task")
+    init.add_argument("--datetime-columns", nargs="*")
+    init.add_argument("--ignore-columns", nargs="*")
+    init.add_argument("--split-column")
+    init.add_argument("--mode")
+    init.add_argument("--goal")
+    init.add_argument("--row-definition")
+    init.add_argument("--decision-moment")
+    init.add_argument("--available-info", nargs="*")
+    init.add_argument("--leakage-notes", nargs="*")
+    init.add_argument("--success-criterion")
+
     for step in STEPS:
         if step == "discover":
             continue
@@ -57,6 +73,10 @@ def main() -> None:
         from broadway.discover.module import profile
 
         profile(args.dataset)
+    elif args.step == "init":
+        from broadway.onboard.module import init
+
+        init(args.csv, args.name, args.target, args.task, args.datetime_columns, args.ignore_columns, args.split_column, args.mode, args.goal, args.row_definition, args.decision_moment, args.available_info, args.leakage_notes, args.success_criterion)
     else:
         from broadway.pipeline import run
 
