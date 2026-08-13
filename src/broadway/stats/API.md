@@ -71,6 +71,22 @@ def durbin_watson(resid: np.ndarray) -> float
 
 def plot_residuals(model, out_path: str) -> None
     # residuals vs fitted, Q-Q, histogram → save PNG
+
+def plot_residuals_vs_fitted(model, out_path: str) -> None
+    # residual-vs-fitted scatter only → save PNG
+
+def mean_specification_diagnostic(model, out_path: str) -> DiagnosticResult
+    # persists residual-vs-fitted plot, returns Question→Evidence→Ramification
+```
+
+## diagnostic_models.py
+
+```python
+class DiagnosticResult(BaseModel):
+    question: str      # the diagnostic question being answered
+    evidence: list[str]  # human-readable evidence trail
+    ramification: str  # what to do if the evidence suggests a problem
+    warnings: list[str]  # non-fatal concerns, defaults to []
 ```
 
 ## anova.py

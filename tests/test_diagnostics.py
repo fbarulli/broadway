@@ -3,7 +3,15 @@ from __future__ import annotations
 import numpy as np
 import statsmodels.api as sm
 
-from broadway.stats.diagnostics import bp_test, durbin_watson, jb_test, plot_residuals
+from broadway.stats.diagnostic_models import DiagnosticResult
+from broadway.stats.diagnostics import (
+    bp_test,
+    durbin_watson,
+    jb_test,
+    mean_specification_diagnostic,
+    plot_residuals,
+    plot_residuals_vs_fitted,
+)
 
 
 def test_bp_test_returns_two_floats_in_sane_range() -> None:
@@ -67,3 +75,38 @@ def test_plot_residuals_saves_png(tmp_path) -> None:
 
     assert tmp_path.joinpath("residuals.png").exists()
     assert tmp_path.joinpath("residuals.png").stat().st_size > 0
+
+
+def test_plot_residuals_vs_fitted_saves_png(tmp_path) -> None:
+    rng = np.random.default_rng(42)
+    n = 200
+    X = sm.add_constant(rng.normal(size=(n, 2)))
+    y = X @ np.array([1.0, 2.0, 3.0]) + rng.normal(scale=0.5, size=n)
+    model = sm.OLS(y, X).fit()
+
+    out_path = str(tmp_path / "rvf.png")
+    plot_residuals_vs_fitted(model, out_path)
+
+    assert tmp_path.joinpath("rvf.png").exists()
+    assert tmp_path.joinpath("rvf.png").stat().st_size > 0
+
+
+def test_mean_specification_diagnostic_returns_typed_result(tmp_path) -> None:
+    rng = np.random.default_rng(42)
+    n = 200
+    X = sm.add_constant(rng.normal(size=(n, 2)))
+    y = X @ np.array([1.0, 2.0, 3.0]) + rng.normal(scale=0.5, size=n)
+    model = sm.OLS(y, X).fit()
+
+    out_path = str(tmp_path / "diag.png")
+    result = mean_specification_diagnostic(model, out_path)
+
+    assert isinstance(result, DiagnosticResult)
+    assert result.question == "Is the mean relationship correctly specified?"
+    assert len(result.evidence) == 1
+    assert out_path in result.evidence[0]
+    assert isinstance(result.ramification, str)
+    assert result.ramification
+    assert result.warnings == []
+    assert tmp_path.joinpath("diag.png").exists()
+    assert tmp_path.joinpath("diag.png").stat().st_size > 0

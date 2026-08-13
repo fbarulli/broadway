@@ -13,6 +13,8 @@ from statsmodels.stats.diagnostic import het_breuschpagan
 from statsmodels.stats.stattools import durbin_watson as _durbin_watson
 from statsmodels.stats.stattools import jarque_bera
 
+from broadway.stats.diagnostic_models import DiagnosticResult
+
 
 def bp_test(resid: np.ndarray, exog: np.ndarray) -> tuple[float, float]:
     statistic, p_value, _, _ = het_breuschpagan(resid, exog)
@@ -28,17 +30,44 @@ def durbin_watson(resid: np.ndarray) -> float:
     return float(_durbin_watson(resid))
 
 
-def plot_residuals(model, out_path: str) -> None:
+def _plot_residuals_vs_fitted(ax, model) -> None:
     fitted = model.fittedvalues
+    resid = model.resid
+    ax.scatter(fitted, resid, s=2, alpha=0.15)
+    ax.axhline(0, color="red", linewidth=1)
+    ax.set_xlabel("Fitted values")
+    ax.set_ylabel("Residuals")
+    ax.set_title("Residuals vs Fitted")
+
+
+def plot_residuals_vs_fitted(model: object, out_path: str) -> None:
+    fig, ax = plt.subplots(figsize=(8, 5))
+    _plot_residuals_vs_fitted(ax, model)
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=150)
+    plt.close(fig)
+
+
+def mean_specification_diagnostic(model: object, out_path: str) -> DiagnosticResult:
+    plot_residuals_vs_fitted(model, out_path)
+    return DiagnosticResult(
+        question="Is the mean relationship correctly specified?",
+        evidence=[f"residual-vs-fitted plot persisted at {out_path}"],
+        ramification=(
+            "Residual-vs-fitted plots may reveal systematic structure that suggests "
+            "the assumed mean function is inadequate; if such structure is observed, "
+            "consider an appropriate transformation, nonlinear term, spline, or "
+            "interaction, then refit and re-diagnose."
+        ),
+    )
+
+
+def plot_residuals(model, out_path: str) -> None:
     resid = model.resid
 
     fig, axes = plt.subplots(1, 3, figsize=(18, 5))
 
-    axes[0].scatter(fitted, resid, s=2, alpha=0.15)
-    axes[0].axhline(0, color="red", linewidth=1)
-    axes[0].set_xlabel("Fitted values")
-    axes[0].set_ylabel("Residuals")
-    axes[0].set_title("Residuals vs Fitted")
+    _plot_residuals_vs_fitted(axes[0], model)
 
     sm.qqplot(resid, line="45", ax=axes[1], markersize=2, alpha=0.15)
     axes[1].set_title("Q-Q Plot of Residuals")
