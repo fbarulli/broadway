@@ -17,6 +17,7 @@ def _setup(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setattr(module, "TIMELINE_DIR", tmp_path / "timeline")
     monkeypatch.setattr(walkthrough, "TIMELINE_DIR", tmp_path / "timeline")
     monkeypatch.setattr(paths, "TIMELINE_PATH", tmp_path / "reports" / "timeline.md")
+    monkeypatch.setattr(paths, "INDEX_PATH", tmp_path / "reports" / "index.md")
     monkeypatch.setattr(paths, "FIGURES_DIR", tmp_path / "reports" / "figures")
 
 

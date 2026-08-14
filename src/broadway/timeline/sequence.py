@@ -23,8 +23,25 @@ class WalkthroughSequence(BaseModel):
     steps: list[WalkthroughStepConfig]
 
 
+class WalkthroughConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    skew_threshold: float
+    kurtosis_threshold: float
+    shapiro_alpha: float
+    imbalance_ratio_threshold: float
+    significance_alpha: float
+
+
 def load_walkthrough_sequence() -> WalkthroughSequence:
     path = loader.CONFIGS_DIR / "flow" / "hypothesis_walkthrough.yaml"
     with open(path, encoding="utf-8") as f:
         data = yaml.safe_load(f)
     return WalkthroughSequence(**data)
+
+
+def load_walkthrough_config() -> WalkthroughConfig:
+    path = loader.CONFIGS_DIR / "step" / "walkthrough.yaml"
+    with open(path, encoding="utf-8") as f:
+        data = yaml.safe_load(f)
+    return WalkthroughConfig(**data)

@@ -7,11 +7,17 @@ from broadway.analysis.contracts import AnalysisContract, AnalysisMode, require_
 from broadway.config.schema import PipelineConfig
 from broadway.lineage.models import SampleSpec
 from broadway.reports import paths
+from broadway.reports.index import render_dashboard
 from broadway.reports.timeline import render_timeline
 from broadway.timeline import module as timeline_module
-from broadway.timeline import runners
-from broadway.timeline.models import AnalysisDecision, AnalysisStep
-from broadway.timeline.sequence import WalkthroughSequence, load_walkthrough_sequence
+from broadway.timeline import runners, suggest
+from broadway.timeline.models import AnalysisDecision, AnalysisStep, Suggestion
+from broadway.timeline.sequence import (
+    WalkthroughConfig,
+    WalkthroughSequence,
+    load_walkthrough_config,
+    load_walkthrough_sequence,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -30,17 +36,35 @@ def _resolved_decision(analysis: str, kind: str) -> AnalysisDecision | None:
     return None
 
 
-def _write_timeline(analysis: str, sequence: WalkthroughSequence) -> None:
+def _write_timeline(
+    analysis: AnalysisContract, sequence: WalkthroughSequence, thresholds: WalkthroughConfig
+) -> None:
+    steps = timeline_module.load_steps(analysis.name)
+    decisions = timeline_module.load_decisions(analysis.name)
+    suggestion = suggest.suggest_next(sequence, steps, decisions, thresholds, analysis.name)
+    timeline_md = render_timeline(analysis.name, sequence, steps, decisions)
+    if suggestion is not None:
+        timeline_md += (
+            "\n## Suggested next action\n\n"
+            f"- {suggestion.headline}\n"
+            f"- command: {suggestion.command}\n"
+        )
     paths.TIMELINE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    paths.TIMELINE_PATH.write_text(
-        render_timeline(
-            analysis,
-            sequence,
-            timeline_module.load_steps(analysis),
-            timeline_module.load_decisions(analysis),
-        ),
+    paths.TIMELINE_PATH.write_text(timeline_md, encoding="utf-8")
+    paths.INDEX_PATH.parent.mkdir(parents=True, exist_ok=True)
+    paths.INDEX_PATH.write_text(
+        render_dashboard(analysis.name, analysis.goal, sequence, steps, decisions, suggestion),
         encoding="utf-8",
     )
+
+
+def _print_suggestion(suggestion: Suggestion) -> None:
+    lines = ["── Suggestion ──", suggestion.headline, f"Next: {suggestion.command}"]
+    if suggestion.alternatives:
+        lines.append("Alternatives:")
+        for alt in suggestion.alternatives:
+            lines.append(f"  [{alt.intent}] {alt.label} — {alt.rationale}")
+    print("\n".join(lines))
 
 
 def _print_decision_required(
@@ -112,6 +136,7 @@ def run(cfg: PipelineConfig, sample: SampleSpec | None, force: bool) -> None:
         raise ValueError("hypothesis mode requires a 'hypothesis' block (group_column, group_values)")
     if cfg.dataset is None:
         raise ValueError("walkthrough requires a dataset config")
+    thresholds = load_walkthrough_config()
     sequence = load_walkthrough_sequence()
     df, group_column, source_group_column, groups = runners.load_frame_and_groups(cfg, sample)
     out_dir = TIMELINE_DIR / analysis.name
@@ -138,7 +163,7 @@ def run(cfg: PipelineConfig, sample: SampleSpec | None, force: bool) -> None:
             if decision is not None:
                 logger.info("gate passed (method=%s)", decision.method)
                 continue
-            _write_timeline(analysis.name, sequence)
+            _write_timeline(analysis, sequence, thresholds)
             if kind == "omnibus":
                 _print_decision_required(analysis, timeline_module.load_steps(analysis.name))
             elif kind == "posthoc":
@@ -152,9 +177,18 @@ def run(cfg: PipelineConfig, sample: SampleSpec | None, force: bool) -> None:
                     f'Next: ds-pipeline decide --analysis {analysis.name} '
                     f'--kind {kind} --method <method> --reason "..."'
                 )
+            decision_suggestion = suggest.suggest_after(
+                step.id,
+                timeline_module.load_steps(analysis.name),
+                timeline_module.load_decisions(analysis.name),
+                thresholds,
+                analysis.name,
+            )
+            if decision_suggestion is not None:
+                _print_suggestion(decision_suggestion)
             return
         if step.id not in EXECUTABLE_STEPS:
-            _write_timeline(analysis.name, sequence)
+            _write_timeline(analysis, sequence, thresholds)
             print(f"step '{step.id}' not yet implemented; stopping.")
             return
         if not force and timeline_module.load_step(analysis.name, step.id) is not None:
@@ -179,7 +213,7 @@ def run(cfg: PipelineConfig, sample: SampleSpec | None, force: bool) -> None:
             decision = _resolved_decision(analysis.name, "omnibus")
             if decision is None:
                 print("no omnibus decision recorded")
-                _write_timeline(analysis.name, sequence)
+                _write_timeline(analysis, sequence, thresholds)
                 return
             step_result = runners.run_omnibus(
                 analysis, step.order, step.question, groups, decision.method,
@@ -196,7 +230,7 @@ def run(cfg: PipelineConfig, sample: SampleSpec | None, force: bool) -> None:
             decision = _resolved_decision(analysis.name, "posthoc")
             if decision is None:
                 print("no posthoc decision recorded")
-                _write_timeline(analysis.name, sequence)
+                _write_timeline(analysis, sequence, thresholds)
                 return
             step_result = runners.run_posthoc(
                 analysis, step.order, step.question, df, source_group_column, target,
@@ -206,7 +240,7 @@ def run(cfg: PipelineConfig, sample: SampleSpec | None, force: bool) -> None:
             omnibus_step = timeline_module.load_step(analysis.name, "omnibus")
             if omnibus_step is None:
                 print("no omnibus evidence recorded")
-                _write_timeline(analysis.name, sequence)
+                _write_timeline(analysis, sequence, thresholds)
                 return
             posthoc_step = timeline_module.load_step(analysis.name, "posthoc")
             step_result = runners.run_conclusion(
@@ -217,7 +251,16 @@ def run(cfg: PipelineConfig, sample: SampleSpec | None, force: bool) -> None:
             continue
         timeline_module.save_step(step_result)
         completed += 1
+        step_suggestion = suggest.suggest_after(
+            step_result.step_id,
+            timeline_module.load_steps(analysis.name),
+            timeline_module.load_decisions(analysis.name),
+            thresholds,
+            analysis.name,
+        )
+        if step_suggestion is not None:
+            _print_suggestion(step_suggestion)
 
     _warn_stale_decisions(analysis.name)
-    _write_timeline(analysis.name, sequence)
+    _write_timeline(analysis, sequence, thresholds)
     print(f"walkthrough: completed {completed} step(s)")

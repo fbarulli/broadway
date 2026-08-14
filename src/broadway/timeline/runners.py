@@ -30,12 +30,11 @@ from broadway.timeline.evidence import (
     VarianceEvidence,
 )
 from broadway.timeline.models import AnalysisStep, StepStatus
+from broadway.timeline.sequence import WalkthroughConfig, load_walkthrough_config
 
-_SKEW_THRESHOLD = 2.0
-_KURTOSIS_THRESHOLD = 7.0
-_SHAPIRO_ALPHA = 0.05
-_IMBALANCE_THRESHOLD = 1.5
-_ALPHA = 0.05
+
+def _thresholds() -> WalkthroughConfig:
+    return load_walkthrough_config()
 
 
 def now_iso() -> str:
@@ -97,12 +96,13 @@ def run_describe(
     (evidence_dir / "describe.json").write_text(
         summary.model_dump_json(indent=2), encoding="utf-8"
     )
-    flagged = summary.imbalance_ratio > _IMBALANCE_THRESHOLD or bool(summary.absent_groups)
+    thresholds = _thresholds()
+    flagged = summary.imbalance_ratio > thresholds.imbalance_ratio_threshold or bool(summary.absent_groups)
     if flagged:
         parts = []
         if summary.absent_groups:
             parts.append(f"groups {', '.join(summary.absent_groups)} have no observations")
-        if summary.imbalance_ratio > _IMBALANCE_THRESHOLD:
+        if summary.imbalance_ratio > thresholds.imbalance_ratio_threshold:
             parts.append(f"group sizes are imbalanced (imbalance ratio {summary.imbalance_ratio})")
         ramification = "; ".join(parts) + "."
     else:
@@ -171,10 +171,11 @@ def run_normality(
     (evidence_dir / "normality.json").write_text(
         evidence.model_dump_json(indent=2), encoding="utf-8"
     )
+    thresholds = _thresholds()
     flagged = any(
-        abs(s["skew"]) > _SKEW_THRESHOLD
-        or abs(s["kurtosis"]) > _KURTOSIS_THRESHOLD
-        or s["shapiro_p"] < _SHAPIRO_ALPHA
+        abs(s["skew"]) > thresholds.skew_threshold
+        or abs(s["kurtosis"]) > thresholds.kurtosis_threshold
+        or s["shapiro_p"] < thresholds.shapiro_alpha
         for s in result.values()
     )
     ramification = (
@@ -219,7 +220,8 @@ def run_variance(
     (evidence_dir / "variance.json").write_text(
         evidence.model_dump_json(indent=2), encoding="utf-8"
     )
-    flagged = result["p_value"] < _SHAPIRO_ALPHA
+    thresholds = _thresholds()
+    flagged = result["p_value"] < thresholds.shapiro_alpha
     ramification = (
         "variance evidence favors considering Welch's ANOVA (or a rank-based alternative) "
         "over standard ANOVA."
@@ -332,7 +334,8 @@ def run_posthoc(
         )
         for _, row in result.iterrows()
     ]
-    significant_pairs = sum(1 for p in pairs if p.p_value < _ALPHA)
+    thresholds = _thresholds()
+    significant_pairs = sum(1 for p in pairs if p.p_value < thresholds.significance_alpha)
     evidence = PosthocEvidence(method=method, pairs=pairs, significant_pairs=significant_pairs)
     evidence_dir = out_dir / "evidence"
     evidence_dir.mkdir(parents=True, exist_ok=True)
