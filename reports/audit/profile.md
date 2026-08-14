@@ -29,7 +29,13 @@ none
 
 Traces are per-feature z-score.
 
-How to read: traces hugging the diagonal are approximately normal; S-curves indicate tail behavior; curvature indicates skew.
+How to read (Q-Q): traces hugging the diagonal are approximately normal; S-curves indicate tail behavior; curvature indicates skew.
+
+![passenger_count, trip_distance, pickup_location_id, dropoff_location_id, total_amount, airport_fee, trip_duration_minutes](../figures/numeric_dist_1.png)
+
+Histograms are in raw units.
+
+How to read (distribution): actual spread and skew in original units; look for heavy tails, multimodality, and gaps.
 
 ## Why this may matter
 

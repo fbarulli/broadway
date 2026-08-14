@@ -75,25 +75,42 @@ def _render_page(
 def _render_profile_evidence(qq: QqOverview | None) -> list[tuple[str, str]]:
     if qq is None:
         return []
-    by_figure: dict[str, list[str]] = {}
+    qq_by_figure: dict[str, list[str]] = {}
+    dist_by_figure: dict[str, list[str]] = {}
     for feature in qq.features:
         if feature.figure:
-            by_figure.setdefault(feature.figure, []).append(feature.feature)
+            qq_by_figure.setdefault(feature.figure, []).append(feature.feature)
+        if feature.dist_figure:
+            dist_by_figure.setdefault(feature.dist_figure, []).append(feature.feature)
+
     lines: list[str] = []
     for figure in qq.figures:
-        label = ", ".join(by_figure.get(figure, []))
+        label = ", ".join(qq_by_figure.get(figure, []))
         lines.append(f"![{label}](../{figure})")
     lines.append("")
     lines.append(f"Traces are {qq.standardization}.")
+    lines.append("")
+    lines.append(
+        "How to read (Q-Q): traces hugging the diagonal are approximately normal; "
+        "S-curves indicate tail behavior; curvature indicates skew."
+    )
+    lines.append("")
+
+    for figure in qq.dist_figures:
+        label = ", ".join(dist_by_figure.get(figure, []))
+        lines.append(f"![{label}](../{figure})")
+    lines.append("")
+    lines.append("Histograms are in raw units.")
+    lines.append("")
+    lines.append(
+        "How to read (distribution): actual spread and skew in original units; "
+        "look for heavy tails, multimodality, and gaps."
+    )
+
     if qq.excluded_notes:
         lines.append("")
         lines.append("Excluded features:")
         lines.extend(f"- {note}" for note in qq.excluded_notes)
-    lines.append("")
-    lines.append(
-        "How to read: traces hugging the diagonal are approximately normal; "
-        "S-curves indicate tail behavior; curvature indicates skew."
-    )
     return [("Profile evidence", "\n".join(lines))]
 
 

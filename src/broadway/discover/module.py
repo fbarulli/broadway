@@ -71,11 +71,11 @@ def _log_identifier_recommendations(contract: DatasetContract, profile: DatasetP
             logger.info(f"likely identifier: {col} (identifier_score={col_profile.identifier_score})")
 
 
-def _write_qq_overview(df: pd.DataFrame) -> None:
+def _write_qq_overview(df: pd.DataFrame, source_path: str) -> None:
     qq_dir = Path(ARTIFACTS_DIR) / "discover"
     qq_dir.mkdir(parents=True, exist_ok=True)
     FIGURES_DIR.mkdir(parents=True, exist_ok=True)
-    plot_numeric_qq(df, FIGURES_DIR, qq_dir / "qq_overview.json")
+    plot_numeric_qq(df, FIGURES_DIR, qq_dir / "qq_overview.json", source_path=source_path)
 
 
 def run(
@@ -102,7 +102,7 @@ def run(
     profile_path.write_text(profile.model_dump_json(indent=2), encoding="utf-8")
     logger.info(f"discover: wrote {len(profile.columns)} column profiles to {profile_path}")
     _log_identifier_recommendations(contract, profile)
-    _write_qq_overview(df)
+    _write_qq_overview(df, csv)
     write_record(
         node_id("profile", contract.name),
         "profile",
@@ -124,7 +124,7 @@ def profile(dataset_name: str) -> None:
     profile_path = profile_dir / "profile.json"
     profile_path.write_text(result.model_dump_json(indent=2), encoding="utf-8")
     logger.info(f"profile: wrote {len(result.columns)} columns to {profile_path}")
-    _write_qq_overview(df)
+    _write_qq_overview(df, contract.path)
     write_record(
         node_id("profile", contract.name),
         "profile",
