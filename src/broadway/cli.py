@@ -75,6 +75,13 @@ def _build_parser() -> argparse.ArgumentParser:
         _add_step_args(p)
         p.add_argument("--sample", required=True)
 
+    walkthrough = sub.add_parser("walkthrough")
+    walkthrough.add_argument("--analysis", type=str, required=True)
+    walkthrough.add_argument("--dataset", type=str, default=None)
+    walkthrough.add_argument("--sample", type=str, default=None)
+    walkthrough.add_argument("--force", action="store_true")
+    walkthrough.add_argument("--environment", type=str, default=DEFAULT_ENVIRONMENT)
+
     return parser
 
 
@@ -134,6 +141,14 @@ def main() -> None:
 
             sample = load_sample(args.sample)
             module_run(cfg, sample)
+    elif args.step == "walkthrough":
+        from broadway.timeline.walkthrough import run as walkthrough_run
+
+        cfg = load_config(
+            "stats", dataset=args.dataset, analysis=args.analysis, environment=args.environment,
+        )
+        sample = load_sample(args.sample) if args.sample else None
+        walkthrough_run(cfg, sample, args.force)
     else:
         from broadway.pipeline import run
 

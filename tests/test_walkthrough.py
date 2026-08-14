@@ -1,0 +1,179 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import pytest
+
+from broadway.config.loader import load_config
+from broadway.reports import paths
+from broadway.timeline import module, runners, walkthrough
+from broadway.timeline.models import AnalysisDecision, StepStatus
+
+
+def _setup(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(module, "TIMELINE_DIR", tmp_path / "timeline")
+    monkeypatch.setattr(walkthrough, "TIMELINE_DIR", tmp_path / "timeline")
+    monkeypatch.setattr(paths, "TIMELINE_PATH", tmp_path / "reports" / "timeline.md")
+    monkeypatch.setattr(paths, "FIGURES_DIR", tmp_path / "reports" / "figures")
+
+
+def _make_canonical(tmp_path: Path) -> Path:
+    rng = np.random.default_rng(0)
+    specs = [
+        ("Manhattan", 10.0, 1.0),
+        ("Brooklyn", 15.0, 1.5),
+        ("Queens", 12.0, 2.0),
+        ("Bronx", 13.0, 8.0),
+        ("Staten Island", 14.0, 1.2),
+    ]
+    frames = [
+        pd.DataFrame(
+            {"Borough": [name] * 60, "trip_duration_minutes": rng.normal(mean, std, 60)}
+        )
+        for name, mean, std in specs
+    ]
+    path = tmp_path / "taxi_canonical.parquet"
+    pd.concat(frames, ignore_index=True).to_parquet(path, index=False)
+    return path
+
+
+def _counter_clock():
+    state = {"n": 0}
+
+    def clock() -> str:
+        state["n"] += 1
+        return f"2026-01-01T00:00:{state['n']:02d}.000000+00:00"
+
+    return clock
+
+
+def _load_cfg():
+    return load_config("stats", dataset="taxi", analysis="taxi_hypothesis")
+
+
+def test_walkthrough_stops_at_gate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _setup(monkeypatch, tmp_path)
+    cfg = _load_cfg()
+    monkeypatch.setattr(runners, "canonical_path", lambda d, e: _make_canonical(tmp_path))
+
+    walkthrough.run(cfg, None, force=False)
+
+    steps_dir = tmp_path / "timeline" / "taxi_hypothesis" / "steps"
+    evidence_dir = tmp_path / "timeline" / "taxi_hypothesis" / "evidence"
+    for step_id in ("describe_groups", "normality", "variance"):
+        assert module.load_step("taxi_hypothesis", step_id) is not None
+        assert (steps_dir / f"{step_id}.json").exists()
+    for evidence in ("describe.json", "normality.json", "variance.json"):
+        assert (evidence_dir / evidence).exists()
+    assert (tmp_path / "reports" / "figures" / "normality_Manhattan.png").exists()
+    assert (tmp_path / "reports" / "timeline.md").exists()
+    assert module.load_step("taxi_hypothesis", "omnibus") is None
+    assert not (steps_dir / "omnibus.json").exists()
+
+    out = capsys.readouterr().out
+    assert "DECISION REQUIRED" in out
+    assert "decide_omnibus" in out
+
+
+def test_walkthrough_resume_idempotent(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _setup(monkeypatch, tmp_path)
+    cfg = _load_cfg()
+    monkeypatch.setattr(runners, "canonical_path", lambda d, e: _make_canonical(tmp_path))
+
+    walkthrough.run(cfg, None, force=False)
+    assert len(module.load_steps("taxi_hypothesis")) == 3
+
+    walkthrough.run(cfg, None, force=False)
+    assert len(module.load_steps("taxi_hypothesis")) == 3
+
+
+def test_walkthrough_force_reruns_but_preserves_decision(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _setup(monkeypatch, tmp_path)
+    cfg = _load_cfg()
+    monkeypatch.setattr(runners, "canonical_path", lambda d, e: _make_canonical(tmp_path))
+    monkeypatch.setattr(runners, "now_iso", _counter_clock())
+
+    walkthrough.run(cfg, None, force=False)
+    before = {s.step_id: s.performed_at for s in module.load_steps("taxi_hypothesis")}
+
+    decision = AnalysisDecision(
+        analysis="taxi_hypothesis",
+        id="omnibus",
+        kind="omnibus",
+        question="Which principal method should answer the question?",
+        method="welch",
+        reason=["non-normal"],
+        status="resolved",
+        parents=["normality"],
+        decided_at="2026-01-01T00:00:00Z",
+    )
+    module.save_decision(decision)
+
+    walkthrough.run(cfg, None, force=True)
+
+    after = {s.step_id: s.performed_at for s in module.load_steps("taxi_hypothesis")}
+    for step_id in ("describe_groups", "normality", "variance"):
+        assert after[step_id] != before[step_id]
+    assert module.load_decision("taxi_hypothesis", "omnibus") is not None
+
+
+def test_run_variance_warning_on_unequal_variances(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _setup(monkeypatch, tmp_path)
+    cfg = _load_cfg()
+    groups = {
+        "a": np.array([1.0, 1.1, 0.9, 1.0, 1.05, 0.95, 1.0, 1.1]),
+        "b": np.array([1.0, 50.0, 1.0, 40.0, 1.0, 60.0, 1.0, 45.0]),
+    }
+    step = runners.run_variance(
+        cfg.analysis, 3, "q?", groups, tmp_path / "timeline" / "taxi_hypothesis",
+        "canonical", None,
+    )
+    assert step.status == StepStatus.WARNING
+    assert step.method == "levene"
+
+
+def test_run_normality_writes_figures(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _setup(monkeypatch, tmp_path)
+    cfg = _load_cfg()
+    rng = np.random.default_rng(0)
+    groups = {g: rng.normal(10.0, 2.0, 30) for g in ("Manhattan", "Brooklyn", "Queens")}
+    figures_dir = tmp_path / "reports" / "figures"
+    step = runners.run_normality(
+        cfg.analysis, 2, "q?", groups, tmp_path / "timeline" / "taxi_hypothesis",
+        figures_dir, "canonical", None,
+    )
+    assert (figures_dir / "normality_Manhattan.png").exists()
+    assert (figures_dir / "normality_Brooklyn.png").exists()
+    assert (figures_dir / "normality_Queens.png").exists()
+    assert any("figures/normality_" in ref for ref in step.evidence_refs)
+
+
+def test_load_frame_and_groups_from_canonical(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _setup(monkeypatch, tmp_path)
+    cfg = _load_cfg()
+    canonical = _make_canonical(tmp_path)
+    monkeypatch.setattr(runners, "canonical_path", lambda d, e: canonical)
+
+    df, group_column, source_group_column, groups = runners.load_frame_and_groups(cfg, None)
+
+    assert group_column == "Borough"
+    assert source_group_column == "Borough"
+    assert set(groups) == set(cfg.analysis.hypothesis.group_values)
+    assert groups["Manhattan"].shape[0] == 60
+    assert groups["Bronx"].shape[0] == 60
+    assert "Borough" in df.columns
+    assert cfg.dataset.target in df.columns
