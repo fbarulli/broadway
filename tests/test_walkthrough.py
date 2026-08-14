@@ -8,7 +8,7 @@ import pytest
 
 from broadway.config.loader import load_config
 from broadway.reports import paths
-from broadway.timeline import module, runners, walkthrough
+from broadway.timeline import decide, module, runners, walkthrough
 from broadway.timeline.models import AnalysisDecision, StepStatus
 
 
@@ -91,6 +91,29 @@ def test_walkthrough_resume_idempotent(
 
     walkthrough.run(cfg, None, force=False)
     assert len(module.load_steps("taxi_hypothesis")) == 3
+
+
+def test_walkthrough_resume_past_gate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _setup(monkeypatch, tmp_path)
+    cfg = _load_cfg()
+    monkeypatch.setattr(runners, "canonical_path", lambda d, e: _make_canonical(tmp_path))
+
+    walkthrough.run(cfg, None, force=False)
+    assert "DECISION REQUIRED" in capsys.readouterr().out
+
+    decision = decide.record(
+        cfg.analysis, "omnibus", "welch", "non-normal",
+        ["describe_groups", "normality", "variance"],
+    )
+    module.save_decision(decision)
+
+    walkthrough.run(cfg, None, force=False)
+    out = capsys.readouterr().out
+    assert "DECISION REQUIRED" not in out
+    assert "step 'omnibus' not yet implemented; stopping." in out
+    assert (tmp_path / "reports" / "timeline.md").exists()
 
 
 def test_walkthrough_force_reruns_but_preserves_decision(

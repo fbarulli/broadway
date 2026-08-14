@@ -10,7 +10,7 @@ from broadway.reports import paths
 from broadway.reports.timeline import render_timeline
 from broadway.timeline import module as timeline_module
 from broadway.timeline import runners
-from broadway.timeline.models import AnalysisStep
+from broadway.timeline.models import AnalysisDecision, AnalysisStep
 from broadway.timeline.sequence import WalkthroughSequence, load_walkthrough_sequence
 
 logger = logging.getLogger(__name__)
@@ -22,8 +22,11 @@ EXECUTABLE_STEPS = {"describe_groups", "normality", "variance"}
 _OMNIBUS_METHODS = ["welch", "anova", "kruskal"]
 
 
-def _omnibus_decided(analysis: str) -> bool:
-    return any(d.kind == "omnibus" for d in timeline_module.load_decisions(analysis))
+def _resolved_decision(analysis: str, kind: str) -> AnalysisDecision | None:
+    for decision in timeline_module.load_decisions(analysis):
+        if decision.kind == kind and decision.status == "resolved":
+            return decision
+    return None
 
 
 def _write_timeline(analysis: str, sequence: WalkthroughSequence) -> None:
@@ -93,15 +96,29 @@ def run(cfg: PipelineConfig, sample: SampleSpec | None, force: bool) -> None:
 
     completed = 0
     for step in sorted(sequence.steps, key=lambda s: s.order):
-        if step.id == "decide_omnibus":
-            if _omnibus_decided(analysis.name):
-                logger.info("decide_omnibus already resolved — continuing past the gate")
+        if step.kind == "decision":
+            kind = step.id.removeprefix("decide_")
+            decision = _resolved_decision(analysis.name, kind)
+            if decision is not None:
+                logger.info("gate passed (method=%s)", decision.method)
                 continue
             _write_timeline(analysis.name, sequence)
-            _print_decision_required(analysis, timeline_module.load_steps(analysis.name))
+            if kind == "omnibus":
+                _print_decision_required(analysis, timeline_module.load_steps(analysis.name))
+            else:
+                print("=" * 60)
+                print(f"DECISION REQUIRED — {step.id}")
+                print("=" * 60)
+                print(f"Goal: {analysis.goal}")
+                print(
+                    f'Next: ds-pipeline decide --analysis {analysis.name} '
+                    f'--kind {kind} --method <method> --reason "..."'
+                )
             return
         if step.id not in EXECUTABLE_STEPS:
-            continue
+            _write_timeline(analysis.name, sequence)
+            print(f"step '{step.id}' not yet implemented; stopping.")
+            return
         if not force and timeline_module.load_step(analysis.name, step.id) is not None:
             logger.info("skipped %s (already exists)", step.id)
             continue

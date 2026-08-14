@@ -82,6 +82,14 @@ def _build_parser() -> argparse.ArgumentParser:
     walkthrough.add_argument("--force", action="store_true")
     walkthrough.add_argument("--environment", type=str, default=DEFAULT_ENVIRONMENT)
 
+    decide = sub.add_parser("decide")
+    decide.add_argument("--analysis", type=str, required=True)
+    decide.add_argument("--method", type=str, required=True)
+    decide.add_argument("--reason", type=str, required=True)
+    decide.add_argument("--kind", type=str, default="omnibus", choices=["omnibus", "posthoc"])
+    decide.add_argument("--dataset", type=str, default=None)
+    decide.add_argument("--environment", type=str, default=DEFAULT_ENVIRONMENT)
+
     return parser
 
 
@@ -149,6 +157,23 @@ def main() -> None:
         )
         sample = load_sample(args.sample) if args.sample else None
         walkthrough_run(cfg, sample, args.force)
+    elif args.step == "decide":
+        from broadway.analysis.contracts import AnalysisMode, require_mode
+        from broadway.timeline import decide as decide_module
+        from broadway.timeline import module as timeline_module
+
+        cfg = load_config(
+            "stats", dataset=args.dataset, analysis=args.analysis, environment=args.environment,
+        )
+        analysis = require_mode(cfg.analysis, AnalysisMode.HYPOTHESIS)
+        parents = decide_module.PARENTS_BY_KIND[args.kind]
+        decision = decide_module.record(analysis, args.kind, args.method, args.reason, parents)
+        timeline_module.save_decision(decision)
+        print(
+            f"recorded decision '{decision.kind}' (method={decision.method}) "
+            f"for analysis '{analysis.name}'"
+        )
+        print(f"next: ds-pipeline walkthrough --analysis {analysis.name}")
     else:
         from broadway.pipeline import run
 

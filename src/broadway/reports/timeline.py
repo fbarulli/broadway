@@ -19,39 +19,28 @@ def _decision_for(step_id: str, decisions: list[AnalysisDecision]) -> AnalysisDe
     return None
 
 
-def _is_blocked(
-    step: WalkthroughStepConfig,
-    seq_steps: list[WalkthroughStepConfig],
-    decisions: list[AnalysisDecision],
-) -> bool:
-    idx = next(i for i, s in enumerate(seq_steps) if s.id == step.id)
-    for upstream in seq_steps[:idx]:
-        if upstream.kind == "decision" and _decision_for(upstream.id, decisions) is None:
-            return True
-    return False
-
-
-def _status(
+def _derive_status(
     step: WalkthroughStepConfig,
     steps_by_id: dict[str, AnalysisStep],
     decisions: list[AnalysisDecision],
-    seq_steps: list[WalkthroughStepConfig],
-) -> str:
+    all_prior_resolved: bool,
+) -> tuple[str, bool]:
     persisted = steps_by_id.get(step.id)
     if persisted is not None:
-        if persisted.status == StepStatus.COMPLETED:
-            return COMPLETED
-        return WARNING
+        status = COMPLETED if persisted.status == StepStatus.COMPLETED else WARNING
+        return status, True
 
     if step.kind == "decision":
+        if not all_prior_resolved:
+            return BLOCKED, False
         decision = _decision_for(step.id, decisions)
         if decision is not None:
-            return f"{DECIDED} (method={decision.method})"
-        return DECISION_REQUIRED
+            return f"{DECIDED} (method={decision.method})", True
+        return DECISION_REQUIRED, False
 
-    if _is_blocked(step, seq_steps, decisions):
-        return BLOCKED
-    return NOT_STARTED
+    if not all_prior_resolved:
+        return BLOCKED, False
+    return NOT_STARTED, False
 
 
 def _summary_lines(summary: dict) -> list[str]:
@@ -70,8 +59,11 @@ def render_timeline(
     lines = [f"# Timeline — {analysis}", ""]
     lines.append("| # | Step | Question | Status |")
     lines.append("| --- | --- | --- | --- |")
+    all_prior_resolved = True
     for step in seq_steps:
-        status = _status(step, steps_by_id, decisions, seq_steps)
+        status, all_prior_resolved = _derive_status(
+            step, steps_by_id, decisions, all_prior_resolved
+        )
         lines.append(f"| {step.order} | {step.id} | {step.question} | {status} |")
 
     for step in seq_steps:

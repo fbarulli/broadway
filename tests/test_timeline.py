@@ -173,9 +173,56 @@ def test_render_not_started_evidence() -> None:
 def test_render_empty_no_crash() -> None:
     seq = load_walkthrough_sequence()
     md = render_timeline("taxi", seq, [], [])
-    assert "◆ decision required" in md
     assert "○ not started" in md
     assert "⏸ blocked" in md
+    assert "◆ decision required" not in md
+
+
+def test_render_decide_posthoc_blocked_when_omnibus_incomplete() -> None:
+    seq = _seq(
+        [
+            {"id": "omnibus", "order": 1, "question": "Q?", "kind": "analysis"},
+            {"id": "decide_posthoc", "order": 2, "question": "Q?", "kind": "decision"},
+        ]
+    )
+    md = render_timeline("taxi", seq, [], [])
+    assert "| 2 | decide_posthoc | Q? | ⏸ blocked |" in md
+    assert "◆ decision required" not in md
+
+
+def test_render_decide_posthoc_required_when_omnibus_completed() -> None:
+    seq = _seq(
+        [
+            {"id": "omnibus", "order": 1, "question": "Q?", "kind": "analysis"},
+            {"id": "decide_posthoc", "order": 2, "question": "Q?", "kind": "decision"},
+        ]
+    )
+    omnibus_step = _step(step_id="omnibus", order=1)
+    md = render_timeline("taxi", seq, [omnibus_step], [])
+    assert "| 2 | decide_posthoc | Q? | ◆ decision required |" in md
+
+
+def test_render_decide_omnibus_required_only_when_prereqs_completed() -> None:
+    seq = _seq(
+        [
+            {"id": "describe_groups", "order": 1, "question": "Q?", "kind": "evidence"},
+            {"id": "normality", "order": 2, "question": "Q?", "kind": "evidence"},
+            {"id": "variance", "order": 3, "question": "Q?", "kind": "evidence"},
+            {"id": "decide_omnibus", "order": 4, "question": "Q?", "kind": "decision"},
+        ]
+    )
+    completed = [
+        _step(step_id="describe_groups", order=1),
+        _step(step_id="normality", order=2),
+        _step(step_id="variance", order=3),
+    ]
+    md = render_timeline("taxi", seq, completed, [])
+    assert "| 4 | decide_omnibus | Q? | ◆ decision required |" in md
+
+    partial = [_step(step_id="describe_groups", order=1)]
+    md = render_timeline("taxi", seq, partial, [])
+    assert "| 4 | decide_omnibus | Q? | ⏸ blocked |" in md
+    assert "◆ decision required" not in md
 
 
 def test_render_includes_details_for_completed() -> None:
