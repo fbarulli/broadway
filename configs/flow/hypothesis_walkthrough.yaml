@@ -1,0 +1,33 @@
+steps:
+  - id: describe_groups
+    order: 1
+    question: Do the groups contain enough observations?
+    kind: evidence
+  - id: normality
+    order: 2
+    question: Is the distributional shape problematic?
+    kind: evidence
+  - id: variance
+    order: 3
+    question: Is error/group variance homogeneous?
+    kind: evidence
+  - id: decide_omnibus
+    order: 4
+    question: Which principal method should answer the question?
+    kind: decision
+  - id: omnibus
+    order: 5
+    question: Do the group means differ?
+    kind: analysis
+  - id: decide_posthoc
+    order: 6
+    question: Which post-hoc comparison is appropriate?
+    kind: decision
+  - id: posthoc
+    order: 7
+    question: Which specific group pairs differ?
+    kind: analysis
+  - id: conclusion
+    order: 8
+    question: What is the conclusion?
+    kind: analysis

@@ -1,0 +1,187 @@
+from __future__ import annotations
+
+import broadway.timeline.module as module
+from broadway.reports.timeline import render_timeline
+from broadway.timeline.models import (
+    Alternative,
+    AnalysisDecision,
+    AnalysisStep,
+    StepStatus,
+    Suggestion,
+)
+from broadway.timeline.sequence import (
+    WalkthroughSequence,
+    WalkthroughStepConfig,
+    load_walkthrough_sequence,
+)
+
+
+def _step(**overrides) -> AnalysisStep:
+    base = {
+        "analysis": "taxi",
+        "step_id": "describe_groups",
+        "order": 1,
+        "question": "Do the groups contain enough observations?",
+        "status": StepStatus.COMPLETED,
+        "method": "describe",
+        "source": "canonical",
+        "sample_name": None,
+        "evidence_refs": ["profile.json"],
+        "result_summary": {"n": 10},
+        "ramification": "groups are comparable",
+        "decision_required": False,
+        "performed_at": "2026-01-01T00:00:00Z",
+    }
+    base.update(overrides)
+    return AnalysisStep(**base)
+
+
+def _decision(**overrides) -> AnalysisDecision:
+    base = {
+        "analysis": "taxi",
+        "id": "omnibus",
+        "kind": "omnibus",
+        "question": "Which principal method should answer the question?",
+        "method": "welch",
+        "reason": ["non-normal"],
+        "status": "resolved",
+        "parents": ["normality"],
+        "decided_at": "2026-01-01T00:00:00Z",
+    }
+    base.update(overrides)
+    return AnalysisDecision(**base)
+
+
+def _seq(steps: list[dict]) -> WalkthroughSequence:
+    return WalkthroughSequence(steps=[WalkthroughStepConfig(**s) for s in steps])
+
+
+def test_step_roundtrip() -> None:
+    step = _step()
+    assert AnalysisStep.model_validate_json(step.model_dump_json()) == step
+
+
+def test_decision_roundtrip() -> None:
+    decision = _decision()
+    assert AnalysisDecision.model_validate_json(decision.model_dump_json()) == decision
+
+
+def test_suggestion_roundtrip() -> None:
+    suggestion = Suggestion(
+        step_id="omnibus",
+        headline="use welch",
+        rationale=["non-normal"],
+        command="run welch",
+        alternatives=[
+            Alternative(
+                label="kruskal",
+                command="run kruskal",
+                intent="alternative",
+                rationale="rank-based",
+            )
+        ],
+    )
+    assert Suggestion.model_validate_json(suggestion.model_dump_json()) == suggestion
+
+
+def test_load_walkthrough_sequence() -> None:
+    seq = load_walkthrough_sequence()
+    assert [s.order for s in seq.steps] == list(range(1, 9))
+    assert [s.id for s in seq.steps] == [
+        "describe_groups",
+        "normality",
+        "variance",
+        "decide_omnibus",
+        "omnibus",
+        "decide_posthoc",
+        "posthoc",
+        "conclusion",
+    ]
+    assert [s.kind for s in seq.steps] == [
+        "evidence",
+        "evidence",
+        "evidence",
+        "decision",
+        "analysis",
+        "decision",
+        "analysis",
+        "analysis",
+    ]
+
+
+def test_persistence_roundtrip(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(module, "TIMELINE_DIR", tmp_path / "timeline")
+    module.save_step(_step(step_id="normality", order=2))
+    module.save_step(_step(step_id="describe_groups", order=1))
+
+    assert module.load_step("taxi", "normality") == _step(step_id="normality", order=2)
+    assert module.load_step("taxi", "missing") is None
+
+    loaded = module.load_steps("taxi")
+    assert [s.step_id for s in loaded] == ["describe_groups", "normality"]
+
+
+def test_decision_persistence_roundtrip(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(module, "TIMELINE_DIR", tmp_path / "timeline")
+    module.save_decision(_decision())
+    assert module.load_decision("taxi", "omnibus") == _decision()
+    assert module.load_decision("taxi", "missing") is None
+    assert [d.id for d in module.load_decisions("taxi")] == ["omnibus"]
+
+
+def test_render_completed_step() -> None:
+    seq = _seq([{"id": "describe_groups", "order": 1, "question": "Q?", "kind": "evidence"}])
+    md = render_timeline("taxi", seq, [_step()], [])
+    assert "✓ completed" in md
+
+
+def test_render_warning_step() -> None:
+    seq = _seq([{"id": "describe_groups", "order": 1, "question": "Q?", "kind": "evidence"}])
+    md = render_timeline("taxi", seq, [_step(status=StepStatus.WARNING)], [])
+    assert "⚠ warning" in md
+
+
+def test_render_decision_resolved() -> None:
+    seq = _seq([{"id": "decide_omnibus", "order": 1, "question": "Q?", "kind": "decision"}])
+    md = render_timeline("taxi", seq, [], [_decision(id="omnibus", kind="omnibus", method="welch")])
+    assert "✓ decided (method=welch)" in md
+
+
+def test_render_decision_required() -> None:
+    seq = _seq([{"id": "decide_omnibus", "order": 1, "question": "Q?", "kind": "decision"}])
+    md = render_timeline("taxi", seq, [], [])
+    assert "◆ decision required" in md
+
+
+def test_render_blocked_after_unresolved_decision() -> None:
+    seq = _seq(
+        [
+            {"id": "decide_omnibus", "order": 1, "question": "Q?", "kind": "decision"},
+            {"id": "omnibus", "order": 2, "question": "Q?", "kind": "analysis"},
+        ]
+    )
+    md = render_timeline("taxi", seq, [], [])
+    assert "⏸ blocked" in md
+
+
+def test_render_not_started_evidence() -> None:
+    seq = _seq([{"id": "describe_groups", "order": 1, "question": "Q?", "kind": "evidence"}])
+    md = render_timeline("taxi", seq, [], [])
+    assert "○ not started" in md
+
+
+def test_render_empty_no_crash() -> None:
+    seq = load_walkthrough_sequence()
+    md = render_timeline("taxi", seq, [], [])
+    assert "◆ decision required" in md
+    assert "○ not started" in md
+    assert "⏸ blocked" in md
+
+
+def test_render_includes_details_for_completed() -> None:
+    seq = _seq([{"id": "describe_groups", "order": 1, "question": "Q?", "kind": "evidence"}])
+    md = render_timeline("taxi", seq, [_step()], [])
+    assert "## describe_groups" in md
+    assert "ramification: groups are comparable" in md
+    assert "profile.json" in md
+    assert "n: 10" in md
