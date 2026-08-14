@@ -92,6 +92,55 @@ def test_suggest_variance_warning_favors_welch() -> None:
     assert "use Welch" not in suggestion.command
 
 
+def test_suggest_variance_warning_command_not_prefilled() -> None:
+    step = _step(
+        "variance",
+        StepStatus.WARNING,
+        {"statistic": 12.3, "p_value": 0.001},
+        order=3,
+    )
+    suggestion = suggest_after("variance", [step], [], _cfg(), "taxi")
+    assert suggestion is not None
+    assert "--method <method>" in suggestion.command
+    assert "--method welch" not in suggestion.command
+    for alt in suggestion.alternatives:
+        assert "--method welch" not in alt.command
+        assert "--method kruskal" not in alt.command
+
+
+def test_suggest_variance_ok_command_not_prefilled() -> None:
+    step = _step(
+        "variance",
+        StepStatus.COMPLETED,
+        {"statistic": 0.5, "p_value": 0.9},
+        order=3,
+    )
+    suggestion = suggest_after("variance", [step], [], _cfg(), "taxi")
+    assert suggestion is not None
+    assert "--method <method>" in suggestion.command
+    assert "--method anova" not in suggestion.command
+
+
+def test_suggest_omnibus_passed_command_not_prefilled() -> None:
+    step = _step(
+        "omnibus",
+        StepStatus.COMPLETED,
+        {"method": "welch", "p_value": 0.001, "passed": True},
+        order=5,
+    )
+    suggestion = suggest_after("omnibus", [step], [], _cfg(), "taxi")
+    assert suggestion is not None
+    assert "--kind posthoc --method <method>" in suggestion.command
+    assert "games_howell" not in suggestion.command
+
+
+def test_suggest_decide_posthoc_command_not_prefilled() -> None:
+    suggestion = suggest_after("decide_posthoc", [], [], _cfg(), "taxi")
+    assert suggestion is not None
+    assert "--kind posthoc --method <method>" in suggestion.command
+    assert "games_howell" not in suggestion.command
+
+
 def test_suggest_describe_note_is_flagged() -> None:
     step = _step(
         "describe_groups",

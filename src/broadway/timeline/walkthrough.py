@@ -243,7 +243,7 @@ def run(cfg: PipelineConfig, sample: SampleSpec | None, force: bool) -> None:
                 step_result = runners.run_describe(
                     analysis, step.order, step.question, df, group_column,
                     source_group_column, group_values, target, source_path,
-                    sample_name, source, out_dir, attrition,
+                    sample_name, source, out_dir, figures_dir, attrition,
                 )
             elif step.id == "normality":
                 step_result = runners.run_normality(

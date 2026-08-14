@@ -4,15 +4,11 @@ from broadway.reports.results import (
     attrition_line,
     derive_status,
     effect_size_lines,
-    figure_link,
     humanize_summary,
+    is_figure_ref,
 )
 from broadway.timeline.models import AnalysisDecision, AnalysisStep
 from broadway.timeline.sequence import WalkthroughSequence
-
-
-def _ref_line(ref: str) -> str:
-    return figure_link(ref, up="")
 
 
 def render_timeline(
@@ -42,7 +38,8 @@ def render_timeline(
         lines.append(f"## {step.label}")
         lines.append("")
         lines.append(f"- ramification: {persisted.ramification}")
-        refs = ", ".join(_ref_line(r) for r in persisted.evidence_refs) if persisted.evidence_refs else "-"
+        machine_refs = [r for r in persisted.evidence_refs if not is_figure_ref(r)]
+        refs = ", ".join(machine_refs) if machine_refs else "-"
         lines.append(f"- evidence_refs: {refs}")
         lines.append("- result_summary:")
         for bullet in humanize_summary(persisted.result_summary):
@@ -52,5 +49,7 @@ def render_timeline(
                 lines.append(f"  - {line}")
         if persisted.step_id == "describe_groups":
             lines.append(f"  - {attrition_line(persisted.result_summary)}")
+        for fig in persisted.figures:
+            lines.append(f"![{fig.caption}]({fig.path})")
 
     return "\n".join(lines)

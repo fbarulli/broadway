@@ -101,7 +101,7 @@ def _suggest_variance(step, cfg: WalkthroughConfig, analysis_name: str) -> Sugge
             rationale=[f"Levene statistic={statistic}, p_value={p_value}"],
             command=(
                 f'ds-pipeline decide --analysis {analysis_name} '
-                f'--method welch --reason "..."'
+                f'--method <method> --reason "..."'
             ),
             alternatives=[
                 _alternative(
@@ -120,7 +120,7 @@ def _suggest_variance(step, cfg: WalkthroughConfig, analysis_name: str) -> Sugge
                     "Rank-based analysis is robust to both shape and variance",
                     command=(
                         f'ds-pipeline decide --analysis {analysis_name} '
-                        f'--method kruskal --reason "..."'
+                        f'--method <method> --reason "..."'
                     ),
                 ),
             ],
@@ -129,7 +129,7 @@ def _suggest_variance(step, cfg: WalkthroughConfig, analysis_name: str) -> Sugge
         step_id=step.step_id,
         headline="No evidence of unequal variances",
         rationale=["proceed to the omnibus analysis"],
-        command=f"ds-pipeline decide --analysis {analysis_name} --method anova --reason \"...\"",
+        command=f"ds-pipeline decide --analysis {analysis_name} --method <method> --reason \"...\"",
         alternatives=[],
     )
 
@@ -142,7 +142,7 @@ def _suggest_omnibus(step, cfg: WalkthroughConfig, analysis_name: str) -> Sugges
             rationale=["at least one group mean differs from the others"],
             command=(
                 f'ds-pipeline decide --analysis {analysis_name} '
-                f'--kind posthoc --method games_howell --reason "..."'
+                f'--kind posthoc --method <method> --reason "..."'
             ),
             alternatives=[
                 _alternative(
@@ -203,7 +203,7 @@ def _suggest_decide_posthoc(cfg: WalkthroughConfig, analysis_name: str) -> Sugge
         rationale=["choose the post-hoc method guided by the omnibus result"],
         command=(
             f'ds-pipeline decide --analysis {analysis_name} '
-            f'--kind posthoc --method games_howell --reason "..."'
+            f'--kind posthoc --method <method> --reason "..."'
         ),
         alternatives=[
             _alternative(

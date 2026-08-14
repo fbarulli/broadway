@@ -6,6 +6,7 @@ from broadway.timeline.models import (
     Alternative,
     AnalysisDecision,
     AnalysisStep,
+    FigureRef,
     StepStatus,
     Suggestion,
 )
@@ -64,6 +65,32 @@ def _seq(steps: list[dict]) -> WalkthroughSequence:
 def test_step_roundtrip() -> None:
     step = _step()
     assert AnalysisStep.model_validate_json(step.model_dump_json()) == step
+
+
+def test_figure_ref_roundtrip() -> None:
+    fig = FigureRef(path="figures/describe_boxplot.png", caption="How to read: ...")
+    assert FigureRef.model_validate_json(fig.model_dump_json()) == fig
+
+
+def test_step_without_figures_defaults_to_empty() -> None:
+    step = _step()
+    assert step.figures == []
+    data = step.model_dump()
+    data.pop("figures", None)
+    parsed = AnalysisStep.model_validate(data)
+    assert parsed.figures == []
+
+
+def test_step_figures_roundtrip() -> None:
+    step = _step(
+        figures=[
+            FigureRef(
+                path="figures/describe_boxplot.png",
+                caption="How to read: each box spans the interquartile range.",
+            )
+        ]
+    )
+    assert AnalysisStep.model_validate_json(step.model_dump_json()).figures == step.figures
 
 
 def test_decision_roundtrip() -> None:
@@ -266,3 +293,28 @@ def test_render_includes_details_for_completed() -> None:
     assert "ramification: groups are comparable" in md
     assert "profile.json" in md
     assert "n: 10" in md
+
+
+def test_render_timeline_figure_link_has_no_parent_prefix() -> None:
+    seq = _seq([{"id": "describe_groups", "order": 1, "question": "Q?", "kind": "evidence"}])
+    caption = "How to read: each box spans the interquartile range."
+    step = _step(
+        figures=[FigureRef(path="figures/describe_boxplot.png", caption=caption)]
+    )
+    md = render_timeline("taxi", seq, [step], [])
+    assert f"![{caption}](figures/describe_boxplot.png)" in md
+    assert "](../figures/describe_boxplot.png)" not in md
+    assert "(../figures/describe_boxplot.png)" not in md
+
+
+def test_render_timeline_machine_json_refs_are_plain_text() -> None:
+    seq = _seq([{"id": "normality", "order": 1, "question": "Q?", "kind": "evidence"}])
+    step = _step(
+        step_id="normality",
+        evidence_refs=["normality.json", "figures/normality_A.png"],
+        figures=[FigureRef(path="figures/normality_A.png", caption="How to read: points hug the diagonal.")],
+    )
+    md = render_timeline("taxi", seq, [step], [])
+    assert "normality.json" in md
+    assert "[normality_A.png]" not in md
+    assert "![How to read: points hug the diagonal.](figures/normality_A.png)" in md

@@ -32,8 +32,8 @@ distributional shape is skewed/heavy-tailed in some groups; consider this alongs
 
 ## Figures
 
-- [normality_Manhattan.png](../figures/normality_Manhattan.png)
-- [normality_Brooklyn.png](../figures/normality_Brooklyn.png)
-- [normality_Queens.png](../figures/normality_Queens.png)
-- [normality_Bronx.png](../figures/normality_Bronx.png)
-- [normality_Staten_Island.png](../figures/normality_Staten_Island.png)
+![How to read: points that hug the diagonal line indicate the group is approximately normal; curvature or heavy tails indicate non-normality.](../figures/normality_Manhattan.png)
+![How to read: points that hug the diagonal line indicate the group is approximately normal; curvature or heavy tails indicate non-normality.](../figures/normality_Brooklyn.png)
+![How to read: points that hug the diagonal line indicate the group is approximately normal; curvature or heavy tails indicate non-normality.](../figures/normality_Queens.png)
+![How to read: points that hug the diagonal line indicate the group is approximately normal; curvature or heavy tails indicate non-normality.](../figures/normality_Bronx.png)
+![How to read: points that hug the diagonal line indicate the group is approximately normal; curvature or heavy tails indicate non-normality.](../figures/normality_Staten_Island.png)

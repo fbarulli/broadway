@@ -67,11 +67,8 @@ def humanize_summary(summary: dict) -> list[str]:
     return lines
 
 
-def figure_link(ref: str, up: str = "../") -> str:
-    if ref.endswith((".png", ".jpg", ".jpeg", ".svg")):
-        name = ref.rsplit("/", 1)[-1]
-        return f"[{name}]({up}{ref})"
-    return ref
+def is_figure_ref(ref: str) -> bool:
+    return ref.endswith((".png", ".jpg", ".jpeg", ".svg"))
 
 
 def attrition_line(summary: dict) -> str:
@@ -180,15 +177,10 @@ def _render_step_page(seq_step, step: AnalysisStep) -> str:
         lines.append("")
         lines.append(attrition_line(step.result_summary))
         lines.append("")
-    figures = [
-        figure_link(ref)
-        for ref in step.evidence_refs
-        if ref.endswith((".png", ".jpg", ".jpeg", ".svg"))
-    ]
-    if figures:
+    if step.figures:
         lines.append("## Figures")
         lines.append("")
-        lines.extend(f"- {f}" for f in figures)
+        lines.extend(f"![{fig.caption}](../{fig.path})" for fig in step.figures)
         lines.append("")
     return "\n".join(lines)
 

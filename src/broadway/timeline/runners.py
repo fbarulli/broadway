@@ -20,7 +20,7 @@ from broadway.lineage.models import SampleSpec
 from broadway.reports.results import humanize_float, humanize_pvalue
 from broadway.stats.anova import run_anova, run_kruskal, run_welch
 from broadway.stats.assumptions import check_normality, run_levene
-from broadway.stats.describe import describe
+from broadway.stats.describe import describe, plot_group_distribution, plot_group_sizes
 from broadway.stats.post_hoc import games_howell
 from broadway.timeline.evidence import (
     ConclusionEvidence,
@@ -30,8 +30,21 @@ from broadway.timeline.evidence import (
     PosthocPair,
     VarianceEvidence,
 )
-from broadway.timeline.models import AnalysisStep, StepStatus
+from broadway.timeline.models import AnalysisStep, FigureRef, StepStatus
 from broadway.timeline.sequence import WalkthroughConfig, load_walkthrough_config
+
+BOXPLOT_CAPTION = (
+    "How to read: each box spans the interquartile range with a line at the median; "
+    "boxes at different heights indicate different group centers."
+)
+GROUP_SIZES_CAPTION = (
+    "How to read: bar height is the number of observations per group; "
+    "very unequal bars indicate imbalance."
+)
+QQ_CAPTION = (
+    "How to read: points that hug the diagonal line indicate the group is "
+    "approximately normal; curvature or heavy tails indicate non-normality."
+)
 
 
 def _thresholds() -> WalkthroughConfig:
@@ -113,6 +126,7 @@ def run_describe(
     sample_name: str | None,
     source: str,
     out_dir: Path,
+    figures_dir: Path,
     attrition: dict[str, int | str] | None = None,
 ) -> AnalysisStep:
     summary = describe(
@@ -126,6 +140,12 @@ def run_describe(
     (evidence_dir / "describe.json").write_text(
         summary.model_dump_json(indent=2), encoding="utf-8"
     )
+    figures_dir.mkdir(parents=True, exist_ok=True)
+    plot_group_distribution(
+        df, source_group_column, group_column, group_values, target,
+        figures_dir / "describe_boxplot.png",
+    )
+    plot_group_sizes(summary, figures_dir / "describe_group_sizes.png")
     thresholds = _thresholds()
     flagged = summary.imbalance_ratio > thresholds.imbalance_ratio_threshold or bool(summary.absent_groups)
     if flagged:
@@ -146,7 +166,15 @@ def run_describe(
         method="describe",
         source=source,
         sample_name=sample_name,
-        evidence_refs=["describe.json"],
+        evidence_refs=[
+            "describe.json",
+            "figures/describe_boxplot.png",
+            "figures/describe_group_sizes.png",
+        ],
+        figures=[
+            FigureRef(path="figures/describe_boxplot.png", caption=BOXPLOT_CAPTION),
+            FigureRef(path="figures/describe_group_sizes.png", caption=GROUP_SIZES_CAPTION),
+        ],
         result_summary={
             "total_n": summary.total_n,
             "imbalance_ratio": summary.imbalance_ratio,
@@ -190,12 +218,14 @@ def run_normality(
     result = check_normality(groups)
     figures_dir.mkdir(parents=True, exist_ok=True)
     figure_paths: list[str] = []
+    figure_refs: list[FigureRef] = []
     for name, vals in groups.items():
         if len(vals) < 2:
             continue
         fname = f"normality_{_safe_filename(name)}.png"
         _plot_qq(vals, name, figures_dir / fname)
         figure_paths.append(f"figures/{fname}")
+        figure_refs.append(FigureRef(path=f"figures/{fname}", caption=QQ_CAPTION))
     evidence = NormalityEvidence(
         groups={g: NormalityGroupStat(**s) for g, s in result.items()},
         figures=figure_paths,
@@ -228,6 +258,7 @@ def run_normality(
         source=source,
         sample_name=sample_name,
         evidence_refs=["normality.json"] + figure_paths,
+        figures=figure_refs,
         result_summary={
             g: {"skew": s["skew"], "kurtosis": s["kurtosis"], "shapiro_p": s["shapiro_p"]}
             for g, s in result.items()

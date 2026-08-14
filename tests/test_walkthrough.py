@@ -419,6 +419,7 @@ def test_run_describe_attrition_none(
         cfg.analysis, 1, "q?", df, "Borough", "Borough",
         ["Manhattan", "Brooklyn"], "trip_duration_minutes", "x.parquet",
         None, "canonical", tmp_path / "timeline" / "taxi_hypothesis",
+        tmp_path / "reports" / "figures",
     )
     rs = step.result_summary
     assert rs["n_total"] == 2
@@ -442,6 +443,7 @@ def test_run_describe_attrition_null_group(
         cfg.analysis, 1, "q?", df, "Borough", "Borough",
         ["Manhattan", "Brooklyn"], "trip_duration_minutes", "x.parquet",
         None, "canonical", tmp_path / "timeline" / "taxi_hypothesis",
+        tmp_path / "reports" / "figures",
     )
     rs = step.result_summary
     assert rs["n_excluded"] == 1
@@ -463,6 +465,7 @@ def test_run_describe_attrition_unlisted_group(
         cfg.analysis, 1, "q?", df, "Borough", "Borough",
         ["Manhattan", "Brooklyn"], "trip_duration_minutes", "x.parquet",
         None, "canonical", tmp_path / "timeline" / "taxi_hypothesis",
+        tmp_path / "reports" / "figures",
     )
     rs = step.result_summary
     assert rs["n_excluded"] == 1

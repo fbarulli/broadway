@@ -24,11 +24,13 @@
   - n_excluded: 710
   - exclusion_reason: unlisted group
   - N used 199420 of 200130 (710 excluded: unlisted group); see audit
+![How to read: each box spans the interquartile range with a line at the median; boxes at different heights indicate different group centers.](figures/describe_boxplot.png)
+![How to read: bar height is the number of observations per group; very unequal bars indicate imbalance.](figures/describe_group_sizes.png)
 
 ## Normality diagnostics
 
 - ramification: distributional shape is skewed/heavy-tailed in some groups; consider this alongside sample size before choosing a method.
-- evidence_refs: normality.json, [normality_Manhattan.png](figures/normality_Manhattan.png), [normality_Brooklyn.png](figures/normality_Brooklyn.png), [normality_Queens.png](figures/normality_Queens.png), [normality_Bronx.png](figures/normality_Bronx.png), [normality_Staten_Island.png](figures/normality_Staten_Island.png)
+- evidence_refs: normality.json
 - result_summary:
   - Manhattan.skew: 2.61
   - Manhattan.kurtosis: 13
@@ -45,6 +47,11 @@
   - Staten Island.skew: 1.02
   - Staten Island.kurtosis: 0.606
   - Staten Island.shapiro_p: < 0.001
+![How to read: points that hug the diagonal line indicate the group is approximately normal; curvature or heavy tails indicate non-normality.](figures/normality_Manhattan.png)
+![How to read: points that hug the diagonal line indicate the group is approximately normal; curvature or heavy tails indicate non-normality.](figures/normality_Brooklyn.png)
+![How to read: points that hug the diagonal line indicate the group is approximately normal; curvature or heavy tails indicate non-normality.](figures/normality_Queens.png)
+![How to read: points that hug the diagonal line indicate the group is approximately normal; curvature or heavy tails indicate non-normality.](figures/normality_Bronx.png)
+![How to read: points that hug the diagonal line indicate the group is approximately normal; curvature or heavy tails indicate non-normality.](figures/normality_Staten_Island.png)
 
 ## Variance homogeneity
 

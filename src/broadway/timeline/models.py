@@ -21,6 +21,13 @@ RENDERED_STATUS: dict[StepStatus, str] = {
 }
 
 
+class FigureRef(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    path: str      # relative to reports/ (e.g. "figures/describe_boxplot.png")
+    caption: str   # one-line "How to read" text
+
+
 class AnalysisStep(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -33,6 +40,7 @@ class AnalysisStep(BaseModel):
     source: str
     sample_name: str | None
     evidence_refs: list[str]
+    figures: list[FigureRef] = []
     result_summary: dict
     ramification: str
     decision_required: bool
