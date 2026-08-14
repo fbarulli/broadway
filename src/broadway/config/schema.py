@@ -55,6 +55,7 @@ class DatasetContract(BaseModel):
     datetime_column: str | None
     columns: dict[str, ColumnSchema]
     lookup_tables: dict[str, LookupSpec]
+    exclude_from_profiling: list[str] = []
 
 
 class EnvironmentConfig(BaseModel):

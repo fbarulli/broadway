@@ -65,3 +65,6 @@ name: taxi
 path: data/processed/training_data.parquet
 target: trip_duration_minutes
 task: regression
+exclude_from_profiling:
+  - pickup_location_id
+  - dropoff_location_id

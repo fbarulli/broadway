@@ -108,6 +108,9 @@ def test_plot_numeric_qq_excludes_and_splits(tmp_path) -> None:
 
     assert overview.total_features == 17
     assert overview.excluded_features == 2
+    assert overview.discrete_features == 0
+    assert overview.non_numeric_columns == []
+    assert overview.flagged_id_columns == []
     assert "allnan: non-finite" in overview.excluded_notes
     assert "const: zero variance" in overview.excluded_notes
 
@@ -176,6 +179,111 @@ def test_plot_numeric_qq_boundary_no_overflow(tmp_path) -> None:
     assert overview.dist_figures == ["figures/numeric_dist_1.png", "figures/numeric_dist_2.png"]
 
 
+def test_plot_numeric_qq_discrete_feature(tmp_path) -> None:
+    figures_dir = tmp_path / "reports" / "figures"
+    evidence_path = tmp_path / "artifacts" / "discover" / "qq_overview.json"
+    rng = np.random.default_rng(0)
+    df = pd.DataFrame(
+        {
+            "passenger_count": rng.integers(1, 6, 200).astype(float),
+            "continuous": rng.normal(0.0, 1.0, 200),
+        }
+    )
+
+    overview = plot_numeric_qq(df, figures_dir, evidence_path, source_path="data.csv")
+
+    pc = next(f for f in overview.features if f.feature == "passenger_count")
+    assert pc.status == "discrete"
+    assert pc.figure == ""
+    assert pc.dist_figure == "figures/numeric_dist_1.png"
+    assert pc.reason == "discrete (5 unique values)"
+    assert overview.discrete_features == 1
+    assert overview.figures == ["figures/numeric_qq_1.png"]
+    assert (figures_dir / "numeric_dist_1.png").exists()
+
+
+def test_plot_numeric_qq_declared_id_excluded(tmp_path) -> None:
+    figures_dir = tmp_path / "reports" / "figures"
+    evidence_path = tmp_path / "artifacts" / "discover" / "qq_overview.json"
+    rng = np.random.default_rng(0)
+    df = pd.DataFrame(
+        {
+            "pickup_location_id": rng.integers(1, 265, 200),
+            "continuous": rng.normal(0.0, 1.0, 200),
+        }
+    )
+
+    overview = plot_numeric_qq(
+        df, figures_dir, evidence_path, source_path="data.csv",
+        exclude=["pickup_location_id"],
+    )
+
+    pid = next(f for f in overview.features if f.feature == "pickup_location_id")
+    assert pid.status == "excluded"
+    assert pid.reason == "declared id"
+    assert pid.figure == ""
+    assert pid.dist_figure == ""
+    assert overview.excluded_features == 1
+    assert "pickup_location_id: declared id" in overview.excluded_notes
+    assert overview.flagged_id_columns == []
+
+
+def test_plot_numeric_qq_id_heuristic_flag(tmp_path) -> None:
+    figures_dir = tmp_path / "reports" / "figures"
+    evidence_path = tmp_path / "artifacts" / "discover" / "qq_overview.json"
+    rng = np.random.default_rng(0)
+    df = pd.DataFrame(
+        {
+            "foo_id": rng.normal(0.0, 1.0, 200),
+            "continuous": rng.normal(1.0, 1.0, 200),
+        }
+    )
+
+    overview = plot_numeric_qq(df, figures_dir, evidence_path, source_path="data.csv")
+
+    foo = next(f for f in overview.features if f.feature == "foo_id")
+    assert foo.status == "plotted"
+    assert foo.figure == "figures/numeric_qq_1.png"
+    assert "foo_id" in overview.flagged_id_columns
+
+
+def test_plot_numeric_qq_non_numeric_columns(tmp_path) -> None:
+    figures_dir = tmp_path / "reports" / "figures"
+    evidence_path = tmp_path / "artifacts" / "discover" / "qq_overview.json"
+    rng = np.random.default_rng(0)
+    df = pd.DataFrame(
+        {
+            "continuous": rng.normal(0.0, 1.0, 200),
+            "when": pd.to_datetime("2024-01-01") + pd.to_timedelta(np.arange(200), unit="D"),
+            "label": ["a", "b"] * 100,
+        }
+    )
+
+    overview = plot_numeric_qq(df, figures_dir, evidence_path, source_path="data.csv")
+
+    assert set(overview.non_numeric_columns) == {"when", "label"}
+    plotted = {f.feature for f in overview.features}
+    assert "when" not in plotted
+    assert "label" not in plotted
+
+
+def test_plot_numeric_qq_min_unique_env_override(tmp_path, monkeypatch) -> None:
+    figures_dir = tmp_path / "reports" / "figures"
+    evidence_path = tmp_path / "artifacts" / "discover" / "qq_overview.json"
+    rng = np.random.default_rng(0)
+    df = pd.DataFrame({"x": rng.integers(0, 20, 300).astype(float)})
+
+    monkeypatch.setenv("BROADWAY_QQ_MIN_UNIQUE", "21")
+    overview = plot_numeric_qq(df, figures_dir, evidence_path, source_path="data.csv")
+    x = next(f for f in overview.features if f.feature == "x")
+    assert x.status == "discrete"
+
+    monkeypatch.delenv("BROADWAY_QQ_MIN_UNIQUE")
+    overview = plot_numeric_qq(df, figures_dir, evidence_path, source_path="data.csv")
+    x = next(f for f in overview.features if f.feature == "x")
+    assert x.status == "plotted"
+
+
 def test_plot_numeric_qq_source_path_is_data_path(tmp_path) -> None:
     figures_dir = tmp_path / "reports" / "figures"
     evidence_path = tmp_path / "artifacts" / "discover" / "qq_overview.json"
@@ -189,9 +297,11 @@ def test_plot_numeric_qq_source_path_is_data_path(tmp_path) -> None:
 
 
 def test_discover_run_writes_qq_overview(tmp_path, monkeypatch) -> None:
+    rng = np.random.default_rng(0)
+    n = 40
     csv = tmp_path / "data.csv"
     pd.DataFrame(
-        {"id": [1, 2, 3, 4], "value": [10.0, 20.0, 30.0, 40.0]}
+        {"foo_id": np.arange(n), "value": rng.normal(0.0, 1.0, n)}
     ).to_csv(csv, index=False)
     monkeypatch.setattr(discover_module, "CONFIGS_DIR", tmp_path / "configs")
     monkeypatch.setattr(discover_module, "ARTIFACTS_DIR", str(tmp_path / "artifacts"))
@@ -206,6 +316,8 @@ def test_discover_run_writes_qq_overview(tmp_path, monkeypatch) -> None:
     overview = QqOverview.model_validate_json(qq_path.read_text())
     assert overview.total_features == 2
     assert overview.source_path == str(csv)
+    assert overview.flagged_id_columns == ["foo_id"]
+    assert overview.discrete_features == 0
     assert (tmp_path / "reports" / "figures" / "numeric_qq_1.png").exists()
     assert (tmp_path / "reports" / "figures" / "numeric_dist_1.png").exists()
 
@@ -234,7 +346,7 @@ def test_discover_profile_writes_qq_overview(tmp_path, monkeypatch) -> None:
             "t": {"dtype": "float64", "null_count": 0, "role": "target"},
         },
         "lookup_tables": {},
-        "row_count": 3,
+        "exclude_from_profiling": ["a"],
     }
     (config_dir / "mydata.yaml").write_text(yaml.safe_dump(contract), encoding="utf-8")
 
@@ -245,16 +357,23 @@ def test_discover_profile_writes_qq_overview(tmp_path, monkeypatch) -> None:
     overview = QqOverview.model_validate_json(qq_path.read_text())
     assert overview.total_features == 2
     assert overview.source_path == str(parquet)
-    assert (tmp_path / "reports" / "figures" / "numeric_qq_1.png").exists()
+    a = next(f for f in overview.features if f.feature == "a")
+    assert a.status == "excluded"
+    assert a.reason == "declared id"
+    assert overview.discrete_features == 1
     assert (tmp_path / "reports" / "figures" / "numeric_dist_1.png").exists()
+    assert not (tmp_path / "reports" / "figures" / "numeric_qq_1.png").exists()
 
 
 def test_render_profile_includes_qq_evidence() -> None:
     qq = QqOverview(
         source_path="data/raw/taxi.csv",
-        total_features=3,
+        total_features=5,
         plotted_features=2,
         excluded_features=1,
+        discrete_features=1,
+        non_numeric_columns=["when"],
+        flagged_id_columns=["foo_id"],
         excluded_notes=["const: zero variance"],
         features=[
             QqFeature(
@@ -267,19 +386,36 @@ def test_render_profile_includes_qq_evidence() -> None:
                 status="plotted", reason=None, figure="figures/numeric_qq_1.png",
                 dist_figure="figures/numeric_dist_1.png",
             ),
+            QqFeature(
+                feature="const", n_valid=4, n_excluded=0, mean=5.0, std=0.0,
+                status="excluded", reason="zero variance", figure="", dist_figure="",
+            ),
+            QqFeature(
+                feature="disc", n_valid=4, n_excluded=0, mean=1.5, std=0.5,
+                status="discrete", reason="discrete (3 unique values)", figure="",
+                dist_figure="figures/numeric_dist_1.png",
+            ),
         ],
         figures=["figures/numeric_qq_1.png"],
         dist_figures=["figures/numeric_dist_1.png"],
     )
     md = audit.render_profile(_profile(), source="artifacts/discover/profile.json", qq=qq)
     assert "## Profile evidence" in md
-    assert "![a, b](../figures/numeric_qq_1.png)" in md
-    assert "![a, b](../figures/numeric_dist_1.png)" in md
+    assert "![Per-feature Q-Q plots — figure 1 of 1](../figures/numeric_qq_1.png)" in md
+    assert "![Per-feature distributions — figure 1 of 1](../figures/numeric_dist_1.png)" in md
+    assert "In this figure: a, b." in md
+    assert "In this figure: a, b, disc." in md
     assert "Traces are per-feature z-score." in md
     assert "Histograms are in raw units." in md
-    assert "- const: zero variance" in md
     assert "How to read (Q-Q)" in md
     assert "How to read (distribution)" in md
+    assert "- const: zero variance" in md
+    assert "- disc: discrete (3 unique values)" in md
+    assert "- foo_id: name suggests an identifier" in md
+    assert "- not profiled (non-numeric): when" in md
+    assert "![a, b]" not in md
+    assert "{" not in md
+    assert "}" not in md
 
 
 def test_render_profile_without_qq_has_no_evidence_section() -> None:

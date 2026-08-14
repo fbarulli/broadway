@@ -72,6 +72,25 @@ def _render_page(
     return "\n".join(lines)
 
 
+def _render_figure_block(
+    caption: str,
+    figures: list[str],
+    by_figure: dict[str, list[str]],
+) -> list[str]:
+    lines: list[str] = []
+    n = len(figures)
+    for i, figure in enumerate(figures, start=1):
+        names = ", ".join(by_figure.get(figure, []))
+        lines.append(f"![{caption} — figure {i} of {n}](../{figure})")
+        lines.append("")
+        lines.append(
+            f"In this figure: {names}. Chunk {i} of {n}; the trailing `_{i}` in the "
+            "filename is the chunk number."
+        )
+        lines.append("")
+    return lines
+
+
 def _render_profile_evidence(qq: QqOverview | None) -> list[tuple[str, str]]:
     if qq is None:
         return []
@@ -84,33 +103,45 @@ def _render_profile_evidence(qq: QqOverview | None) -> list[tuple[str, str]]:
             dist_by_figure.setdefault(feature.dist_figure, []).append(feature.feature)
 
     lines: list[str] = []
-    for figure in qq.figures:
-        label = ", ".join(qq_by_figure.get(figure, []))
-        lines.append(f"![{label}](../{figure})")
-    lines.append("")
-    lines.append(f"Traces are {qq.standardization}.")
-    lines.append("")
-    lines.append(
-        "How to read (Q-Q): traces hugging the diagonal are approximately normal; "
-        "S-curves indicate tail behavior; curvature indicates skew."
-    )
-    lines.append("")
-
-    for figure in qq.dist_figures:
-        label = ", ".join(dist_by_figure.get(figure, []))
-        lines.append(f"![{label}](../{figure})")
-    lines.append("")
-    lines.append("Histograms are in raw units.")
-    lines.append("")
-    lines.append(
-        "How to read (distribution): actual spread and skew in original units; "
-        "look for heavy tails, multimodality, and gaps."
-    )
-
-    if qq.excluded_notes:
+    if qq.figures:
+        lines.append(f"Traces are {qq.standardization}.")
         lines.append("")
-        lines.append("Excluded features:")
-        lines.extend(f"- {note}" for note in qq.excluded_notes)
+        lines.extend(_render_figure_block("Per-feature Q-Q plots", qq.figures, qq_by_figure))
+        lines.append(
+            "How to read (Q-Q): traces hugging the diagonal are approximately normal; "
+            "S-curves indicate tail behavior; curvature indicates skew."
+        )
+        lines.append("")
+    if qq.dist_figures:
+        lines.append("Histograms are in raw units.")
+        lines.append("")
+        lines.extend(_render_figure_block("Per-feature distributions", qq.dist_figures, dist_by_figure))
+        lines.append(
+            "How to read (distribution): actual spread and skew in original units; "
+            "look for heavy tails, multimodality, and gaps."
+        )
+
+    notes: list[str] = []
+    for feature in qq.features:
+        if feature.status == "excluded":
+            notes.append(f"{feature.feature}: {feature.reason}")
+    for feature in qq.features:
+        if feature.status == "discrete":
+            notes.append(
+                f"{feature.feature}: {feature.reason} (excluded from Q-Q, kept as a "
+                "bar chart in the distribution grid)"
+            )
+    for name in qq.flagged_id_columns:
+        notes.append(
+            f"{name}: name suggests an identifier; declare in exclude_from_profiling to exclude"
+        )
+    for name in qq.non_numeric_columns:
+        notes.append(f"not profiled (non-numeric): {name}")
+
+    if notes:
+        lines.append("")
+        lines.append("Notes:")
+        lines.extend(f"- {note}" for note in notes)
     return [("Profile evidence", "\n".join(lines))]
 
 

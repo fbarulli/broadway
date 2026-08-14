@@ -25,17 +25,28 @@ none
 
 ## Profile evidence
 
-![passenger_count, trip_distance, pickup_location_id, dropoff_location_id, total_amount, airport_fee, trip_duration_minutes](../figures/numeric_qq_1.png)
-
 Traces are per-feature z-score.
+
+![Per-feature Q-Q plots — figure 1 of 1](../figures/numeric_qq_1.png)
+
+In this figure: trip_distance, total_amount, trip_duration_minutes. Chunk 1 of 1; the trailing `_1` in the filename is the chunk number.
 
 How to read (Q-Q): traces hugging the diagonal are approximately normal; S-curves indicate tail behavior; curvature indicates skew.
 
-![passenger_count, trip_distance, pickup_location_id, dropoff_location_id, total_amount, airport_fee, trip_duration_minutes](../figures/numeric_dist_1.png)
-
 Histograms are in raw units.
 
+![Per-feature distributions — figure 1 of 1](../figures/numeric_dist_1.png)
+
+In this figure: passenger_count, trip_distance, total_amount, airport_fee, trip_duration_minutes. Chunk 1 of 1; the trailing `_1` in the filename is the chunk number.
+
 How to read (distribution): actual spread and skew in original units; look for heavy tails, multimodality, and gaps.
+
+Notes:
+- pickup_location_id: declared id
+- dropoff_location_id: declared id
+- passenger_count: discrete (6 unique values) (excluded from Q-Q, kept as a bar chart in the distribution grid)
+- airport_fee: discrete (3 unique values) (excluded from Q-Q, kept as a bar chart in the distribution grid)
+- not profiled (non-numeric): pickup_datetime
 
 ## Why this may matter
 

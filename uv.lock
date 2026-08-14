@@ -217,6 +217,7 @@ dependencies = [
     { name = "requests" },
     { name = "scikit-learn" },
     { name = "scipy" },
+    { name = "seaborn" },
     { name = "sqlalchemy" },
     { name = "statsmodels" },
     { name = "tqdm" },
@@ -226,10 +227,8 @@ dependencies = [
 [package.optional-dependencies]
 all = [
     { name = "kubernetes" },
-    { name = "matplotlib" },
     { name = "psycopg", extra = ["binary"] },
     { name = "pyspark" },
-    { name = "seaborn" },
     { name = "sqlalchemy" },
 ]
 db = [
@@ -242,20 +241,15 @@ k8s = [
 spark = [
     { name = "pyspark" },
 ]
-viz = [
-    { name = "matplotlib" },
-    { name = "seaborn" },
-]
 
 [package.metadata]
 requires-dist = [
-    { name = "broadway", extras = ["spark", "viz", "db", "k8s"], marker = "extra == 'all'" },
+    { name = "broadway", extras = ["spark", "db", "k8s"], marker = "extra == 'all'" },
     { name = "joblib", specifier = ">=1.5.0" },
     { name = "kubernetes", specifier = ">=32.0.0" },
     { name = "kubernetes", marker = "extra == 'k8s'", specifier = ">=32.0.0" },
     { name = "lightgbm", specifier = ">=4.7.0" },
     { name = "matplotlib", specifier = ">=3.10.0" },
-    { name = "matplotlib", marker = "extra == 'viz'", specifier = ">=3.10.0" },
     { name = "mlflow", specifier = ">=3.15.1" },
     { name = "optuna", specifier = ">=4.4.0" },
     { name = "pandas", specifier = ">=2.3.0" },
@@ -273,14 +267,14 @@ requires-dist = [
     { name = "requests", specifier = ">=2.32.0" },
     { name = "scikit-learn", specifier = ">=1.7.0" },
     { name = "scipy", specifier = ">=1.16.0" },
-    { name = "seaborn", marker = "extra == 'viz'", specifier = ">=0.13.0" },
+    { name = "seaborn", specifier = ">=0.13.0" },
     { name = "sqlalchemy", specifier = ">=2.0.0" },
     { name = "sqlalchemy", marker = "extra == 'db'", specifier = ">=2.0.0" },
     { name = "statsmodels", specifier = ">=0.14.6" },
     { name = "tqdm", specifier = ">=4.66.0" },
     { name = "xgboost", specifier = ">=3.4.0" },
 ]
-provides-extras = ["spark", "viz", "db", "k8s", "all"]
+provides-extras = ["spark", "db", "k8s", "all"]
 
 [[package]]
 name = "cachetools"
