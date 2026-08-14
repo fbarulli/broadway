@@ -10,12 +10,18 @@ conclusion
 
 ## What it found
 
-- verdict: group means differ (welch p=< 0.001), with 19 significant pairwise difference(s).
+- verdict: group means differ (welch p=< 0.001), with 17 significant pairwise difference(s).
 - principal_method: welch
 - p_value: < 0.001
-- effect_size: eta²=0.999, omega²=0.122
-- significant_pairs: 19
+- significant_pairs: 17
+- eta_squared: 0.982
+- omega_squared: 0.123
 
 ## Why it matters
 
-group means differ (welch p=< 0.001), with 19 significant pairwise difference(s).
+group means differ (welch p=< 0.001), with 17 significant pairwise difference(s).
+
+## Effect size
+
+- eta² = 0.982: proportion of outcome variance explained by group membership (can be inflated under extreme imbalance)
+- omega² = 0.123: corrects for small-sample bias; the more conservative estimate

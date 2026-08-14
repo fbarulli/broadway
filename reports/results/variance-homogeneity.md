@@ -10,7 +10,7 @@ levene
 
 ## What it found
 
-- statistic: 4.2e+03
+- Levene statistic: 4.2e+03
 - p_value: < 0.001
 
 ## Why it matters

@@ -291,7 +291,7 @@ def test_render_includes_details_for_completed() -> None:
     md = render_timeline("taxi", seq, [_step()], [])
     assert "## Describe Groups" in md
     assert "ramification: groups are comparable" in md
-    assert "profile.json" in md
+    assert "evidence_refs" not in md
     assert "n: 10" in md
 
 
@@ -315,6 +315,46 @@ def test_render_timeline_machine_json_refs_are_plain_text() -> None:
         figures=[FigureRef(path="figures/normality_A.png", caption="How to read: points hug the diagonal.")],
     )
     md = render_timeline("taxi", seq, [step], [])
-    assert "normality.json" in md
+    assert "evidence_refs" not in md
+    assert "normality.json" not in md
     assert "[normality_A.png]" not in md
     assert "![How to read: points hug the diagonal.](figures/normality_A.png)" in md
+
+
+def test_render_timeline_labels_omnibus_statistic() -> None:
+    seq = _seq([{"id": "omnibus", "order": 1, "question": "Q?", "kind": "analysis"}])
+    step = _step(
+        step_id="omnibus",
+        method="welch",
+        result_summary={
+            "method": "welch",
+            "statistic": 7000.0,
+            "p_value": 0.0004,
+            "passed": True,
+            "eta_squared": 0.9,
+            "omega_squared": 0.1,
+        },
+    )
+    md = render_timeline("taxi", seq, [step], [])
+    assert "F: 7e+03" in md
+    assert "omega²" in md
+    assert "the more conservative estimate" in md
+
+
+def test_render_timeline_conclusion_shows_effect_size() -> None:
+    seq = _seq([{"id": "conclusion", "order": 1, "question": "Q?", "kind": "analysis"}])
+    step = _step(
+        step_id="conclusion",
+        method="conclusion",
+        result_summary={
+            "verdict": "group means differ",
+            "principal_method": "welch",
+            "p_value": 0.0004,
+            "significant_pairs": 2,
+            "eta_squared": 0.9,
+            "omega_squared": 0.1,
+        },
+    )
+    md = render_timeline("taxi", seq, [step], [])
+    assert "omega²" in md
+    assert "the more conservative estimate" in md

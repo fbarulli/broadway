@@ -6,7 +6,6 @@ from broadway.reports.results import (
     derive_status,
     effect_size_lines,
     humanize_summary,
-    is_figure_ref,
     posthoc_headline,
     posthoc_pair_rows,
 )
@@ -41,13 +40,10 @@ def render_timeline(
         lines.append(f"## {step.label}")
         lines.append("")
         lines.append(f"- ramification: {persisted.ramification}")
-        machine_refs = [r for r in persisted.evidence_refs if not is_figure_ref(r)]
-        refs = ", ".join(machine_refs) if machine_refs else "-"
-        lines.append(f"- evidence_refs: {refs}")
         lines.append("- result_summary:")
-        for bullet in humanize_summary(persisted.result_summary):
+        for bullet in humanize_summary(persisted.result_summary, persisted.step_id):
             lines.append(f"  - {bullet}")
-        if persisted.step_id == "omnibus":
+        if persisted.step_id in ("omnibus", "conclusion"):
             for line in effect_size_lines(persisted.result_summary):
                 lines.append(f"  - {line}")
         if persisted.step_id == "describe_groups":

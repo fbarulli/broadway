@@ -106,7 +106,7 @@ def test_render_timeline_figures_relative_to_reports() -> None:
 def test_render_results_figures_relative_to_results() -> None:
     seq = load_walkthrough_sequence()
     pages = render_results("taxi", seq, [_figure_step()], [])
-    page = pages["describe_groups.md"]
+    page = pages["describe-groups.md"]
     assert "![How to read: boxplot.](../figures/describe_boxplot.png)" in page
     assert "![How to read: bars.](../figures/describe_group_sizes.png)" in page
 
@@ -119,5 +119,5 @@ def test_write_results_figures_relative_to_results(
     monkeypatch.setattr(paths, "RESULTS_DIR", tmp_path / "reports" / "results")
     seq = load_walkthrough_sequence()
     write_results("taxi", seq, [_figure_step()], [])
-    page = (tmp_path / "reports" / "results" / "describe_groups.md").read_text()
+    page = (tmp_path / "reports" / "results" / "describe-groups.md").read_text()
     assert "![How to read: boxplot.](../figures/describe_boxplot.png)" in page

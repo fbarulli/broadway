@@ -124,7 +124,7 @@ def _print_decision_required(
     if describe is not None:
         rs = describe.result_summary
         lines.append(
-            f"  - describe_groups: total_n={rs.get('total_n')}, "
+            f"  - describe_groups: n_total={rs.get('n_total')}, "
             f"imbalance_ratio={humanize_float(rs.get('imbalance_ratio'))}, "
             f"absent_groups={rs.get('absent_groups')}"
         )

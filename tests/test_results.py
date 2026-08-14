@@ -14,6 +14,8 @@ from broadway.reports.results import (
     posthoc_headline,
     posthoc_pair_rows,
     render_results,
+    slugify,
+    statistic_label,
     write_results,
 )
 from broadway.reports.timeline import render_timeline
@@ -33,7 +35,6 @@ def _step(**overrides) -> AnalysisStep:
         "sample_name": None,
         "evidence_refs": ["describe.json"],
         "result_summary": {
-            "total_n": 123456,
             "imbalance_ratio": 1.23456789,
             "absent_groups": 0,
             "n_total": 123456,
@@ -134,24 +135,79 @@ def test_humanize_helpers_live_in_shared_module() -> None:
     assert shared_humanize_pvalue(0.0) == "< 0.001"
 
 
+def test_slugify_humanizes_step_labels() -> None:
+    assert slugify("Describe groups") == "describe-groups"
+    assert slugify("Principal analysis") == "principal-analysis"
+    assert slugify("Post-hoc comparisons") == "post-hoc-comparisons"
+    assert slugify("Normality diagnostics") == "normality-diagnostics"
+    assert slugify("Variance homogeneity") == "variance-homogeneity"
+    assert slugify("Conclusion") == "conclusion"
+
+
+def test_statistic_label_per_step() -> None:
+    assert statistic_label("variance", {"statistic": 4.2}) == "Levene statistic"
+    assert statistic_label("omnibus", {"method": "welch"}) == "F"
+    assert statistic_label("omnibus", {"method": "anova"}) == "F"
+    assert statistic_label("omnibus", {"method": "kruskal"}) == "H"
+    assert statistic_label("omnibus", {}) == "statistic"
+
+
+def test_humanize_summary_labels_statistic() -> None:
+    variance_lines = humanize_summary(
+        {"statistic": 4199.7167447099055, "p_value": 0.0}, "variance"
+    )
+    assert "Levene statistic: 4.2e+03" in variance_lines
+
+    omnibus_lines = humanize_summary(
+        {"method": "welch", "statistic": 7000.0, "p_value": 0.0001}, "omnibus"
+    )
+    assert "F: 7e+03" in omnibus_lines
+
+    kruskal_lines = humanize_summary(
+        {"method": "kruskal", "statistic": 12.5, "p_value": 0.01}, "omnibus"
+    )
+    assert "H: 12.5" in kruskal_lines
+
+
+def test_render_results_conclusion_shows_effect_size_caveat() -> None:
+    seq = load_walkthrough_sequence()
+    conclusion = _step(
+        step_id="conclusion",
+        order=8,
+        method="conclusion",
+        result_summary={
+            "verdict": "group means differ",
+            "principal_method": "welch",
+            "p_value": 0.0004,
+            "significant_pairs": 2,
+            "eta_squared": 0.123456,
+            "omega_squared": 0.098765,
+        },
+    )
+    page = render_results("taxi", seq, [conclusion], [])["conclusion.md"]
+    assert "## Effect size" in page
+    assert "omega²" in page
+    assert "the more conservative estimate" in page
+
+
 def test_render_results_index_and_pages() -> None:
     seq = load_walkthrough_sequence()
     pages = render_results("taxi", seq, _full_steps(), [])
     assert set(pages) == {
         "index.md",
-        "describe_groups.md",
-        "normality.md",
-        "variance.md",
-        "omnibus.md",
+        "describe-groups.md",
+        "normality-diagnostics.md",
+        "variance-homogeneity.md",
+        "principal-analysis.md",
     }
 
     idx = pages["index.md"]
     assert "awaiting decision" in idx
-    assert "[Describe groups](describe_groups.md)" in idx
-    assert "[Principal analysis](omnibus.md)" in idx
+    assert "[Describe groups](describe-groups.md)" in idx
+    assert "[Principal analysis](principal-analysis.md)" in idx
     assert "Choose principal method" in idx
 
-    describe_page = pages["describe_groups.md"]
+    describe_page = pages["describe-groups.md"]
     assert "# Describe groups" in describe_page
     assert "## Question" in describe_page
     assert "## What was run" in describe_page
@@ -160,10 +216,10 @@ def test_render_results_index_and_pages() -> None:
     assert "## Attrition" in describe_page
     assert "null target" in describe_page
 
-    normality_page = pages["normality.md"]
+    normality_page = pages["normality-diagnostics.md"]
     assert "< 0.001" in normality_page
 
-    omnibus_page = pages["omnibus.md"]
+    omnibus_page = pages["principal-analysis.md"]
     assert "## Effect size" in omnibus_page
     assert "eta²" in omnibus_page
     assert "omega²" in omnibus_page
@@ -186,7 +242,7 @@ def test_render_results_kruskal_not_computed() -> None:
         )
     ]
     pages = render_results("taxi", seq, steps, [])
-    assert "deliberately not computed" in pages["omnibus.md"]
+    assert "deliberately not computed" in pages["principal-analysis.md"]
 
 
 def test_rendered_output_plain_text_no_glyphs_or_literals() -> None:
@@ -204,7 +260,7 @@ def test_write_results_orphan_deletion(tmp_path: Path, monkeypatch: pytest.Monke
     results_dir = tmp_path / "results"
     monkeypatch.setattr(paths, "RESULTS_DIR", results_dir)
     results_dir.mkdir(parents=True)
-    (results_dir / "describe_groups.md").write_text("old", encoding="utf-8")
+    (results_dir / "describe-groups.md").write_text("old", encoding="utf-8")
     (results_dir / "ghost.md").write_text("orphan", encoding="utf-8")
     (results_dir / "index.md").write_text("old index", encoding="utf-8")
 
@@ -212,9 +268,9 @@ def test_write_results_orphan_deletion(tmp_path: Path, monkeypatch: pytest.Monke
     write_results("taxi", seq, [_step(step_id="describe_groups", order=1)], [])
 
     assert (results_dir / "index.md").exists()
-    assert (results_dir / "describe_groups.md").exists()
+    assert (results_dir / "describe-groups.md").exists()
     assert not (results_dir / "ghost.md").exists()
-    assert (results_dir / "describe_groups.md").read_text() != "old"
+    assert (results_dir / "describe-groups.md").read_text() != "old"
 
 
 def test_write_results_failed_step_has_no_page(
@@ -223,13 +279,13 @@ def test_write_results_failed_step_has_no_page(
     results_dir = tmp_path / "results"
     monkeypatch.setattr(paths, "RESULTS_DIR", results_dir)
     results_dir.mkdir(parents=True)
-    (results_dir / "describe_groups.md").write_text("old", encoding="utf-8")
+    (results_dir / "describe-groups.md").write_text("old", encoding="utf-8")
 
     seq = load_walkthrough_sequence()
     steps = [_step(step_id="describe_groups", order=1, status=StepStatus.FAILED)]
     write_results("taxi", seq, steps, [])
 
-    assert not (results_dir / "describe_groups.md").exists()
+    assert not (results_dir / "describe-groups.md").exists()
     idx = (results_dir / "index.md").read_text()
     assert "failed" in idx
 
@@ -255,7 +311,7 @@ def test_posthoc_headline_and_rows() -> None:
 def test_posthoc_step_page_renders_significant_pairs() -> None:
     seq = load_walkthrough_sequence()
     pages = render_results("taxi", seq, [_posthoc_step()], [])
-    page = pages["posthoc.md"]
+    page = pages["post-hoc-comparisons.md"]
     assert "## Significant pairs" in page
     assert "2 of 3 pairs significant" in page
     assert "| Pair | p | Cohen's d | Hedges' g | Note |" in page
@@ -278,7 +334,7 @@ def test_posthoc_step_page_zero_significant_pairs() -> None:
             "significant_pair_details": [],
         },
     )
-    page = render_results("taxi", seq, [step], [])["posthoc.md"]
+    page = render_results("taxi", seq, [step], [])["post-hoc-comparisons.md"]
     assert "## Significant pairs" in page
     assert "0 of 3 pairs significant" in page
     assert "none" in page

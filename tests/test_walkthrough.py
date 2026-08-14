@@ -101,7 +101,7 @@ def test_decision_gate_humanizes_and_deprescribes(
             sample_name=None,
             evidence_refs=[],
             result_summary={
-                "total_n": 4332549,
+                "n_total": 4332549,
                 "imbalance_ratio": 2162.6747,
                 "absent_groups": 0,
             },
@@ -297,6 +297,62 @@ def test_run_omnibus_kruskal_no_effect_size(
     assert "deliberately not computed" in step.ramification
 
 
+def _omnibus_step(method: str) -> AnalysisStep:
+    summary: dict = {
+        "method": method,
+        "statistic": 12.0,
+        "p_value": 0.0004,
+        "passed": True,
+    }
+    if method in ("anova", "welch"):
+        summary["eta_squared"] = 0.982
+        summary["omega_squared"] = 0.123
+    else:
+        summary["effect_size"] = "not_computed"
+    return AnalysisStep(
+        analysis="taxi_hypothesis",
+        step_id="omnibus",
+        order=5,
+        question="q?",
+        status=StepStatus.COMPLETED,
+        method=method,
+        source="canonical",
+        sample_name=None,
+        evidence_refs=[],
+        result_summary=summary,
+        ramification="r",
+        decision_required=True,
+        performed_at="2026-01-01T00:00:00Z",
+    )
+
+
+def test_run_conclusion_copies_effect_sizes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _setup(monkeypatch, tmp_path)
+    cfg = _load_cfg()
+    step = runners.run_conclusion(
+        cfg.analysis, 8, "q?", _omnibus_step("welch"), None,
+        tmp_path / "timeline" / "taxi_hypothesis", "canonical", None,
+    )
+    rs = step.result_summary
+    assert rs["eta_squared"] == 0.982
+    assert rs["omega_squared"] == 0.123
+    assert "effect_size" not in rs
+
+
+def test_run_conclusion_kruskal_keeps_not_computed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _setup(monkeypatch, tmp_path)
+    cfg = _load_cfg()
+    step = runners.run_conclusion(
+        cfg.analysis, 8, "q?", _omnibus_step("kruskal"), None,
+        tmp_path / "timeline" / "taxi_hypothesis", "canonical", None,
+    )
+    assert step.result_summary["effect_size"] == "not_computed"
+
+
 def test_run_posthoc_significant_pairs(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -479,6 +535,7 @@ def test_run_describe_attrition_none(
         tmp_path / "reports" / "figures",
     )
     rs = step.result_summary
+    assert "total_n" not in rs
     assert rs["n_total"] == 2
     assert rs["n_used"] == 2
     assert rs["n_excluded"] == 0

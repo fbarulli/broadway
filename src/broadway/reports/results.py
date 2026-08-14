@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 from broadway.formatting import humanize_float, humanize_pvalue
 from broadway.reports import paths
 from broadway.timeline.models import (
@@ -50,12 +52,29 @@ def _flatten(summary: dict, prefix: str = "") -> list[tuple[str, object]]:
     return out
 
 
-def humanize_summary(summary: dict) -> list[str]:
+def slugify(label: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", label.lower()).strip("-")
+
+
+def statistic_label(step_id: str, summary: dict) -> str:
+    if step_id == "variance":
+        return "Levene statistic"
+    if step_id == "omnibus":
+        method = str(summary.get("method", ""))
+        if method == "kruskal":
+            return "H"
+        if method in ("anova", "welch"):
+            return "F"
+    return "statistic"
+
+
+def humanize_summary(summary: dict, step_id: str = "") -> list[str]:
     lines: list[str] = []
     for key, value in _flatten(summary):
         if isinstance(value, str) and value == "":
             continue
-        lines.append(f"{key}: {humanize_value(value, key)}")
+        label = statistic_label(step_id, summary) if key == "statistic" else key
+        lines.append(f"{label}: {humanize_value(value, key)}")
     return lines
 
 
@@ -140,7 +159,7 @@ def _render_index(
         )
         persisted = steps_by_id.get(step.id)
         linkable = persisted is not None and persisted.status in COMPLETED_STATUSES
-        name = f"[{step.label}]({step.id}.md)" if linkable else step.label
+        name = f"[{step.label}]({slugify(step.label)}.md)" if linkable else step.label
         lines.append(f"| {name} | {status} |")
     return "\n".join(lines)
 
@@ -157,7 +176,7 @@ def _render_step_page(seq_step, step: AnalysisStep) -> str:
     lines.append("")
     lines.append("## What it found")
     lines.append("")
-    bullets = humanize_summary(step.result_summary)
+    bullets = humanize_summary(step.result_summary, step.step_id)
     if bullets:
         lines.extend(f"- {b}" for b in bullets)
     else:
@@ -167,7 +186,7 @@ def _render_step_page(seq_step, step: AnalysisStep) -> str:
     lines.append("")
     lines.append(step.ramification)
     lines.append("")
-    if step.step_id == "omnibus":
+    if step.step_id in ("omnibus", "conclusion"):
         effect = effect_size_lines(step.result_summary)
         if effect:
             lines.append("## Effect size")
@@ -220,7 +239,7 @@ def render_results(
         persisted = steps_by_id.get(step.id)
         if persisted is None or persisted.status not in COMPLETED_STATUSES:
             continue
-        pages[f"{persisted.step_id}.md"] = _render_step_page(step, persisted)
+        pages[f"{slugify(step.label)}.md"] = _render_step_page(step, persisted)
     return pages
 
 
@@ -232,11 +251,11 @@ def write_results(
 ) -> None:
     pages = render_results(analysis, sequence, steps, decisions)
     paths.RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    completed_ids = {s.step_id for s in steps if s.status in COMPLETED_STATUSES}
+    completed_slugs = {name[:-3] for name in pages if name.endswith(".md") and name != "index.md"}
     for path in paths.RESULTS_DIR.glob("*.md"):
         if path.name == "index.md":
             continue
-        if path.stem not in completed_ids:
+        if path.stem not in completed_slugs:
             path.unlink()
     for name, content in pages.items():
         (paths.RESULTS_DIR / name).write_text(content, encoding="utf-8")

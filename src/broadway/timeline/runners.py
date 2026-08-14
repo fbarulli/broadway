@@ -72,7 +72,7 @@ def _attrition(
     if null_target:
         reasons.append("null target")
     if unlisted:
-        reasons.append("unlisted group")
+        reasons.append("unlisted group (values outside the configured group list; see audit)")
     return {
         "n_total": total,
         "n_used": used,
@@ -150,7 +150,7 @@ def run_describe(
         if summary.absent_groups:
             parts.append(f"groups {', '.join(summary.absent_groups)} have no observations")
         if summary.imbalance_ratio > thresholds.imbalance_ratio_threshold:
-            parts.append(f"group sizes are imbalanced (imbalance ratio {summary.imbalance_ratio})")
+            parts.append(f"group sizes are imbalanced (imbalance ratio {humanize_float(summary.imbalance_ratio)})")
         ramification = "; ".join(parts) + "."
     else:
         ramification = "group sizes are adequate."
@@ -173,7 +173,6 @@ def run_describe(
             FigureRef(path="figures/describe_group_sizes.png", caption=GROUP_SIZES_CAPTION),
         ],
         result_summary={
-            "total_n": summary.total_n,
             "imbalance_ratio": summary.imbalance_ratio,
             "absent_groups": len(summary.absent_groups),
             "n_total": attrition["n_total"],
@@ -509,6 +508,17 @@ def run_conclusion(
     (evidence_dir / "conclusion.json").write_text(
         evidence.model_dump_json(indent=2), encoding="utf-8"
     )
+    result_summary: dict[str, object] = {
+        "verdict": verdict,
+        "principal_method": method,
+        "p_value": p_value,
+        "significant_pairs": significant_pairs,
+    }
+    if method in ("anova", "welch") and "eta_squared" in summary and "omega_squared" in summary:
+        result_summary["eta_squared"] = summary["eta_squared"]
+        result_summary["omega_squared"] = summary["omega_squared"]
+    else:
+        result_summary["effect_size"] = "not_computed"
     return AnalysisStep(
         analysis=analysis.name,
         step_id="conclusion",
@@ -519,13 +529,7 @@ def run_conclusion(
         source=source,
         sample_name=sample_name,
         evidence_refs=["conclusion.json"],
-        result_summary={
-            "verdict": verdict,
-            "principal_method": method,
-            "p_value": p_value,
-            "effect_size": effect_size,
-            "significant_pairs": significant_pairs,
-        },
+        result_summary=result_summary,
         ramification=verdict,
         decision_required=False,
         performed_at=now_iso(),
