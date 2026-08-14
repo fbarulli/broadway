@@ -1,30 +1,24 @@
-# Broadway Results Index
+# taxi_hypothesis
 
 ## Question
 
 test whether trip duration differs across pickup boroughs
 
-## Latest result
+## Progress
 
-describe: 200130 rows across 5 groups; imbalance ratio 2162.6747; absent: none
+8 of 8 stages completed
 
-## Next test
+## Status
 
-normality
+COMPLETE
 
-## Results
+## Next action
 
-| status | step |
-| --- | --- |
-| [x] | [describe](results/describe.md) |
-| [ ] | normality |
-| [ ] | levene |
-| [ ] | anova |
-| [ ] | welch |
-| [ ] | kruskal |
-| [ ] | effect_size |
-| [ ] | games_howell |
+none — analysis complete
 
 ## Navigation
 
-[lineage graph](lineage/graph.md)
+- [analysis timeline](timeline.md)
+- [data audit](audit/index.md)
+- [results](results/)
+- [lineage graph](lineage/graph.md)
