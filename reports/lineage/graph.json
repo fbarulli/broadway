@@ -1,24 +1,6 @@
 {
   "nodes": [
     {
-      "id": "analysis:taxi",
-      "kind": "analysis",
-      "label": "taxi",
-      "artifact": "configs/analysis/taxi.yaml",
-      "status": "produced",
-      "sample_name": null,
-      "sample_role": null
-    },
-    {
-      "id": "analysis:taxi_causal",
-      "kind": "analysis",
-      "label": "taxi_causal",
-      "artifact": "configs/analysis/taxi_causal.yaml",
-      "status": "produced",
-      "sample_name": null,
-      "sample_role": null
-    },
-    {
       "id": "analysis:taxi_hypothesis",
       "kind": "analysis",
       "label": "taxi_hypothesis",
@@ -28,19 +10,19 @@
       "sample_role": null
     },
     {
-      "id": "dataset:taxi",
-      "kind": "dataset",
-      "label": "taxi",
-      "artifact": "data/processed/training_data.parquet",
-      "status": "produced",
+      "id": "baseline:taxi_hypothesis",
+      "kind": "baseline",
+      "label": "baseline:taxi_hypothesis",
+      "artifact": null,
+      "status": "referenced_not_found",
       "sample_name": null,
       "sample_role": null
     },
     {
-      "id": "dataset:test",
+      "id": "dataset:taxi",
       "kind": "dataset",
-      "label": "test",
-      "artifact": "/tmp/test.csv",
+      "label": "taxi",
+      "artifact": "data/processed/training_data.parquet",
       "status": "produced",
       "sample_name": null,
       "sample_role": null
@@ -91,15 +73,6 @@
       "sample_role": null
     },
     {
-      "id": "etl:test",
-      "kind": "etl",
-      "label": "etl:test",
-      "artifact": "data/processed/test_canonical.parquet",
-      "status": "produced",
-      "sample_name": null,
-      "sample_role": null
-    },
-    {
       "id": "ingest:taxi",
       "kind": "ingest",
       "label": "ingest:taxi",
@@ -113,42 +86,6 @@
       "kind": "join",
       "label": "join:taxi",
       "artifact": "data/processed/taxi_join_audit.json",
-      "status": "produced",
-      "sample_name": null,
-      "sample_role": null
-    },
-    {
-      "id": "lookup_value:taxi",
-      "kind": "lookup_value",
-      "label": "lookup_value:taxi",
-      "artifact": "data/processed/taxi_lookup_value_audit.json",
-      "status": "produced",
-      "sample_name": null,
-      "sample_role": null
-    },
-    {
-      "id": "profile:data",
-      "kind": "profile",
-      "label": "profile:data",
-      "artifact": "/tmp/pytest-of-opc/pytest-202/test_run_writes_profile0/artifacts/discover/profile.json",
-      "status": "produced",
-      "sample_name": null,
-      "sample_role": null
-    },
-    {
-      "id": "profile:taxi",
-      "kind": "profile",
-      "label": "profile:taxi",
-      "artifact": "artifacts/discover/profile.json",
-      "status": "produced",
-      "sample_name": null,
-      "sample_role": null
-    },
-    {
-      "id": "profile:test_data",
-      "kind": "profile",
-      "label": "profile:test_data",
-      "artifact": "artifacts/discover/profile.json",
       "status": "produced",
       "sample_name": null,
       "sample_role": null
@@ -203,62 +140,37 @@
     {
       "source": "analysis:taxi_hypothesis",
       "target": "describe:taxi_hypothesis",
-      "relation": "produced_by"
+      "relation": "produces"
     },
     {
       "source": "analysis:taxi_hypothesis",
       "target": "stats:taxi_hypothesis",
-      "relation": "produced_by"
+      "relation": "produces"
     },
     {
       "source": "baseline:taxi_hypothesis",
       "target": "stats:taxi_hypothesis",
-      "relation": "produced_by"
-    },
-    {
-      "source": "dataset:data",
-      "target": "profile:data",
-      "relation": "produced_by"
+      "relation": "produces"
     },
     {
       "source": "dataset:taxi",
       "target": "ingest:taxi",
-      "relation": "produced_by"
-    },
-    {
-      "source": "dataset:taxi",
-      "target": "profile:taxi",
-      "relation": "produced_by"
-    },
-    {
-      "source": "dataset:test",
-      "target": "etl:test",
-      "relation": "produced_by"
-    },
-    {
-      "source": "dataset:test_data",
-      "target": "profile:test_data",
-      "relation": "produced_by"
+      "relation": "produces"
     },
     {
       "source": "etl:taxi",
       "target": "describe:taxi_hypothesis",
-      "relation": "produced_by"
+      "relation": "produces"
     },
     {
       "source": "ingest:taxi",
       "target": "join:taxi",
-      "relation": "produced_by"
+      "relation": "produces"
     },
     {
       "source": "join:taxi",
       "target": "etl:taxi",
-      "relation": "produced_by"
-    },
-    {
-      "source": "join:taxi",
-      "target": "lookup_value:taxi",
-      "relation": "produced_by"
+      "relation": "produces"
     },
     {
       "source": "slice:airport",

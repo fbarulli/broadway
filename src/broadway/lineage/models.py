@@ -71,7 +71,9 @@ class LineageNode(BaseModel):
     kind: str
     label: str
     artifact: str | None = None
-    status: Literal["produced", "not_yet_produced", "ran_but_output_missing"]
+    status: Literal[
+        "produced", "not_yet_produced", "ran_but_output_missing", "referenced_not_found"
+    ]
     sample_name: str | None = None
     sample_role: SampleRole | None = None
 

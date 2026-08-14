@@ -118,3 +118,61 @@ def test_build_graph_links_nodes_and_records(tmp_path: Path) -> None:
     assert ("analysis:taxi", "baseline:taxi") in edges
     assert ("slice:airport", "decision:keep_outliers") in edges
     assert ("baseline:taxi", "stats:taxi") in edges
+
+
+def test_record_edges_use_produces_relation(tmp_path: Path) -> None:
+    configs = tmp_path / "configs"
+    lineage = tmp_path / "lineage"
+    (configs / "analysis").mkdir(parents=True)
+    (configs / "analysis" / "taxi.yaml").write_text(
+        yaml.safe_dump({"name": "taxi", "mode": "prediction"}), encoding="utf-8"
+    )
+
+    records_dir = lineage / "records"
+    records_dir.mkdir(parents=True)
+    baseline = LineageRecord(
+        node_id="baseline:taxi",
+        kind="baseline",
+        artifact=str(tmp_path / "baseline.json"),
+        parents=["analysis:taxi"],
+    )
+    (records_dir / "baseline_taxi.json").write_text(
+        baseline.model_dump_json(), encoding="utf-8"
+    )
+    stats = LineageRecord(
+        node_id="stats:taxi",
+        kind="stats",
+        artifact=str(tmp_path / "stats.json"),
+        parents=["baseline:taxi"],
+    )
+    (records_dir / "stats_taxi.json").write_text(stats.model_dump_json(), encoding="utf-8")
+
+    graph = build_graph(configs, lineage)
+
+    relations = {(e.source, e.target): e.relation for e in graph.edges}
+    assert relations[("baseline:taxi", "stats:taxi")] == "produces"
+
+
+def test_dangling_parent_gets_placeholder_node(tmp_path: Path) -> None:
+    configs = tmp_path / "configs"
+    lineage = tmp_path / "lineage"
+    (configs / "analysis").mkdir(parents=True)
+    (configs / "analysis" / "taxi.yaml").write_text(
+        yaml.safe_dump({"name": "taxi", "mode": "prediction"}), encoding="utf-8"
+    )
+
+    records_dir = lineage / "records"
+    records_dir.mkdir(parents=True)
+    rec = LineageRecord(
+        node_id="stats:taxi",
+        kind="stats",
+        artifact=str(tmp_path / "stats.json"),
+        parents=["missing:thing"],
+    )
+    (records_dir / "stats_taxi.json").write_text(rec.model_dump_json(), encoding="utf-8")
+
+    graph = build_graph(configs, lineage)
+
+    nodes_by_id = {n.id: n for n in graph.nodes}
+    assert "missing:thing" in nodes_by_id
+    assert nodes_by_id["missing:thing"].status == "referenced_not_found"

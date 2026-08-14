@@ -1,39 +1,41 @@
+# Lineage — taxi_hypothesis
+
+This graph shows how the evidence and results for this analysis were produced.
+
+Read arrows left-to-right:
+
+parent --produces--> child
+
+Special relationships:
+
+- filters -> a slice restricts its parent dataset
+- raises -> evidence raised an analytical decision
+- referenced_not_found -> a node references this parent, but no persisted lineage record was found
+
 ```mermaid
 flowchart LR
-    analysis_taxi["taxi"]
-    analysis_taxi_causal["taxi_causal"]
     analysis_taxi_hypothesis["taxi_hypothesis"]
+    baseline_taxi_hypothesis["baseline:taxi_hypothesis"]
     dataset_taxi["taxi"]
-    dataset_test["test"]
     decision_cast_and_bound_passenger_count["cast_and_bound_passenger_count"]
     decision_distance_duration_is_flat_rate["distance_duration_is_flat_rate"]
     decision_drop_invalid_datetime["drop_invalid_datetime"]
     describe_taxi_hypothesis["describe:taxi_hypothesis (sample=taxi_diagnostic, role=diagnostic)"]
     etl_taxi["etl:taxi"]
-    etl_test["etl:test"]
     ingest_taxi["ingest:taxi"]
     join_taxi["join:taxi"]
-    lookup_value_taxi["lookup_value:taxi"]
-    profile_data["profile:data"]
-    profile_taxi["profile:taxi"]
-    profile_test_data["profile:test_data"]
     slice_airport["airport"]
     slice_distance_duration_inconsistent["distance_duration_inconsistent"]
     slice_passenger_out_of_range["passenger_out_of_range"]
     slice_pre_2024["pre_2024"]
     stats_taxi_hypothesis["stats:taxi_hypothesis"]
-    analysis_taxi_hypothesis -->|produced_by| describe_taxi_hypothesis
-    analysis_taxi_hypothesis -->|produced_by| stats_taxi_hypothesis
-    baseline_taxi_hypothesis -->|produced_by| stats_taxi_hypothesis
-    dataset_data -->|produced_by| profile_data
-    dataset_taxi -->|produced_by| ingest_taxi
-    dataset_taxi -->|produced_by| profile_taxi
-    dataset_test -->|produced_by| etl_test
-    dataset_test_data -->|produced_by| profile_test_data
-    etl_taxi -->|produced_by| describe_taxi_hypothesis
-    ingest_taxi -->|produced_by| join_taxi
-    join_taxi -->|produced_by| etl_taxi
-    join_taxi -->|produced_by| lookup_value_taxi
+    analysis_taxi_hypothesis -->|produces| describe_taxi_hypothesis
+    analysis_taxi_hypothesis -->|produces| stats_taxi_hypothesis
+    baseline_taxi_hypothesis -->|produces| stats_taxi_hypothesis
+    dataset_taxi -->|produces| ingest_taxi
+    etl_taxi -->|produces| describe_taxi_hypothesis
+    ingest_taxi -->|produces| join_taxi
+    join_taxi -->|produces| etl_taxi
     slice_airport -->|filters| dataset_taxi
     slice_distance_duration_inconsistent -->|filters| dataset_taxi
     slice_distance_duration_inconsistent -->|raises| decision_distance_duration_is_flat_rate

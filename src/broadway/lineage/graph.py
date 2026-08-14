@@ -118,7 +118,7 @@ def build_graph(configs_dir: Path, lineage_dir: Path) -> LineageGraph:
             )
             nodes[node.id] = node
             for parent in rec.parents:
-                edges.append(LineageEdge(source=parent, target=rec.node_id, relation="produced_by"))
+                edges.append(LineageEdge(source=parent, target=rec.node_id, relation="produces"))
 
     decisions_path = lineage_dir / "decisions"
     if decisions_path.is_dir():
@@ -134,9 +134,95 @@ def build_graph(configs_dir: Path, lineage_dir: Path) -> LineageGraph:
             for parent in decision.parents:
                 edges.append(LineageEdge(source=parent, target=node.id, relation="raises"))
 
+    for edge in edges:
+        if edge.source not in nodes:
+            nodes[edge.source] = LineageNode(
+                id=edge.source,
+                kind=edge.source.split(":")[0],
+                label=edge.source,
+                artifact=None,
+                status="referenced_not_found",
+            )
+
     return LineageGraph(
         nodes=sorted(nodes.values(), key=lambda n: n.id),
         edges=_dedupe_edges(edges),
+    )
+
+
+class LineageScopeError(ValueError):
+    pass
+
+
+DATA_PREP = {"ingest", "join", "etl", "lookup_value", "profile"}
+
+
+def _forward_closure(edges: list[LineageEdge], start: str) -> set[str]:
+    selected = {start}
+    changed = True
+    while changed:
+        changed = False
+        for edge in edges:
+            if edge.source in selected and edge.target not in selected and edge.relation == "produces":
+                selected.add(edge.target)
+                changed = True
+    return selected
+
+
+def scope_graph(
+    graph: LineageGraph, analysis: str | None = None, dataset: str | None = None
+) -> LineageGraph:
+    nodes = {n.id: n for n in graph.nodes}
+    edges = graph.edges
+
+    if analysis is not None:
+        analysis_id = node_id("analysis", analysis)
+        if analysis_id not in nodes:
+            raise LineageScopeError(f"analysis {analysis!r} not found")
+        selected = _forward_closure(edges, analysis_id)
+        changed = True
+        while changed:
+            changed = False
+            for edge in edges:
+                if edge.target in selected and edge.source not in selected:
+                    selected.add(edge.source)
+                    changed = True
+        for edge in edges:
+            if edge.relation == "raises" and edge.source in selected:
+                selected.add(edge.target)
+    else:
+        dataset_id = node_id("dataset", dataset)
+        if dataset_id not in nodes:
+            raise LineageScopeError(f"dataset {dataset!r} not found")
+        selected = {dataset_id}
+        changed = True
+        while changed:
+            changed = False
+            for edge in edges:
+                if (
+                    edge.source in selected
+                    and edge.relation == "produces"
+                    and edge.target not in selected
+                    and edge.target.split(":")[0] in DATA_PREP
+                ):
+                    selected.add(edge.target)
+                    changed = True
+        for edge in edges:
+            if edge.relation == "filters" and edge.target == dataset_id:
+                selected.add(edge.source)
+        for edge in edges:
+            if edge.relation == "raises" and edge.source in selected:
+                selected.add(edge.target)
+
+    if dataset is not None:
+        if node_id("dataset", dataset) not in selected:
+            raise LineageScopeError(
+                f"analysis {analysis!r} is not derived from dataset {dataset!r}"
+            )
+
+    return LineageGraph(
+        nodes=[n for n in graph.nodes if n.id in selected],
+        edges=[e for e in edges if e.source in selected and e.target in selected],
     )
 
 
