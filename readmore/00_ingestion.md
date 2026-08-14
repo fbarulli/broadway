@@ -5,6 +5,18 @@ the columns. Two surfaces produce data: the pipeline CLI (`ingest` → `etl`)
 and the numbered project scripts. Column correctness is enforced at several
 boundaries, each with its own command.
 
+### Human-readable views
+
+The JSON audit/clean artifacts below aren't meant to be read by hand. For a
+human-readable summary of what happened to the data, run:
+
+```bash
+uv run ds-pipeline audit --dataset taxi
+```
+
+This renders `reports/audit/` (`index.md`, `profile.md`, `transform.md`,
+`join.md`, `lookup_values.md`) from the persisted typed evidence — no recompute.
+
 ## Commands to load + verify columns
 
 ### 1. Inspect the produced raw data schema (read-only, no recompute)

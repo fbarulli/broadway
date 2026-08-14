@@ -42,6 +42,6 @@ def render_index(question: str, stats_dir: Path) -> str:
         ("Latest result", latest_text),
         ("Next test", next_test if next_test is not None else "all complete"),
         ("Results", results_table),
-        ("Navigation", "[lineage graph](lineage/graph.md)"),
+        ("Navigation", "[data audit](audit/index.md)\n[lineage graph](lineage/graph.md)"),
     ]
     return render_result("Broadway Results Index", sections)

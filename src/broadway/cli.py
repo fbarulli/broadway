@@ -40,6 +40,11 @@ def _build_parser() -> argparse.ArgumentParser:
     profile = sub.add_parser("profile")
     profile.add_argument("--dataset", type=str, required=True)
 
+    audit = sub.add_parser("audit")
+    audit.add_argument("--dataset", type=str, required=True)
+    audit.add_argument("--analysis", type=str, default=None)
+    audit.add_argument("--environment", type=str, default=DEFAULT_ENVIRONMENT)
+
     sub.add_parser("ingest")
 
     init = sub.add_parser("init")
@@ -102,6 +107,10 @@ def main() -> None:
         from broadway.discover.module import profile
 
         profile(args.dataset)
+    elif args.step == "audit":
+        from broadway.reports.audit import run as audit_run
+
+        audit_run(args.dataset, args.analysis, args.environment)
     elif args.step == "ingest":
         from broadway.etl.process import process_data
 

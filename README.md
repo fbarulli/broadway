@@ -98,6 +98,7 @@ Every step except `discover` takes the same three flags.
 | full | `ds-pipeline full …` | dispatches to the mode flow (prediction/hypothesis/causal) based on `--analysis` | works |
 | lineage | `ds-pipeline lineage --analysis <a> --dataset <d>` | `reports/lineage/graph.json` + `graph.md` + run-state summary | works (reporting, not a pipeline step) |
 | report | `ds-pipeline report --analysis <a> --dataset <d>` | `reports/index.md` (navigable results hierarchy) | works (reporting, not a pipeline step) |
+| audit | `ds-pipeline audit --dataset <d> [--analysis <a>]` | `reports/audit/*.md` (human-readable data readiness) | works (reporting, not a pipeline step) |
 
 `causal` is a separate analysis mode, run on its own — it is not part of
 `full`. `full` is a thin dispatcher that reads `AnalysisContract.mode` and
@@ -132,6 +133,9 @@ hierarchy built from the machine evidence in `artifacts/`.
 ```bash
 ds-pipeline report --analysis taxi_hypothesis --dataset taxi
 # → reports/index.md (entry point) + results/<step>.md + figures/
+
+ds-pipeline audit --dataset taxi [--analysis taxi_hypothesis]
+# → reports/audit/{index,profile,transform,join,lookup_values}.md
 ```
 
 ```text
@@ -139,6 +143,12 @@ reports/
   index.md            # entry point: question, latest result, next test, status table
   results/<step>.md   # one markdown result per stats step (describe, anova, ...)
   figures/*.png       # charts (describe_boxplot.png, describe_group_sizes.png)
+  audit/              # human-readable data readiness (on-demand, typed renderers)
+    index.md          # data used, status, what changed, enrichment quality, caveats
+    profile.md        # observed column facts (dtypes, nulls, cardinality, identifiers)
+    transform.md      # structural canonicalization: row transitions + parse failures
+    join.md           # lookup key-matching completeness
+    lookup_values.md  # matched-value quality (nulls/sentinels per enrichment column)
   lineage/graph.{md,json}  # run graph (from the lineage command)
 ```
 
@@ -146,6 +156,13 @@ The step order is authored once in `configs/flow/stats_sequence.yaml`
 (`StatsSequence`). Each step's result renderer lives in
 `src/broadway/reports/` (`registry.RESULT_RENDERERS`); `index.md` marks a step
 done when `results/<step>.md` exists and points to the next pending test.
+
+The `reports/` surface has three parts, each answering a different question:
+`results/` — "what did the statistics find"; `audit/` — "what happened to the
+data"; `lineage/` — "how artifacts connect". The `audit` command is on-demand
+and pure-rendering: it reads the persisted typed evidence (`StructuralCleanResult`,
+`JoinAuditReport`, `LookupValueAuditReport`, `DatasetProfile`), renders Markdown,
+and never re-runs ingest/etl/stats/profile.
 
 ### Git-track policy
 

@@ -31,6 +31,17 @@ result per stats step), `figures/` (charts), and `lineage/` (run graph). The
 `src/broadway/reports/registry.py`. Outputs are split by kind: machine JSON →
 `artifacts/stats/`, markdown → `reports/results/`, images → `reports/figures/`.
 
+The `audit` command (`ds-pipeline audit --dataset <d> [--analysis <a>]`) is a
+separate on-demand, question-oriented surface. It reads the persisted typed
+evidence — `StructuralCleanResult` (`data/processed/<name>_clean.json`),
+`JoinAuditReport` (`<name>_join_audit.json`), `LookupValueAuditReport`
+(`<name>_lookup_value_audit.json`), and `DatasetProfile`
+(`artifacts/discover/profile.json`) — and renders one page per question
+(`profile.md`, `transform.md`, `join.md`, `lookup_values.md`) plus an
+`index.md` (data used, dataset status, what changed, enrichment quality,
+things to consider). It is pure rendering: it never re-runs ingest/etl/stats
+and never reads parquet.
+
 `causal` is a separate analysis mode, not part of this flow and not part of
 `full`. `full` is a thin dispatcher: it reads `AnalysisContract.mode` and
 resolves one of `configs/flow/{prediction,hypothesis,causal}.yaml`. Run causal
@@ -147,12 +158,13 @@ broadway/
       state.py              # current_state(graph, mode, goal, decisions) -> RunState
       module.py             # ds-pipeline lineage command
     reports/                # human-facing product surface (index + per-step markdown + figures)
-      paths.py              # REPORTS_DIR / RESULTS_DIR / FIGURES_DIR (owns the surface paths)
+      paths.py              # REPORTS_DIR / RESULTS_DIR / FIGURES_DIR / AUDIT_DIR (owns the surface paths)
       markdown.py           # render_result(title, sections) -> markdown
       sequence.py           # StatsSequence (configs/flow/stats_sequence.yaml)
       describe.py           # load_artifact / render / headline for the describe result
       registry.py           # RESULT_RENDERERS = {"describe": describe, ...}
       index.py              # render_index(question, stats_dir) -> reports/index.md
+      audit.py              # ds-pipeline audit: typed renderers -> reports/audit/{index,profile,transform,join,lookup_values}.md
   project/
     features.py             # FEATURE_SPECS registry → ENGINEERED_FEATURES/types/schema
     ml_pipeline.py          # FeaturePipeline (taxi orchestration)
