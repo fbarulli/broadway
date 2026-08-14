@@ -12,6 +12,7 @@ rename_map:
   tpep_pickup_datetime: pickup_datetime
   PULocationID: pickup_location_id
   DOLocationID: dropoff_location_id
+  Airport_fee: airport_fee
 borough_column: Borough
 borough_lookup_column: Borough_lookup
 lookup_path: data/raw/taxi_zone_lookup.csv

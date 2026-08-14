@@ -21,6 +21,8 @@ RAW_FEATURES = [
     "trip_distance",
     "pickup_location_id",
     "dropoff_location_id",
+    "total_amount",
+    "airport_fee",
 ]
 
 RAW_FEATURE_TYPES = {
@@ -29,6 +31,8 @@ RAW_FEATURE_TYPES = {
     "trip_distance": float,
     "pickup_location_id": int,
     "dropoff_location_id": int,
+    "total_amount": float,
+    "airport_fee": float,
 }
 
 STREAM_FEATURE_TYPES = {

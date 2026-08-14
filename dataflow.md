@@ -232,7 +232,7 @@ through ingest and the etl step:
 data/raw/yellow_tripdata_*.parquet
         │  ingest (process_data: Polars scan → CI-gated sample → clean → save)
         ▼
-data/processed/training_data.parquet     (~8.5M rows, 6 cols)
+data/processed/training_data.parquet     (~8.5M rows, 8 cols)
         │  etl (load_with_audit → canonicalize → validate → split)
         ├──▶ data/processed/<name>_join_audit.json           (JoinAudit)
         ├──▶ data/processed/<name>_lookup_value_audit.json   (LookupValueAudit)
@@ -301,7 +301,7 @@ Analysis intent is authored separately via `configs/analysis/<name>.yaml` → `A
 | Engineered features | Pandera | `project/features.py` (`FEATURE_SPECS`) → `broadway/features/schema.py::build_engineered_schema` |
 | Python interfaces | type hints | throughout |
 
-- The raw schema is generated at runtime from `DatasetContract.columns` — one `pa.Column` per contract entry (the raw 6 columns, not join-derived `pickup_borough`/`LocationID`). Dtypes are checked strictly (`coerce=False`); `null_count` is observed, not an invariant, so nullability is left at Pandera's default.
+- The raw schema is generated at runtime from `DatasetContract.columns` — one `pa.Column` per contract entry (the raw 8 columns, not join-derived `pickup_borough`/`LocationID`). Dtypes are checked strictly (`coerce=False`); `null_count` is observed, not an invariant, so nullability is left at Pandera's default.
 - Role-based column selection is `broadway/contracts/selectors.py` (`feature_columns`, `datetime_columns`, `target_columns`) — pure functions over the contract, no hardcoded names.
 - Engineered features are defined ONCE in `project/features.py::FEATURE_SPECS`; `ENGINEERED_FEATURES`, `ENGINEERED_FEATURE_TYPES`, and `ENGINEERED_SCHEMA` are all derived from that registry (no parallel hand-maintained list).
 - Enforcement points: `read_training_data()` validates the raw frame via `build_raw_schema`; `FeaturePipeline.transform()` validates against `ENGINEERED_SCHEMA`.

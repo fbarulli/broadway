@@ -31,13 +31,15 @@ It hard-fails on any column mismatch via `validate_raw_schema`
 (`features/contracts.py`): exactly `RAW_FEATURES + [TARGET]`, no nulls, strict
 dtypes.
 
-Expected 6 columns (`features/schema.py`):
+Expected 8 columns (`features/schema.py`):
 
 - `pickup_datetime`
 - `passenger_count`
 - `trip_distance`
 - `pickup_location_id`
 - `dropoff_location_id`
+- `total_amount`
+- `airport_fee`
 - `trip_duration_minutes` (target)
 
 ### 3. Canonicalize + split (`etl`)
@@ -95,7 +97,7 @@ uv run pytest -q
 
 ## Key column facts (what "correct" means)
 
-- **Contract source of truth:** `configs/dataset/taxi.yaml` — 6 columns, each
+- **Contract source of truth:** `configs/dataset/taxi.yaml` — 8 columns, each
   with `dtype`, `null_count`, and `role`.
 - **Raw-boundary check** (`contracts`) verifies **presence + nulls only**;
   dtype is intentionally deferred (`contracts/checks.py`).
