@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from pydantic import BaseModel, ConfigDict
 
+from broadway import viz
 from broadway.analysis.contracts import AnalysisMode, require_mode
 from broadway.config.schema import PipelineConfig
 from broadway.lineage.ids import node_id
@@ -73,13 +74,17 @@ def plot_group_distribution(df: pd.DataFrame, source_group_column: str, group_co
     data = [df[df[source_group_column] == g][target].dropna().to_numpy() for g in group_values]
     labels = [f"{g} (n={len(v)})" for g, v in zip(group_values, data)]
     fig, ax = plt.subplots(figsize=(10, 5))
-    ax.boxplot(data, tick_labels=labels)
+    colors = viz.palette_colors(len(data))
+    bp = ax.boxplot(data, tick_labels=labels, patch_artist=True)
+    for patch, color in zip(bp["boxes"], colors):
+        patch.set_facecolor(color)
     ax.set_xlabel(group_column)
     ax.set_ylabel(target)
     ax.set_title("Group distribution (target by group)")
     absent = [g for g, v in zip(group_values, data) if len(v) == 0]
     if absent:
         ax.text(0.99, 0.02, f"absent (n=0): {', '.join(absent)}", transform=ax.transAxes, ha="right", va="bottom", color="red")
+    viz.despine(ax)
     fig.tight_layout()
     fig.savefig(out_path)
     plt.close(fig)
@@ -89,7 +94,7 @@ def plot_group_sizes(summary: GroupSummary, out_path: Path) -> None:
     names = list(summary.groups.keys())
     sizes = [summary.groups[g].n for g in names]
     fig, ax = plt.subplots(figsize=(10, 5))
-    colors = ["#c0392b" if s == 0 else "#3498db" for s in sizes]
+    colors = viz.palette_colors(len(names))
     ax.bar(names, sizes, color=colors)
     ax.set_ylabel("n")
     ax.set_xlabel(summary.group_column)
@@ -97,6 +102,7 @@ def plot_group_sizes(summary: GroupSummary, out_path: Path) -> None:
     for i, s in enumerate(sizes):
         ax.text(i, s, f"n={s}", ha="center", va="bottom")
     ax.text(0.99, 0.02, f"imbalance ratio = {summary.imbalance_ratio}", transform=ax.transAxes, ha="right", va="bottom")
+    viz.despine(ax)
     fig.tight_layout()
     fig.savefig(out_path)
     plt.close(fig)

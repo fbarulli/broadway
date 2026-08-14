@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 from pathlib import Path
 
 import numpy as np
@@ -7,6 +8,7 @@ import pandas as pd
 import pytest
 import yaml
 
+from broadway import viz
 import broadway.discover.module as discover_module
 from broadway.config.loader import load_config
 from broadway.discover.profile import ColumnProfile, DatasetProfile
@@ -447,3 +449,8 @@ def test_render_profile_includes_qq_evidence() -> None:
 def test_render_profile_without_qq_has_no_evidence_section() -> None:
     md = audit.render_profile(_profile(), source="artifacts/discover/profile.json")
     assert "## Profile evidence" not in md
+
+
+def test_plot_numeric_qq_default_palette_is_shared() -> None:
+    sig = inspect.signature(plot_numeric_qq)
+    assert sig.parameters["palette"].default == viz.PALETTE

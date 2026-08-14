@@ -24,6 +24,8 @@ import seaborn as sns
 from pydantic import BaseModel, ConfigDict
 from scipy import stats
 
+from broadway import viz
+
 MAX_FEATURES_PER_FIGURE = 12
 MAX_POINTS_PER_TRACE = 2_000   # Q-Q shape is preserved well below this
 FIG_SIZE_PER_SUBPLOT = 3.0     # inches; total figure scales with the grid
@@ -181,7 +183,7 @@ def plot_numeric_qq(
     fig_size_per_subplot: float = FIG_SIZE_PER_SUBPLOT,
     dpi: int = DEFAULT_DPI,
     standardization: str = "per-feature z-score",
-    palette: str = "BuPu_r",
+    palette: str = viz.PALETTE,
 ) -> QqOverview:
     figures_dir = Path(figures_dir)
     evidence_path = Path(evidence_path)

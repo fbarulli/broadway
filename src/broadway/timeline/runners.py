@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
+from broadway import viz
 from broadway.analysis.contracts import AnalysisContract
 from broadway.config.schema import PipelineConfig
 from broadway.data.loader import canonical_path
@@ -192,15 +193,16 @@ def _plot_qq_joint(
     names = list(groups)[:max_groups]
     fig = plt.figure(figsize=(7, 7))
     ax = fig.add_subplot(111)
+    colors = viz.palette_colors(len(names))
     osm_all: list[np.ndarray] = []
     osr_all: list[np.ndarray] = []
-    for name in names:
+    for color, name in zip(colors, names):
         vals = np.asarray(groups[name], dtype=float)
         z = (vals - vals.mean()) / vals.std()
         osm, osr = stats.probplot(z, dist="norm", fit=False)
         osm_all.append(osm)
         osr_all.append(osr)
-        ax.scatter(osm, osr, s=10, label=name)
+        ax.scatter(osm, osr, s=10, label=name, color=color)
     lo = min(np.concatenate(osm_all).min(), np.concatenate(osr_all).min())
     hi = max(np.concatenate(osm_all).max(), np.concatenate(osr_all).max())
     ax.plot([lo, hi], [lo, hi], color="red", linestyle="--", linewidth=1)
@@ -208,6 +210,7 @@ def _plot_qq_joint(
     ax.set_ylabel("Sample quantiles (standardized)")
     ax.set_title("Joint per-group Q-Q plot (per-group standardization)")
     ax.legend()
+    viz.despine(ax)
     fig.tight_layout()
     fig.savefig(out_path)
     plt.close(fig)

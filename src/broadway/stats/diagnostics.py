@@ -13,6 +13,7 @@ from statsmodels.stats.diagnostic import het_breuschpagan
 from statsmodels.stats.stattools import durbin_watson as _durbin_watson
 from statsmodels.stats.stattools import jarque_bera
 
+from broadway import viz
 from broadway.stats.diagnostic_models import DiagnosticResult
 
 
@@ -33,11 +34,12 @@ def durbin_watson(resid: np.ndarray) -> float:
 def _plot_residuals_vs_fitted(ax, model) -> None:
     fitted = model.fittedvalues
     resid = model.resid
-    ax.scatter(fitted, resid, s=2, alpha=0.15)
+    ax.scatter(fitted, resid, s=2, alpha=0.15, color=viz.palette_colors(1)[0])
     ax.axhline(0, color="red", linewidth=1)
     ax.set_xlabel("Fitted values")
     ax.set_ylabel("Residuals")
     ax.set_title("Residuals vs Fitted")
+    viz.despine(ax)
 
 
 def plot_residuals_vs_fitted(model: object, out_path: str) -> None:
@@ -72,10 +74,12 @@ def plot_residuals(model, out_path: str) -> None:
     sm.qqplot(resid, line="45", ax=axes[1], markersize=2, alpha=0.15)
     axes[1].set_title("Q-Q Plot of Residuals")
 
-    axes[2].hist(resid, bins=100)
+    axes[2].hist(resid, bins=100, color=viz.palette_colors(1)[0])
     axes[2].set_title("Residual Distribution")
     axes[2].set_xlabel("Residual")
 
+    for ax in axes:
+        viz.despine(ax)
     plt.tight_layout()
     plt.savefig(out_path, dpi=150)
     plt.close(fig)
