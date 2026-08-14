@@ -12,8 +12,10 @@ import yaml
 from broadway.config.loader import CONFIGS_DIR
 from broadway.config.schema import ColumnRole, ColumnSchema, DatasetContract, TaskType
 from broadway.discover.profile import DatasetProfile, build_profile
+from broadway.discover.qq import plot_numeric_qq
 from broadway.lineage.ids import node_id
 from broadway.lineage.records import write_record
+from broadway.reports.paths import FIGURES_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -69,6 +71,13 @@ def _log_identifier_recommendations(contract: DatasetContract, profile: DatasetP
             logger.info(f"likely identifier: {col} (identifier_score={col_profile.identifier_score})")
 
 
+def _write_qq_overview(df: pd.DataFrame) -> None:
+    qq_dir = Path(ARTIFACTS_DIR) / "discover"
+    qq_dir.mkdir(parents=True, exist_ok=True)
+    FIGURES_DIR.mkdir(parents=True, exist_ok=True)
+    plot_numeric_qq(df, FIGURES_DIR, qq_dir / "qq_overview.json")
+
+
 def run(
     csv: str,
     target: str,
@@ -93,6 +102,7 @@ def run(
     profile_path.write_text(profile.model_dump_json(indent=2), encoding="utf-8")
     logger.info(f"discover: wrote {len(profile.columns)} column profiles to {profile_path}")
     _log_identifier_recommendations(contract, profile)
+    _write_qq_overview(df)
     write_record(
         node_id("profile", contract.name),
         "profile",
@@ -114,6 +124,7 @@ def profile(dataset_name: str) -> None:
     profile_path = profile_dir / "profile.json"
     profile_path.write_text(result.model_dump_json(indent=2), encoding="utf-8")
     logger.info(f"profile: wrote {len(result.columns)} columns to {profile_path}")
+    _write_qq_overview(df)
     write_record(
         node_id("profile", contract.name),
         "profile",

@@ -89,12 +89,10 @@ def test_run_normality_sets_figures(tmp_path: Path, monkeypatch: pytest.MonkeyPa
         cfg.analysis, 2, "q?", groups,
         tmp_path / "timeline" / "taxi_hypothesis", figures_dir, "canonical", None,
     )
-    assert {f.path for f in step.figures} == {
-        "figures/normality_Manhattan.png",
-        "figures/normality_Brooklyn.png",
-    }
+    assert [f.path for f in step.figures] == ["figures/normality_qq.png"]
     for fig in step.figures:
-        assert "approximately normal" in fig.caption
+        assert "standardized" in fig.caption
+    assert "figures/normality_qq.png" in step.evidence_refs
 
 
 def test_render_timeline_figures_relative_to_reports() -> None:

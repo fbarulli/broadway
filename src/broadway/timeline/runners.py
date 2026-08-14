@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -42,9 +41,11 @@ GROUP_SIZES_CAPTION = (
     "very unequal bars indicate imbalance."
 )
 QQ_CAPTION = (
-    "How to read: points that hug the diagonal line indicate the group is "
-    "approximately normal; curvature or heavy tails indicate non-normality."
+    "How to read: each trace is one group's standardized values; traces hugging "
+    "the diagonal are approximately normal; curvature or heavy tails indicate "
+    "non-normality."
 )
+MAX_QQ_GROUPS = 12
 
 
 def _thresholds() -> WalkthroughConfig:
@@ -53,10 +54,6 @@ def _thresholds() -> WalkthroughConfig:
 
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
-
-
-def _safe_filename(name: str) -> str:
-    return re.sub(r"[^A-Za-z0-9_.-]+", "_", name).strip("_") or "group"
 
 
 def _attrition(
@@ -190,19 +187,28 @@ def run_describe(
     )
 
 
-def _plot_qq(vals: np.ndarray, name: str, out_path: Path) -> None:
-    arr = np.asarray(vals, dtype=float)
-    (osm, osr), (slope, intercept, _r) = stats.probplot(arr, dist="norm", fit=True)
-    fig = plt.figure(figsize=(5, 5))
+def _plot_qq_joint(
+    groups: dict[str, np.ndarray], out_path: Path, max_groups: int = MAX_QQ_GROUPS
+) -> int:
+    names = list(groups)[:max_groups]
+    fig = plt.figure(figsize=(7, 7))
     ax = fig.add_subplot(111)
-    ax.scatter(osm, osr, s=10)
-    ax.plot(osm, slope * osm + intercept, color="red")
-    ax.set_xlabel("Theoretical quantiles")
-    ax.set_ylabel("Sample quantiles")
-    ax.set_title(f"Q-Q plot — {name}")
+    for name in names:
+        vals = np.asarray(groups[name], dtype=float)
+        z = (vals - vals.mean()) / vals.std()
+        osm, osr = stats.probplot(z, dist="norm", fit=False)
+        ax.scatter(osm, osr, s=10, label=name)
+    lower = min(ax.get_xlim()[0], ax.get_ylim()[0])
+    upper = max(ax.get_xlim()[1], ax.get_ylim()[1])
+    ax.plot([lower, upper], [lower, upper], color="red", linestyle="--", linewidth=1)
+    ax.set_xlabel("Theoretical quantiles (standard normal)")
+    ax.set_ylabel("Sample quantiles (standardized)")
+    ax.set_title("Joint per-group Q-Q plot (per-group standardization)")
+    ax.legend()
     fig.tight_layout()
     fig.savefig(out_path)
     plt.close(fig)
+    return len(names)
 
 
 def run_normality(
@@ -217,18 +223,11 @@ def run_normality(
 ) -> AnalysisStep:
     result = check_normality(groups)
     figures_dir.mkdir(parents=True, exist_ok=True)
-    figure_paths: list[str] = []
-    figure_refs: list[FigureRef] = []
-    for name, vals in groups.items():
-        if len(vals) < 2:
-            continue
-        fname = f"normality_{_safe_filename(name)}.png"
-        _plot_qq(vals, name, figures_dir / fname)
-        figure_paths.append(f"figures/{fname}")
-        figure_refs.append(FigureRef(path=f"figures/{fname}", caption=QQ_CAPTION))
+    _plot_qq_joint(groups, figures_dir / "normality_qq.png")
+    figure_refs = [FigureRef(path="figures/normality_qq.png", caption=QQ_CAPTION)]
     evidence = NormalityEvidence(
         groups={g: NormalityGroupStat(**s) for g, s in result.items()},
-        figures=figure_paths,
+        figure="figures/normality_qq.png",
     )
     evidence_dir = out_dir / "evidence"
     evidence_dir.mkdir(parents=True, exist_ok=True)
@@ -248,6 +247,15 @@ def run_normality(
         if flagged
         else "distributional shape is broadly reasonable."
     )
+    result_summary: dict[str, object] = {
+        g: {"skew": s["skew"], "kurtosis": s["kurtosis"], "shapiro_p": s["shapiro_p"]}
+        for g, s in result.items()
+    }
+    result_summary["standardization"] = "per-group z-score"
+    if len(groups) > MAX_QQ_GROUPS:
+        result_summary["truncation"] = (
+            f"plotted first {MAX_QQ_GROUPS} of {len(groups)} groups"
+        )
     return AnalysisStep(
         analysis=analysis.name,
         step_id="normality",
@@ -257,12 +265,9 @@ def run_normality(
         method="check_normality",
         source=source,
         sample_name=sample_name,
-        evidence_refs=["normality.json"] + figure_paths,
+        evidence_refs=["normality.json", "figures/normality_qq.png"],
         figures=figure_refs,
-        result_summary={
-            g: {"skew": s["skew"], "kurtosis": s["kurtosis"], "shapiro_p": s["shapiro_p"]}
-            for g, s in result.items()
-        },
+        result_summary=result_summary,
         ramification=ramification,
         decision_required=False,
         performed_at=now_iso(),

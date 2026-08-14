@@ -43,6 +43,7 @@ class TestDiscoverCLI:
             "BROADWAY_CONFIGS_DIR": str(configs_dir),
             "BROADWAY_DATASET_DIR": "dataset",
             "BROADWAY_ARTIFACTS_DIR": str(tmp_path / "artifacts"),
+            "BROADWAY_REPORTS_DIR": str(tmp_path / "reports"),
             "BROADWAY_LINEAGE_DIR": str(tmp_path / "lineage"),
         }
 
@@ -86,6 +87,7 @@ class TestDiscoverCLI:
             "BROADWAY_CONFIGS_DIR": str(configs_dir),
             "BROADWAY_DATASET_DIR": "dataset",
             "BROADWAY_ARTIFACTS_DIR": str(tmp_path / "artifacts"),
+            "BROADWAY_REPORTS_DIR": str(tmp_path / "reports"),
             "BROADWAY_LINEAGE_DIR": str(tmp_path / "lineage"),
         }
 

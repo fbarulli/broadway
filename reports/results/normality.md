@@ -25,6 +25,7 @@ check_normality
 - Staten Island.skew: 1.02
 - Staten Island.kurtosis: 0.606
 - Staten Island.shapiro_p: < 0.001
+- standardization: per-group z-score
 
 ## Why it matters
 
@@ -32,8 +33,4 @@ distributional shape is skewed/heavy-tailed in some groups; consider this alongs
 
 ## Figures
 
-![How to read: points that hug the diagonal line indicate the group is approximately normal; curvature or heavy tails indicate non-normality.](../figures/normality_Manhattan.png)
-![How to read: points that hug the diagonal line indicate the group is approximately normal; curvature or heavy tails indicate non-normality.](../figures/normality_Brooklyn.png)
-![How to read: points that hug the diagonal line indicate the group is approximately normal; curvature or heavy tails indicate non-normality.](../figures/normality_Queens.png)
-![How to read: points that hug the diagonal line indicate the group is approximately normal; curvature or heavy tails indicate non-normality.](../figures/normality_Bronx.png)
-![How to read: points that hug the diagonal line indicate the group is approximately normal; curvature or heavy tails indicate non-normality.](../figures/normality_Staten_Island.png)
+![How to read: each trace is one group's standardized values; traces hugging the diagonal are approximately normal; curvature or heavy tails indicate non-normality.](../figures/normality_qq.png)

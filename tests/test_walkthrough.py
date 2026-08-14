@@ -72,7 +72,7 @@ def test_walkthrough_stops_at_gate(
         assert (steps_dir / f"{step_id}.json").exists()
     for evidence in ("describe.json", "normality.json", "variance.json"):
         assert (evidence_dir / evidence).exists()
-    assert (tmp_path / "reports" / "figures" / "normality_Manhattan.png").exists()
+    assert (tmp_path / "reports" / "figures" / "normality_qq.png").exists()
     assert (tmp_path / "reports" / "timeline.md").exists()
     assert module.load_step("taxi_hypothesis", "omnibus") is None
     assert not (steps_dir / "omnibus.json").exists()
@@ -182,10 +182,8 @@ def test_run_normality_writes_figures(
         cfg.analysis, 2, "q?", groups, tmp_path / "timeline" / "taxi_hypothesis",
         figures_dir, "canonical", None,
     )
-    assert (figures_dir / "normality_Manhattan.png").exists()
-    assert (figures_dir / "normality_Brooklyn.png").exists()
-    assert (figures_dir / "normality_Queens.png").exists()
-    assert any("figures/normality_" in ref for ref in step.evidence_refs)
+    assert (figures_dir / "normality_qq.png").exists()
+    assert "figures/normality_qq.png" in step.evidence_refs
 
 
 def test_load_frame_and_groups_from_canonical(

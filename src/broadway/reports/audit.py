@@ -17,6 +17,7 @@ from broadway.config.loader import load_config
 from broadway.data.join_audit import JoinAuditReport
 from broadway.data.lookup_value_audit import LookupValueAuditReport
 from broadway.discover.profile import DatasetProfile
+from broadway.discover.qq import QqOverview
 from broadway.reports.paths import AUDIT_DIR
 
 PASS = "PASS"
@@ -43,10 +44,16 @@ def _render_page(
     why: str,
     not_decided: str,
     source: str = "",
+    extra_sections: list[tuple[str, str]] | None = None,
 ) -> str:
     lines = [f"# {title}", "", "## Answer", "", answer, "", "## Key evidence", ""]
     for subheading, body in evidence_sections:
         lines.append(f"### {subheading}")
+        lines.append("")
+        lines.append(body)
+        lines.append("")
+    for heading, body in extra_sections or []:
+        lines.append(f"## {heading}")
         lines.append("")
         lines.append(body)
         lines.append("")
@@ -65,7 +72,32 @@ def _render_page(
     return "\n".join(lines)
 
 
-def render_profile(profile: DatasetProfile | None, source: str = "") -> str:
+def _render_profile_evidence(qq: QqOverview | None) -> list[tuple[str, str]]:
+    if qq is None:
+        return []
+    by_figure: dict[str, list[str]] = {}
+    for feature in qq.features:
+        if feature.figure:
+            by_figure.setdefault(feature.figure, []).append(feature.feature)
+    lines: list[str] = []
+    for figure in qq.figures:
+        label = ", ".join(by_figure.get(figure, []))
+        lines.append(f"![{label}](../{figure})")
+    lines.append("")
+    lines.append(f"Traces are {qq.standardization}.")
+    if qq.excluded_notes:
+        lines.append("")
+        lines.append("Excluded features:")
+        lines.extend(f"- {note}" for note in qq.excluded_notes)
+    lines.append("")
+    lines.append(
+        "How to read: traces hugging the diagonal are approximately normal; "
+        "S-curves indicate tail behavior; curvature indicates skew."
+    )
+    return [("Profile evidence", "\n".join(lines))]
+
+
+def render_profile(profile: DatasetProfile | None, source: str = "", qq: QqOverview | None = None) -> str:
     if profile is None:
         return _render_page(
             "Dataset Profile",
@@ -106,7 +138,15 @@ def render_profile(profile: DatasetProfile | None, source: str = "") -> str:
         "identity if used as grouping features."
     )
     not_decided = "Broadway did not exclude or transform any column based on this profile."
-    return _render_page("Dataset Profile", answer, evidence, why, not_decided, source)
+    return _render_page(
+        "Dataset Profile",
+        answer,
+        evidence,
+        why,
+        not_decided,
+        source,
+        extra_sections=_render_profile_evidence(qq),
+    )
 
 
 def render_transform(result: StructuralCleanResult | None, source: str = "") -> str:
@@ -518,6 +558,7 @@ def _evidence_paths(cfg: Any) -> dict[str, Path]:
         "join": processed / f"{cfg.dataset.name}_join_audit.json",
         "lookup": processed / f"{cfg.dataset.name}_lookup_value_audit.json",
         "profile": Path(os.getenv("BROADWAY_ARTIFACTS_DIR", "artifacts")) / "discover" / "profile.json",
+        "qq": Path(os.getenv("BROADWAY_ARTIFACTS_DIR", "artifacts")) / "discover" / "qq_overview.json",
     }
 
 
@@ -536,9 +577,12 @@ def run(dataset: str, analysis: str | None, environment: str) -> None:
     join_report = _load(paths["join"], JoinAuditReport)
     lookup_report = _load(paths["lookup"], LookupValueAuditReport)
     profile = _load(paths["profile"], DatasetProfile)
+    qq = _load(paths.get("qq", Path("artifacts/discover/qq_overview.json")), QqOverview)
 
     AUDIT_DIR.mkdir(parents=True, exist_ok=True)
-    (AUDIT_DIR / "profile.md").write_text(render_profile(profile, str(paths["profile"])), encoding="utf-8")
+    (AUDIT_DIR / "profile.md").write_text(
+        render_profile(profile, str(paths["profile"]), qq), encoding="utf-8"
+    )
     (AUDIT_DIR / "transform.md").write_text(render_transform(result, str(paths["clean"])), encoding="utf-8")
     (AUDIT_DIR / "join.md").write_text(render_join(join_report, str(paths["join"])), encoding="utf-8")
     (AUDIT_DIR / "lookup_values.md").write_text(

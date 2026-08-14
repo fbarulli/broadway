@@ -55,6 +55,8 @@ def _suggest_normality(step, cfg: WalkthroughConfig, analysis_name: str) -> Sugg
     if step.status in (StepStatus.WARNING, StepStatus.NOTE):
         rationale = []
         for group, values in step.result_summary.items():
+            if not isinstance(values, dict):
+                continue
             skew = values.get("skew")
             kurtosis = values.get("kurtosis")
             shapiro = values.get("shapiro_p")

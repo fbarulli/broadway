@@ -23,6 +23,14 @@ The dataset has 8545833 rows and 8 columns.
 
 none
 
+## Profile evidence
+
+![passenger_count, trip_distance, pickup_location_id, dropoff_location_id, total_amount, airport_fee, trip_duration_minutes](../figures/numeric_qq_1.png)
+
+Traces are per-feature z-score.
+
+How to read: traces hugging the diagonal are approximately normal; S-curves indicate tail behavior; curvature indicates skew.
+
 ## Why this may matter
 
 High-cardinality/identifier-like columns can inflate group counts or leak identity if used as grouping features.

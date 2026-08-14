@@ -15,7 +15,8 @@ class NormalityEvidence(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     groups: dict[str, NormalityGroupStat]
-    figures: list[str]
+    figure: str
+    standardization: str = "per-group z-score"
 
 
 class VarianceEvidence(BaseModel):

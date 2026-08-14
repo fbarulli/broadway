@@ -47,11 +47,8 @@
   - Staten Island.skew: 1.02
   - Staten Island.kurtosis: 0.606
   - Staten Island.shapiro_p: < 0.001
-![How to read: points that hug the diagonal line indicate the group is approximately normal; curvature or heavy tails indicate non-normality.](figures/normality_Manhattan.png)
-![How to read: points that hug the diagonal line indicate the group is approximately normal; curvature or heavy tails indicate non-normality.](figures/normality_Brooklyn.png)
-![How to read: points that hug the diagonal line indicate the group is approximately normal; curvature or heavy tails indicate non-normality.](figures/normality_Queens.png)
-![How to read: points that hug the diagonal line indicate the group is approximately normal; curvature or heavy tails indicate non-normality.](figures/normality_Bronx.png)
-![How to read: points that hug the diagonal line indicate the group is approximately normal; curvature or heavy tails indicate non-normality.](figures/normality_Staten_Island.png)
+  - standardization: per-group z-score
+![How to read: each trace is one group's standardized values; traces hugging the diagonal are approximately normal; curvature or heavy tails indicate non-normality.](figures/normality_qq.png)
 
 ## Variance homogeneity
 
