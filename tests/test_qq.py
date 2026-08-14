@@ -60,7 +60,7 @@ def test_run_normality_produces_single_joint_qq(tmp_path, monkeypatch) -> None:
     assert list(figures_dir.glob("normality_*.png")) == [figures_dir / "normality_qq.png"]
     assert [f.path for f in step.figures] == ["figures/normality_qq.png"]
     assert "standardized" in step.figures[0].caption
-    assert "y = x diagonal" in step.figures[0].caption
+    assert "fitted" in step.figures[0].caption
     assert step.result_summary.get("standardization") == "per-group z-score"
 
     evidence = NormalityEvidence.model_validate_json(

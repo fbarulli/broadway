@@ -45,7 +45,7 @@
   - Staten Island.kurtosis: 0.606
   - Staten Island.shapiro_p: < 0.001
   - standardization: per-group z-score
-![How to read: each trace is one group's standardized values; traces hugging the diagonal are approximately normal; curvature or heavy tails indicate non-normality.](figures/normality_qq.png)
+![How to read: one plot per group; each group's standardized values are plotted against theoretical normal quantiles; points following the fitted reference line are approximately normal; curvature or heavy tails indicate non-normality.](figures/normality_qq.png)
 
 ## Variance homogeneity
 

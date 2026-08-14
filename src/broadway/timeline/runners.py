@@ -42,9 +42,9 @@ GROUP_SIZES_CAPTION = (
     "very unequal bars indicate imbalance."
 )
 QQ_CAPTION = (
-    "How to read: each trace is one group's standardized values; points following "
-    "the y = x diagonal are approximately normal; curvature or heavy tails indicate "
-    "non-normality."
+    "How to read: one plot per group; each group's standardized values are plotted "
+    "against theoretical normal quantiles; points following the fitted reference line "
+    "are approximately normal; curvature or heavy tails indicate non-normality."
 )
 MAX_QQ_GROUPS = 12
 
@@ -191,28 +191,35 @@ def _plot_qq_joint(
     groups: dict[str, np.ndarray], out_path: Path, max_groups: int = MAX_QQ_GROUPS
 ) -> int:
     names = list(groups)[:max_groups]
-    fig = plt.figure(figsize=(7, 7))
-    ax = fig.add_subplot(111)
-    colors = viz.palette_colors(len(names))
-    osm_all: list[np.ndarray] = []
-    osr_all: list[np.ndarray] = []
-    for color, name in zip(colors, names):
+    n = len(names)
+    n_cols = max(1, int(np.ceil(np.sqrt(n))))
+    n_rows = max(1, int(np.ceil(n / n_cols)))
+    colors = viz.palette_colors(n)
+    fig, axes = plt.subplots(
+        n_rows,
+        n_cols,
+        figsize=(n_cols * 3.0, n_rows * 3.0),
+        squeeze=False,
+        layout="constrained",
+    )
+    ax_flat = axes.ravel()
+    for color, ax, name in zip(colors, ax_flat, names):
         vals = np.asarray(groups[name], dtype=float)
         z = (vals - vals.mean()) / vals.std()
-        osm, osr = stats.probplot(z, dist="norm", fit=False)
-        osm_all.append(osm)
-        osr_all.append(osr)
-        ax.scatter(osm, osr, s=10, label=name, color=color)
-    lo = min(np.concatenate(osm_all).min(), np.concatenate(osr_all).min())
-    hi = max(np.concatenate(osm_all).max(), np.concatenate(osr_all).max())
-    ax.plot([lo, hi], [lo, hi], color="red", linestyle="--", linewidth=1)
-    ax.set_xlabel("Theoretical quantiles (standard normal)")
-    ax.set_ylabel("Sample quantiles (standardized)")
-    ax.set_title("Joint per-group Q-Q plot (per-group standardization)")
-    ax.legend()
-    viz.despine(ax)
-    fig.tight_layout()
-    fig.savefig(out_path)
+        (osm, osr), (slope, intercept, _) = stats.probplot(z, dist="norm", fit=True)
+        ax.scatter(osm, osr, s=6, alpha=0.55, edgecolor="none", color=color)
+        xs = np.array([osm.min(), osm.max()])
+        ax.plot(xs, slope * xs + intercept, color="red", linestyle="--", linewidth=0.8)
+        ax.set_xlabel("Theoretical quantiles", fontsize=8)
+        ax.set_ylabel("Sample quantiles (z)", fontsize=8)
+        ax.set_title(name, fontsize=9)
+        ax.grid(True, alpha=0.3)
+        ax.tick_params(labelsize=7)
+        viz.despine(ax)
+    for ax in ax_flat[n:]:
+        ax.set_visible(False)
+    fig.suptitle("Per-group Q-Q plots (per-group standardization)", fontsize=13)
+    fig.savefig(out_path, dpi=100, bbox_inches="tight")
     plt.close(fig)
     return len(names)
 

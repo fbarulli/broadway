@@ -33,4 +33,4 @@ distributional shape is skewed/heavy-tailed in some groups; consider this alongs
 
 ## Figures
 
-![How to read: each trace is one group's standardized values; traces hugging the diagonal are approximately normal; curvature or heavy tails indicate non-normality.](../figures/normality_qq.png)
+![How to read: one plot per group; each group's standardized values are plotted against theoretical normal quantiles; points following the fitted reference line are approximately normal; curvature or heavy tails indicate non-normality.](../figures/normality_qq.png)
