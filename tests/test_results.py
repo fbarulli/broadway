@@ -4,6 +4,8 @@ from pathlib import Path
 
 import pytest
 
+from broadway.formatting import humanize_float as shared_humanize_float
+from broadway.formatting import humanize_pvalue as shared_humanize_pvalue
 from broadway.reports import paths
 from broadway.reports.results import (
     humanize_float,
@@ -85,6 +87,13 @@ def test_humanize_pvalue_floors_at_small() -> None:
 def test_humanize_float_three_sig_figs() -> None:
     assert humanize_float(1.23456789) == "1.23"
     assert humanize_float(12.345678901) == "12.3"
+
+
+def test_humanize_helpers_live_in_shared_module() -> None:
+    assert shared_humanize_float is humanize_float
+    assert shared_humanize_pvalue is humanize_pvalue
+    assert shared_humanize_float(4199.7167447099055) == "4.2e+03"
+    assert shared_humanize_pvalue(0.0) == "< 0.001"
 
 
 def test_render_results_index_and_pages() -> None:

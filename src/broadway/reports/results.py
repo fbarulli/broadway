@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from broadway.formatting import humanize_float, humanize_pvalue
 from broadway.reports import paths
 from broadway.timeline.models import (
     AnalysisDecision,
@@ -10,17 +11,6 @@ from broadway.timeline.models import (
 from broadway.timeline.sequence import WalkthroughSequence
 
 COMPLETED_STATUSES = frozenset({StepStatus.COMPLETED, StepStatus.NOTE, StepStatus.WARNING})
-
-
-def humanize_float(value: float) -> str:
-    return f"{float(value):.3g}"
-
-
-def humanize_pvalue(value: float) -> str:
-    value = float(value)
-    if value < 0.001:
-        return "< 0.001"
-    return f"{value:.3f}"
 
 
 def _is_pvalue_key(key: str) -> bool:

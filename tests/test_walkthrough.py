@@ -10,7 +10,7 @@ from broadway.config.loader import load_config
 from broadway.reports import paths
 from broadway.timeline import decide, module, runners, walkthrough
 from broadway.timeline.evidence import PosthocEvidence
-from broadway.timeline.models import AnalysisDecision, StepStatus
+from broadway.timeline.models import AnalysisDecision, AnalysisStep, StepStatus
 
 
 def _setup(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -80,6 +80,62 @@ def test_walkthrough_stops_at_gate(
     out = capsys.readouterr().out
     assert "DECISION REQUIRED" in out
     assert "decide_omnibus" in out
+    assert "--method <method>" in out
+    assert "--method welch" not in out
+
+
+def test_decision_gate_humanizes_and_deprescribes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _setup(monkeypatch, tmp_path)
+    analysis = _load_cfg().analysis
+    steps = [
+        AnalysisStep(
+            analysis=analysis.name,
+            step_id="describe_groups",
+            order=1,
+            question="q?",
+            status=StepStatus.COMPLETED,
+            method="describe",
+            source="canonical",
+            sample_name=None,
+            evidence_refs=[],
+            result_summary={
+                "total_n": 4332549,
+                "imbalance_ratio": 2162.6747,
+                "absent_groups": 0,
+            },
+            ramification="r",
+            decision_required=False,
+            performed_at="2026-01-01T00:00:00Z",
+        ),
+        AnalysisStep(
+            analysis=analysis.name,
+            step_id="variance",
+            order=3,
+            question="q?",
+            status=StepStatus.WARNING,
+            method="levene",
+            source="canonical",
+            sample_name=None,
+            evidence_refs=[],
+            result_summary={"statistic": 4199.7167447099055, "p_value": 0.0},
+            ramification="r",
+            decision_required=False,
+            performed_at="2026-01-01T00:00:00Z",
+        ),
+    ]
+
+    walkthrough._print_decision_required(analysis, steps)
+    out = capsys.readouterr().out
+
+    assert "DECISION REQUIRED" in out
+    assert "--method <method>" in out
+    assert "--method welch" not in out
+    assert "< 0.001" in out
+    assert "4199.71" not in out
+    assert "4.2e+03" in out
+    assert "2.16e+03" in out
 
 
 def test_walkthrough_resume_idempotent(

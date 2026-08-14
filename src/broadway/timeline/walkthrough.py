@@ -6,6 +6,7 @@ from pathlib import Path
 
 from broadway.analysis.contracts import AnalysisContract, AnalysisMode, require_mode
 from broadway.config.schema import PipelineConfig
+from broadway.formatting import humanize_float, humanize_pvalue
 from broadway.lineage.models import SampleSpec
 from broadway.reports import paths
 from broadway.reports.index import render_dashboard
@@ -124,7 +125,7 @@ def _print_decision_required(
         rs = describe.result_summary
         lines.append(
             f"  - describe_groups: total_n={rs.get('total_n')}, "
-            f"imbalance_ratio={rs.get('imbalance_ratio')}, "
+            f"imbalance_ratio={humanize_float(rs.get('imbalance_ratio'))}, "
             f"absent_groups={rs.get('absent_groups')}"
         )
     normality = by_id.get("normality")
@@ -134,7 +135,8 @@ def _print_decision_required(
     if variance is not None:
         rs = variance.result_summary
         lines.append(
-            f"  - variance: Levene statistic={rs.get('statistic')}, p_value={rs.get('p_value')}"
+            f"  - variance: Levene statistic={humanize_float(rs.get('statistic'))}, "
+            f"p_value={humanize_pvalue(rs.get('p_value'))}"
         )
     lines.append("")
     lines.append("Eligible methods:")
@@ -142,7 +144,7 @@ def _print_decision_required(
         lines.append(f"  - {method}")
     lines.append("")
     lines.append(
-        f'Next: ds-pipeline decide --analysis {analysis.name} --method welch --reason "..."'
+        f'Next: ds-pipeline decide --analysis {analysis.name} --method <method> --reason "..."'
     )
     print("\n".join(lines))
 
@@ -157,7 +159,7 @@ def _print_posthoc_decision_required(analysis: AnalysisContract) -> None:
     lines.append("")
     lines.append(
         f'Next: ds-pipeline decide --analysis {analysis.name} '
-        f'--kind posthoc --method games_howell --reason "..."'
+        f'--kind posthoc --method <method> --reason "..."'
     )
     print("\n".join(lines))
 
