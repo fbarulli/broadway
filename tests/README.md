@@ -32,6 +32,16 @@ Run graph, sidecar records, and sample specs.
 - `test_lineage_graph.py`, `test_lineage_mermaid.py`, `test_lineage_state.py` — graph assembly, Mermaid output, run-state derivation.
 - `test_sample.py` — `SampleSpec` loading + `column_mapping`.
 
+## Timeline / walkthrough
+
+`src/broadway/timeline/` plus the `reports/results.py` / `reports/timeline.py` renderers.
+
+- `test_timeline.py` — `AnalysisStep`/`AnalysisDecision`/`Suggestion` models, persistence roundtrips, sequence config, and `render_timeline` status vocabulary.
+- `test_walkthrough.py` — walkthrough orchestration: decision-gate stops, idempotent resume, `--force` rerun, runner evidence, and failure capture.
+- `test_decide.py` — `decide.record` validation (method allowlist per kind, unknown-kind rejection).
+- `test_suggest.py` — deterministic suggestion layer (`suggest_after`/`suggest_next`) + `render_dashboard`.
+- `test_results.py` — `render_results`/`write_results`, humanization (3 sig figs, p-value floor), orphan deletion, failed-step page omission.
+
 ## Stats library
 
 `src/broadway/stats/` (pandas/numpy only).

@@ -24,12 +24,14 @@ stats/, causal/), human-facing reports (markdown + figures) live under
 human-facing derived views (regenerable from records + configs).
 
 `reports/` is the human-facing product surface, owned by
-`src/broadway/reports/`: `index.md` (entry point), `results/*.md` (one markdown
-result per stats step), `figures/` (charts), and `lineage/` (run graph). The
-`report` command renders `index.md` from `configs/flow/stats_sequence.yaml`
-(`StatsSequence`) and the per-step renderers in
-`src/broadway/reports/registry.py`. Outputs are split by kind: machine JSON →
-`artifacts/stats/`, markdown → `reports/results/`, images → `reports/figures/`.
+`src/broadway/reports/`. The surface is split by owner: `walkthrough` owns
+`index.md` (progress dashboard) and `results/` (per-step pages + results
+index); `audit` owns `audit/`; `lineage` owns `lineage/`;
+`reports/timeline.md` is the analysis timeline. The legacy `report` command is
+a thin wrapper that renders `reports/results/index.md` (and errors with "run
+the walkthrough first" if no timeline state exists). Outputs are split by kind:
+machine JSON → `artifacts/`, markdown → `reports/`, images →
+`reports/figures/`.
 
 The `audit` command (`ds-pipeline audit --dataset <d> [--analysis <a>]`) is a
 separate on-demand, question-oriented surface. It reads the persisted typed
@@ -50,6 +52,29 @@ explicitly:
 ```
 ds-pipeline causal --dataset <d> --experiment <e>
 ```
+
+### Timeline / walkthrough
+
+The "analysis timeline" is an analyst-led hypothesis walkthrough driven by two
+commands. `ds-pipeline walkthrough --analysis <a> --dataset <d> [--sample <s>]
+[--force]` advances an eight-step sequence — `describe_groups → normality →
+variance → decide_omnibus → omnibus → decide_posthoc → posthoc → conclusion` —
+authored in `configs/flow/hypothesis_walkthrough.yaml` (thresholds in
+`configs/step/walkthrough.yaml`), stopping at each decision gate. It is
+idempotent (existing steps are skipped on resume); `--force` recomputes steps
+but never overwrites recorded decisions. `ds-pipeline decide --analysis <a>
+--method <m> --reason "..." [--kind omnibus|posthoc]` records an
+`AnalysisDecision` (omnibus: `welch`/`anova`/`kruskal`; post-hoc:
+`games_howell`) that gates the walkthrough.
+
+Step state is a plain-text vocabulary — `completed`, `completed with note`,
+`awaiting decision`, `failed`, `warning` — persisted as `AnalysisStep` JSON
+under `artifacts/timeline/<analysis>/steps/`. A `failed` step captures the
+exception at the step boundary, writes the traceback to
+`artifacts/timeline/<analysis>/failures/<step>.log`, and shows a one-line
+message on the report page. Report pages are humanized: human step labels,
+three significant figures, p-values floored at "< 0.001", and no dict literals
+or machine paths.
 
 ### Mode-specific pipelines
 
@@ -157,13 +182,24 @@ broadway/
       mermaid.py            # to_mermaid(graph) -> mermaid source
       state.py              # current_state(graph, mode, goal, decisions) -> RunState
       module.py             # ds-pipeline lineage command
-    reports/                # human-facing product surface (index + per-step markdown + figures)
-      paths.py              # REPORTS_DIR / RESULTS_DIR / FIGURES_DIR / AUDIT_DIR (owns the surface paths)
+    timeline/               # hypothesis walkthrough: step sequence + decision gates (the "analysis timeline")
+      models.py             # StepStatus / AnalysisStep / AnalysisDecision / Suggestion / Alternative (Pydantic)
+      sequence.py           # WalkthroughSequence / WalkthroughConfig + loaders (configs/flow/hypothesis_walkthrough.yaml, configs/step/walkthrough.yaml)
+      module.py             # steps_dir/decisions_dir + save/load AnalysisStep / AnalysisDecision (artifacts/timeline/<analysis>/)
+      evidence.py           # typed evidence: NormalityEvidence / VarianceEvidence / PosthocEvidence / ConclusionEvidence
+      runners.py            # run_describe/run_normality/run_variance/run_omnibus/run_posthoc/run_conclusion (one runner per evidence step)
+      walkthrough.py        # ds-pipeline walkthrough: advances the sequence, stops at decision gates, captures failures
+      decide.py             # ds-pipeline decide: record() an AnalysisDecision (method allowlist per kind)
+      suggest.py            # suggest_after / suggest_next: deterministic next-action suggestion layer
+    reports/                # human-facing product surface (index + timeline + per-step markdown + figures)
+      paths.py              # REPORTS_DIR / RESULTS_DIR / FIGURES_DIR / AUDIT_DIR / TIMELINE_PATH / INDEX_PATH (owns the surface paths)
       markdown.py           # render_result(title, sections) -> markdown
       sequence.py           # StatsSequence (configs/flow/stats_sequence.yaml)
       describe.py           # load_artifact / render / headline for the describe result
       registry.py           # RESULT_RENDERERS = {"describe": describe, ...}
-      index.py              # render_index(question, stats_dir) -> reports/index.md
+      index.py              # render_index(question, stats_dir) + render_dashboard(...) -> reports/index.md
+      results.py            # render_results/write_results -> reports/results/ (per-step pages + results index; humanize_* helpers)
+      timeline.py           # render_timeline(...) -> reports/timeline.md (status table + per-step details)
       audit.py              # ds-pipeline audit: typed renderers -> reports/audit/{index,profile,transform,join,lookup_values}.md
   project/
     features.py             # FEATURE_SPECS registry → ENGINEERED_FEATURES/types/schema

@@ -97,7 +97,9 @@ Every step except `discover` takes the same three flags.
 | evaluate | `ds-pipeline evaluate --dataset <d> --analysis <a>` | `EvaluationResult` + promotion decision | works |
 | full | `ds-pipeline full …` | dispatches to the mode flow (prediction/hypothesis/causal) based on `--analysis` | works |
 | lineage | `ds-pipeline lineage --analysis <a> --dataset <d>` | `reports/lineage/graph.json` + `graph.md` + run-state summary | works (reporting, not a pipeline step) |
-| report | `ds-pipeline report --analysis <a> --dataset <d>` | `reports/index.md` (navigable results hierarchy) | works (reporting, not a pipeline step) |
+| report | `ds-pipeline report --analysis <a> --dataset <d>` | `reports/results/index.md` (thin wrapper over the walkthrough results index) | works (errors "run the walkthrough first" if no timeline state) |
+| walkthrough | `ds-pipeline walkthrough --analysis <a> --dataset <d> [--sample <s>] [--force]` | hypothesis analysis timeline (`reports/index.md` dashboard + `reports/timeline.md` + `reports/results/` + `reports/figures/`) | works (idempotent resume; stops at decision gates) |
+| decide | `ds-pipeline decide --analysis <a> --method <m> --reason "..." [--kind omnibus\|posthoc]` | `AnalysisDecision` (gates the walkthrough) | works (recording, not a pipeline step) |
 | audit | `ds-pipeline audit --dataset <d> [--analysis <a>]` | `reports/audit/*.md` (human-readable data readiness) | works (reporting, not a pipeline step) |
 
 `causal` is a separate analysis mode, run on its own — it is not part of
@@ -131,8 +133,8 @@ runtime events (`artifacts/lineage/decisions/`).
 hierarchy built from the machine evidence in `artifacts/`.
 
 ```bash
-ds-pipeline report --analysis taxi_hypothesis --dataset taxi
-# → reports/index.md (entry point) + results/<step>.md + figures/
+ds-pipeline walkthrough --analysis taxi_hypothesis --dataset taxi
+# → reports/index.md (dashboard) + reports/timeline.md + reports/results/ + reports/figures/
 
 ds-pipeline audit --dataset taxi [--analysis taxi_hypothesis]
 # → reports/audit/{index,profile,transform,join,lookup_values}.md
@@ -140,29 +142,55 @@ ds-pipeline audit --dataset taxi [--analysis taxi_hypothesis]
 
 ```text
 reports/
-  index.md            # entry point: question, latest result, next test, status table
-  results/<step>.md   # one markdown result per stats step (describe, anova, ...)
-  figures/*.png       # charts (describe_boxplot.png, describe_group_sizes.png)
-  audit/              # human-readable data readiness (on-demand, typed renderers)
+  index.md            # walkthrough progress dashboard (status, progress count, next action, navigation)
+  timeline.md         # analysis timeline: one status row per step + per-step details
+  results/            # per-step pages + results index (owned by the walkthrough)
+    index.md          # step-by-step status table (links to completed step pages)
+    <step>.md         # one page per completed step (question / what was run / found / why it matters)
+  figures/*.png       # charts (normality Q-Q plots, ...)
+  audit/              # human-readable data readiness (owned by audit; on-demand, typed renderers)
     index.md          # data used, status, what changed, enrichment quality, caveats
     profile.md        # observed column facts (dtypes, nulls, cardinality, identifiers)
     transform.md      # structural canonicalization: row transitions + parse failures
     join.md           # lookup key-matching completeness
     lookup_values.md  # matched-value quality (nulls/sentinels per enrichment column)
-  lineage/graph.{md,json}  # run graph (from the lineage command)
+  lineage/graph.{md,json}  # run graph (owned by lineage; from the lineage command)
 ```
 
-The step order is authored once in `configs/flow/stats_sequence.yaml`
-(`StatsSequence`). Each step's result renderer lives in
-`src/broadway/reports/` (`registry.RESULT_RENDERERS`); `index.md` marks a step
-done when `results/<step>.md` exists and points to the next pending test.
+The `reports/` surface has four owners, one per question the surface answers:
+`walkthrough` owns `index.md` (progress dashboard) and `results/` (per-step
+pages + results index); `audit` owns `audit/`; `lineage` owns `lineage/`;
+`reports/timeline.md` is the analysis timeline. The `audit` command is
+on-demand and pure-rendering: it reads the persisted typed evidence
+(`StructuralCleanResult`, `JoinAuditReport`, `LookupValueAuditReport`,
+`DatasetProfile`), renders Markdown, and never re-runs ingest/etl/stats/profile.
 
-The `reports/` surface has three parts, each answering a different question:
-`results/` — "what did the statistics find"; `audit/` — "what happened to the
-data"; `lineage/` — "how artifacts connect". The `audit` command is on-demand
-and pure-rendering: it reads the persisted typed evidence (`StructuralCleanResult`,
-`JoinAuditReport`, `LookupValueAuditReport`, `DatasetProfile`), renders Markdown,
-and never re-runs ingest/etl/stats/profile.
+### Timeline / walkthrough
+
+The walkthrough is an analyst-led hypothesis analysis timeline that advances an
+eight-step sequence — `describe_groups → normality → variance → decide_omnibus →
+omnibus → decide_posthoc → posthoc → conclusion` — authored in
+`configs/flow/hypothesis_walkthrough.yaml` (thresholds in
+`configs/step/walkthrough.yaml`) and implemented in `src/broadway/timeline/`.
+
+```bash
+ds-pipeline walkthrough --analysis <a> --dataset <d> [--sample <s>] [--force]
+```
+
+Each run advances the sequence and stops at the next decision gate. The run is
+idempotent (existing steps are skipped on resume); `--force` recomputes steps
+but never overwrites recorded decisions. Evidence steps run automatically;
+decision steps require an analyst decision, recorded via:
+
+```bash
+ds-pipeline decide --analysis <a> --method <m> --reason "..." [--kind omnibus|posthoc]
+```
+
+which persists an `AnalysisDecision` that gates the walkthrough (omnibus
+methods: `welch`/`anova`/`kruskal`; post-hoc: `games_howell`). Step status is a
+plain-text vocabulary — `completed`, `completed with note`, `awaiting decision`,
+`failed`, `warning` — and report pages are humanized (human step labels, three
+significant figures, p-values floored at "< 0.001").
 
 ### Git-track policy
 
