@@ -429,7 +429,7 @@ def render_index(
     status_line = f"Dataset status: {status}"
     if status == "READY WITH WARNINGS":
         status_line += (
-            " All required audit artifacts are present, but one or more deterministic "
+            "\nAll required audit artifacts are present, but one or more deterministic "
             "evidence checks reported non-zero deficiencies."
         )
 

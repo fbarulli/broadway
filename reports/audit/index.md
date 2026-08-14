@@ -6,7 +6,8 @@
 - rows_out (canonical): 8545832
 - rows_dropped_total: 1
 
-Dataset status: READY WITH WARNINGS All required audit artifacts are present, but one or more deterministic evidence checks reported non-zero deficiencies.
+Dataset status: READY WITH WARNINGS
+All required audit artifacts are present, but one or more deterministic evidence checks reported non-zero deficiencies.
 
 ## What changed
 
@@ -19,7 +20,6 @@ Dataset status: READY WITH WARNINGS All required audit artifacts are present, bu
 
 ## Things to consider before inference
 
-- High-cardinality/identifier-like columns can inflate group counts or leak identity if used as grouping features.
 - Borough has deficient values; analyses that group or filter by this column may use fewer or differently classified observations depending on the analytical population definition.
 - Zone has deficient values; analyses that group or filter by this column may use fewer or differently classified observations depending on the analytical population definition.
 - service_zone has deficient values; analyses that group or filter by this column may use fewer or differently classified observations depending on the analytical population definition.
