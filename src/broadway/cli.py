@@ -77,7 +77,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
     walkthrough = sub.add_parser("walkthrough")
     walkthrough.add_argument("--analysis", type=str, required=True)
-    walkthrough.add_argument("--dataset", type=str, default=None)
+    walkthrough.add_argument("--dataset", type=str, required=True)
     walkthrough.add_argument("--sample", type=str, default=None)
     walkthrough.add_argument("--force", action="store_true")
     walkthrough.add_argument("--environment", type=str, default=DEFAULT_ENVIRONMENT)
@@ -110,14 +110,14 @@ def main() -> None:
         from pathlib import Path
 
         from broadway.reports import index
-        from broadway.reports.paths import REPORTS_DIR
+        from broadway.reports.paths import RESULTS_INDEX_PATH
 
         cfg = load_config("stats", dataset=args.dataset, analysis=args.analysis)
         question = cfg.analysis.goal if cfg.analysis else "no analysis contract"
         stats_dir = Path(cfg.stats.output_dir) if cfg.stats else Path("artifacts/stats")
-        REPORTS_DIR.mkdir(parents=True, exist_ok=True)
-        (REPORTS_DIR / "index.md").write_text(index.render_index(question, stats_dir), encoding="utf-8")
-        print("wrote reports/index.md")
+        RESULTS_INDEX_PATH.parent.mkdir(parents=True, exist_ok=True)
+        RESULTS_INDEX_PATH.write_text(index.render_index(question, stats_dir), encoding="utf-8")
+        print("wrote reports/results/index.md")
     elif args.step == "profile":
         from broadway.discover.module import profile
 

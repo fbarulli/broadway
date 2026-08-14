@@ -19,7 +19,7 @@ def render_index(question: str, stats_dir: Path) -> str:
     rows = ["| status | step |", "| --- | --- |"]
     for step in sequence.steps:
         if _done(step):
-            rows.append(f"| [x] | [{step}](results/{step}.md) |")
+            rows.append(f"| [x] | [{step}]({step}.md) |")
         else:
             rows.append(f"| [ ] | {step} |")
     results_table = "\n".join(rows)
@@ -44,7 +44,10 @@ def render_index(question: str, stats_dir: Path) -> str:
         ("Latest result", latest_text),
         ("Next test", next_test if next_test is not None else "all complete"),
         ("Results", results_table),
-        ("Navigation", "[data audit](audit/index.md)\n[lineage graph](lineage/graph.md)"),
+        (
+            "Navigation",
+            "- [overview](../index.md)\n- [data audit](../audit/index.md)\n- [lineage graph](../lineage/graph.md)",
+        ),
     ]
     return render_result("Broadway Results Index", sections)
 

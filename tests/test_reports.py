@@ -99,5 +99,5 @@ def test_render_index_describe_done(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     monkeypatch.setattr(paths, "RESULTS_DIR", results_dir)
     md = render_index("q?", tmp_path / "stats")
     assert "[x]" in md
-    assert "results/describe.md" in md
+    assert "describe.md" in md
     assert "## Next test\n\nnormality\n" in md

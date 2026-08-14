@@ -122,6 +122,13 @@ class TestTrainCLI:
         )
 
 
+class TestWalkthroughCLI:
+    def test_walkthrough_requires_dataset(self) -> None:
+        result = _run("walkthrough", "--analysis", "taxi_hypothesis")
+        assert result.returncode == 2
+        assert "required" in result.stderr.lower()
+
+
 class TestMissingSubcommand:
     def test_no_subcommand_raises_error(self) -> None:
         result = _run()
