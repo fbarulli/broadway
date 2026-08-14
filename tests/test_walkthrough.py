@@ -9,6 +9,7 @@ import pytest
 from broadway.config.loader import load_config
 from broadway.reports import paths
 from broadway.timeline import decide, module, runners, walkthrough
+from broadway.timeline.evidence import PosthocEvidence
 from broadway.timeline.models import AnalysisDecision, StepStatus
 
 
@@ -111,8 +112,10 @@ def test_walkthrough_resume_past_gate(
 
     walkthrough.run(cfg, None, force=False)
     out = capsys.readouterr().out
-    assert "DECISION REQUIRED" not in out
-    assert "step 'omnibus' not yet implemented; stopping." in out
+    assert "DECISION REQUIRED" in out
+    assert "decide_posthoc" in out
+    assert "games_howell" in out
+    assert module.load_step("taxi_hypothesis", "omnibus") is not None
     assert (tmp_path / "reports" / "timeline.md").exists()
 
 
@@ -200,3 +203,180 @@ def test_load_frame_and_groups_from_canonical(
     assert groups["Bronx"].shape[0] == 60
     assert "Borough" in df.columns
     assert cfg.dataset.target in df.columns
+
+
+def test_run_omnibus_welch_reports_effect_sizes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _setup(monkeypatch, tmp_path)
+    cfg = _load_cfg()
+    rng = np.random.default_rng(0)
+    groups = {g: rng.normal(10.0 + i, 1.0, 30) for i, g in enumerate(("A", "B", "C"))}
+    step = runners.run_omnibus(
+        cfg.analysis, 5, "q?", groups, "welch",
+        tmp_path / "timeline" / "taxi_hypothesis", "canonical", None,
+    )
+    assert step.method == "welch"
+    assert "eta_squared" in step.result_summary
+    assert "omega_squared" in step.result_summary
+    assert (tmp_path / "timeline" / "taxi_hypothesis" / "evidence" / "omnibus.json").exists()
+
+
+def test_run_omnibus_kruskal_no_effect_size(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _setup(monkeypatch, tmp_path)
+    cfg = _load_cfg()
+    rng = np.random.default_rng(0)
+    groups = {g: rng.normal(10.0 + i, 1.0, 30) for i, g in enumerate(("A", "B", "C"))}
+    step = runners.run_omnibus(
+        cfg.analysis, 5, "q?", groups, "kruskal",
+        tmp_path / "timeline" / "taxi_hypothesis", "canonical", None,
+    )
+    assert step.result_summary["effect_size"] == "not_available"
+    assert "did not substitute" in step.ramification
+
+
+def test_run_posthoc_significant_pairs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _setup(monkeypatch, tmp_path)
+    cfg = _load_cfg()
+    rng = np.random.default_rng(42)
+    frames = [
+        pd.DataFrame({"group": g, "dv": rng.normal(0.0 + i * 10.0, 1.0, 30)})
+        for i, g in enumerate(("A", "B", "C"))
+    ]
+    df = pd.concat(frames, ignore_index=True)
+    step = runners.run_posthoc(
+        cfg.analysis, 7, "q?", df, "group", "dv", "games_howell",
+        tmp_path / "timeline" / "taxi_hypothesis", "canonical", None,
+    )
+    assert step.method == "games_howell"
+    assert step.result_summary["pairs"] == 3
+    assert step.result_summary["significant_pairs"] == 3
+    evidence = PosthocEvidence.model_validate_json(
+        (tmp_path / "timeline" / "taxi_hypothesis" / "evidence" / "posthoc.json").read_text()
+    )
+    assert evidence.significant_pairs == 3
+    assert len(evidence.pairs) == 3
+
+
+def test_walkthrough_end_to_end(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _setup(monkeypatch, tmp_path)
+    cfg = _load_cfg()
+    monkeypatch.setattr(runners, "canonical_path", lambda d, e: _make_canonical(tmp_path))
+
+    walkthrough.run(cfg, None, force=False)
+    assert "DECISION REQUIRED" in capsys.readouterr().out
+
+    omnibus = decide.record(
+        cfg.analysis, "omnibus", "welch", "non-normal",
+        ["describe_groups", "normality", "variance"],
+    )
+    module.save_decision(omnibus)
+
+    walkthrough.run(cfg, None, force=False)
+    out = capsys.readouterr().out
+    assert "DECISION REQUIRED" in out
+    assert "decide_posthoc" in out
+    assert "games_howell" in out
+
+    posthoc = decide.record(
+        cfg.analysis, "posthoc", "games_howell", "significant omnibus", ["omnibus"],
+    )
+    module.save_decision(posthoc)
+
+    walkthrough.run(cfg, None, force=False)
+    out = capsys.readouterr().out
+
+    by_id = {s.step_id: s for s in module.load_steps("taxi_hypothesis")}
+    for step_id in ("describe_groups", "normality", "variance", "omnibus", "posthoc", "conclusion"):
+        assert step_id in by_id
+    for decision_id in ("omnibus", "posthoc"):
+        assert module.load_decision("taxi_hypothesis", decision_id) is not None
+
+    assert by_id["omnibus"].decision_required is True
+    assert by_id["posthoc"].decision_required is False
+    assert by_id["conclusion"].method == "conclusion"
+    assert "no significant difference" not in by_id["conclusion"].ramification
+
+    timeline = (tmp_path / "reports" / "timeline.md").read_text()
+    assert "conclusion" in timeline
+
+
+def test_walkthrough_posthoc_gated_on_insignificant_omnibus(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _setup(monkeypatch, tmp_path)
+    cfg = _load_cfg()
+    rng = np.random.default_rng(1)
+    frames = [
+        pd.DataFrame(
+            {"Borough": [name] * 60, "trip_duration_minutes": rng.normal(10.0, 1.0, 60)}
+        )
+        for name in ("Manhattan", "Brooklyn", "Queens", "Bronx", "Staten Island")
+    ]
+    path = tmp_path / "taxi_canonical.parquet"
+    pd.concat(frames, ignore_index=True).to_parquet(path, index=False)
+    monkeypatch.setattr(runners, "canonical_path", lambda d, e: path)
+
+    walkthrough.run(cfg, None, force=False)
+
+    omnibus = decide.record(
+        cfg.analysis, "omnibus", "welch", "normal",
+        ["describe_groups", "normality", "variance"],
+    )
+    module.save_decision(omnibus)
+
+    walkthrough.run(cfg, None, force=False)
+    capsys.readouterr().out
+
+    by_id = {s.step_id: s for s in module.load_steps("taxi_hypothesis")}
+    assert "omnibus" in by_id
+    assert "posthoc" not in by_id
+    assert "conclusion" in by_id
+    assert "no significant difference" in by_id["conclusion"].ramification
+
+
+def test_stale_decision_warning(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _setup(monkeypatch, tmp_path)
+    cfg = _load_cfg()
+    monkeypatch.setattr(runners, "canonical_path", lambda d, e: _make_canonical(tmp_path))
+    monkeypatch.setattr(runners, "now_iso", _counter_clock())
+
+    walkthrough.run(cfg, None, force=False)
+
+    omnibus = AnalysisDecision(
+        analysis="taxi_hypothesis",
+        id="omnibus",
+        kind="omnibus",
+        question="Which principal method should answer the question?",
+        method="welch",
+        reason=["non-normal"],
+        status="resolved",
+        parents=["describe_groups", "normality", "variance"],
+        decided_at="2026-01-01T00:00:00Z",
+    )
+    module.save_decision(omnibus)
+    posthoc = AnalysisDecision(
+        analysis="taxi_hypothesis",
+        id="posthoc",
+        kind="posthoc",
+        question="Which post-hoc comparison is appropriate?",
+        method="games_howell",
+        reason=["significant omnibus"],
+        status="resolved",
+        parents=["omnibus"],
+        decided_at="2026-01-01T00:00:00Z",
+    )
+    module.save_decision(posthoc)
+
+    walkthrough.run(cfg, None, force=True)
+    out = capsys.readouterr().out
+    assert "WARNING: decision 'omnibus' was made against earlier evidence" in out
+    assert "WARNING: decision 'posthoc' was made against earlier evidence" in out
