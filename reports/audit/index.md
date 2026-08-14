@@ -15,7 +15,7 @@ All required audit artifacts are present, but one or more deterministic evidence
 
 ## Enrichment quality
 
-- Join completeness: PASS — all lookup keys matched (17091666/17091666)
+- Join completeness: PASS — 8545833 rows evaluated across 2 join(s); 17091666 matched key events, 0 unmatched
 - Lookup value quality: WARNING — 258461 matched rows had missing or sentinel enrichment values
 
 ## Things to consider before inference

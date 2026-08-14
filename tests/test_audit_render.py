@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+import pytest
+
 from broadway.cleaning.models import ParseFailure, StructuralCleanResult
 from broadway.data.join_audit import JoinAudit, JoinAuditReport
 from broadway.data.lookup_value_audit import (
@@ -96,9 +98,74 @@ def _profile(identifier_score=0.5):
 
 def test_render_join_all_matched_notes_value_usability() -> None:
     md = audit.render_join(_join_report(unmatched=0))
-    assert "All lookup keys matched" in md
+    assert "Rows evaluated" in md
+    assert "Matched join-key events" in md
     assert "key matching only" in md
     assert "matched values were usable" in md
+
+
+def test_render_join_distinguishes_rows_from_events() -> None:
+    report = JoinAuditReport(
+        joins=[
+            JoinAudit(
+                lookup="pickup_location_id",
+                lookup_path="data/raw/taxi_zone_lookup.csv",
+                left_key="pickup_location_id",
+                right_key="LocationID",
+                rows_attempted=5,
+                matched=5,
+                unmatched=0,
+                null_keys=0,
+                unmatched_rate=0.0,
+            ),
+            JoinAudit(
+                lookup="dropoff_location_id",
+                lookup_path="data/raw/taxi_zone_lookup.csv",
+                left_key="dropoff_location_id",
+                right_key="LocationID",
+                rows_attempted=5,
+                matched=5,
+                unmatched=0,
+                null_keys=0,
+                unmatched_rate=0.0,
+            ),
+        ]
+    )
+    md = audit.render_join(report)
+    assert "Rows evaluated: 5" in md
+    assert "Lookup joins checked: 2" in md
+    assert "Matched join-key events: 10" in md
+
+
+def test_join_counts_raises_on_divergent_row_counts() -> None:
+    report = JoinAuditReport(
+        joins=[
+            JoinAudit(
+                lookup="pickup_location_id",
+                lookup_path="data/raw/taxi_zone_lookup.csv",
+                left_key="pickup_location_id",
+                right_key="LocationID",
+                rows_attempted=5,
+                matched=5,
+                unmatched=0,
+                null_keys=0,
+                unmatched_rate=0.0,
+            ),
+            JoinAudit(
+                lookup="dropoff_location_id",
+                lookup_path="data/raw/taxi_zone_lookup.csv",
+                left_key="dropoff_location_id",
+                right_key="LocationID",
+                rows_attempted=4,
+                matched=4,
+                unmatched=0,
+                null_keys=0,
+                unmatched_rate=0.0,
+            ),
+        ]
+    )
+    with pytest.raises(ValueError):
+        audit._join_counts(report)
 
 
 def test_render_lookup_values_affected_mentions_deficiency_and_no_redefinition() -> None:

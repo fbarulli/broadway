@@ -166,24 +166,44 @@ def render_transform(result: StructuralCleanResult | None, source: str = "") -> 
     return _render_page("Structural Transform", answer, evidence, why, not_decided, source)
 
 
+def _join_counts(report: JoinAuditReport) -> tuple[int, int, int, int]:
+    if not report.joins:
+        return (0, 0, 0, 0)
+    row_counts = {join.rows_attempted for join in report.joins}
+    if len(row_counts) != 1:
+        raise ValueError(
+            "JoinAuditReport contains joins evaluated over different row counts; "
+            "cannot produce a single rows_evaluated summary."
+        )
+    rows_evaluated = next(iter(row_counts))
+    n_joins = len(report.joins)
+    matched_events = sum(join.matched for join in report.joins)
+    unmatched_events = sum(join.unmatched for join in report.joins)
+    return rows_evaluated, n_joins, matched_events, unmatched_events
+
+
 def render_join(report: JoinAuditReport | None, source: str = "") -> str:
     not_decided = "Broadway did not drop or impute unmatched rows."
     if report is None:
         return _render_page("Join Audit", _incomplete_answer(source), [], "", not_decided, source)
 
-    if all(j.unmatched == 0 for j in report.joins):
-        matched = sum(j.matched for j in report.joins)
-        attempted = sum(j.rows_attempted for j in report.joins)
-        answer = f"All lookup keys matched successfully ({matched}/{attempted})."
-    else:
-        answer = "Not all lookup keys matched."
+    rows_evaluated, n_joins, matched_events, unmatched_events = _join_counts(report)
+    answer = "\n".join(
+        [
+            f"Rows evaluated: {rows_evaluated}",
+            f"Lookup joins checked: {n_joins}",
+            f"Matched join-key events: {matched_events}",
+            f"Unmatched join-key events: {unmatched_events}",
+            f"Join completeness: {_join_state(report)}",
+        ]
+    )
     answer += (
-        " This describes key matching only. It does NOT mean the matched values were usable — "
+        "\n\nThis describes key matching only. It does NOT mean the matched values were usable — "
         "see the Lookup Value Audit."
     )
 
     rows = [
-        "| lookup | rows_attempted | matched | unmatched | null_keys | unmatched_rate |",
+        "| lookup | rows_evaluated | matched | unmatched | null_keys | unmatched_rate |",
         "| --- | --- | --- | --- | --- | --- |",
     ]
     for j in report.joins:
@@ -321,12 +341,16 @@ def _borough_deficient(report: LookupValueAuditReport | None) -> bool:
 def _join_summary(report: JoinAuditReport | None) -> str:
     if report is None:
         return "no join audit available"
-    total_unmatched = sum(j.unmatched for j in report.joins)
-    if total_unmatched == 0:
-        matched = sum(j.matched for j in report.joins)
-        attempted = sum(j.rows_attempted for j in report.joins)
-        return f"all lookup keys matched ({matched}/{attempted})"
-    return f"{total_unmatched} unmatched key(s) across {len(report.joins)} join(s)"
+    rows_evaluated, n_joins, matched_events, unmatched_events = _join_counts(report)
+    if unmatched_events == 0:
+        return (
+            f"{rows_evaluated} rows evaluated across {n_joins} join(s); "
+            f"{matched_events} matched key events, 0 unmatched"
+        )
+    return (
+        f"{rows_evaluated} rows evaluated across {n_joins} join(s); "
+        f"{unmatched_events} unmatched key event(s)"
+    )
 
 
 def _lookup_summary(report: LookupValueAuditReport | None) -> str:
@@ -531,10 +555,10 @@ def run(dataset: str, analysis: str | None, environment: str) -> None:
     if join_report is None:
         print("join unmatched rate: no join audit")
     else:
-        total_unmatched = sum(j.unmatched for j in join_report.joins)
-        non_null = sum(j.matched + j.unmatched for j in join_report.joins)
-        rate = round(total_unmatched / non_null, 6) if non_null else 0.0
-        print(f"join unmatched rate: {rate}")
+        rows_evaluated, n_joins, matched_events, unmatched_events = _join_counts(join_report)
+        total_events = matched_events + unmatched_events
+        rate = round(unmatched_events / total_events * 100, 4) if total_events else 0.0
+        print(f"join unmatched rate: {rate}% across {total_events} key events")
 
     if lookup_report is None:
         print("lookup affected rows total: no lookup audit")
