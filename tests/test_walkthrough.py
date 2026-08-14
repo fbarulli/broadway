@@ -315,6 +315,9 @@ def test_run_posthoc_significant_pairs(
     assert step.method == "games_howell"
     assert step.result_summary["pairs"] == 3
     assert step.result_summary["significant_pairs"] == 3
+    details = step.result_summary["significant_pair_details"]
+    assert len(details) == 3
+    assert set(details[0]) == {"a", "b", "p_value", "cohens_d", "hedges_g", "effect_size_note"}
     evidence = PosthocEvidence.model_validate_json(
         (tmp_path / "timeline" / "taxi_hypothesis" / "evidence" / "posthoc.json").read_text()
     )

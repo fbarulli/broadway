@@ -60,34 +60,54 @@
 
 ## Principal analysis
 
-- ramification: reject H0: at least one group mean differs (p=< 0.001) eta² = 0.982 (proportion of outcome variance explained by group membership; can be inflated under extreme imbalance); omega² = 0.123 (corrects for small-sample bias; the more conservative estimate). eta² and omega² diverge here because group sizes are extremely imbalanced; report omega².
+- ramification: reject H0: at least one group mean differs (p=< 0.001) eta² = 0.999 (proportion of outcome variance explained by group membership; can be inflated under extreme imbalance); omega² = 0.122 (corrects for small-sample bias; the more conservative estimate). eta² and omega² diverge here because group sizes are extremely imbalanced; report omega².
 - evidence_refs: omnibus.json
 - result_summary:
   - method: welch
-  - statistic: 7e+03
+  - statistic: 2.97e+05
   - p_value: < 0.001
   - passed: yes
-  - eta_squared: 0.982
-  - omega_squared: 0.123
-  - eta² = 0.982: proportion of outcome variance explained by group membership (can be inflated under extreme imbalance)
-  - omega² = 0.123: corrects for small-sample bias; the more conservative estimate
+  - eta_squared: 0.999
+  - omega_squared: 0.122
+  - eta² = 0.999: proportion of outcome variance explained by group membership (can be inflated under extreme imbalance)
+  - omega² = 0.122: corrects for small-sample bias; the more conservative estimate
 
 ## Post-hoc comparisons
 
-- ramification: Games-Howell found 17 significant pairwise difference(s) at alpha=0.05.
+- ramification: Games-Howell found 19 significant pairwise difference(s) at alpha=0.05.
 - evidence_refs: posthoc.json
 - result_summary:
   - method: games_howell
   - pairs: 21
-  - significant_pairs: 17
+  - significant_pairs: 19
+  - 19 of 21 pairs significant:
+    - Bronx vs Brooklyn: p < 0.001, Cohen's d 0.278, Hedges' g 0.278
+    - Bronx vs EWR: p < 0.001, Cohen's d 0.591, Hedges' g 0.59
+    - Bronx vs Manhattan: p < 0.001, Cohen's d 3.07, Hedges' g 3.07
+    - Bronx vs Queens: p < 0.001, Cohen's d 0.492, Hedges' g 0.492
+    - Bronx vs Staten Island: p < 0.001, Cohen's d 0.682, Hedges' g 0.682
+    - Bronx vs Unknown: p < 0.001, Cohen's d 1.42, Hedges' g 1.42
+    - Brooklyn vs EWR: p 0.024, Cohen's d 0.32, Hedges' g 0.32
+    - Brooklyn vs Manhattan: p < 0.001, Cohen's d 2.25, Hedges' g 2.25
+    - Brooklyn vs Queens: p < 0.001, Cohen's d 0.0545, Hedges' g 0.0545
+    - Brooklyn vs Staten Island: p < 0.001, Cohen's d 0.412, Hedges' g 0.412
+    - Brooklyn vs Unknown: p < 0.001, Cohen's d 0.846, Hedges' g 0.846
+    - EWR vs Manhattan: p < 0.001, Cohen's d 1.4, Hedges' g 1.4
+    - EWR vs Unknown: p 0.001, Cohen's d 0.91, Hedges' g 0.91
+    - Manhattan vs Queens: p < 0.001, Cohen's d -2.01, Hedges' g -2.01
+    - Manhattan vs Staten Island: p < 0.001, Cohen's d -1.13, Hedges' g -1.13
+    - Manhattan vs Unknown: p < 0.001, Cohen's d -0.229, Hedges' g -0.229
+    - Queens vs Staten Island: p < 0.001, Cohen's d 0.597, Hedges' g 0.597
+    - Queens vs Unknown: p < 0.001, Cohen's d 1.11, Hedges' g 1.11
+    - Staten Island vs Unknown: p 0.003, Cohen's d 0.707, Hedges' g 0.707
 
 ## Conclusion
 
-- ramification: group means differ (welch p=< 0.001), with 17 significant pairwise difference(s).
+- ramification: group means differ (welch p=< 0.001), with 19 significant pairwise difference(s).
 - evidence_refs: conclusion.json
 - result_summary:
-  - verdict: group means differ (welch p=< 0.001), with 17 significant pairwise difference(s).
+  - verdict: group means differ (welch p=< 0.001), with 19 significant pairwise difference(s).
   - principal_method: welch
   - p_value: < 0.001
-  - effect_size: eta²=0.982, omega²=0.123
-  - significant_pairs: 17
+  - effect_size: eta²=0.999, omega²=0.122
+  - significant_pairs: 19

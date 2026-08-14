@@ -437,6 +437,18 @@ def run_posthoc(
             "method": method,
             "pairs": len(pairs),
             "significant_pairs": significant_pairs,
+            "significant_pair_details": [
+                {
+                    "a": p.a,
+                    "b": p.b,
+                    "p_value": p.p_value,
+                    "cohens_d": p.cohens_d,
+                    "hedges_g": p.hedges_g,
+                    "effect_size_note": p.effect_size_note,
+                }
+                for p in pairs
+                if p.p_value < thresholds.significance_alpha
+            ],
         },
         ramification=(
             f"Games-Howell found {significant_pairs} significant pairwise "

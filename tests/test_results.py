@@ -10,9 +10,13 @@ from broadway.reports import paths
 from broadway.reports.results import (
     humanize_float,
     humanize_pvalue,
+    humanize_summary,
+    posthoc_headline,
+    posthoc_pair_rows,
     render_results,
     write_results,
 )
+from broadway.reports.timeline import render_timeline
 from broadway.timeline.models import AnalysisDecision, AnalysisStep, StepStatus
 from broadway.timeline.sequence import load_walkthrough_sequence
 
@@ -76,6 +80,40 @@ def _full_steps() -> list[AnalysisStep]:
             },
         ),
     ]
+
+
+def _posthoc_step() -> AnalysisStep:
+    return _step(
+        step_id="posthoc",
+        order=7,
+        method="games_howell",
+        result_summary={
+            "method": "games_howell",
+            "pairs": 3,
+            "significant_pairs": 2,
+            "significant_pair_details": [
+                {
+                    "a": "Manhattan",
+                    "b": "Brooklyn",
+                    "p_value": 0.0004,
+                    "cohens_d": 1.23456789,
+                    "hedges_g": 1.24,
+                    "effect_size_note": "large",
+                },
+                {
+                    "a": "Queens",
+                    "b": "Bronx",
+                    "p_value": 0.01,
+                    "cohens_d": 0.5,
+                    "hedges_g": 0.49,
+                    "effect_size_note": "medium",
+                },
+            ],
+        },
+        ramification=(
+            "Games-Howell found 2 significant pairwise difference(s) at alpha=0.05."
+        ),
+    )
 
 
 def test_humanize_pvalue_floors_at_small() -> None:
@@ -205,3 +243,60 @@ def test_render_results_decision_awaiting() -> None:
     ]
     idx = render_results("taxi", seq, steps, [])["index.md"]
     assert "| Choose principal method | awaiting decision |" in idx
+
+
+def test_posthoc_headline_and_rows() -> None:
+    summary = _posthoc_step().result_summary
+    assert posthoc_headline(summary) == "2 of 3 pairs significant"
+    assert posthoc_pair_rows(summary) == summary["significant_pair_details"]
+    assert posthoc_pair_rows({"method": "games_howell"}) == []
+
+
+def test_posthoc_step_page_renders_significant_pairs() -> None:
+    seq = load_walkthrough_sequence()
+    pages = render_results("taxi", seq, [_posthoc_step()], [])
+    page = pages["posthoc.md"]
+    assert "## Significant pairs" in page
+    assert "2 of 3 pairs significant" in page
+    assert "| Pair | p | Cohen's d | Hedges' g | Note |" in page
+    assert "| Manhattan vs Brooklyn | < 0.001 | 1.23 | 1.24 | large |" in page
+    assert "| Queens vs Bronx | 0.010 | 0.5 | 0.49 | medium |" in page
+    assert "significant_pair_details" not in page
+    assert "[{" not in page
+
+
+def test_posthoc_step_page_zero_significant_pairs() -> None:
+    seq = load_walkthrough_sequence()
+    step = _step(
+        step_id="posthoc",
+        order=7,
+        method="games_howell",
+        result_summary={
+            "method": "games_howell",
+            "pairs": 3,
+            "significant_pairs": 0,
+            "significant_pair_details": [],
+        },
+    )
+    page = render_results("taxi", seq, [step], [])["posthoc.md"]
+    assert "## Significant pairs" in page
+    assert "0 of 3 pairs significant" in page
+    assert "none" in page
+    assert "| Pair |" not in page
+
+
+def test_humanize_summary_does_not_leak_pair_list() -> None:
+    lines = humanize_summary(_posthoc_step().result_summary)
+    text = "\n".join(lines)
+    assert "significant_pair_details" not in text
+    assert "[" not in text
+    assert "pairs: 3" in text
+    assert "significant_pairs: 2" in text
+
+
+def test_render_timeline_posthoc_bullet() -> None:
+    seq = load_walkthrough_sequence()
+    timeline = render_timeline("taxi", seq, [_posthoc_step()], [])
+    assert "2 of 3 pairs significant:" in timeline
+    assert "Manhattan vs Brooklyn: p < 0.001, Cohen's d 1.23, Hedges' g 1.24" in timeline
+    assert "Queens vs Bronx: p 0.010, Cohen's d 0.5, Hedges' g 0.49" in timeline

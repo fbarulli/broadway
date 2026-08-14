@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+from broadway.formatting import humanize_float, humanize_pvalue
 from broadway.reports.results import (
     attrition_line,
     derive_status,
     effect_size_lines,
     humanize_summary,
     is_figure_ref,
+    posthoc_headline,
+    posthoc_pair_rows,
 )
 from broadway.timeline.models import AnalysisDecision, AnalysisStep
 from broadway.timeline.sequence import WalkthroughSequence
@@ -49,6 +52,15 @@ def render_timeline(
                 lines.append(f"  - {line}")
         if persisted.step_id == "describe_groups":
             lines.append(f"  - {attrition_line(persisted.result_summary)}")
+        if persisted.step_id == "posthoc":
+            lines.append(f"  - {posthoc_headline(persisted.result_summary)}:")
+            for row in posthoc_pair_rows(persisted.result_summary):
+                lines.append(
+                    f"    - {row.get('a')} vs {row.get('b')}: "
+                    f"p {humanize_pvalue(float(row.get('p_value')))}, "
+                    f"Cohen's d {humanize_float(float(row.get('cohens_d')))}, "
+                    f"Hedges' g {humanize_float(float(row.get('hedges_g')))}"
+                )
         for fig in persisted.figures:
             lines.append(f"![{fig.caption}]({fig.path})")
 

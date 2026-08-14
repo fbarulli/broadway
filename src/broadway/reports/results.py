@@ -43,6 +43,8 @@ def _flatten(summary: dict, prefix: str = "") -> list[tuple[str, object]]:
         full_key = f"{prefix}.{key}" if prefix else key
         if isinstance(value, dict):
             out.extend(_flatten(value, full_key))
+        elif isinstance(value, list):
+            continue
         else:
             out.append((full_key, value))
     return out
@@ -83,6 +85,16 @@ def effect_size_lines(summary: dict) -> list[str]:
             f"omega² = {omega}: corrects for small-sample bias; the more conservative estimate",
         ]
     return []
+
+
+def posthoc_headline(summary: dict) -> str:
+    total = summary.get("pairs", 0)
+    significant = summary.get("significant_pairs", 0)
+    return f"{significant} of {total} pairs significant"
+
+
+def posthoc_pair_rows(summary: dict) -> list[dict]:
+    return summary.get("significant_pair_details", [])
 
 
 def _decision_for(step_id: str, decisions: list[AnalysisDecision]) -> AnalysisDecision | None:
@@ -166,6 +178,26 @@ def _render_step_page(seq_step, step: AnalysisStep) -> str:
         lines.append("## Attrition")
         lines.append("")
         lines.append(attrition_line(step.result_summary))
+        lines.append("")
+    if step.step_id == "posthoc":
+        rows = posthoc_pair_rows(step.result_summary)
+        lines.append("## Significant pairs")
+        lines.append("")
+        lines.append(posthoc_headline(step.result_summary))
+        lines.append("")
+        if rows:
+            lines.append("| Pair | p | Cohen's d | Hedges' g | Note |")
+            lines.append("| --- | --- | --- | --- | --- |")
+            for row in rows:
+                lines.append(
+                    f"| {row.get('a')} vs {row.get('b')} | "
+                    f"{humanize_pvalue(float(row.get('p_value')))} | "
+                    f"{humanize_float(float(row.get('cohens_d')))} | "
+                    f"{humanize_float(float(row.get('hedges_g')))} | "
+                    f"{row.get('effect_size_note')} |"
+                )
+        else:
+            lines.append("none")
         lines.append("")
     if step.figures:
         lines.append("## Figures")
