@@ -17,6 +17,7 @@ from broadway.analysis.contracts import AnalysisContract
 from broadway.config.schema import PipelineConfig
 from broadway.data.loader import canonical_path
 from broadway.lineage.models import SampleSpec
+from broadway.reports.results import humanize_float, humanize_pvalue
 from broadway.stats.anova import run_anova, run_kruskal, run_welch
 from broadway.stats.assumptions import check_normality, run_levene
 from broadway.stats.describe import describe
@@ -45,9 +46,34 @@ def _safe_filename(name: str) -> str:
     return re.sub(r"[^A-Za-z0-9_.-]+", "_", name).strip("_") or "group"
 
 
+def _attrition(
+    df: pd.DataFrame, source_group_column: str, group_values: list[str], target: str
+) -> dict[str, int | str]:
+    total = int(len(df))
+    group_col = df[source_group_column]
+    listed = group_col.isin(group_values)
+    null_group = int(group_col.isna().sum())
+    unlisted = int((group_col.notna() & ~listed).sum())
+    null_target = int(df[target].isna().sum())
+    used = int((listed & df[target].notna()).sum())
+    reasons: list[str] = []
+    if null_group:
+        reasons.append("null group")
+    if null_target:
+        reasons.append("null target")
+    if unlisted:
+        reasons.append("unlisted group")
+    return {
+        "n_total": total,
+        "n_used": used,
+        "n_excluded": total - used,
+        "exclusion_reason": ", ".join(reasons),
+    }
+
+
 def load_frame_and_groups(
     cfg: PipelineConfig, sample: SampleSpec | None
-) -> tuple[pd.DataFrame, str, str, dict[str, np.ndarray]]:
+) -> tuple[pd.DataFrame, str, str, dict[str, np.ndarray], dict[str, int | str]]:
     if cfg.dataset is None or cfg.analysis is None or cfg.analysis.hypothesis is None:
         raise ValueError("walkthrough requires dataset and hypothesis config")
     group_column = cfg.analysis.hypothesis.group_column
@@ -70,7 +96,8 @@ def load_frame_and_groups(
         g: df[df[source_group_column] == g][cfg.dataset.target].dropna().to_numpy()
         for g in group_values
     }
-    return df, group_column, source_group_column, groups
+    attrition = _attrition(df, source_group_column, group_values, cfg.dataset.target)
+    return df, group_column, source_group_column, groups, attrition
 
 
 def run_describe(
@@ -86,11 +113,14 @@ def run_describe(
     sample_name: str | None,
     source: str,
     out_dir: Path,
+    attrition: dict[str, int | str] | None = None,
 ) -> AnalysisStep:
     summary = describe(
         df, group_column, source_group_column, group_values, target,
         source_path, sample_name or "canonical", "diagnostic",
     )
+    if attrition is None:
+        attrition = _attrition(df, source_group_column, group_values, target)
     evidence_dir = out_dir / "evidence"
     evidence_dir.mkdir(parents=True, exist_ok=True)
     (evidence_dir / "describe.json").write_text(
@@ -112,7 +142,7 @@ def run_describe(
         step_id="describe_groups",
         order=order,
         question=question,
-        status=StepStatus.WARNING if flagged else StepStatus.COMPLETED,
+        status=StepStatus.NOTE if flagged else StepStatus.COMPLETED,
         method="describe",
         source=source,
         sample_name=sample_name,
@@ -121,6 +151,10 @@ def run_describe(
             "total_n": summary.total_n,
             "imbalance_ratio": summary.imbalance_ratio,
             "absent_groups": len(summary.absent_groups),
+            "n_total": attrition["n_total"],
+            "n_used": attrition["n_used"],
+            "n_excluded": attrition["n_excluded"],
+            "exclusion_reason": attrition["exclusion_reason"],
         },
         ramification=ramification,
         decision_required=False,
@@ -189,7 +223,7 @@ def run_normality(
         step_id="normality",
         order=order,
         question=question,
-        status=StepStatus.WARNING if flagged else StepStatus.COMPLETED,
+        status=StepStatus.NOTE if flagged else StepStatus.COMPLETED,
         method="check_normality",
         source=source,
         sample_name=sample_name,
@@ -269,17 +303,28 @@ def run_omnibus(
         plan.model_dump_json(indent=2), encoding="utf-8"
     )
     p_value = plan.statistics["p_value"]
+    p_text = humanize_pvalue(p_value)
     if plan.passed:
-        ramification = f"reject H0: at least one group mean differs (p={p_value:.4e})"
+        ramification = f"reject H0: at least one group mean differs (p={p_text})"
     else:
-        ramification = f"fail to reject H0: no mean difference (p={p_value:.4e})"
-    if method == "kruskal":
+        ramification = f"fail to reject H0: no mean difference (p={p_text})"
+    if method in ("anova", "welch"):
+        eta = plan.effect_sizes["eta_squared"]
+        omega = plan.effect_sizes["omega_squared"]
         ramification += (
-            " rank-based effect size not yet implemented; Broadway did not "
-            "substitute an ANOVA effect-size measure."
+            f" eta² = {humanize_float(eta)} (proportion of outcome variance explained by"
+            " group membership; can be inflated under extreme imbalance);"
+            f" omega² = {humanize_float(omega)} (corrects for small-sample bias; the more"
+            " conservative estimate)."
         )
-    if plan.reason:
-        ramification += " " + "; ".join(plan.reason)
+        imbalance_ratio = plan.threshold_context.get("imbalance_ratio")
+        if imbalance_ratio is not None and float(imbalance_ratio) > 2.0:
+            ramification += (
+                " eta² and omega² diverge here because group sizes are extremely imbalanced;"
+                " report omega²."
+            )
+    elif method == "kruskal":
+        ramification += " Rank-based effect size deliberately not computed — epsilon² pending."
     result_summary: dict[str, object] = {
         "method": method,
         "statistic": plan.statistics["statistic"],
@@ -290,13 +335,13 @@ def run_omnibus(
         result_summary["eta_squared"] = plan.effect_sizes["eta_squared"]
         result_summary["omega_squared"] = plan.effect_sizes["omega_squared"]
     else:
-        result_summary["effect_size"] = "not_available"
+        result_summary["effect_size"] = "not_computed"
     return AnalysisStep(
         analysis=analysis.name,
         step_id="omnibus",
         order=order,
         question=question,
-        status=StepStatus.WARNING if plan.warnings else StepStatus.COMPLETED,
+        status=StepStatus.NOTE if plan.warnings else StepStatus.COMPLETED,
         method=method,
         source=source,
         sample_name=sample_name,
@@ -380,13 +425,14 @@ def run_conclusion(
     method = str(summary["method"])
     p_value = float(summary["p_value"])
     passed = bool(summary["passed"])
+    p_text = humanize_pvalue(p_value)
     if method in ("anova", "welch"):
         effect_size = (
-            f"eta²={float(summary['eta_squared']):.4g}, "
-            f"omega²={float(summary['omega_squared']):.4g}"
+            f"eta²={humanize_float(float(summary['eta_squared']))}, "
+            f"omega²={humanize_float(float(summary['omega_squared']))}"
         )
     else:
-        effect_size = "not available (rank-based)"
+        effect_size = "not computed (rank-based)"
     significant_pairs = (
         int(posthoc_step.result_summary.get("significant_pairs", 0))
         if posthoc_step is not None
@@ -394,11 +440,11 @@ def run_conclusion(
     )
     if passed:
         verdict = (
-            f"group means differ ({method} p={p_value:.4e}), with {significant_pairs} "
+            f"group means differ ({method} p={p_text}), with {significant_pairs} "
             "significant pairwise difference(s)."
         )
     else:
-        verdict = f"no significant difference across groups ({method} p={p_value:.4e})."
+        verdict = f"no significant difference across groups ({method} p={p_text})."
     notes = [omnibus_step.ramification]
     if posthoc_step is not None:
         notes.append(posthoc_step.ramification)

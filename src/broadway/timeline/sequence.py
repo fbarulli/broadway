@@ -12,6 +12,7 @@ class WalkthroughStepConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     id: str
+    label: str
     order: int
     question: str
     kind: Literal["evidence", "decision", "analysis"]

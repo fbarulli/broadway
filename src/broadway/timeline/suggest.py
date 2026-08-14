@@ -15,7 +15,7 @@ def _alternative(label: str, intent: str, rationale: str, command: str = "") -> 
 
 
 def _suggest_describe(step, cfg: WalkthroughConfig, analysis_name: str) -> Suggestion:
-    if step.status == StepStatus.WARNING:
+    if step.status in (StepStatus.WARNING, StepStatus.NOTE):
         rationale = []
         ratio = step.result_summary.get("imbalance_ratio")
         absent = step.result_summary.get("absent_groups", 0)
@@ -52,7 +52,7 @@ def _suggest_describe(step, cfg: WalkthroughConfig, analysis_name: str) -> Sugge
 
 
 def _suggest_normality(step, cfg: WalkthroughConfig, analysis_name: str) -> Suggestion:
-    if step.status == StepStatus.WARNING:
+    if step.status in (StepStatus.WARNING, StepStatus.NOTE):
         rationale = []
         for group, values in step.result_summary.items():
             skew = values.get("skew")

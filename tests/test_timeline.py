@@ -53,7 +53,12 @@ def _decision(**overrides) -> AnalysisDecision:
 
 
 def _seq(steps: list[dict]) -> WalkthroughSequence:
-    return WalkthroughSequence(steps=[WalkthroughStepConfig(**s) for s in steps])
+    configs = []
+    for s in steps:
+        s = dict(s)
+        s.setdefault("label", s.get("id", "step").replace("_", " ").title())
+        configs.append(WalkthroughStepConfig(**s))
+    return WalkthroughSequence(steps=configs)
 
 
 def test_step_roundtrip() -> None:
@@ -107,6 +112,23 @@ def test_load_walkthrough_sequence() -> None:
         "analysis",
         "analysis",
     ]
+    assert [s.label for s in seq.steps] == [
+        "Describe groups",
+        "Normality diagnostics",
+        "Variance homogeneity",
+        "Choose principal method",
+        "Principal analysis",
+        "Choose post-hoc method",
+        "Post-hoc comparisons",
+        "Conclusion",
+    ]
+
+
+def test_step_status_has_note_and_failed() -> None:
+    assert StepStatus.NOTE.value == "note"
+    assert StepStatus.FAILED.value == "failed"
+    assert StepStatus.WARNING.value == "warning"
+    assert StepStatus.COMPLETED.value == "completed"
 
 
 def test_persistence_roundtrip(tmp_path, monkeypatch) -> None:
@@ -132,25 +154,37 @@ def test_decision_persistence_roundtrip(tmp_path, monkeypatch) -> None:
 def test_render_completed_step() -> None:
     seq = _seq([{"id": "describe_groups", "order": 1, "question": "Q?", "kind": "evidence"}])
     md = render_timeline("taxi", seq, [_step()], [])
-    assert "✓ completed" in md
+    assert "| completed |" in md
 
 
 def test_render_warning_step() -> None:
     seq = _seq([{"id": "describe_groups", "order": 1, "question": "Q?", "kind": "evidence"}])
     md = render_timeline("taxi", seq, [_step(status=StepStatus.WARNING)], [])
-    assert "⚠ warning" in md
+    assert "| warning |" in md
+
+
+def test_render_note_step() -> None:
+    seq = _seq([{"id": "describe_groups", "order": 1, "question": "Q?", "kind": "evidence"}])
+    md = render_timeline("taxi", seq, [_step(status=StepStatus.NOTE)], [])
+    assert "| completed with note |" in md
+
+
+def test_render_failed_step() -> None:
+    seq = _seq([{"id": "describe_groups", "order": 1, "question": "Q?", "kind": "evidence"}])
+    md = render_timeline("taxi", seq, [_step(status=StepStatus.FAILED)], [])
+    assert "| failed |" in md
 
 
 def test_render_decision_resolved() -> None:
     seq = _seq([{"id": "decide_omnibus", "order": 1, "question": "Q?", "kind": "decision"}])
     md = render_timeline("taxi", seq, [], [_decision(id="omnibus", kind="omnibus", method="welch")])
-    assert "✓ decided (method=welch)" in md
+    assert "| completed |" in md
 
 
 def test_render_decision_required() -> None:
     seq = _seq([{"id": "decide_omnibus", "order": 1, "question": "Q?", "kind": "decision"}])
     md = render_timeline("taxi", seq, [], [])
-    assert "◆ decision required" in md
+    assert "| awaiting decision |" in md
 
 
 def test_render_blocked_after_unresolved_decision() -> None:
@@ -161,21 +195,21 @@ def test_render_blocked_after_unresolved_decision() -> None:
         ]
     )
     md = render_timeline("taxi", seq, [], [])
-    assert "⏸ blocked" in md
+    assert "| blocked |" in md
 
 
 def test_render_not_started_evidence() -> None:
     seq = _seq([{"id": "describe_groups", "order": 1, "question": "Q?", "kind": "evidence"}])
     md = render_timeline("taxi", seq, [], [])
-    assert "○ not started" in md
+    assert "| not started |" in md
 
 
 def test_render_empty_no_crash() -> None:
     seq = load_walkthrough_sequence()
     md = render_timeline("taxi", seq, [], [])
-    assert "○ not started" in md
-    assert "⏸ blocked" in md
-    assert "◆ decision required" not in md
+    assert "| not started |" in md
+    assert "| blocked |" in md
+    assert "awaiting decision" not in md
 
 
 def test_render_decide_posthoc_blocked_when_omnibus_incomplete() -> None:
@@ -186,8 +220,8 @@ def test_render_decide_posthoc_blocked_when_omnibus_incomplete() -> None:
         ]
     )
     md = render_timeline("taxi", seq, [], [])
-    assert "| 2 | decide_posthoc | Q? | ⏸ blocked |" in md
-    assert "◆ decision required" not in md
+    assert "| 2 | Decide Posthoc | Q? | blocked |" in md
+    assert "awaiting decision" not in md
 
 
 def test_render_decide_posthoc_required_when_omnibus_completed() -> None:
@@ -199,7 +233,7 @@ def test_render_decide_posthoc_required_when_omnibus_completed() -> None:
     )
     omnibus_step = _step(step_id="omnibus", order=1)
     md = render_timeline("taxi", seq, [omnibus_step], [])
-    assert "| 2 | decide_posthoc | Q? | ◆ decision required |" in md
+    assert "| 2 | Decide Posthoc | Q? | awaiting decision |" in md
 
 
 def test_render_decide_omnibus_required_only_when_prereqs_completed() -> None:
@@ -217,18 +251,18 @@ def test_render_decide_omnibus_required_only_when_prereqs_completed() -> None:
         _step(step_id="variance", order=3),
     ]
     md = render_timeline("taxi", seq, completed, [])
-    assert "| 4 | decide_omnibus | Q? | ◆ decision required |" in md
+    assert "| 4 | Decide Omnibus | Q? | awaiting decision |" in md
 
     partial = [_step(step_id="describe_groups", order=1)]
     md = render_timeline("taxi", seq, partial, [])
-    assert "| 4 | decide_omnibus | Q? | ⏸ blocked |" in md
-    assert "◆ decision required" not in md
+    assert "| 4 | Decide Omnibus | Q? | blocked |" in md
+    assert "awaiting decision" not in md
 
 
 def test_render_includes_details_for_completed() -> None:
     seq = _seq([{"id": "describe_groups", "order": 1, "question": "Q?", "kind": "evidence"}])
     md = render_timeline("taxi", seq, [_step()], [])
-    assert "## describe_groups" in md
+    assert "## Describe Groups" in md
     assert "ramification: groups are comparable" in md
     assert "profile.json" in md
     assert "n: 10" in md

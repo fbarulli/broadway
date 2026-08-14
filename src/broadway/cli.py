@@ -107,17 +107,18 @@ def main() -> None:
 
         run(args.analysis, args.dataset)
     elif args.step == "report":
-        from pathlib import Path
+        from broadway.reports.results import write_results
+        from broadway.timeline import module as timeline_module
+        from broadway.timeline.sequence import load_walkthrough_sequence
 
-        from broadway.reports import index
-        from broadway.reports.paths import RESULTS_INDEX_PATH
-
-        cfg = load_config("stats", dataset=args.dataset, analysis=args.analysis)
-        question = cfg.analysis.goal if cfg.analysis else "no analysis contract"
-        stats_dir = Path(cfg.stats.output_dir) if cfg.stats else Path("artifacts/stats")
-        RESULTS_INDEX_PATH.parent.mkdir(parents=True, exist_ok=True)
-        RESULTS_INDEX_PATH.write_text(index.render_index(question, stats_dir), encoding="utf-8")
-        print("wrote reports/results/index.md")
+        steps = timeline_module.load_steps(args.analysis)
+        decisions = timeline_module.load_decisions(args.analysis)
+        if not steps and not decisions:
+            print("run the walkthrough first")
+            return
+        sequence = load_walkthrough_sequence()
+        write_results(args.analysis, sequence, steps, decisions)
+        print("wrote reports/results/")
     elif args.step == "profile":
         from broadway.discover.module import profile
 

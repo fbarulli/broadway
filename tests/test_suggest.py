@@ -92,6 +92,30 @@ def test_suggest_variance_warning_favors_welch() -> None:
     assert "use Welch" not in suggestion.command
 
 
+def test_suggest_describe_note_is_flagged() -> None:
+    step = _step(
+        "describe_groups",
+        StepStatus.NOTE,
+        {"imbalance_ratio": 3.0, "absent_groups": 0},
+        order=1,
+    )
+    suggestion = suggest_after("describe_groups", [step], [], _cfg(), "taxi")
+    assert suggestion is not None
+    assert "imbalanced" in suggestion.headline
+
+
+def test_suggest_normality_note_is_flagged() -> None:
+    step = _step(
+        "normality",
+        StepStatus.NOTE,
+        {"Manhattan": {"skew": 3.0, "kurtosis": 8.0, "shapiro_p": 0.001}},
+        order=2,
+    )
+    suggestion = suggest_after("normality", [step], [], _cfg(), "taxi")
+    assert suggestion is not None
+    assert "flagged" in suggestion.headline
+
+
 def test_suggest_omnibus_passed_requests_posthoc() -> None:
     step = _step(
         "omnibus",

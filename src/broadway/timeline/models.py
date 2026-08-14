@@ -8,7 +8,17 @@ from pydantic import BaseModel, ConfigDict
 
 class StepStatus(str, Enum):
     COMPLETED = "completed"
+    NOTE = "note"
     WARNING = "warning"
+    FAILED = "failed"
+
+
+RENDERED_STATUS: dict[StepStatus, str] = {
+    StepStatus.COMPLETED: "completed",
+    StepStatus.NOTE: "completed with note",
+    StepStatus.WARNING: "warning",
+    StepStatus.FAILED: "failed",
+}
 
 
 class AnalysisStep(BaseModel):

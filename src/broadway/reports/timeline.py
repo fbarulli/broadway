@@ -1,50 +1,18 @@
 from __future__ import annotations
 
-from broadway.timeline.models import AnalysisDecision, AnalysisStep, StepStatus
-from broadway.timeline.sequence import WalkthroughStepConfig, WalkthroughSequence
-
-COMPLETED = "✓ completed"
-WARNING = "⚠ warning"
-DECIDED = "✓ decided"
-DECISION_REQUIRED = "◆ decision required"
-BLOCKED = "⏸ blocked"
-NOT_STARTED = "○ not started"
-
-
-def _decision_for(step_id: str, decisions: list[AnalysisDecision]) -> AnalysisDecision | None:
-    expected = step_id.removeprefix("decide_")
-    for decision in decisions:
-        if decision.id == expected and decision.kind == expected:
-            return decision
-    return None
+from broadway.reports.results import (
+    attrition_line,
+    derive_status,
+    effect_size_lines,
+    figure_link,
+    humanize_summary,
+)
+from broadway.timeline.models import AnalysisDecision, AnalysisStep
+from broadway.timeline.sequence import WalkthroughSequence
 
 
-def _derive_status(
-    step: WalkthroughStepConfig,
-    steps_by_id: dict[str, AnalysisStep],
-    decisions: list[AnalysisDecision],
-    all_prior_resolved: bool,
-) -> tuple[str, bool]:
-    persisted = steps_by_id.get(step.id)
-    if persisted is not None:
-        status = COMPLETED if persisted.status == StepStatus.COMPLETED else WARNING
-        return status, True
-
-    if step.kind == "decision":
-        if not all_prior_resolved:
-            return BLOCKED, False
-        decision = _decision_for(step.id, decisions)
-        if decision is not None:
-            return f"{DECIDED} (method={decision.method})", True
-        return DECISION_REQUIRED, False
-
-    if not all_prior_resolved:
-        return BLOCKED, False
-    return NOT_STARTED, False
-
-
-def _summary_lines(summary: dict) -> list[str]:
-    return [f"  - {key}: {value}" for key, value in summary.items()]
+def _ref_line(ref: str) -> str:
+    return figure_link(ref, up="")
 
 
 def render_timeline(
@@ -61,22 +29,28 @@ def render_timeline(
     lines.append("| --- | --- | --- | --- |")
     all_prior_resolved = True
     for step in seq_steps:
-        status, all_prior_resolved = _derive_status(
+        status, all_prior_resolved = derive_status(
             step, steps_by_id, decisions, all_prior_resolved
         )
-        lines.append(f"| {step.order} | {step.id} | {step.question} | {status} |")
+        lines.append(f"| {step.order} | {step.label} | {step.question} | {status} |")
 
     for step in seq_steps:
         persisted = steps_by_id.get(step.id)
         if persisted is None:
             continue
         lines.append("")
-        lines.append(f"## {step.id}")
+        lines.append(f"## {step.label}")
         lines.append("")
         lines.append(f"- ramification: {persisted.ramification}")
-        refs = ", ".join(persisted.evidence_refs) if persisted.evidence_refs else "-"
+        refs = ", ".join(_ref_line(r) for r in persisted.evidence_refs) if persisted.evidence_refs else "-"
         lines.append(f"- evidence_refs: {refs}")
         lines.append("- result_summary:")
-        lines.extend(_summary_lines(persisted.result_summary))
+        for bullet in humanize_summary(persisted.result_summary):
+            lines.append(f"  - {bullet}")
+        if persisted.step_id == "omnibus":
+            for line in effect_size_lines(persisted.result_summary):
+                lines.append(f"  - {line}")
+        if persisted.step_id == "describe_groups":
+            lines.append(f"  - {attrition_line(persisted.result_summary)}")
 
     return "\n".join(lines)

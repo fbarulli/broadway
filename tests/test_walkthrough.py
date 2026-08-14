@@ -18,6 +18,7 @@ def _setup(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setattr(walkthrough, "TIMELINE_DIR", tmp_path / "timeline")
     monkeypatch.setattr(paths, "TIMELINE_PATH", tmp_path / "reports" / "timeline.md")
     monkeypatch.setattr(paths, "INDEX_PATH", tmp_path / "reports" / "index.md")
+    monkeypatch.setattr(paths, "RESULTS_DIR", tmp_path / "reports" / "results")
     monkeypatch.setattr(paths, "FIGURES_DIR", tmp_path / "reports" / "figures")
 
 
@@ -195,7 +196,7 @@ def test_load_frame_and_groups_from_canonical(
     canonical = _make_canonical(tmp_path)
     monkeypatch.setattr(runners, "canonical_path", lambda d, e: canonical)
 
-    df, group_column, source_group_column, groups = runners.load_frame_and_groups(cfg, None)
+    df, group_column, source_group_column, groups, attrition = runners.load_frame_and_groups(cfg, None)
 
     assert group_column == "Borough"
     assert source_group_column == "Borough"
@@ -204,6 +205,10 @@ def test_load_frame_and_groups_from_canonical(
     assert groups["Bronx"].shape[0] == 60
     assert "Borough" in df.columns
     assert cfg.dataset.target in df.columns
+    assert attrition["n_total"] == 300
+    assert attrition["n_used"] == 300
+    assert attrition["n_excluded"] == 0
+    assert attrition["exclusion_reason"] == ""
 
 
 def test_run_omnibus_welch_reports_effect_sizes(
@@ -234,8 +239,8 @@ def test_run_omnibus_kruskal_no_effect_size(
         cfg.analysis, 5, "q?", groups, "kruskal",
         tmp_path / "timeline" / "taxi_hypothesis", "canonical", None,
     )
-    assert step.result_summary["effect_size"] == "not_available"
-    assert "did not substitute" in step.ramification
+    assert step.result_summary["effect_size"] == "not_computed"
+    assert "deliberately not computed" in step.ramification
 
 
 def test_run_posthoc_significant_pairs(
@@ -381,3 +386,120 @@ def test_stale_decision_warning(
     out = capsys.readouterr().out
     assert "WARNING: decision 'omnibus' was made against earlier evidence" in out
     assert "WARNING: decision 'posthoc' was made against earlier evidence" in out
+
+
+def test_run_omnibus_imbalanced_significant_is_note(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _setup(monkeypatch, tmp_path)
+    cfg = _load_cfg()
+    rng = np.random.default_rng(0)
+    groups = {
+        "a": rng.normal(10.0, 1.0, 10),
+        "b": rng.normal(15.0, 1.0, 200),
+        "c": rng.normal(11.0, 1.0, 10),
+    }
+    step = runners.run_omnibus(
+        cfg.analysis, 5, "q?", groups, "anova",
+        tmp_path / "timeline" / "taxi_hypothesis", "canonical", None,
+    )
+    assert step.status == StepStatus.NOTE
+    assert step.result_summary["passed"] is True
+
+
+def test_run_describe_attrition_none(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _setup(monkeypatch, tmp_path)
+    cfg = _load_cfg()
+    df = pd.DataFrame(
+        {"Borough": ["Manhattan", "Brooklyn"], "trip_duration_minutes": [10.0, 20.0]}
+    )
+    step = runners.run_describe(
+        cfg.analysis, 1, "q?", df, "Borough", "Borough",
+        ["Manhattan", "Brooklyn"], "trip_duration_minutes", "x.parquet",
+        None, "canonical", tmp_path / "timeline" / "taxi_hypothesis",
+    )
+    rs = step.result_summary
+    assert rs["n_total"] == 2
+    assert rs["n_used"] == 2
+    assert rs["n_excluded"] == 0
+    assert rs["exclusion_reason"] == ""
+
+
+def test_run_describe_attrition_null_group(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _setup(monkeypatch, tmp_path)
+    cfg = _load_cfg()
+    df = pd.DataFrame(
+        {
+            "Borough": ["Manhattan", "Brooklyn", None],
+            "trip_duration_minutes": [10.0, 20.0, 30.0],
+        }
+    )
+    step = runners.run_describe(
+        cfg.analysis, 1, "q?", df, "Borough", "Borough",
+        ["Manhattan", "Brooklyn"], "trip_duration_minutes", "x.parquet",
+        None, "canonical", tmp_path / "timeline" / "taxi_hypothesis",
+    )
+    rs = step.result_summary
+    assert rs["n_excluded"] == 1
+    assert "null group" in rs["exclusion_reason"]
+
+
+def test_run_describe_attrition_unlisted_group(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _setup(monkeypatch, tmp_path)
+    cfg = _load_cfg()
+    df = pd.DataFrame(
+        {
+            "Borough": ["Manhattan", "Brooklyn", "Queens"],
+            "trip_duration_minutes": [10.0, 20.0, 30.0],
+        }
+    )
+    step = runners.run_describe(
+        cfg.analysis, 1, "q?", df, "Borough", "Borough",
+        ["Manhattan", "Brooklyn"], "trip_duration_minutes", "x.parquet",
+        None, "canonical", tmp_path / "timeline" / "taxi_hypothesis",
+    )
+    rs = step.result_summary
+    assert rs["n_excluded"] == 1
+    assert "unlisted group" in rs["exclusion_reason"]
+
+
+def test_walkthrough_failure_capture(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _setup(monkeypatch, tmp_path)
+    cfg = _load_cfg()
+    monkeypatch.setattr(runners, "canonical_path", lambda d, e: _make_canonical(tmp_path))
+
+    original = runners.run_describe
+
+    def boom(*args, **kwargs):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(runners, "run_describe", boom)
+
+    walkthrough.run(cfg, None, force=False)
+
+    failed = module.load_step("taxi_hypothesis", "describe_groups")
+    assert failed is not None
+    assert failed.status == StepStatus.FAILED
+    assert failed.result_summary == {}
+    assert failed.evidence_refs == []
+    log = tmp_path / "timeline" / "taxi_hypothesis" / "failures" / "describe_groups.log"
+    assert log.exists()
+    assert "RuntimeError" in log.read_text()
+    out = capsys.readouterr().out
+    assert "failed while attempting describing the groups" in out
+    assert "fix and rerun" in out
+
+    monkeypatch.setattr(runners, "run_describe", original)
+    walkthrough.run(cfg, None, force=True)
+
+    replaced = module.load_step("taxi_hypothesis", "describe_groups")
+    assert replaced is not None
+    assert replaced.status != StepStatus.FAILED
