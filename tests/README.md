@@ -77,6 +77,5 @@ Run graph, sidecar records, and sample specs.
 - `test_cli.py` — dispatch + argparse errors.
 - `test_integration.py` — synthetic end-to-end: load → clean → split → train → evaluate.
 - `test_imports.py` — all modules import; no stale references.
-- `test_eda.py` — summarize / quality / missingness.
 - `test_loud_failures.py` — silent-failure regressions (missing/malformed artifacts, non-finite metrics).
 - `test_reports.py` — `reports/` renderers (`index.md`, per-step markdown).

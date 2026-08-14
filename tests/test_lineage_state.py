@@ -37,9 +37,9 @@ def test_hypothesis_state() -> None:
 
 
 def test_non_lineage_kinds_never_listed() -> None:
-    kinds = {"profile", "baseline", "etl", "eda", "contracts", "features"}
+    kinds = {"profile", "baseline", "etl", "contracts", "features"}
     state = current_state(_graph(kinds), "prediction", "g", [])
-    for kind in ("etl", "eda", "contracts", "features"):
+    for kind in ("etl", "contracts", "features"):
         assert kind not in state.not_yet_run
         assert kind not in state.ran_but_output_missing
 

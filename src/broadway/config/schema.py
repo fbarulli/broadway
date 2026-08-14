@@ -190,14 +190,6 @@ class ContractsStep(BaseModel):
     null_threshold: float
 
 
-class EdaStep(BaseModel):
-    output_dir: str
-    max_columns: int
-    output_file: str
-    mcar_alpha: float
-    outlier_iqr_multiplier: float
-
-
 class FeaturesStep(BaseModel):
     encoding_smoothing: int
     frequency_fill: float
@@ -287,7 +279,6 @@ class PipelineConfig(BaseModel):
     discover: DiscoverStep | None = None
     etl: EtlStep | None = None
     contracts: ContractsStep | None = None
-    eda: EdaStep | None = None
     features: FeaturesStep | None = None
     stats: StatsStep | None = None
     causal: CausalStep | None = None

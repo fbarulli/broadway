@@ -207,7 +207,6 @@ dependencies = [
     { name = "pandas" },
     { name = "pandera" },
     { name = "pingouin" },
-    { name = "plotly" },
     { name = "polars" },
     { name = "psycopg", extra = ["binary"] },
     { name = "pyarrow" },
@@ -228,7 +227,6 @@ dependencies = [
 all = [
     { name = "kubernetes" },
     { name = "matplotlib" },
-    { name = "plotly" },
     { name = "psycopg", extra = ["binary"] },
     { name = "pyspark" },
     { name = "seaborn" },
@@ -246,7 +244,6 @@ spark = [
 ]
 viz = [
     { name = "matplotlib" },
-    { name = "plotly" },
     { name = "seaborn" },
 ]
 
@@ -264,8 +261,6 @@ requires-dist = [
     { name = "pandas", specifier = ">=2.3.0" },
     { name = "pandera", specifier = ">=0.32.1" },
     { name = "pingouin", specifier = ">=0.6.0" },
-    { name = "plotly", specifier = ">=6.2.0" },
-    { name = "plotly", marker = "extra == 'viz'", specifier = ">=6.2.0" },
     { name = "polars", specifier = ">=1.43.2" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.3.0" },
     { name = "psycopg", extras = ["binary"], marker = "extra == 'db'", specifier = ">=3.3.0" },
@@ -1849,19 +1844,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/c8/3f/354391f09b826ca73fbb0e59222c531ffe38de8f5b6a8decb66e435ceb26/pingouin-0.6.1.tar.gz", hash = "sha256:df5ac1f057ef257c07cf0e0785ac8fb9ace923ba1b0ef775886914d674a9f63d", size = 233176, upload-time = "2026-03-28T14:04:36.186Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/58/6d/23037a7081a15c2ddfcd788194996bafe5c4cee8532d7e23d5e5beebcfbe/pingouin-0.6.1-py3-none-any.whl", hash = "sha256:514f2897d7ee354723268551147bbc95849ccec83d6f1dddde1395779c6a7b15", size = 203990, upload-time = "2026-03-28T14:04:34.536Z" },
-]
-
-[[package]]
-name = "plotly"
-version = "6.2.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "narwhals" },
-    { name = "packaging" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/6e/5c/0efc297df362b88b74957a230af61cd6929f531f72f48063e8408702ffba/plotly-6.2.0.tar.gz", hash = "sha256:9dfa23c328000f16c928beb68927444c1ab9eae837d1fe648dbcda5360c7953d", size = 6801941, upload-time = "2025-06-26T16:20:45.765Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/ed/20/f2b7ac96a91cc5f70d81320adad24cc41bf52013508d649b1481db225780/plotly-6.2.0-py3-none-any.whl", hash = "sha256:32c444d4c940887219cb80738317040363deefdfee4f354498cc0b6dab8978bd", size = 9635469, upload-time = "2025-06-26T16:20:40.76Z" },
 ]
 
 [[package]]

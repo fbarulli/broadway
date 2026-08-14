@@ -88,7 +88,6 @@ Every step except `discover` takes the same three flags.
 | ingest | `ds-pipeline ingest` | `data/processed/training_data.parquet` (~8.5M rows, 8 cols) + `ingest:taxi` lineage record | works (Polars; CI-gated) |
 | etl | `ds-pipeline etl --dataset <d> --experiment <e>` | cleaned + split parquet + `JoinAudit`/`LookupValueAudit` (`join`/`lookup_value` lineage nodes) | works |
 | contracts | `ds-pipeline contracts …` | pass/fail validation | works |
-| eda | `ds-pipeline eda …` | `reports/eda.html` | works |
 | features | `ds-pipeline features …` | fitted feature pipeline | works |
 | stats | `ds-pipeline stats {run,describe} --dataset <d> --analysis <a> --sample <name>` | `AnalysisPlan` JSON + `reports/results/describe.md` + figures | works (requires `--sample`) |
 | causal | `ds-pipeline causal --dataset <d> --analysis <a>` | `ExperimentDesign` (power analysis) | separate mode (not in `full`) |

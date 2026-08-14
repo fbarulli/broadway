@@ -78,7 +78,7 @@ or machine paths.
 
 ### Mode-specific pipelines
 
-The three flows share the prefix `discover → etl → contracts → eda → baseline`
+The three flows share the prefix `discover → etl → contracts → baseline`
 and diverge on the mode tail: prediction appends `features → train → evaluate`,
 hypothesis appends `stats`, and causal appends `causal`.
 
@@ -388,7 +388,7 @@ The node chain begins `dataset → ingest → join → {etl, lookup_value}`, the
   open/resolved decisions, `not_yet_run`, `ran_but_output_missing`).
 - `not_yet_run` is derived only from lineage-emitting steps for the active
   mode flow (`broadway/lineage/state.py::LINEAGE_STEPS`), e.g. hypothesis =
-  `profile`/`etl`/`baseline`/`stats`; `contracts`/`eda` are never listed.
+  `profile`/`etl`/`baseline`/`stats`; `contracts` is never listed.
 - `ran_but_output_missing` flags steps whose sidecar record exists but whose
   artifact file is absent — an integrity error, not a normal "not yet produced".
 
