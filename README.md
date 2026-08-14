@@ -146,10 +146,10 @@ reports/
   results/            # per-step pages + results index (owned by the walkthrough)
     index.md          # step-by-step status table (links to completed step pages)
     <step>.md         # one page per completed step (question / what was run / found / why it matters)
-  figures/*.png       # charts (normality Q-Q plots, ...)
+  figures/*.png       # charts rendered from per-step FigureRef (path + one-line "How to read" caption)
   audit/              # human-readable data readiness (owned by audit; on-demand, typed renderers)
     index.md          # data used, status, what changed, enrichment quality, caveats
-    profile.md        # observed column facts (dtypes, nulls, cardinality, identifiers)
+    profile.md        # observed column facts (dtypes, nulls, cardinality, identifiers) + "Profile evidence" (feature Q-Q + distribution grids)
     transform.md      # structural canonicalization: row transitions + parse failures
     join.md           # lookup key-matching completeness
     lookup_values.md  # matched-value quality (nulls/sentinels per enrichment column)
@@ -190,6 +190,33 @@ methods: `welch`/`anova`/`kruskal`; post-hoc: `games_howell`). Step status is a
 plain-text vocabulary — `completed`, `completed with note`, `awaiting decision`,
 `failed`, `warning` — and report pages are humanized (human step labels, three
 significant figures, p-values floored at "< 0.001").
+
+Evidence steps attach figures via `FigureRef` (a `path` relative to `reports/`
+plus a one-line "How to read" caption) on `AnalysisStep.figures`. `timeline.md`
+embeds them as `![caption](figures/...)`; per-step pages under `reports/results/`
+embed the same figures one link-depth deeper as `![caption](../figures/...)`.
+
+Two Q-Q surfaces answer "is this normal?" at different scopes and deliberately
+diverge in layout:
+
+- **Features Q-Q** (`src/broadway/discover/qq.py`, run by `discover`/`profile`)
+  uses **small multiples** — one subplot per numeric feature (per-feature
+  z-score) plus a matching per-feature **distribution (histogram) grid in raw
+  units** — because 7+ features don't read overlaid. Non-finite and zero-variance
+  features are recorded, not plotted; the grid chunks beyond 12 features per
+  figure.
+- **Groups Q-Q** (`src/broadway/timeline/runners.py::run_normality`) uses a
+  **single overlaid figure**, one trace per group, per-group z-score — because
+  ~5 groups read fine overlaid (capped at 12 groups).
+
+The `audit` profile page renders both feature grids in a "Profile evidence"
+section on `reports/audit/profile.md`, from the `QqOverview` record
+(`artifacts/discover/qq_overview.json`), with how-to-read lines and
+standardization notes (Q-Q = per-feature z-score, distribution = raw units).
+
+Suggestions are de-prescribed: `suggest.py` emits
+`ds-pipeline decide --analysis <a> --method <method> --reason "..."` (never a
+pre-filled method), and the post-hoc gate adds `--kind posthoc`.
 
 ### Git-track policy
 

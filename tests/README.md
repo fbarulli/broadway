@@ -41,6 +41,7 @@ Run graph, sidecar records, and sample specs.
 - `test_decide.py` — `decide.record` validation (method allowlist per kind, unknown-kind rejection).
 - `test_suggest.py` — deterministic suggestion layer (`suggest_after`/`suggest_next`) + `render_dashboard`.
 - `test_results.py` — `render_results`/`write_results`, humanization (3 sig figs, p-value floor), orphan deletion, failed-step page omission.
+- `test_figures.py` — `FigureRef` captions render as figures in `timeline.md` (`figures/...`) and results pages (`../figures/...`); `run_describe`/`run_normality` attach figures.
 
 ## Stats library
 
@@ -54,6 +55,7 @@ Run graph, sidecar records, and sample specs.
 ## Discover / profile / onboarding
 
 - `test_profile.py` — `DatasetProfile` / `ColumnProfile` observed facts.
+- `test_qq.py` — `plot_numeric_qq` small multiples + per-feature distribution grid (exclusion/chunking), `run_normality` joint per-group Q-Q cap, and profile-evidence rendering.
 - `test_onboard.py`, `test_init.py` — semantic inference hints + `ds-pipeline init` scaffolding.
 - `test_onboarding_e2e.py` — non-taxi CSV: init → etl → contracts → baseline → features → train → evaluate with a local MLflow file store.
 
@@ -79,3 +81,4 @@ Run graph, sidecar records, and sample specs.
 - `test_imports.py` — all modules import; no stale references.
 - `test_loud_failures.py` — silent-failure regressions (missing/malformed artifacts, non-finite metrics).
 - `test_reports.py` — `reports/` renderers (`index.md`, per-step markdown).
+- `test_surface_integrity.py` — tracked `reports/` markdown link resolution + 5 MB HTML / 2 MB PNG size caps (read-only).

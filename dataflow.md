@@ -33,6 +33,14 @@ the walkthrough first" if no timeline state exists). Outputs are split by kind:
 machine JSON → `artifacts/`, markdown → `reports/`, images →
 `reports/figures/`.
 
+Per-step figures are declared as `FigureRef` (a `path` relative to `reports/`
+plus a one-line "How to read" caption) and embedded as `![caption](figures/...)`
+in `timeline.md` and `![caption](../figures/...)` in `results/` pages (one link
+depth deeper). The surface is guarded by `tests/test_surface_integrity.py`,
+which verifies every relative markdown link in tracked `reports/` files resolves
+on disk and that tracked `.html` / `.png` files stay under size caps (5 MB / 2
+MB).
+
 The `audit` command (`ds-pipeline audit --dataset <d> [--analysis <a>]`) is a
 separate on-demand, question-oriented surface. It reads the persisted typed
 evidence — `StructuralCleanResult` (`data/processed/<name>_clean.json`),
@@ -76,6 +84,32 @@ message on the report page. Report pages are humanized: human step labels,
 three significant figures, p-values floored at "< 0.001", and no dict literals
 or machine paths.
 
+Evidence steps attach figures via `FigureRef` (`path` relative to `reports/` +
+one-line "How to read" caption) on `AnalysisStep.figures`; `timeline.md` embeds
+them as `![caption](figures/...)` and `results/` pages as
+`![caption](../figures/...)` (one link depth deeper).
+
+Two Q-Q surfaces answer "is this normal?" at different scopes and deliberately
+diverge in layout:
+
+- **Features Q-Q** (`src/broadway/discover/qq.py::plot_numeric_qq`) is the
+  profile surface: **small multiples** — one subplot per numeric feature
+  (per-feature z-score) plus a matching per-feature **distribution (histogram)
+  grid in raw units** — because 7+ features don't read overlaid. Non-finite and
+  zero-variance features are recorded, not plotted; the grid chunks into
+  multiple PNGs beyond 12 features per figure.
+- **Groups Q-Q** (`src/broadway/timeline/runners.py::run_normality`) is the
+  normality gate: a **single overlaid figure**, one trace per group, per-group
+  z-score — because ~5 groups read fine overlaid (capped at 12 groups).
+
+The `audit` command renders the feature grids in a "Profile evidence" section
+on `reports/audit/profile.md` from the `QqOverview` record
+(`artifacts/discover/qq_overview.json`), with how-to-read lines and
+standardization notes (Q-Q = per-feature z-score, distribution = raw units).
+Suggestions are de-prescribed: `suggest.py` emits
+`ds-pipeline decide --analysis <a> --method <method> --reason "..."` (never a
+pre-filled method) and adds `--kind posthoc` at the post-hoc gate.
+
 ### Mode-specific pipelines
 
 The three flows share the prefix `discover → etl → contracts → baseline`
@@ -102,6 +136,7 @@ broadway/
     discover/               # read CSV/parquet → infer contract + observed profile
       module.py             # run(): writes configs/dataset/<name>.yaml + artifacts/discover/profile.json
       profile.py            # DatasetProfile / ColumnProfile (observed facts; identifier_score is descriptive only)
+      qq.py                 # plot_numeric_qq: per-feature Q-Q small multiples + per-feature distribution grid (QqOverview evidence)
     onboard/                # onboarding/scaffolding (ds-pipeline init) + semantic inference hints
       infer.py              # dtype/null/cardinality/identifier/datetime hints (evidence only)
       models.py             # InferenceReport (typed hints)
