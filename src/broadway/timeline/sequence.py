@@ -32,6 +32,7 @@ class WalkthroughConfig(BaseModel):
     shapiro_alpha: float
     imbalance_ratio_threshold: float
     significance_alpha: float
+    max_qq_groups: int
 
 
 def load_walkthrough_sequence() -> WalkthroughSequence:

@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import csv as csv_module
 import os
+import shutil
 import subprocess
 from pathlib import Path
 
 import pytest
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 def _run(*args: str, **kwargs: object) -> subprocess.CompletedProcess[str]:
@@ -24,6 +27,11 @@ def _write_csv(path: Path, rows: list[dict[str, object]]) -> None:
         w.writerows(rows)
 
 
+def _copy_viz_config(configs_dir: Path) -> None:
+    (configs_dir / "step").mkdir(parents=True, exist_ok=True)
+    shutil.copy(REPO_ROOT / "configs" / "step" / "viz.yaml", configs_dir / "step" / "viz.yaml")
+
+
 class TestDiscoverCLI:
     def test_discover_parses_and_generates_yaml(self, tmp_path: Path) -> None:
         csv_path = tmp_path / "test_data.csv"
@@ -38,6 +46,7 @@ class TestDiscoverCLI:
 
         configs_dir = tmp_path / "configs"
         dataset_dir = configs_dir / "dataset"
+        _copy_viz_config(configs_dir)
         env = {
             **os.environ,
             "BROADWAY_CONFIGS_DIR": str(configs_dir),
@@ -82,6 +91,7 @@ class TestDiscoverCLI:
 
         configs_dir = tmp_path / "configs"
         dataset_dir = configs_dir / "dataset"
+        _copy_viz_config(configs_dir)
         env = {
             **os.environ,
             "BROADWAY_CONFIGS_DIR": str(configs_dir),

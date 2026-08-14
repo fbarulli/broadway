@@ -70,8 +70,7 @@ def test_render_describe_headings_and_figures() -> None:
     md = describe_reports.render(_summary())
     for heading in ("Question", "Sample", "Groups", "Imbalance", "Warnings", "Figures"):
         assert f"## {heading}" in md
-    assert "figures/describe_boxplot.png" in md
-    assert "figures/describe_group_sizes.png" in md
+    assert "figures/describe.png" in md
 
 
 def test_describe_headline_one_liner() -> None:

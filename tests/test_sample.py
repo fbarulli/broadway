@@ -103,8 +103,6 @@ def _setup_test_cfg(
     )
     monkeypatch.setattr(loader, "CONFIGS_DIR", configs_dir)
     monkeypatch.setattr(records, "LINEAGE_DIR", tmp_path / "lineage")
-    monkeypatch.setattr(describe_module.paths, "RESULTS_DIR", tmp_path / "reports" / "results")
-    monkeypatch.setattr(describe_module.paths, "FIGURES_DIR", tmp_path / "reports" / "figures")
 
 
 def test_describe_run_stamps_sample(

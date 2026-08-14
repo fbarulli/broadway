@@ -15,8 +15,7 @@ from broadway.reports import paths
 from broadway.stats.describe import (
     GroupSummary,
     describe,
-    plot_group_distribution,
-    plot_group_sizes,
+    plot_describe_figures,
     run,
 )
 
@@ -54,12 +53,9 @@ def test_describe_imbalance_ratio_present_only() -> None:
 def test_plot_functions_write_files(tmp_path: Path) -> None:
     df = pd.DataFrame({"g": ["a", "a", "b"], "t": [1.0, 2.0, 3.0]})
     summary = describe(df, "g", "g", ["a", "b"], "t", "path", "s", "diagnostic")
-    box_path = tmp_path / "box.png"
-    sizes_path = tmp_path / "sizes.png"
-    plot_group_distribution(df, "g", "g", ["a", "b"], "t", box_path)
-    plot_group_sizes(summary, sizes_path)
-    assert box_path.exists()
-    assert sizes_path.exists()
+    out = tmp_path / "describe.png"
+    plot_describe_figures(df, "g", "g", ["a", "b"], "t", summary, out)
+    assert out.exists()
 
 
 def _setup_test_cfg(
@@ -114,9 +110,9 @@ def test_describe_run_writes_artifacts(
     run(cfg, sample)
 
     assert (tmp_path / "describe.json").exists()
-    assert (tmp_path / "reports" / "results" / "describe.md").exists()
-    assert (tmp_path / "reports" / "figures" / "describe_boxplot.png").exists()
-    assert (tmp_path / "reports" / "figures" / "describe_group_sizes.png").exists()
+    assert (tmp_path / "lineage" / "records" / "describe_test_hypothesis.json").exists()
+    assert not (tmp_path / "reports" / "results" / "describe.md").exists()
+    assert not (tmp_path / "reports" / "figures" / "describe.png").exists()
 
 
 def test_describe_run_missing_sample_raises(

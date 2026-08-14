@@ -20,17 +20,11 @@ matplotlib.use("Agg")  # headless; set before pyplot import
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import seaborn as sns
 from pydantic import BaseModel, ConfigDict
 from scipy import stats
 
 from broadway import viz
-
-MAX_FEATURES_PER_FIGURE = 12
-MAX_POINTS_PER_TRACE = 2_000   # Q-Q shape is preserved well below this
-FIG_SIZE_PER_SUBPLOT = 3.0     # inches; total figure scales with the grid
-DEFAULT_DPI = 100
-MIN_UNIQUE_FOR_QQ = 15         # below this many unique values, a feature is discrete
+from broadway.config.viz import load_viz_config
 
 
 class QqFeature(BaseModel):
@@ -68,22 +62,23 @@ def _numeric_cols(df: pd.DataFrame, cols: list[str] | None) -> list[str]:
     return list(df.select_dtypes(include="number").columns)
 
 
-def _resolve_min_unique(override: int | None) -> int:
+def _resolve_min_unique(override: int | None, default: int) -> int:
     if override is not None:
         return override
-    return int(os.getenv("BROADWAY_QQ_MIN_UNIQUE", str(MIN_UNIQUE_FOR_QQ)))
+    return int(os.getenv("BROADWAY_QQ_MIN_UNIQUE", str(default)))
 
 
 def _qq_points(
     vals: np.ndarray,
+    max_points_per_trace: int,
 ) -> tuple[np.ndarray, np.ndarray, float, float]:
     """Standardized Q-Q points for one feature, thinned for plotting, plus fit line."""
     if vals.size < 2:
         return np.array([]), np.array([]), 0.0, 0.0
     z = (vals - vals.mean()) / vals.std(ddof=0)
     (osm, osr), (slope, intercept, _) = stats.probplot(z, dist="norm", fit=True)
-    if osm.size > MAX_POINTS_PER_TRACE:
-        idx = np.linspace(0, osm.size - 1, MAX_POINTS_PER_TRACE).astype(int)
+    if osm.size > max_points_per_trace:
+        idx = np.linspace(0, osm.size - 1, max_points_per_trace).astype(int)
         osm, osr = osm[idx], osr[idx]
     return osm, osr, float(slope), float(intercept)
 
@@ -105,7 +100,7 @@ def _plot_chunk(
 ) -> None:
     n = len(traces)
     n_rows, n_cols = _grid_dims(n)
-    colors = sns.color_palette(palette, n) if n else []
+    colors = viz.palette_colors(n, palette)
     fig, axes = plt.subplots(
         n_rows, n_cols,
         figsize=(n_cols * subplot_size, n_rows * subplot_size),
@@ -114,21 +109,32 @@ def _plot_chunk(
     )
     ax_flat = axes.ravel()
     for color, ax, (name, osm, osr, slope, intercept) in zip(colors, ax_flat, traces):
-        ax.scatter(osm, osr, s=6, alpha=0.55, edgecolor="none", color=color)
+        ax.scatter(
+            osm, osr,
+            s=viz.QQ_SCATTER_SIZE,
+            alpha=viz.QQ_SCATTER_ALPHA,
+            edgecolor=viz.QQ_SCATTER_EDGE_COLOR,
+            color=color,
+        )
         xs = np.array([osm.min(), osm.max()])
-        ax.plot(xs, slope * xs + intercept, color="red", linestyle="--", linewidth=0.8)
-        ax.set_xlabel("Theoretical quantiles", fontsize=8)
-        ax.set_ylabel("Sample quantiles (z)", fontsize=8)
-        ax.set_title(f"{name}  (n={osm.size:,})", fontsize=9)
-        ax.grid(True, alpha=0.3)
-        ax.tick_params(labelsize=7)
-        sns.despine(ax=ax)
+        ax.plot(
+            xs, slope * xs + intercept,
+            color=viz.QQ_REF_LINE_COLOR,
+            linestyle=viz.QQ_REF_LINE_STYLE,
+            linewidth=viz.QQ_REF_LINE_WIDTH,
+        )
+        ax.set_xlabel(viz.QQ_XLABEL, fontsize=viz.LABEL_FONTSIZE)
+        ax.set_ylabel(viz.QQ_YLABEL, fontsize=viz.LABEL_FONTSIZE)
+        ax.set_title(name, fontsize=viz.TITLE_FONTSIZE)
+        ax.grid(True, alpha=viz.GRID_ALPHA)
+        ax.tick_params(labelsize=viz.TICK_FONTSIZE)
+        viz.despine(ax)
     for ax in ax_flat[n:]:
         ax.set_visible(False)
     title = "Per-feature Q-Q plots (standardized)"
     if n_figs > 1:
         title += f" - figure {fig_num} of {n_figs}"
-    fig.suptitle(title, fontsize=13)
+    fig.suptitle(title, fontsize=viz.SUPTITLE_FONTSIZE)
     fig.savefig(out_path, dpi=dpi)
     plt.close(fig)
 
@@ -144,7 +150,7 @@ def _plot_dist_chunk(
 ) -> None:
     n = len(hists)
     n_rows, n_cols = _grid_dims(n)
-    colors = sns.color_palette(palette, n) if n else []
+    colors = viz.palette_colors(n, palette)
     fig, axes = plt.subplots(
         n_rows, n_cols,
         figsize=(n_cols * subplot_size, n_rows * subplot_size),
@@ -154,18 +160,18 @@ def _plot_dist_chunk(
     ax_flat = axes.ravel()
     for color, ax, (name, counts, edges) in zip(colors, ax_flat, hists):
         ax.stairs(counts, edges, fill=True, color=color)
-        ax.set_xlabel("Value (raw units)", fontsize=8)
-        ax.set_ylabel("Count", fontsize=8)
-        ax.set_title(f"{name}  (n={int(counts.sum()):,})", fontsize=9)
-        ax.grid(True, alpha=0.3)
-        ax.tick_params(labelsize=7)
-        sns.despine(ax=ax)
+        ax.set_xlabel("Value (raw units)", fontsize=viz.LABEL_FONTSIZE)
+        ax.set_ylabel("Count", fontsize=viz.LABEL_FONTSIZE)
+        ax.set_title(name, fontsize=viz.TITLE_FONTSIZE)
+        ax.grid(True, alpha=viz.GRID_ALPHA)
+        ax.tick_params(labelsize=viz.TICK_FONTSIZE)
+        viz.despine(ax)
     for ax in ax_flat[n:]:
         ax.set_visible(False)
     title = "Per-feature distributions (raw units)"
     if n_figs > 1:
         title += f" - figure {fig_num} of {n_figs}"
-    fig.suptitle(title, fontsize=13)
+    fig.suptitle(title, fontsize=viz.SUPTITLE_FONTSIZE)
     fig.savefig(out_path, dpi=dpi)
     plt.close(fig)
 
@@ -179,16 +185,28 @@ def plot_numeric_qq(
     cols: list[str] | None = None,
     exclude: list[str] | None = None,
     min_unique_for_qq: int | None = None,
-    max_features_per_figure: int = MAX_FEATURES_PER_FIGURE,
-    fig_size_per_subplot: float = FIG_SIZE_PER_SUBPLOT,
-    dpi: int = DEFAULT_DPI,
+    max_features_per_figure: int | None = None,
+    fig_size_per_subplot: float | None = None,
+    dpi: int | None = None,
+    max_points_per_trace: int | None = None,
     standardization: str = "per-feature z-score",
-    palette: str = viz.PALETTE,
+    palette: str | None = None,
 ) -> QqOverview:
+    cfg = load_viz_config()
     figures_dir = Path(figures_dir)
     evidence_path = Path(evidence_path)
     exclude = exclude or []
-    min_unique = _resolve_min_unique(min_unique_for_qq)
+    if max_features_per_figure is None:
+        max_features_per_figure = cfg.max_features_per_figure
+    if fig_size_per_subplot is None:
+        fig_size_per_subplot = cfg.fig_size_per_subplot
+    if dpi is None:
+        dpi = cfg.dpi
+    if max_points_per_trace is None:
+        max_points_per_trace = cfg.max_points_per_trace
+    if palette is None:
+        palette = cfg.palette
+    min_unique = _resolve_min_unique(min_unique_for_qq, cfg.min_unique_for_qq)
 
     features: list[QqFeature] = []
     traces: dict[str, tuple[np.ndarray, np.ndarray, float, float]] = {}
@@ -249,7 +267,7 @@ def plot_numeric_qq(
             ))
             continue
 
-        osm, osr, slope, intercept = _qq_points(finite)
+        osm, osr, slope, intercept = _qq_points(finite, max_points_per_trace)
         traces[name] = (osm, osr, slope, intercept)
         counts, edges = np.histogram(finite, bins="auto")
         hists[name] = (counts, edges)
@@ -278,11 +296,12 @@ def plot_numeric_qq(
 
     figures: list[str] = []
     for fig_num, chunk in enumerate(qq_chunks, start=1):
-        fig_name = f"figures/numeric_qq_{fig_num}.png"
+        basename = cfg.qq_figure.format(fig_num=fig_num)
+        fig_name = f"figures/{basename}"
         figures.append(fig_name)
         _plot_chunk(
             [(n, *traces[n]) for n in chunk],
-            figures_dir / f"numeric_qq_{fig_num}.png",
+            figures_dir / basename,
             fig_num, len(qq_chunks), fig_size_per_subplot, dpi, palette,
         )
         for n in chunk:
@@ -291,11 +310,12 @@ def plot_numeric_qq(
 
     dist_figures: list[str] = []
     for fig_num, chunk in enumerate(dist_chunks, start=1):
-        dist_name = f"figures/numeric_dist_{fig_num}.png"
+        basename = cfg.dist_figure.format(fig_num=fig_num)
+        dist_name = f"figures/{basename}"
         dist_figures.append(dist_name)
         _plot_dist_chunk(
             [(n, *hists[n]) for n in chunk],
-            figures_dir / f"numeric_dist_{fig_num}.png",
+            figures_dir / basename,
             fig_num, len(dist_chunks), fig_size_per_subplot, dpi, palette,
         )
         for n in chunk:

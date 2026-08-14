@@ -6,7 +6,7 @@ import numpy as np
 from sklearn.base import BaseEstimator, clone
 from sklearn.model_selection import KFold
 
-from broadway.evaluate.metrics import METRIC_DECIMALS, compute_metrics
+from broadway.evaluate.metrics import compute_metrics
 
 
 def cross_validate(
@@ -15,6 +15,7 @@ def cross_validate(
     y: np.ndarray,
     cv_folds: int,
     random_state: int,
+    decimals: int = 4,
 ) -> dict[str, float]:
     kf = KFold(n_splits=cv_folds, shuffle=True, random_state=random_state)
     fold_scores: list[dict[str, float]] = []
@@ -22,9 +23,9 @@ def cross_validate(
         fold_model = clone(model)
         fold_model.fit(X[train_idx], y[train_idx])
         fold_scores.append(
-            compute_metrics(y[val_idx], fold_model.predict(X[val_idx]))
+            compute_metrics(y[val_idx], fold_model.predict(X[val_idx]), decimals=decimals)
         )
-    return _mean_metrics(fold_scores)
+    return _mean_metrics(fold_scores, decimals)
 
 
 def residual_summary(y_true: np.ndarray, y_pred: np.ndarray) -> dict[str, float]:
@@ -36,8 +37,8 @@ def residual_summary(y_true: np.ndarray, y_pred: np.ndarray) -> dict[str, float]
     }
 
 
-def _mean_metrics(fold_scores: list[dict[str, float]]) -> dict[str, float]:
+def _mean_metrics(fold_scores: list[dict[str, float]], decimals: int = 4) -> dict[str, float]:
     return {
-        metric: round(float(np.mean([scores[metric] for scores in fold_scores])), METRIC_DECIMALS)
+        metric: round(float(np.mean([scores[metric] for scores in fold_scores])), decimals)
         for metric in fold_scores[0]
     }

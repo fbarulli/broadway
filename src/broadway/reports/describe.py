@@ -47,8 +47,7 @@ def render(summary: GroupSummary) -> str:
 
     figures = "\n".join(
         [
-            "[describe_boxplot.png](figures/describe_boxplot.png)",
-            "[describe_group_sizes.png](figures/describe_group_sizes.png)",
+            "[describe.png](figures/describe.png)",
         ]
     )
 

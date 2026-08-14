@@ -17,7 +17,6 @@ from broadway.config.schema import PipelineConfig
 from broadway.lineage.ids import node_id
 from broadway.lineage.models import SampleRole, SampleSpec
 from broadway.lineage.records import write_record
-from broadway.reports import paths
 
 logger = logging.getLogger(__name__)
 
@@ -69,12 +68,8 @@ def describe(df: pd.DataFrame, group_column: str, source_group_column: str, grou
     )
 
 
-def plot_group_distribution(df: pd.DataFrame, source_group_column: str, group_column: str, group_values: list[str], target: str, out_path: Path) -> None:
+def _draw_group_distribution(ax, data, labels, group_column, target, group_values, colors) -> None:
     # boxplot of target by group, present groups only (absent groups have no data)
-    data = [df[df[source_group_column] == g][target].dropna().to_numpy() for g in group_values]
-    labels = [f"{g} (n={len(v)})" for g, v in zip(group_values, data)]
-    fig, ax = plt.subplots(figsize=(10, 5))
-    colors = viz.palette_colors(len(data))
     bp = ax.boxplot(data, tick_labels=labels, patch_artist=True)
     for patch, color in zip(bp["boxes"], colors):
         patch.set_facecolor(color)
@@ -85,16 +80,9 @@ def plot_group_distribution(df: pd.DataFrame, source_group_column: str, group_co
     if absent:
         ax.text(0.99, 0.02, f"absent (n=0): {', '.join(absent)}", transform=ax.transAxes, ha="right", va="bottom", color="red")
     viz.despine(ax)
-    fig.tight_layout()
-    fig.savefig(out_path)
-    plt.close(fig)
 
 
-def plot_group_sizes(summary: GroupSummary, out_path: Path) -> None:
-    names = list(summary.groups.keys())
-    sizes = [summary.groups[g].n for g in names]
-    fig, ax = plt.subplots(figsize=(10, 5))
-    colors = viz.palette_colors(len(names))
+def _draw_group_sizes(ax, summary: GroupSummary, names: list[str], sizes: list[int], colors) -> None:
     ax.bar(names, sizes, color=colors)
     ax.set_ylabel("n")
     ax.set_xlabel(summary.group_column)
@@ -103,7 +91,26 @@ def plot_group_sizes(summary: GroupSummary, out_path: Path) -> None:
         ax.text(i, s, f"n={s}", ha="center", va="bottom")
     ax.text(0.99, 0.02, f"imbalance ratio = {summary.imbalance_ratio}", transform=ax.transAxes, ha="right", va="bottom")
     viz.despine(ax)
-    fig.tight_layout()
+
+
+def plot_describe_figures(
+    df: pd.DataFrame,
+    source_group_column: str,
+    group_column: str,
+    group_values: list[str],
+    target: str,
+    summary: GroupSummary,
+    out_path: Path,
+) -> None:
+    data = [df[df[source_group_column] == g][target].dropna().to_numpy() for g in group_values]
+    labels = [f"{g} (n={len(v)})" for g, v in zip(group_values, data)]
+    names = list(summary.groups.keys())
+    sizes = [summary.groups[g].n for g in names]
+    colors = viz.palette_colors(len(data))
+
+    fig, (ax_top, ax_bottom) = plt.subplots(2, 1, figsize=(10, 10), layout="constrained")
+    _draw_group_distribution(ax_top, data, labels, group_column, target, group_values, colors)
+    _draw_group_sizes(ax_bottom, summary, names, sizes, colors)
     fig.savefig(out_path)
     plt.close(fig)
 
@@ -128,15 +135,6 @@ def run(cfg: PipelineConfig, sample: SampleSpec) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     json_path = out_dir / "describe.json"
     json_path.write_text(summary.model_dump_json(indent=2), encoding="utf-8")
-
-    from broadway.reports.describe import render as render_describe
-
-    paths.RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    (paths.RESULTS_DIR / "describe.md").write_text(render_describe(summary), encoding="utf-8")
-
-    paths.FIGURES_DIR.mkdir(parents=True, exist_ok=True)
-    plot_group_distribution(df, source_group_column, group_column, group_values, cfg.dataset.target, paths.FIGURES_DIR / "describe_boxplot.png")
-    plot_group_sizes(summary, paths.FIGURES_DIR / "describe_group_sizes.png")
 
     logger.info("describe: %d groups, total_n=%d, imbalance=%.2f -> %s", len(group_values), summary.total_n, summary.imbalance_ratio, json_path)
     write_record(

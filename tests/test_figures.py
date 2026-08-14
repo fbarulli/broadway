@@ -30,12 +30,10 @@ def _figure_step(**overrides) -> AnalysisStep:
         "sample_name": None,
         "evidence_refs": [
             "describe.json",
-            "figures/describe_boxplot.png",
-            "figures/describe_group_sizes.png",
+            "figures/describe.png",
         ],
         "figures": [
-            FigureRef(path="figures/describe_boxplot.png", caption="How to read: boxplot."),
-            FigureRef(path="figures/describe_group_sizes.png", caption="How to read: bars."),
+            FigureRef(path="figures/describe.png", caption="How to read: boxplot."),
         ],
         "result_summary": {"n": 10},
         "ramification": "group sizes are adequate.",
@@ -66,13 +64,10 @@ def test_run_describe_sets_figures(tmp_path: Path, monkeypatch: pytest.MonkeyPat
         None, "canonical", tmp_path / "timeline" / "taxi_hypothesis", figures_dir,
     )
     assert [f.path for f in step.figures] == [
-        "figures/describe_boxplot.png",
-        "figures/describe_group_sizes.png",
+        "figures/describe.png",
     ]
-    assert (figures_dir / "describe_boxplot.png").exists()
-    assert (figures_dir / "describe_group_sizes.png").exists()
-    assert "figures/describe_boxplot.png" in step.evidence_refs
-    assert "figures/describe_group_sizes.png" in step.evidence_refs
+    assert (figures_dir / "describe.png").exists()
+    assert "figures/describe.png" in step.evidence_refs
     for fig in step.figures:
         assert fig.caption.startswith("How to read:")
 
@@ -98,8 +93,7 @@ def test_run_normality_sets_figures(tmp_path: Path, monkeypatch: pytest.MonkeyPa
 def test_render_timeline_figures_relative_to_reports() -> None:
     seq = load_walkthrough_sequence()
     md = render_timeline("taxi", seq, [_figure_step()], [])
-    assert "![How to read: boxplot.](figures/describe_boxplot.png)" in md
-    assert "![How to read: bars.](figures/describe_group_sizes.png)" in md
+    assert "![How to read: boxplot.](figures/describe.png)" in md
     assert "](../figures/" not in md
 
 
@@ -107,8 +101,7 @@ def test_render_results_figures_relative_to_results() -> None:
     seq = load_walkthrough_sequence()
     pages = render_results("taxi", seq, [_figure_step()], [])
     page = pages["describe-groups.md"]
-    assert "![How to read: boxplot.](../figures/describe_boxplot.png)" in page
-    assert "![How to read: bars.](../figures/describe_group_sizes.png)" in page
+    assert "![How to read: boxplot.](../figures/describe.png)" in page
 
 
 def test_write_results_figures_relative_to_results(
@@ -120,4 +113,4 @@ def test_write_results_figures_relative_to_results(
     seq = load_walkthrough_sequence()
     write_results("taxi", seq, [_figure_step()], [])
     page = (tmp_path / "reports" / "results" / "describe-groups.md").read_text()
-    assert "![How to read: boxplot.](../figures/describe_boxplot.png)" in page
+    assert "![How to read: boxplot.](../figures/describe.png)" in page

@@ -7,8 +7,6 @@ from scipy import stats
 
 from broadway.stats.guards import validate_groups
 
-_SHAPIRO_MAX_N = 5000
-
 
 def run_levene(groups: dict[str, np.ndarray]) -> dict[str, float]:
     warnings = validate_groups(groups)
@@ -18,16 +16,18 @@ def run_levene(groups: dict[str, np.ndarray]) -> dict[str, float]:
     return {"statistic": float(statistic), "p_value": float(p_value)}
 
 
-def check_normality(groups: dict[str, np.ndarray]) -> dict[str, dict[str, float]]:
+def check_normality(
+    groups: dict[str, np.ndarray], shapiro_max_n: int = 5000
+) -> dict[str, dict[str, float]]:
     warnings = validate_groups(groups)
     if any("zero variance" in w for w in warnings):
         raise ValueError("normality checks require non-constant groups")
     result: dict[str, dict[str, float]] = {}
     for name, vals in groups.items():
         arr = np.asarray(vals, dtype=float)
-        if arr.size > _SHAPIRO_MAX_N:
+        if arr.size > shapiro_max_n:
             rng = np.random.default_rng(0)
-            arr = rng.choice(arr, size=_SHAPIRO_MAX_N, replace=False)
+            arr = rng.choice(arr, size=shapiro_max_n, replace=False)
         result[name] = {
             "skew": float(stats.skew(arr)),
             "kurtosis": float(stats.kurtosis(arr)),

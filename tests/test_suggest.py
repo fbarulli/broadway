@@ -58,6 +58,7 @@ def test_load_walkthrough_config_defaults() -> None:
     assert cfg.shapiro_alpha == 0.05
     assert cfg.imbalance_ratio_threshold == 1.5
     assert cfg.significance_alpha == 0.05
+    assert cfg.max_qq_groups == 12
 
 
 def test_load_walkthrough_config_picks_up_custom_threshold(
@@ -70,7 +71,8 @@ def test_load_walkthrough_config_picks_up_custom_threshold(
         "kurtosis_threshold: 7.0\n"
         "shapiro_alpha: 0.05\n"
         "imbalance_ratio_threshold: 1.5\n"
-        "significance_alpha: 0.05\n",
+        "significance_alpha: 0.05\n"
+        "max_qq_groups: 12\n",
         encoding="utf-8",
     )
     monkeypatch.setattr(loader, "CONFIGS_DIR", configs_dir)

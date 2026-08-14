@@ -1,0 +1,10 @@
+palette: BuPu_r
+max_features_per_figure: 12
+max_points_per_trace: 10000
+fig_size_per_subplot: 3.0
+dpi: 100
+min_unique_for_qq: 15
+qq_figure: numeric_qq_{fig_num}.png
+dist_figure: numeric_dist_{fig_num}.png
+describe_figure: describe.png
+normality_figure: normality_qq.png

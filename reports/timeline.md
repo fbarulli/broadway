@@ -22,8 +22,7 @@
   - n_excluded: 710
   - exclusion_reason: unlisted group (values outside the configured group list; see audit)
   - N used 199420 of 200130 (710 excluded: unlisted group (values outside the configured group list; see audit)); see audit
-![How to read: each box spans the interquartile range with a line at the median; boxes at different heights indicate different group centers.](figures/describe_boxplot.png)
-![How to read: bar height is the number of observations per group; very unequal bars indicate imbalance.](figures/describe_group_sizes.png)
+![How to read: the top panel is a boxplot of the target by group, each box spanning the interquartile range with a line at the median; the bottom panel shows the number of observations per group; very unequal bars indicate imbalance.](figures/describe.png)
 
 ## Normality diagnostics
 

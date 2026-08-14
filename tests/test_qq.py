@@ -11,8 +11,9 @@ import yaml
 from broadway import viz
 import broadway.discover.module as discover_module
 from broadway.config.loader import load_config
+from broadway.config.viz import load_viz_config
 from broadway.discover.profile import ColumnProfile, DatasetProfile
-from broadway.discover.qq import QqFeature, QqOverview, _qq_points, plot_numeric_qq
+from broadway.discover.qq import QqFeature, QqOverview, _qq_points, _plot_chunk, plot_numeric_qq
 from broadway.lineage import records
 from broadway.reports import audit
 from broadway.timeline import module as timeline_module
@@ -90,7 +91,7 @@ def test_qq_points_returns_fit_line_params() -> None:
     rng = np.random.default_rng(0)
     vals = rng.normal(0.0, 1.0, 200)
 
-    osm, osr, slope, intercept = _qq_points(vals)
+    osm, osr, slope, intercept = _qq_points(vals, 10000)
 
     assert osm.shape == (200,)
     assert osr.shape == (200,)
@@ -104,7 +105,7 @@ def test_qq_points_thins_large_input() -> None:
     rng = np.random.default_rng(0)
     vals = rng.normal(0.0, 1.0, 5_000)
 
-    osm, osr, slope, intercept = _qq_points(vals)
+    osm, osr, slope, intercept = _qq_points(vals, 2000)
 
     assert osm.size == 2_000
     assert osr.size == 2_000
@@ -133,7 +134,11 @@ def test_plot_numeric_qq_excludes_and_splits(tmp_path) -> None:
 
     overview = plot_numeric_qq(df, figures_dir, evidence_path, source_path="data.csv")
 
-    assert overview.total_features == 17
+    total_cols = len(df.columns)
+    max_per_figure = load_viz_config().max_features_per_figure
+    plotted = [f.feature for f in overview.features if f.status == "plotted"]
+
+    assert overview.total_features == total_cols
     assert overview.excluded_features == 2
     assert overview.discrete_features == 0
     assert overview.non_numeric_columns == []
@@ -161,14 +166,14 @@ def test_plot_numeric_qq_excludes_and_splits(tmp_path) -> None:
             by_figure.setdefault(f.figure, []).append(f.feature)
         if f.dist_figure:
             dist_by_figure.setdefault(f.dist_figure, []).append(f.feature)
-    assert len(by_figure["figures/numeric_qq_1.png"]) == 12
-    assert len(by_figure["figures/numeric_qq_2.png"]) == 3
-    assert len(dist_by_figure["figures/numeric_dist_1.png"]) == 12
-    assert len(dist_by_figure["figures/numeric_dist_2.png"]) == 3
+    assert len(by_figure["figures/numeric_qq_1.png"]) == max_per_figure
+    assert len(by_figure["figures/numeric_qq_2.png"]) == len(plotted) - max_per_figure
+    assert len(dist_by_figure["figures/numeric_dist_1.png"]) == max_per_figure
+    assert len(dist_by_figure["figures/numeric_dist_2.png"]) == len(plotted) - max_per_figure
 
     mixed = next(f for f in overview.features if f.feature == "mixed")
-    assert mixed.n_valid == 19
-    assert mixed.n_excluded == 1
+    assert mixed.n_valid == int(df["mixed"].notna().sum())
+    assert mixed.n_excluded == int(df["mixed"].isna().sum())
 
     f0 = next(f for f in overview.features if f.feature == "f0")
     vals = df["f0"].to_numpy(dtype=float)
@@ -453,4 +458,45 @@ def test_render_profile_without_qq_has_no_evidence_section() -> None:
 
 def test_plot_numeric_qq_default_palette_is_shared() -> None:
     sig = inspect.signature(plot_numeric_qq)
-    assert sig.parameters["palette"].default == viz.PALETTE
+    assert sig.parameters["palette"].default is None
+    assert load_viz_config().palette == viz.default_palette()
+
+
+def test_plot_numeric_qq_defaults_come_from_config() -> None:
+    sig = inspect.signature(plot_numeric_qq)
+    cfg = load_viz_config()
+    assert sig.parameters["max_features_per_figure"].default is None
+    assert sig.parameters["fig_size_per_subplot"].default is None
+    assert sig.parameters["dpi"].default is None
+    assert sig.parameters["max_points_per_trace"].default is None
+    assert cfg.max_points_per_trace == 10000
+    assert cfg.max_features_per_figure == 12
+    assert cfg.fig_size_per_subplot == 3.0
+    assert cfg.dpi == 100
+    assert cfg.min_unique_for_qq == 15
+
+
+def test_qq_subplot_titles_are_feature_names_only(tmp_path, monkeypatch) -> None:
+    import broadway.discover.qq as qq_module
+
+    captured: list = []
+    monkeypatch.setattr(qq_module.plt, "close", lambda fig: captured.append(fig))
+    traces = [
+        ("my_feature", np.array([-1.0, 0.0, 1.0]), np.array([-1.0, 0.0, 1.0]), 1.0, 0.0)
+    ]
+    _plot_chunk(traces, tmp_path / "qq_titles.png", 1, 1, 3.0, 100, "BuPu_r")
+    titles = [ax.get_title() for ax in captured[-1].axes]
+    assert "my_feature" in titles
+    assert not any("(n=" in t for t in titles)
+
+
+def test_dist_subplot_titles_are_feature_names_only(tmp_path, monkeypatch) -> None:
+    import broadway.discover.qq as qq_module
+
+    captured: list = []
+    monkeypatch.setattr(qq_module.plt, "close", lambda fig: captured.append(fig))
+    hists = [("my_feature", np.array([1, 2, 3]), np.array([0.0, 1.0, 2.0, 3.0]))]
+    qq_module._plot_dist_chunk(hists, tmp_path / "dist_titles.png", 1, 1, 3.0, 100, "BuPu_r")
+    titles = [ax.get_title() for ax in captured[-1].axes]
+    assert "my_feature" in titles
+    assert not any("(n=" in t for t in titles)

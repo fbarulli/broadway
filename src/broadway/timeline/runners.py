@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -15,12 +16,13 @@ from scipy import stats
 from broadway import viz
 from broadway.analysis.contracts import AnalysisContract
 from broadway.config.schema import PipelineConfig
+from broadway.config.viz import load_viz_config
 from broadway.data.loader import canonical_path
 from broadway.lineage.models import SampleSpec
 from broadway.reports.results import humanize_float, humanize_pvalue
 from broadway.stats.anova import run_anova, run_kruskal, run_welch
 from broadway.stats.assumptions import check_normality, run_levene
-from broadway.stats.describe import describe, plot_group_distribution, plot_group_sizes
+from broadway.stats.describe import describe, plot_describe_figures
 from broadway.stats.post_hoc import games_howell
 from broadway.timeline.evidence import (
     ConclusionEvidence,
@@ -34,19 +36,17 @@ from broadway.timeline.models import AnalysisStep, FigureRef, StepStatus
 from broadway.timeline.sequence import WalkthroughConfig, load_walkthrough_config
 
 BOXPLOT_CAPTION = (
-    "How to read: each box spans the interquartile range with a line at the median; "
-    "boxes at different heights indicate different group centers."
-)
-GROUP_SIZES_CAPTION = (
-    "How to read: bar height is the number of observations per group; "
-    "very unequal bars indicate imbalance."
+    "How to read: the top panel is a boxplot of the target by group, each box spanning the "
+    "interquartile range with a line at the median; the bottom panel shows the number of "
+    "observations per group; very unequal bars indicate imbalance."
 )
 QQ_CAPTION = (
     "How to read: one plot per group; each group's standardized values are plotted "
     "against theoretical normal quantiles; points following the fitted reference line "
     "are approximately normal; curvature or heavy tails indicate non-normality."
 )
-MAX_QQ_GROUPS = 12
+
+logger = logging.getLogger(__name__)
 
 
 def _thresholds() -> WalkthroughConfig:
@@ -139,11 +139,11 @@ def run_describe(
         summary.model_dump_json(indent=2), encoding="utf-8"
     )
     figures_dir.mkdir(parents=True, exist_ok=True)
-    plot_group_distribution(
-        df, source_group_column, group_column, group_values, target,
-        figures_dir / "describe_boxplot.png",
+    describe_figure = load_viz_config().describe_figure
+    plot_describe_figures(
+        df, source_group_column, group_column, group_values, target, summary,
+        figures_dir / describe_figure,
     )
-    plot_group_sizes(summary, figures_dir / "describe_group_sizes.png")
     thresholds = _thresholds()
     flagged = summary.imbalance_ratio > thresholds.imbalance_ratio_threshold or bool(summary.absent_groups)
     if flagged:
@@ -166,12 +166,10 @@ def run_describe(
         sample_name=sample_name,
         evidence_refs=[
             "describe.json",
-            "figures/describe_boxplot.png",
-            "figures/describe_group_sizes.png",
+            f"figures/{describe_figure}",
         ],
         figures=[
-            FigureRef(path="figures/describe_boxplot.png", caption=BOXPLOT_CAPTION),
-            FigureRef(path="figures/describe_group_sizes.png", caption=GROUP_SIZES_CAPTION),
+            FigureRef(path=f"figures/{describe_figure}", caption=BOXPLOT_CAPTION),
         ],
         result_summary={
             "imbalance_ratio": summary.imbalance_ratio,
@@ -188,8 +186,11 @@ def run_describe(
 
 
 def _plot_qq_joint(
-    groups: dict[str, np.ndarray], out_path: Path, max_groups: int = MAX_QQ_GROUPS
+    groups: dict[str, np.ndarray], out_path: Path, max_groups: int | None = None
 ) -> int:
+    if max_groups is None:
+        max_groups = load_walkthrough_config().max_qq_groups
+    viz_cfg = load_viz_config()
     names = list(groups)[:max_groups]
     n = len(names)
     n_cols = max(1, int(np.ceil(np.sqrt(n))))
@@ -198,30 +199,57 @@ def _plot_qq_joint(
     fig, axes = plt.subplots(
         n_rows,
         n_cols,
-        figsize=(n_cols * 3.0, n_rows * 3.0),
+        figsize=(n_cols * viz_cfg.fig_size_per_subplot, n_rows * viz_cfg.fig_size_per_subplot),
         squeeze=False,
         layout="constrained",
     )
     ax_flat = axes.ravel()
-    for color, ax, name in zip(colors, ax_flat, names):
+    skipped: list[str] = []
+    plotted = 0
+    for name in names:
         vals = np.asarray(groups[name], dtype=float)
-        z = (vals - vals.mean()) / vals.std()
+        std = vals.std()
+        if std == 0.0 or not np.isfinite(std):
+            skipped.append(name)
+            continue
+        ax = ax_flat[plotted]
+        z = (vals - vals.mean()) / std
         (osm, osr), (slope, intercept, _) = stats.probplot(z, dist="norm", fit=True)
-        ax.scatter(osm, osr, s=6, alpha=0.55, edgecolor="none", color=color)
+        ax.scatter(
+            osm,
+            osr,
+            s=viz.QQ_SCATTER_SIZE,
+            alpha=viz.QQ_SCATTER_ALPHA,
+            edgecolor=viz.QQ_SCATTER_EDGE_COLOR,
+            color=colors[plotted],
+        )
         xs = np.array([osm.min(), osm.max()])
-        ax.plot(xs, slope * xs + intercept, color="red", linestyle="--", linewidth=0.8)
-        ax.set_xlabel("Theoretical quantiles", fontsize=8)
-        ax.set_ylabel("Sample quantiles (z)", fontsize=8)
-        ax.set_title(name, fontsize=9)
-        ax.grid(True, alpha=0.3)
-        ax.tick_params(labelsize=7)
+        ax.plot(
+            xs,
+            slope * xs + intercept,
+            color=viz.QQ_REF_LINE_COLOR,
+            linestyle=viz.QQ_REF_LINE_STYLE,
+            linewidth=viz.QQ_REF_LINE_WIDTH,
+        )
+        ax.set_xlabel(viz.QQ_XLABEL, fontsize=viz.LABEL_FONTSIZE)
+        ax.set_ylabel(viz.QQ_YLABEL, fontsize=viz.LABEL_FONTSIZE)
+        ax.set_title(name, fontsize=viz.TITLE_FONTSIZE)
+        ax.grid(True, alpha=viz.GRID_ALPHA)
+        ax.tick_params(labelsize=viz.TICK_FONTSIZE)
         viz.despine(ax)
-    for ax in ax_flat[n:]:
+        plotted += 1
+    for ax in ax_flat[plotted:]:
         ax.set_visible(False)
-    fig.suptitle("Per-group Q-Q plots (per-group standardization)", fontsize=13)
-    fig.savefig(out_path, dpi=100, bbox_inches="tight")
+    if skipped:
+        logger.warning(
+            "Q-Q plot skipped %d zero-variance group(s): %s",
+            len(skipped),
+            ", ".join(skipped),
+        )
+    fig.suptitle("Per-group Q-Q plots (per-group standardization)", fontsize=viz.SUPTITLE_FONTSIZE)
+    fig.savefig(out_path, dpi=viz_cfg.dpi, bbox_inches="tight")
     plt.close(fig)
-    return len(names)
+    return plotted
 
 
 def run_normality(
@@ -236,18 +264,21 @@ def run_normality(
 ) -> AnalysisStep:
     result = check_normality(groups)
     figures_dir.mkdir(parents=True, exist_ok=True)
-    _plot_qq_joint(groups, figures_dir / "normality_qq.png")
-    figure_refs = [FigureRef(path="figures/normality_qq.png", caption=QQ_CAPTION)]
+    thresholds = _thresholds()
+    max_qq_groups = thresholds.max_qq_groups
+    normality_figure = load_viz_config().normality_figure
+    _plot_qq_joint(groups, figures_dir / normality_figure, max_qq_groups)
+    figure_path = f"figures/{normality_figure}"
+    figure_refs = [FigureRef(path=figure_path, caption=QQ_CAPTION)]
     evidence = NormalityEvidence(
         groups={g: NormalityGroupStat(**s) for g, s in result.items()},
-        figure="figures/normality_qq.png",
+        figure=figure_path,
     )
     evidence_dir = out_dir / "evidence"
     evidence_dir.mkdir(parents=True, exist_ok=True)
     (evidence_dir / "normality.json").write_text(
         evidence.model_dump_json(indent=2), encoding="utf-8"
     )
-    thresholds = _thresholds()
     flagged = any(
         abs(s["skew"]) > thresholds.skew_threshold
         or abs(s["kurtosis"]) > thresholds.kurtosis_threshold
@@ -265,9 +296,9 @@ def run_normality(
         for g, s in result.items()
     }
     result_summary["standardization"] = "per-group z-score"
-    if len(groups) > MAX_QQ_GROUPS:
+    if len(groups) > max_qq_groups:
         result_summary["truncation"] = (
-            f"plotted first {MAX_QQ_GROUPS} of {len(groups)} groups"
+            f"plotted first {max_qq_groups} of {len(groups)} groups"
         )
     return AnalysisStep(
         analysis=analysis.name,
@@ -278,7 +309,7 @@ def run_normality(
         method="check_normality",
         source=source,
         sample_name=sample_name,
-        evidence_refs=["normality.json", "figures/normality_qq.png"],
+        evidence_refs=["normality.json", figure_path],
         figures=figure_refs,
         result_summary=result_summary,
         ramification=ramification,
@@ -304,7 +335,7 @@ def run_variance(
         evidence.model_dump_json(indent=2), encoding="utf-8"
     )
     thresholds = _thresholds()
-    flagged = result["p_value"] < thresholds.shapiro_alpha
+    flagged = result["p_value"] < thresholds.significance_alpha
     ramification = (
         "variance evidence favors considering Welch's ANOVA (or a rank-based alternative) "
         "over standard ANOVA."
@@ -338,12 +369,14 @@ def run_omnibus(
     source: str,
     sample_name: str | None,
 ) -> AnalysisStep:
+    thresholds = _thresholds()
+    alpha = thresholds.significance_alpha
     if method == "anova":
-        plan = run_anova(groups)
+        plan = run_anova(groups, alpha=alpha)
     elif method == "welch":
-        plan = run_welch(groups)
+        plan = run_welch(groups, alpha=alpha)
     elif method == "kruskal":
-        plan = run_kruskal(groups)
+        plan = run_kruskal(groups, alpha=alpha)
     else:
         raise ValueError(f"unknown omnibus method '{method}'")
     evidence_dir = out_dir / "evidence"
@@ -367,7 +400,7 @@ def run_omnibus(
             " conservative estimate)."
         )
         imbalance_ratio = plan.threshold_context.get("imbalance_ratio")
-        if imbalance_ratio is not None and float(imbalance_ratio) > 2.0:
+        if imbalance_ratio is not None and float(imbalance_ratio) > thresholds.imbalance_ratio_threshold:
             ramification += (
                 " eta² and omega² diverge here because group sizes are extremely imbalanced;"
                 " report omega²."
@@ -469,7 +502,7 @@ def run_posthoc(
         },
         ramification=(
             f"Games-Howell found {significant_pairs} significant pairwise "
-            "difference(s) at alpha=0.05."
+            f"difference(s) at alpha={thresholds.significance_alpha}."
         ),
         decision_required=False,
         performed_at=now_iso(),
