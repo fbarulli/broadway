@@ -69,6 +69,7 @@ def test_run_writes_profile(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(module, "CONFIGS_DIR", tmp_path / "configs")
     monkeypatch.setattr(module, "ARTIFACTS_DIR", str(tmp_path / "artifacts"))
     monkeypatch.setattr(module, "DATASET_DIR", "dataset")
+    monkeypatch.setattr(records, "LINEAGE_DIR", tmp_path / "lineage")
     module.run(str(csv), "value", "regression")
     profile_path = tmp_path / "artifacts" / "discover" / "profile.json"
     assert profile_path.exists()

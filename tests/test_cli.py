@@ -42,6 +42,8 @@ class TestDiscoverCLI:
             **os.environ,
             "BROADWAY_CONFIGS_DIR": str(configs_dir),
             "BROADWAY_DATASET_DIR": "dataset",
+            "BROADWAY_ARTIFACTS_DIR": str(tmp_path / "artifacts"),
+            "BROADWAY_LINEAGE_DIR": str(tmp_path / "lineage"),
         }
 
         result = _run(
@@ -55,6 +57,7 @@ class TestDiscoverCLI:
         assert result.returncode == 0, f"stderr: {result.stderr}"
         yaml_path = dataset_dir / f"{csv_path.stem}.yaml"
         assert yaml_path.exists()
+        assert (tmp_path / "artifacts" / "discover" / "profile.json").exists()
 
     def test_discover_missing_csv_raises(self, tmp_path: Path) -> None:
         result = _run(
@@ -82,7 +85,12 @@ class TestDiscoverCLI:
             **os.environ,
             "BROADWAY_CONFIGS_DIR": str(configs_dir),
             "BROADWAY_DATASET_DIR": "dataset",
+            "BROADWAY_ARTIFACTS_DIR": str(tmp_path / "artifacts"),
+            "BROADWAY_LINEAGE_DIR": str(tmp_path / "lineage"),
         }
+
+        real = Path("artifacts/discover/profile.json")
+        before = real.read_bytes() if real.exists() else None
 
         result = _run(
             "discover",
@@ -95,6 +103,9 @@ class TestDiscoverCLI:
         )
         assert result.returncode == 0, f"stderr: {result.stderr}"
         assert dataset_dir.joinpath(f"{csv_path.stem}.yaml").exists()
+        assert (tmp_path / "artifacts" / "discover" / "profile.json").exists()
+        if before is not None:
+            assert real.read_bytes() == before
 
 
 class TestTrainCLI:
