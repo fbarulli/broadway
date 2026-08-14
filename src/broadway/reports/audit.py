@@ -108,7 +108,7 @@ def _render_profile_evidence(qq: QqOverview | None) -> list[tuple[str, str]]:
         lines.append("")
         lines.extend(_render_figure_block("Per-feature Q-Q plots", qq.figures, qq_by_figure))
         lines.append(
-            "How to read (Q-Q): traces hugging the diagonal are approximately normal; "
+            "How to read (Q-Q): points should follow the fitted reference line; "
             "S-curves indicate tail behavior; curvature indicates skew."
         )
         lines.append("")

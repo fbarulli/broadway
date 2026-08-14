@@ -31,7 +31,7 @@ Traces are per-feature z-score.
 
 In this figure: trip_distance, total_amount, trip_duration_minutes. Chunk 1 of 1; the trailing `_1` in the filename is the chunk number.
 
-How to read (Q-Q): traces hugging the diagonal are approximately normal; S-curves indicate tail behavior; curvature indicates skew.
+How to read (Q-Q): points should follow the fitted reference line; S-curves indicate tail behavior; curvature indicates skew.
 
 Histograms are in raw units.
 

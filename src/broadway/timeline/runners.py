@@ -41,8 +41,8 @@ GROUP_SIZES_CAPTION = (
     "very unequal bars indicate imbalance."
 )
 QQ_CAPTION = (
-    "How to read: each trace is one group's standardized values; traces hugging "
-    "the diagonal are approximately normal; curvature or heavy tails indicate "
+    "How to read: each trace is one group's standardized values; points following "
+    "the y = x diagonal are approximately normal; curvature or heavy tails indicate "
     "non-normality."
 )
 MAX_QQ_GROUPS = 12
@@ -192,14 +192,18 @@ def _plot_qq_joint(
     names = list(groups)[:max_groups]
     fig = plt.figure(figsize=(7, 7))
     ax = fig.add_subplot(111)
+    osm_all: list[np.ndarray] = []
+    osr_all: list[np.ndarray] = []
     for name in names:
         vals = np.asarray(groups[name], dtype=float)
         z = (vals - vals.mean()) / vals.std()
         osm, osr = stats.probplot(z, dist="norm", fit=False)
+        osm_all.append(osm)
+        osr_all.append(osr)
         ax.scatter(osm, osr, s=10, label=name)
-    lower = min(ax.get_xlim()[0], ax.get_ylim()[0])
-    upper = max(ax.get_xlim()[1], ax.get_ylim()[1])
-    ax.plot([lower, upper], [lower, upper], color="red", linestyle="--", linewidth=1)
+    lo = min(np.concatenate(osm_all).min(), np.concatenate(osr_all).min())
+    hi = max(np.concatenate(osm_all).max(), np.concatenate(osr_all).max())
+    ax.plot([lo, hi], [lo, hi], color="red", linestyle="--", linewidth=1)
     ax.set_xlabel("Theoretical quantiles (standard normal)")
     ax.set_ylabel("Sample quantiles (standardized)")
     ax.set_title("Joint per-group Q-Q plot (per-group standardization)")

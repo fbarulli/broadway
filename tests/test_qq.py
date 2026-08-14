@@ -10,7 +10,7 @@ import yaml
 import broadway.discover.module as discover_module
 from broadway.config.loader import load_config
 from broadway.discover.profile import ColumnProfile, DatasetProfile
-from broadway.discover.qq import QqFeature, QqOverview, plot_numeric_qq
+from broadway.discover.qq import QqFeature, QqOverview, _qq_points, plot_numeric_qq
 from broadway.lineage import records
 from broadway.reports import audit
 from broadway.timeline import module as timeline_module
@@ -58,6 +58,7 @@ def test_run_normality_produces_single_joint_qq(tmp_path, monkeypatch) -> None:
     assert list(figures_dir.glob("normality_*.png")) == [figures_dir / "normality_qq.png"]
     assert [f.path for f in step.figures] == ["figures/normality_qq.png"]
     assert "standardized" in step.figures[0].caption
+    assert "y = x diagonal" in step.figures[0].caption
     assert step.result_summary.get("standardization") == "per-group z-score"
 
     evidence = NormalityEvidence.model_validate_json(
@@ -81,6 +82,30 @@ def test_run_normality_caps_at_twelve_groups(tmp_path, monkeypatch) -> None:
     assert "truncation" in step.result_summary
     assert "12" in step.result_summary["truncation"]
     assert "15" in step.result_summary["truncation"]
+
+
+def test_qq_points_returns_fit_line_params() -> None:
+    rng = np.random.default_rng(0)
+    vals = rng.normal(0.0, 1.0, 200)
+
+    osm, osr, slope, intercept = _qq_points(vals)
+
+    assert osm.shape == (200,)
+    assert osr.shape == (200,)
+    assert isinstance(slope, float)
+    assert isinstance(intercept, float)
+    assert slope == pytest.approx(1.0, abs=0.05)
+    assert intercept == pytest.approx(0.0, abs=0.05)
+
+
+def test_qq_points_thins_large_input() -> None:
+    rng = np.random.default_rng(0)
+    vals = rng.normal(0.0, 1.0, 5_000)
+
+    osm, osr, slope, intercept = _qq_points(vals)
+
+    assert osm.size == 2_000
+    assert osr.size == 2_000
 
 
 def _qq_df() -> pd.DataFrame:
@@ -408,6 +433,7 @@ def test_render_profile_includes_qq_evidence() -> None:
     assert "Traces are per-feature z-score." in md
     assert "Histograms are in raw units." in md
     assert "How to read (Q-Q)" in md
+    assert "fitted reference line" in md
     assert "How to read (distribution)" in md
     assert "- const: zero variance" in md
     assert "- disc: discrete (3 unique values)" in md

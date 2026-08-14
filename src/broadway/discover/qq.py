@@ -72,16 +72,18 @@ def _resolve_min_unique(override: int | None) -> int:
     return int(os.getenv("BROADWAY_QQ_MIN_UNIQUE", str(MIN_UNIQUE_FOR_QQ)))
 
 
-def _qq_points(vals: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    """Standardized Q-Q points for one feature, thinned for plotting."""
+def _qq_points(
+    vals: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, float, float]:
+    """Standardized Q-Q points for one feature, thinned for plotting, plus fit line."""
     if vals.size < 2:
-        return np.array([]), np.array([])
+        return np.array([]), np.array([]), 0.0, 0.0
     z = (vals - vals.mean()) / vals.std(ddof=0)
-    osm, osr = stats.probplot(z, dist="norm", fit=False)
+    (osm, osr), (slope, intercept, _) = stats.probplot(z, dist="norm", fit=True)
     if osm.size > MAX_POINTS_PER_TRACE:
         idx = np.linspace(0, osm.size - 1, MAX_POINTS_PER_TRACE).astype(int)
         osm, osr = osm[idx], osr[idx]
-    return osm, osr
+    return osm, osr, float(slope), float(intercept)
 
 
 def _grid_dims(n: int) -> tuple[int, int]:
@@ -91,7 +93,7 @@ def _grid_dims(n: int) -> tuple[int, int]:
 
 
 def _plot_chunk(
-    traces: list[tuple[str, np.ndarray, np.ndarray]],
+    traces: list[tuple[str, np.ndarray, np.ndarray, float, float]],
     out_path: Path,
     fig_num: int,
     n_figs: int,
@@ -109,11 +111,10 @@ def _plot_chunk(
         layout="constrained",
     )
     ax_flat = axes.ravel()
-    for color, ax, (name, osm, osr) in zip(colors, ax_flat, traces):
+    for color, ax, (name, osm, osr, slope, intercept) in zip(colors, ax_flat, traces):
         ax.scatter(osm, osr, s=6, alpha=0.55, edgecolor="none", color=color)
-        lo = min(osm.min(), osr.min())
-        hi = max(osm.max(), osr.max())
-        ax.plot([lo, hi], [lo, hi], color="red", linestyle="--", linewidth=0.8)
+        xs = np.array([osm.min(), osm.max()])
+        ax.plot(xs, slope * xs + intercept, color="red", linestyle="--", linewidth=0.8)
         ax.set_xlabel("Theoretical quantiles", fontsize=8)
         ax.set_ylabel("Sample quantiles (z)", fontsize=8)
         ax.set_title(f"{name}  (n={osm.size:,})", fontsize=9)
@@ -188,7 +189,7 @@ def plot_numeric_qq(
     min_unique = _resolve_min_unique(min_unique_for_qq)
 
     features: list[QqFeature] = []
-    traces: dict[str, tuple[np.ndarray, np.ndarray]] = {}
+    traces: dict[str, tuple[np.ndarray, np.ndarray, float, float]] = {}
     hists: dict[str, tuple[np.ndarray, np.ndarray]] = {}
     excluded_notes: list[str] = []
     flagged_id_columns: list[str] = []
@@ -246,8 +247,8 @@ def plot_numeric_qq(
             ))
             continue
 
-        osm, osr = _qq_points(finite)
-        traces[name] = (osm, osr)
+        osm, osr, slope, intercept = _qq_points(finite)
+        traces[name] = (osm, osr, slope, intercept)
         counts, edges = np.histogram(finite, bins="auto")
         hists[name] = (counts, edges)
         features.append(QqFeature(
