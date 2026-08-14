@@ -9,7 +9,7 @@ import pytest
 from broadway.config.loader import load_config
 from broadway.reports import paths
 from broadway.timeline import decide, module, runners, walkthrough
-from broadway.timeline.evidence import PosthocEvidence
+from broadway.timeline.evidence import ConclusionEvidence, PosthocEvidence
 from broadway.timeline.models import AnalysisDecision, AnalysisStep, StepStatus
 
 
@@ -282,7 +282,7 @@ def test_run_omnibus_welch_reports_effect_sizes(
     assert (tmp_path / "timeline" / "taxi_hypothesis" / "evidence" / "omnibus.json").exists()
 
 
-def test_run_omnibus_kruskal_no_effect_size(
+def test_run_omnibus_kruskal_epsilon_squared(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _setup(monkeypatch, tmp_path)
@@ -293,8 +293,10 @@ def test_run_omnibus_kruskal_no_effect_size(
         cfg.analysis, 5, "q?", groups, "kruskal",
         tmp_path / "timeline" / "taxi_hypothesis", "canonical", None,
     )
-    assert step.result_summary["effect_size"] == "not_computed"
-    assert "deliberately not computed" in step.ramification
+    assert "epsilon_squared" in step.result_summary
+    assert "effect_size" not in step.result_summary
+    assert "ε²" in step.ramification
+    assert "deliberately not computed" not in step.ramification
 
 
 def _omnibus_step(method: str) -> AnalysisStep:
@@ -308,7 +310,7 @@ def _omnibus_step(method: str) -> AnalysisStep:
         summary["eta_squared"] = 0.982
         summary["omega_squared"] = 0.123
     else:
-        summary["effect_size"] = "not_computed"
+        summary["epsilon_squared"] = 0.456
     return AnalysisStep(
         analysis="taxi_hypothesis",
         step_id="omnibus",
@@ -341,7 +343,7 @@ def test_run_conclusion_copies_effect_sizes(
     assert "effect_size" not in rs
 
 
-def test_run_conclusion_kruskal_keeps_not_computed(
+def test_run_conclusion_kruskal_epsilon_squared(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _setup(monkeypatch, tmp_path)
@@ -350,7 +352,13 @@ def test_run_conclusion_kruskal_keeps_not_computed(
         cfg.analysis, 8, "q?", _omnibus_step("kruskal"), None,
         tmp_path / "timeline" / "taxi_hypothesis", "canonical", None,
     )
-    assert step.result_summary["effect_size"] == "not_computed"
+    rs = step.result_summary
+    assert rs["epsilon_squared"] == pytest.approx(0.456)
+    assert "effect_size" not in rs
+    evidence = ConclusionEvidence.model_validate_json(
+        (tmp_path / "timeline" / "taxi_hypothesis" / "evidence" / "conclusion.json").read_text()
+    )
+    assert "ε²" in evidence.effect_size
 
 
 def test_run_posthoc_significant_pairs(

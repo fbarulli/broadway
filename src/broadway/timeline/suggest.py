@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from broadway.formatting import humanize_float
 from broadway.timeline.models import (
     Alternative,
     AnalysisDecision,
@@ -137,11 +138,23 @@ def _suggest_variance(step, cfg: WalkthroughConfig, analysis_name: str) -> Sugge
 
 
 def _suggest_omnibus(step, cfg: WalkthroughConfig, analysis_name: str) -> Suggestion:
-    if step.result_summary.get("passed") is True:
+    summary = step.result_summary
+    effect: str | None = None
+    if summary.get("method") == "kruskal" and "epsilon_squared" in summary:
+        effect = f"rank-based ε² = {humanize_float(float(summary['epsilon_squared']))}"
+    elif "eta_squared" in summary and "omega_squared" in summary:
+        effect = (
+            f"eta² = {humanize_float(float(summary['eta_squared']))}, "
+            f"omega² = {humanize_float(float(summary['omega_squared']))}"
+        )
+    if summary.get("passed") is True:
+        rationale = ["at least one group mean differs from the others"]
+        if effect is not None:
+            rationale.append(effect)
         return Suggestion(
             step_id=step.step_id,
             headline="Omnibus result is significant",
-            rationale=["at least one group mean differs from the others"],
+            rationale=rationale,
             command=(
                 f'ds-pipeline decide --analysis {analysis_name} '
                 f'--kind posthoc --method <method> --reason "..."'
@@ -159,10 +172,13 @@ def _suggest_omnibus(step, cfg: WalkthroughConfig, analysis_name: str) -> Sugges
                 ),
             ],
         )
+    rationale = ["no evidence of a group mean difference"]
+    if effect is not None:
+        rationale.append(effect)
     return Suggestion(
         step_id=step.step_id,
         headline="Omnibus result is not significant",
-        rationale=["no evidence of a group mean difference"],
+        rationale=rationale,
         command=f"ds-pipeline walkthrough --analysis {analysis_name}",
         alternatives=[
             _alternative(

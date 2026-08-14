@@ -160,7 +160,7 @@ broadway/
     stats/                  # pandas/numpy stats library (no Spark)
       base.py               # stratified_sample
       plan.py               # AnalysisPlan (Pydantic model) + save/load
-      effect_size.py        # eta², omega², Cohen's d, Hedges' g, group_imbalance
+      effect_size.py        # eta², omega², epsilon_squared, Cohen's d, Hedges' g, group_imbalance
       assumptions.py        # Levene, skew/kurtosis/Shapiro
       anova.py              # run_anova, run_welch, run_kruskal
       post_hoc.py           # games_howell

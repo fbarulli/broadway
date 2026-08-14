@@ -5,6 +5,7 @@ import pytest
 
 from broadway.stats.effect_size import (
     cohens_d,
+    epsilon_squared,
     eta_squared,
     group_imbalance,
     hedges_g,
@@ -27,6 +28,23 @@ def test_omega_squared_less_than_eta_squared() -> None:
     omega = omega_squared(f_stat, df1, df2, n_total)
     eta = eta_squared(f_stat, df1, df2)
     assert omega < eta
+
+
+def test_epsilon_squared_hand_computed() -> None:
+    assert epsilon_squared(12.0, 3, 90) == pytest.approx((12.0 - 3 + 1) / (90 - 3))
+
+
+def test_epsilon_squared_clamped_negative_to_zero() -> None:
+    assert epsilon_squared(1.0, 3, 90) == 0.0
+
+
+def test_epsilon_squared_clamped_above_one() -> None:
+    assert epsilon_squared(1000.0, 3, 90) == 1.0
+
+
+def test_epsilon_squared_n_not_greater_than_k() -> None:
+    assert epsilon_squared(12.0, 3, 3) == 0.0
+    assert epsilon_squared(12.0, 4, 2) == 0.0
 
 
 def test_cohens_d_identical_mean_is_zero() -> None:

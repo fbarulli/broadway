@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 from scipy import stats
 
-from broadway.stats.effect_size import eta_squared, group_imbalance, omega_squared
+from broadway.stats.effect_size import epsilon_squared, eta_squared, group_imbalance, omega_squared
 from broadway.stats.guards import validate_groups
 from broadway.stats.plan import AnalysisPlan
 
@@ -50,8 +50,8 @@ def _build_plan(
     alpha: float,
     reason: list[str],
     warnings: list[str],
+    effect_sizes: dict[str, float],
 ) -> AnalysisPlan:
-    n_total = sum(sizes.values())
     imbalance_ratio = group_imbalance(sizes)
     any_small_group = any(s < _SMALL_GROUP_THRESHOLD for s in sizes.values())
     passed = bool(p_value < alpha)
@@ -60,10 +60,7 @@ def _build_plan(
         analysis_type="group_comparison",
         test_name=test_name,
         statistics={"statistic": statistic, "p_value": p_value},
-        effect_sizes={
-            "eta_squared": eta_squared(statistic, int(df1), int(df2)),
-            "omega_squared": omega_squared(statistic, int(df1), int(df2), n_total),
-        },
+        effect_sizes=effect_sizes,
         threshold_context={
             "imbalance_ratio": imbalance_ratio,
             "any_small_group": any_small_group,
@@ -107,6 +104,10 @@ def run_anova(groups: dict[str, np.ndarray], alpha: float = 0.05) -> AnalysisPla
         alpha=alpha,
         reason=reason,
         warnings=warnings,
+        effect_sizes={
+            "eta_squared": eta_squared(f_stat, int(df1), int(df2)),
+            "omega_squared": omega_squared(f_stat, int(df1), int(df2), n_total),
+        },
     )
 
 
@@ -143,6 +144,10 @@ def run_welch(groups: dict[str, np.ndarray], alpha: float = 0.05) -> AnalysisPla
         alpha=alpha,
         reason=reason,
         warnings=warnings,
+        effect_sizes={
+            "eta_squared": eta_squared(f_stat, int(df1), int(df2)),
+            "omega_squared": omega_squared(f_stat, int(df1), int(df2), n_total),
+        },
     )
 
 
@@ -177,4 +182,5 @@ def run_kruskal(groups: dict[str, np.ndarray], alpha: float = 0.05) -> AnalysisP
         alpha=alpha,
         reason=reason,
         warnings=warnings,
+        effect_sizes={"epsilon_squared": epsilon_squared(h_stat, k, n_total)},
     )

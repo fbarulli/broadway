@@ -363,7 +363,11 @@ def run_omnibus(
                 " report omega²."
             )
     elif method == "kruskal":
-        ramification += " Rank-based effect size deliberately not computed — epsilon² pending."
+        eps = plan.effect_sizes["epsilon_squared"]
+        ramification += (
+            f" rank-based ε² = {humanize_float(eps)}"
+            " (proportion of variance in ranks explained by group membership)."
+        )
     result_summary: dict[str, object] = {
         "method": method,
         "statistic": plan.statistics["statistic"],
@@ -374,7 +378,7 @@ def run_omnibus(
         result_summary["eta_squared"] = plan.effect_sizes["eta_squared"]
         result_summary["omega_squared"] = plan.effect_sizes["omega_squared"]
     else:
-        result_summary["effect_size"] = "not_computed"
+        result_summary["epsilon_squared"] = plan.effect_sizes["epsilon_squared"]
     return AnalysisStep(
         analysis=analysis.name,
         step_id="omnibus",
@@ -483,7 +487,7 @@ def run_conclusion(
             f"omega²={humanize_float(float(summary['omega_squared']))}"
         )
     else:
-        effect_size = "not computed (rank-based)"
+        effect_size = f"rank-based ε² = {humanize_float(float(summary['epsilon_squared']))}"
     significant_pairs = (
         int(posthoc_step.result_summary.get("significant_pairs", 0))
         if posthoc_step is not None
@@ -521,8 +525,8 @@ def run_conclusion(
     if method in ("anova", "welch") and "eta_squared" in summary and "omega_squared" in summary:
         result_summary["eta_squared"] = summary["eta_squared"]
         result_summary["omega_squared"] = summary["omega_squared"]
-    else:
-        result_summary["effect_size"] = "not_computed"
+    elif "epsilon_squared" in summary:
+        result_summary["epsilon_squared"] = float(summary["epsilon_squared"])
     return AnalysisStep(
         analysis=analysis.name,
         step_id="conclusion",

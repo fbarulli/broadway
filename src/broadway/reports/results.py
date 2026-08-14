@@ -93,6 +93,9 @@ def attrition_line(summary: dict) -> str:
 
 
 def effect_size_lines(summary: dict) -> list[str]:
+    if "epsilon_squared" in summary:
+        eps = humanize_float(float(summary["epsilon_squared"]))
+        return [f"rank-based ε² = {eps}: proportion of variance in ranks explained by group membership."]
     if summary.get("effect_size") == "not_computed":
         return ["Rank-based effect size deliberately not computed — epsilon² pending."]
     if "eta_squared" in summary and "omega_squared" in summary:

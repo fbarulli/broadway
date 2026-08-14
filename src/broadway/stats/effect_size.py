@@ -20,6 +20,13 @@ def omega_squared(f_stat: float, df1: int, df2: int, n_total: int) -> float:
     return numerator / denominator
 
 
+def epsilon_squared(h_stat: float, k: int, n: int) -> float:
+    if n <= k:
+        return 0.0
+    value = (h_stat - k + 1) / (n - k)
+    return float(max(0.0, min(1.0, value)))
+
+
 def cohens_d(a: np.ndarray, b: np.ndarray) -> float:
     a = np.asarray(a, dtype=float)
     b = np.asarray(b, dtype=float)

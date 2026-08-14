@@ -61,8 +61,9 @@ def test_run_kruskal_valid_plan() -> None:
     assert plan.passed is True
     assert "statistic" in plan.statistics
     assert "p_value" in plan.statistics
-    assert "eta_squared" in plan.effect_sizes
-    assert "omega_squared" in plan.effect_sizes
+    assert "epsilon_squared" in plan.effect_sizes
+    assert "eta_squared" not in plan.effect_sizes
+    assert "omega_squared" not in plan.effect_sizes
 
 
 def test_anova_empty_group_raises() -> None:

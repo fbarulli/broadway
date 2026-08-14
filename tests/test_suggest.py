@@ -178,6 +178,30 @@ def test_suggest_omnibus_passed_requests_posthoc() -> None:
     assert suggestion.headline == "Omnibus result is significant"
 
 
+def test_suggest_omnibus_kruskal_rationale_includes_epsilon_squared() -> None:
+    step = _step(
+        "omnibus",
+        StepStatus.COMPLETED,
+        {"method": "kruskal", "p_value": 0.001, "passed": True, "epsilon_squared": 0.1149},
+        order=5,
+    )
+    suggestion = suggest_after("omnibus", [step], [], _cfg(), "taxi")
+    assert suggestion is not None
+    assert any("rank-based ε²" in line for line in suggestion.rationale)
+
+
+def test_suggest_omnibus_welch_rationale_includes_eta_omega() -> None:
+    step = _step(
+        "omnibus",
+        StepStatus.COMPLETED,
+        {"method": "welch", "p_value": 0.001, "passed": True, "eta_squared": 0.5, "omega_squared": 0.4},
+        order=5,
+    )
+    suggestion = suggest_after("omnibus", [step], [], _cfg(), "taxi")
+    assert suggestion is not None
+    assert any("eta²" in line and "omega²" in line for line in suggestion.rationale)
+
+
 def test_suggest_next_frontier_before_anything() -> None:
     suggestion = suggest_next(load_walkthrough_sequence(), [], [], _cfg(), "taxi")
     assert suggestion is not None

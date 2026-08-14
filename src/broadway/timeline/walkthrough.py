@@ -103,8 +103,11 @@ def _handle_failure(
     print(f"fix and rerun: ds-pipeline walkthrough --analysis {analysis.name} --force")
 
 
-def _print_suggestion(suggestion: Suggestion) -> None:
-    lines = ["── Suggestion ──", suggestion.headline, f"Next: {suggestion.command}"]
+def _print_suggestion(suggestion: Suggestion, include_rationale: bool = False) -> None:
+    lines = ["── Suggestion ──", suggestion.headline]
+    if include_rationale:
+        lines.extend(suggestion.rationale)
+    lines.append(f"Next: {suggestion.command}")
     if suggestion.alternatives:
         lines.append("Alternatives:")
         for alt in suggestion.alternatives:
@@ -309,7 +312,7 @@ def run(cfg: PipelineConfig, sample: SampleSpec | None, force: bool) -> None:
             analysis.name,
         )
         if step_suggestion is not None:
-            _print_suggestion(step_suggestion)
+            _print_suggestion(step_suggestion, include_rationale=(step.id == "omnibus"))
 
     _warn_stale_decisions(analysis.name)
     _write_timeline(analysis, sequence, thresholds)

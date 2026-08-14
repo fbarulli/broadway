@@ -42,7 +42,7 @@ class AnalysisPlan(BaseModel):
     analysis_type: str             # "group_comparison" | "regression" | "timeseries"
     test_name: str                 # "one-way ANOVA", "Welch's ANOVA", ...
     statistics: dict[str, float]   # {"p_value": ..., "statistic": ..., ...}
-    effect_sizes: dict[str, float] # {"eta_squared": ..., "omega_squared": ...} | {"cohens_d": ..., "hedges_g": ...}
+    effect_sizes: dict[str, float] # {"eta_squared": ..., "omega_squared": ...} | {"epsilon_squared": ...} | {"cohens_d": ..., "hedges_g": ...}
     threshold_context: dict[str, float | bool]  # {"imbalance_ratio": ..., "any_small_group": ...}
     reason: list[str]              # human-readable evidence trail
     warnings: list[str]            # "underpowered", "n imbalance", ...
@@ -61,6 +61,8 @@ def load_plan(path: Path) -> AnalysisPlan
 ```python
 def eta_squared(f_stat: float, df1: int, df2: int) -> float
 def omega_squared(f_stat: float, df1: int, df2: int, n_total: int) -> float
+def epsilon_squared(h_stat: float, k: int, n: int) -> float
+    # rank-based ε² = (H - k + 1) / (N - k), clamped to [0, 1]
 def cohens_d(a: np.ndarray, b: np.ndarray) -> float
 def hedges_g(a: np.ndarray, b: np.ndarray) -> float
     # Cohen's d corrected for small sample bias; negligible for large n

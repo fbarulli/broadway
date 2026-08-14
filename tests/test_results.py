@@ -225,7 +225,28 @@ def test_render_results_index_and_pages() -> None:
     assert "omega²" in omnibus_page
 
 
-def test_render_results_kruskal_not_computed() -> None:
+def test_render_results_kruskal_epsilon_squared() -> None:
+    seq = load_walkthrough_sequence()
+    steps = [
+        _step(
+            step_id="omnibus",
+            order=5,
+            method="kruskal",
+            result_summary={
+                "method": "kruskal",
+                "statistic": 5.0,
+                "p_value": 0.02,
+                "passed": True,
+                "epsilon_squared": 0.1149,
+            },
+        )
+    ]
+    pages = render_results("taxi", seq, steps, [])
+    assert "rank-based ε²" in pages["principal-analysis.md"]
+    assert "proportion of variance in ranks" in pages["principal-analysis.md"]
+
+
+def test_render_results_kruskal_not_computed_backward_compat() -> None:
     seq = load_walkthrough_sequence()
     steps = [
         _step(
