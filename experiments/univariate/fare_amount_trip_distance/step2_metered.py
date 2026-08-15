@@ -56,11 +56,11 @@ def main() -> None:
     RESULTS.mkdir(parents=True, exist_ok=True)
     df = load_cleaned()
     metered, flat = split(df)
-    plot_split(metered, flat, RESULTS / "metered_vs_flat_scatter.png")
+    plot_split(metered, flat, RESULTS / "plot_split.png")
     print(f"cleaned rows: {len(df)}")
     print(f"metered (< ${METERED_CUTOFF:.0f}): {len(metered)}")
     print(f"flat (>= ${METERED_CUTOFF:.0f}): {len(flat)}")
-    print(f"wrote {RESULTS / 'metered_vs_flat_scatter.png'}")
+    print(f"wrote {RESULTS / 'plot_split.png'}")
 
 
 if __name__ == "__main__":
