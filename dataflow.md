@@ -110,6 +110,14 @@ The discover Q-Q/distribution figures downsample the input to a configured
 sample size (`qq_sample_size`, 10,000) once per figure and show a single
 `n = …` in the suptitle; discrete distributions use midpoint bin edges so bars
 center on the observed unique values (min/max auto-derived from the data).
+
+The features Q-Q also draws config-driven **diagnostic zones** (`qq_zones` in
+`configs/step/viz.yaml`): shaded tail bands and a central quantile band plus a
+dashed zero-mass shelf. These are **visual references only** — they carry no
+statistical verdict and are not part of any normality decision; the groups Q-Q
+draws none of them. The shelf is keyed off `QqFeature.zero_rate`, the fraction
+of zeros in the **downsampled plotted sample** (`finite`), so it reflects the
+points actually shown, not the full column.
 Suggestions are de-prescribed: `suggest.py` emits
 `ds-pipeline decide --analysis <a> --method <method> --reason "..."` (never a
 pre-filled method) and adds `--kind posthoc` at the post-hoc gate.

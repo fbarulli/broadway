@@ -8,6 +8,19 @@ from pydantic import BaseModel, ConfigDict
 from broadway.config import loader
 
 
+class QqZonesConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool
+    central_quantiles: list[float]
+    tail_threshold: float
+    zero_mass_threshold: float
+    central_alpha: float
+    tail_alpha: float
+    zone_color: str
+    shelf_color: str
+
+
 class VizConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -23,6 +36,7 @@ class VizConfig(BaseModel):
     dist_figure: str
     describe_figure: str
     normality_figure: str
+    qq_zones: QqZonesConfig
 
 
 def load_viz_config() -> VizConfig:

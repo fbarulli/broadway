@@ -7,11 +7,12 @@ import numpy as np
 import pandas as pd
 import pytest
 import yaml
+from pydantic import ValidationError
 
 from broadway import viz
 import broadway.discover.module as discover_module
 from broadway.config.loader import load_config
-from broadway.config.viz import load_viz_config
+from broadway.config.viz import QqZonesConfig, load_viz_config
 from broadway.discover.profile import ColumnProfile, DatasetProfile
 from broadway.discover.qq import (
     QqFeature,
@@ -527,12 +528,100 @@ def test_qq_subplot_titles_are_feature_names_only(tmp_path, monkeypatch) -> None
     captured: list = []
     monkeypatch.setattr(qq_module.plt, "close", lambda fig: captured.append(fig))
     traces = [
-        ("my_feature", np.array([-1.0, 0.0, 1.0]), np.array([-1.0, 0.0, 1.0]), 1.0, 0.0)
+        ("my_feature", np.array([-1.0, 0.0, 1.0]), np.array([-1.0, 0.0, 1.0]), 1.0, 0.0, 0.05)
     ]
-    _plot_chunk(traces, tmp_path / "qq_titles.png", 1, 1, 3.0, 100, "BuPu_r", 10000)
+    _plot_chunk(
+        traces, tmp_path / "qq_titles.png", 1, 1, 3.0, 100, "BuPu_r", 10000,
+        load_viz_config().qq_zones,
+    )
     titles = [ax.get_title() for ax in captured[-1].axes]
     assert "my_feature" in titles
     assert not any("(n=" in t for t in titles)
+
+
+def test_qq_zones_config_loaded() -> None:
+    zones = load_viz_config().qq_zones
+    assert zones.enabled is True
+    assert zones.central_quantiles == [0.25, 0.75]
+    assert zones.tail_threshold == 1.96
+    assert zones.zero_mass_threshold == 0.05
+    assert zones.central_alpha == 0.08
+    assert zones.tail_alpha == 0.04
+    assert zones.shelf_color == "#d62728"
+    with pytest.raises(ValidationError):
+        QqZonesConfig(
+            enabled=True,
+            central_quantiles=[0.25, 0.75],
+            tail_threshold=1.96,
+            zero_mass_threshold=0.05,
+            central_alpha=0.08,
+            tail_alpha=0.04,
+            zone_color="#999999",
+            shelf_color="#d62728",
+            unknown_key="nope",
+        )
+
+
+def test_qq_zones_disabled(tmp_path, monkeypatch) -> None:
+    import broadway.discover.qq as qq_module
+
+    captured: list = []
+    monkeypatch.setattr(qq_module.plt, "close", lambda fig: captured.append(fig))
+    zones = load_viz_config().qq_zones.model_copy(update={"enabled": False})
+    traces = [
+        ("f", np.array([-1.0, 0.0, 1.0]), np.array([-1.0, 0.0, 1.0]), 1.0, 0.0, 0.05)
+    ]
+    _plot_chunk(traces, tmp_path / "zones_off.png", 1, 1, 3.0, 100, "BuPu_r", 10000, zones)
+    ax = captured[-1].axes[0]
+    assert len(ax.patches) == 0
+    assert len(ax.lines) == 1
+
+
+def test_qq_zero_mass_shelf_drawn(tmp_path, monkeypatch) -> None:
+    import broadway.discover.qq as qq_module
+
+    zones = load_viz_config().qq_zones
+    trace_high = ("f", np.array([-1.0, 0.0, 1.0]), np.array([-1.0, 0.0, 1.0]), 1.0, 0.0, 0.5)
+    trace_low = ("f", np.array([-1.0, 0.0, 1.0]), np.array([-1.0, 0.0, 1.0]), 1.0, 0.0, 0.01)
+
+    captured: list = []
+    monkeypatch.setattr(qq_module.plt, "close", lambda fig: captured.append(fig))
+    _plot_chunk([trace_high], tmp_path / "shelf_on.png", 1, 1, 3.0, 100, "BuPu_r", 10000, zones)
+    ax = captured[-1].axes[0]
+    assert len(ax.lines) == 2
+    assert any(l.get_color() == zones.shelf_color for l in ax.lines)
+
+    _plot_chunk([trace_low], tmp_path / "shelf_off.png", 1, 1, 3.0, 100, "BuPu_r", 10000, zones)
+    ax = captured[-1].axes[0]
+    assert len(ax.lines) == 1
+
+
+def test_qq_zero_mass_shelf_backward_compat(tmp_path, monkeypatch) -> None:
+    import broadway.discover.qq as qq_module
+
+    captured: list = []
+    monkeypatch.setattr(qq_module.plt, "close", lambda fig: captured.append(fig))
+    zones = load_viz_config().qq_zones
+    traces = [
+        ("f", np.array([-1.0, 0.0, 1.0]), np.array([-1.0, 0.0, 1.0]), 1.0, 0.0, None)
+    ]
+    _plot_chunk(traces, tmp_path / "shelf_none.png", 1, 1, 3.0, 100, "BuPu_r", 10000, zones)
+    ax = captured[-1].axes[0]
+    assert len(ax.lines) == 1
+
+
+def test_qq_zones_not_on_joint(tmp_path, monkeypatch) -> None:
+    import broadway.timeline.runners as runners_module
+
+    rng = np.random.default_rng(0)
+    groups = {g: rng.normal(float(i), 1.0, 30) for i, g in enumerate(["A", "B", "C"])}
+    captured: list = []
+    monkeypatch.setattr(runners_module.plt, "close", lambda fig: captured.append(fig))
+    runners._plot_qq_joint(groups, tmp_path / "joint.png")
+    fig = captured[-1]
+    for ax in fig.axes:
+        assert len(ax.patches) == 0
+        assert len(ax.lines) == (1 if ax.get_visible() else 0)
 
 
 def test_dist_subplot_titles_are_feature_names_only(tmp_path, monkeypatch) -> None:

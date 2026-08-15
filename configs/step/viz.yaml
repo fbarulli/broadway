@@ -10,3 +10,12 @@ qq_figure: numeric_qq_{fig_num}.png
 dist_figure: numeric_dist_{fig_num}.png
 describe_figure: describe.png
 normality_figure: normality_qq.png
+qq_zones:
+  enabled: true
+  central_quantiles: [0.25, 0.75]
+  tail_threshold: 1.96
+  zero_mass_threshold: 0.05
+  central_alpha: 0.08
+  tail_alpha: 0.04
+  zone_color: "#999999"
+  shelf_color: "#d62728"

@@ -24,7 +24,7 @@ from pydantic import BaseModel, ConfigDict
 from scipy import stats
 
 from broadway import viz
-from broadway.config.viz import load_viz_config
+from broadway.config.viz import QqZonesConfig, load_viz_config
 
 
 class QqFeature(BaseModel):
@@ -38,6 +38,7 @@ class QqFeature(BaseModel):
     reason: str | None
     figure: str
     dist_figure: str = ""
+    zero_rate: float | None = None
 
 
 class QqOverview(BaseModel):
@@ -106,7 +107,7 @@ def _grid_dims(n: int) -> tuple[int, int]:
 
 
 def _plot_chunk(
-    traces: list[tuple[str, np.ndarray, np.ndarray, float, float]],
+    traces: list[tuple[str, np.ndarray, np.ndarray, float, float, float | None]],
     out_path: Path,
     fig_num: int,
     n_figs: int,
@@ -114,6 +115,7 @@ def _plot_chunk(
     dpi: int,
     palette: str,
     n_rows: int,
+    zones: QqZonesConfig,
 ) -> None:
     n = len(traces)
     grid_rows, grid_cols = _grid_dims(n)
@@ -125,21 +127,48 @@ def _plot_chunk(
         layout="constrained",
     )
     ax_flat = axes.ravel()
-    for color, ax, (name, osm, osr, slope, intercept) in zip(colors, ax_flat, traces):
+    for color, ax, (name, osm, osr, slope, intercept, zero_rate) in zip(colors, ax_flat, traces):
         ax.scatter(
             osm, osr,
             s=viz.QQ_SCATTER_SIZE,
             alpha=viz.QQ_SCATTER_ALPHA,
             edgecolor=viz.QQ_SCATTER_EDGE_COLOR,
             color=color,
+            zorder=3,
         )
+        xmin, xmax = ax.get_xlim()
+        ymin, ymax = ax.get_ylim()
         xs = np.array([osm.min(), osm.max()])
         ax.plot(
             xs, slope * xs + intercept,
             color=viz.QQ_REF_LINE_COLOR,
             linestyle=viz.QQ_REF_LINE_STYLE,
             linewidth=viz.QQ_REF_LINE_WIDTH,
+            zorder=2,
         )
+        if zones.enabled:
+            ax.axvspan(
+                xmin, -zones.tail_threshold,
+                color=zones.zone_color, alpha=zones.tail_alpha, zorder=0,
+            )
+            ax.axvspan(
+                zones.tail_threshold, xmax,
+                color=zones.zone_color, alpha=zones.tail_alpha, zorder=0,
+            )
+            ax.axvspan(
+                stats.norm.ppf(zones.central_quantiles[0]),
+                stats.norm.ppf(zones.central_quantiles[1]),
+                color=zones.zone_color, alpha=zones.central_alpha, zorder=0,
+            )
+            if (
+                zero_rate is not None
+                and zero_rate > zones.zero_mass_threshold
+                and ymin <= 0 <= ymax
+            ):
+                ax.axhline(
+                    y=0, color=zones.shelf_color,
+                    linestyle="--", linewidth=1, alpha=0.7, zorder=2,
+                )
         ax.set_xlabel(viz.QQ_XLABEL, fontsize=viz.LABEL_FONTSIZE)
         ax.set_ylabel(viz.QQ_YLABEL, fontsize=viz.LABEL_FONTSIZE)
         ax.set_title(name, fontsize=viz.TITLE_FONTSIZE)
@@ -235,7 +264,7 @@ def plot_numeric_qq(
         random_state = cfg.qq_random_state
 
     features: list[QqFeature] = []
-    traces: dict[str, tuple[np.ndarray, np.ndarray, float, float]] = {}
+    traces: dict[str, tuple[np.ndarray, np.ndarray, float, float, float | None]] = {}
     hists: dict[str, tuple[np.ndarray, np.ndarray]] = {}
     excluded_notes: list[str] = []
     flagged_id_columns: list[str] = []
@@ -258,6 +287,7 @@ def plot_numeric_qq(
 
         arr = pd.to_numeric(df[name], errors="coerce").to_numpy(dtype=float)
         finite = arr[np.isfinite(arr)]
+        zero_rate = float((finite == 0).mean())
         n_valid = int(finite.size)
         n_excluded = int(arr.size) - n_valid
 
@@ -270,6 +300,7 @@ def plot_numeric_qq(
             features.append(QqFeature(
                 feature=name, n_valid=n_valid, n_excluded=n_excluded,
                 mean=None, std=None, status="excluded", reason=reason, figure="",
+                zero_rate=zero_rate,
             ))
             continue
 
@@ -279,7 +310,7 @@ def plot_numeric_qq(
             features.append(QqFeature(
                 feature=name, n_valid=n_valid, n_excluded=n_excluded,
                 mean=float(finite.mean()), std=0.0, status="excluded",
-                reason="zero variance", figure="",
+                reason="zero variance", figure="", zero_rate=zero_rate,
             ))
             continue
 
@@ -292,17 +323,18 @@ def plot_numeric_qq(
                 feature=name, n_valid=n_valid, n_excluded=n_excluded,
                 mean=mean_val, std=std_val, status="discrete",
                 reason=f"discrete ({n_unique} unique values)", figure="",
+                zero_rate=zero_rate,
             ))
             continue
 
         osm, osr, slope, intercept = _qq_points(finite, max_points_per_trace)
-        traces[name] = (osm, osr, slope, intercept)
+        traces[name] = (osm, osr, slope, intercept, zero_rate)
         counts, edges = np.histogram(finite, bins="auto")
         hists[name] = (counts, edges)
         features.append(QqFeature(
             feature=name, n_valid=n_valid, n_excluded=n_excluded,
             mean=mean_val, std=std_val, status="plotted",
-            reason=None, figure="",
+            reason=None, figure="", zero_rate=zero_rate,
         ))
 
     figures_dir.mkdir(parents=True, exist_ok=True)
@@ -331,6 +363,7 @@ def plot_numeric_qq(
             [(n, *traces[n]) for n in chunk],
             figures_dir / basename,
             fig_num, len(qq_chunks), fig_size_per_subplot, dpi, palette, n_rows,
+            cfg.qq_zones,
         )
         for n in chunk:
             i = name_to_idx[n]

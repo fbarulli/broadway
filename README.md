@@ -205,7 +205,11 @@ diverge in layout:
   z-score) plus a matching per-feature **distribution (histogram) grid in raw
   units** — because 7+ features don't read overlaid. Non-finite and zero-variance
   features are recorded, not plotted; the grid chunks beyond 12 features per
-  figure.
+  figure. Config-driven **diagnostic zones** (`qq_zones` in
+  `configs/step/viz.yaml`) shade the left/right tails (beyond a z-score
+  threshold) and the central quantile band as read-only visual references, and
+  draw a dashed "zero-mass shelf" on features where a notable fraction of the
+  plotted sample is exactly zero.
 - **Groups Q-Q** (`src/broadway/timeline/runners.py::run_normality`) uses a
   **single overlaid figure**, one trace per group, per-group z-score — because
   ~5 groups read fine overlaid (capped at 12 groups).

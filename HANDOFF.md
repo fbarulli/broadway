@@ -21,7 +21,7 @@ Single-owner surfaces (each has exactly one writer-of-record):
 Guardrail: `tests/test_surface_integrity.py` enforces (a) every relative markdown link in tracked reports/docs resolves, and (b) size caps — **5 MB HTML / 2 MB PNG**. Keep this test meaningful; don't raise caps to pass it.
 
 ## The two Q-Q surfaces (converged on small multiples — documented, not drift)
-- **Features Q-Q** — from `discover`/`profile`, rendered on `reports/audit/profile.md` under "Profile evidence". **Small multiples**: one subplot per numeric feature, adaptive grid, figure scales to fill the screen. Built in `src/broadway/discover/qq.py`.
+- **Features Q-Q** — from `discover`/`profile`, rendered on `reports/audit/profile.md` under "Profile evidence". **Small multiples**: one subplot per numeric feature, adaptive grid, figure scales to fill the screen. Built in `src/broadway/discover/qq.py`. Draws config-driven diagnostic zones (`qq_zones` in `configs/step/viz.yaml`: tail bands, central band, zero-mass shelf) as visual references only — the groups Q-Q draws none.
 - **Groups Q-Q** — from the walkthrough normality step, on the timeline/results. **Small multiples (one subplot per group)**, a deliberate convergence for consistency (made in commit `00e0234`).
 
 Rationale to preserve: 7+ features don't read overlaid (→ small multiples); the groups plot now converges on the same small-multiples layout so both Q-Q surfaces render consistently. If either surface ever stops reading well, record the reason before diverging again.
