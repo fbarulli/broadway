@@ -76,7 +76,7 @@ Three roles:
 
 - **Tests:** synthetic data, no taxi coupling in platform tests. No pixel assertions for figures — test structure (counts, zorder, presence). Backward-compat tests for old evidence.
 - **Visuals:** restraint. Don't overwhelm the figure. Every visual layer behind a config toggle. Captions are fixed prose in code; numeric values derived from config.
-- **Experiments:** scripts live under `experiments/<category>/<name>/` (committed); outputs live under gitignored `experiments/results/<category>/<name>/`. Script names follow `[dataset]_[operation]_[output].py` (number-prefixed, e.g. `01_taxi_clean_scatter.py`, to preserve order; plots share the script name). Experiment plumbing stays out of production `src/`.
+- **Experiments:** scripts live under `experiments/<category>/<name>/` (committed); outputs live under gitignored `experiments/results/<category>/<name>/`. Script names are descriptive and number-prefixed for order (e.g. `01_filtered_min_max_scatter.py`); plots share the script name. Experiment plumbing stays out of production `src/`.
 - **Docs:** live with the code. A renamed/moved/retired surface without a doc update is a bug in the same commit.
 
 ## What we refuse

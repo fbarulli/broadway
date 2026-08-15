@@ -26,7 +26,7 @@ MAX_DISTANCE = 50.0
 
 def clean(df: pd.DataFrame) -> pd.DataFrame:
     return df[
-        (df["fare_amount"] > MIN_FARE)
+          (df["fare_amount"] > MIN_FARE)
         & (df["trip_distance"] > MIN_DISTANCE)
         & (df["trip_distance"] <= MAX_DISTANCE)
     ]
@@ -58,12 +58,12 @@ def main() -> None:
     )
     cleaned = clean(raw)
     cleaned.to_parquet(RESULTS / "sample_clean.parquet")
-    scatter(cleaned, RESULTS / "01_taxi_clean_scatter.png")
+    scatter(cleaned, RESULTS / "01_filtered_min_max_scatter.png")
     print(f"random sample rows: {len(raw)}")
     print(f"rows after filter: {len(cleaned)}")
     print(f"rows removed: {len(raw) - len(cleaned)}")
     print(f"wrote {RESULTS / 'sample_clean.parquet'}")
-    print(f"wrote {RESULTS / '01_taxi_clean_scatter.png'}")
+    print(f"wrote {RESULTS / '01_filtered_min_max_scatter.png'}")
 
 
 if __name__ == "__main__":
