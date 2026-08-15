@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pandas as pd
+import polars as pl
 
 from broadway.config.schema import DatasetContract, EnvironmentConfig
 from broadway.data.join_audit import JoinAudit, audit_join
@@ -58,3 +59,29 @@ def load_with_audit(dataset: DatasetContract) -> tuple[pd.DataFrame, list[JoinAu
             )
         )
     return df, audits, value_audits
+
+
+def read_sample(
+    dataset: DatasetContract,
+    sample: int | None = None,
+    seed: int | None = None,
+    columns: list[str] | None = None,
+    *,
+    full: bool = False,
+) -> pd.DataFrame:
+    """Seeded random sample of ``dataset.path`` via a lazy scan.
+
+    Draws directly from the dataset's raw parquet — NOT the dev/live mode
+    caches. Optional ``columns`` prunes to those columns only. ``sample=None``
+    requires ``full=True`` (loading the full dataset is deliberate). ``seed`` is
+    passed through unchanged; callers own reproducibility.
+    """
+    if sample is None and not full:
+        raise ValueError("pass sample=<n>, or full=True to load the full dataset")
+    lf = pl.scan_parquet(dataset.path)
+    if columns:
+        lf = lf.select(columns)
+    df = lf.collect()
+    if sample is not None:
+        df = df.sample(n=sample, seed=seed)
+    return df.to_pandas()

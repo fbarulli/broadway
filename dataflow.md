@@ -413,6 +413,8 @@ Analysis intent is authored separately via `configs/analysis/<name>.yaml` → `A
 - `DatasetContract` is the accepted schema (authored/authoritative); `DatasetProfile` / `ColumnProfile` describe observed facts computed at discover time. `identifier_score` is purely descriptive — discover only logs a recommendation, it never mutates roles or the contract.
 - `DatasetContract` carries no `row_count` — observed counts live in `DatasetProfile` (discover) and `TransformAudit` (etl lineage). Datetime dtypes are normalized to canonical `datetime64` (`schema.py::normalize_dtype`).
 - Lookup ingestion reads lookups with `keep_default_na=False` plus a per-lookup `na_values` policy, so nulls are attributable to the authored config. `JoinAudit` measures key completeness, while `LookupValueAudit` measures matched-value quality and records the `na_values` evidence.
+- `broadway/data/loader.py::read_sample(dataset, sample, seed, columns, *, full)` is a seeded random draw of the dataset's raw parquet (lazy scan → optional column pruning → sample) — a fast experiment path that is NOT `DATA_MODE`-aware; the caller supplies `seed`. `project/data.py::read_training_sample` wraps it with the taxi `_contract` and `RANDOM_STATE`.
+- Experiment layout: scripts live under `experiments/<category>/<name>/`, outputs under the gitignored `experiments/results/<category>/<name>/`. Root-level `experiment_*.py` / `*_experiment/` dirs predating this convention are grandfathered (forward-only).
 
 ## Mode enforcement
 

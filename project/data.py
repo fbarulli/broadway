@@ -23,6 +23,7 @@ from broadway.config.schema import (
     TrainStep,
 )
 from broadway.contracts.pandera import build_raw_schema
+from broadway.data import loader as _loader
 from broadway.stats.effect_size import group_imbalance
 
 logger = logging.getLogger(__name__)
@@ -160,6 +161,18 @@ def read_training_data(
 ) -> pd.DataFrame:
     raw = pd.read_parquet(DATA_PATH, columns=columns, filters=filters)
     return build_raw_schema(_contract).validate(raw)
+
+
+def read_training_sample(
+    sample: int | None = None,
+    seed: int | None = RANDOM_STATE,
+    columns: list[str] | None = None,
+    *,
+    full: bool = False,
+) -> pd.DataFrame:
+    return _loader.read_sample(
+        _contract, sample=sample, seed=seed, columns=columns, full=full
+    )
 
 
 def load_boroughs_pandas() -> pd.DataFrame:
