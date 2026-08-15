@@ -19,8 +19,10 @@ def load_cleaned() -> pd.DataFrame:
 
 
 def plot_histogram(df: pd.DataFrame, out_path: Path) -> None:
+    values = df["fare_amount"]
     fig, ax = plt.subplots(figsize=(9, 6))
-    ax.hist(df["fare_amount"], bins=60, edgecolor="white", linewidth=0.5)
+    ax.hist(values, bins=60, edgecolor="white", linewidth=0.5)
+    ax.set_xlim(float(values.min()), float(values.max()))
     ax.set_xlabel("fare_amount ($)")
     ax.set_ylabel("count")
     ax.set_title("fare_amount histogram (cleaned)")
