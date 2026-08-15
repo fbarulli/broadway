@@ -19,3 +19,7 @@ qq_zones:
   tail_alpha: 0.04
   zone_color: "#999999"
   shelf_color: "#d62728"
+diagnostics:
+  colormap: coolwarm
+  figure: numeric_diagnostics.png
+  annotate: true

@@ -21,6 +21,14 @@ class QqZonesConfig(BaseModel):
     shelf_color: str
 
 
+class DiagnosticsConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    colormap: str
+    figure: str
+    annotate: bool
+
+
 class VizConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -37,6 +45,7 @@ class VizConfig(BaseModel):
     describe_figure: str
     normality_figure: str
     qq_zones: QqZonesConfig
+    diagnostics: DiagnosticsConfig
 
 
 def load_viz_config() -> VizConfig:

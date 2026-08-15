@@ -118,6 +118,15 @@ statistical verdict and are not part of any normality decision; the groups Q-Q
 draws none of them. The shelf is keyed off `QqFeature.zero_rate`, the fraction
 of zeros in the **downsampled plotted sample** (`finite`), so it reflects the
 points actually shown, not the full column.
+
+The profile surface also carries a **per-feature distribution diagnostics**
+surface (`diagnostics` in `configs/step/viz.yaml`): a single heatmap
+(`numeric_diagnostics.png`) over the `[skew, kurtosis, zero_rate]` columns,
+z-normalized per column (cell text is the raw value), plus a matching
+`mean`/`std`/`skew`/`kurtosis`/`zero_rate` table on `reports/audit/profile.md`.
+Skew/kurtosis are computed on the same downsampled `finite` sample as
+`zero_rate`/`mean`/`std`; the surface is a visual reference only and carries no
+statistical verdict or threshold.
 Suggestions are de-prescribed: `suggest.py` emits
 `ds-pipeline decide --analysis <a> --method <method> --reason "..."` (never a
 pre-filled method) and adds `--kind posthoc` at the post-hoc gate.

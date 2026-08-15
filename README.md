@@ -150,7 +150,7 @@ reports/
   figures/*.png       # charts rendered from per-step FigureRef (path + one-line "How to read" caption)
   audit/              # human-readable data readiness (owned by audit; on-demand, typed renderers)
     index.md          # data used, status, what changed, enrichment quality, caveats
-    profile.md        # observed column facts (dtypes, nulls, cardinality, identifiers) + "Profile evidence" (feature Q-Q + distribution grids)
+    profile.md        # observed column facts (dtypes, nulls, cardinality, identifiers) + "Profile evidence" (feature Q-Q + distribution grids + per-feature distribution diagnostics table/heatmap)
     transform.md      # structural canonicalization: row transitions + parse failures
     join.md           # lookup key-matching completeness
     lookup_values.md  # matched-value quality (nulls/sentinels per enrichment column)
@@ -218,6 +218,11 @@ The `audit` profile page renders both feature grids in a "Profile evidence"
 section on `reports/audit/profile.md`, from the `QqOverview` record
 (`artifacts/discover/qq_overview.json`), with how-to-read lines and
 standardization notes (Q-Q = per-feature z-score, distribution = raw units).
+Alongside the two grids it renders a **per-feature distribution diagnostics**
+surface: a `mean`/`std`/`skew`/`kurtosis`/`zero_rate` table and a single
+heatmap (`numeric_diagnostics.png`) whose columns are `[skew, kurtosis,
+zero_rate]` z-normalized per column, with the raw value annotated in each cell.
+This is a visual reference only — no statistical verdicts or thresholds.
 
 The discover Q-Q/distribution figures downsample the input to a configured
 sample size (`qq_sample_size`, 10,000) computed once per figure and show a

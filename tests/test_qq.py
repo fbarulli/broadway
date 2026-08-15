@@ -8,6 +8,7 @@ import pandas as pd
 import pytest
 import yaml
 from pydantic import ValidationError
+from scipy import stats
 
 from broadway import viz
 import broadway.discover.module as discover_module
@@ -178,10 +179,12 @@ def test_plot_numeric_qq_excludes_and_splits(tmp_path) -> None:
         "figures/numeric_dist_1.png",
         "figures/numeric_dist_2.png",
     ]
+    assert overview.diagnostics_figures == ["figures/numeric_diagnostics.png"]
     assert (figures_dir / "numeric_qq_1.png").exists()
     assert (figures_dir / "numeric_qq_2.png").exists()
     assert (figures_dir / "numeric_dist_1.png").exists()
     assert (figures_dir / "numeric_dist_2.png").exists()
+    assert (figures_dir / "numeric_diagnostics.png").exists()
 
     by_figure: dict[str, list[str]] = {}
     dist_by_figure: dict[str, list[str]] = {}
@@ -205,10 +208,13 @@ def test_plot_numeric_qq_excludes_and_splits(tmp_path) -> None:
     assert f0.n_excluded == 0
     assert f0.mean == pytest.approx(float(np.mean(vals)))
     assert f0.std == pytest.approx(float(np.std(vals)))
+    assert f0.skew == pytest.approx(float(stats.skew(vals)))
+    assert f0.kurtosis == pytest.approx(float(stats.kurtosis(vals)))
 
     for f in overview.features:
         if f.status == "plotted":
             assert f.figure and f.dist_figure
+            assert f.skew is not None and f.kurtosis is not None
 
     excluded = {f.feature for f in overview.features if f.figure == ""}
     assert excluded == {"allnan", "const"}
@@ -216,6 +222,7 @@ def test_plot_numeric_qq_excludes_and_splits(tmp_path) -> None:
     reloaded = QqOverview.model_validate_json(evidence_path.read_text())
     assert reloaded.figures == overview.figures
     assert reloaded.dist_figures == overview.dist_figures
+    assert reloaded.diagnostics_figures == overview.diagnostics_figures
 
 
 def test_plot_numeric_qq_boundary_no_overflow(tmp_path) -> None:
@@ -436,11 +443,13 @@ def test_render_profile_includes_qq_evidence() -> None:
                 feature="a", n_valid=4, n_excluded=0, mean=2.5, std=1.0,
                 status="plotted", reason=None, figure="figures/numeric_qq_1.png",
                 dist_figure="figures/numeric_dist_1.png",
+                zero_rate=0.125, skew=0.5, kurtosis=-0.25,
             ),
             QqFeature(
                 feature="b", n_valid=4, n_excluded=0, mean=2.5, std=1.0,
                 status="plotted", reason=None, figure="figures/numeric_qq_1.png",
                 dist_figure="figures/numeric_dist_1.png",
+                zero_rate=0.0, skew=-0.5, kurtosis=0.75,
             ),
             QqFeature(
                 feature="const", n_valid=4, n_excluded=0, mean=5.0, std=0.0,
@@ -450,10 +459,12 @@ def test_render_profile_includes_qq_evidence() -> None:
                 feature="disc", n_valid=4, n_excluded=0, mean=1.5, std=0.5,
                 status="discrete", reason="discrete (3 unique values)", figure="",
                 dist_figure="figures/numeric_dist_1.png",
+                zero_rate=0.333, skew=0.0, kurtosis=-1.2,
             ),
         ],
         figures=["figures/numeric_qq_1.png"],
         dist_figures=["figures/numeric_dist_1.png"],
+        diagnostics_figures=["figures/numeric_diagnostics.png"],
         sample_size=10000,
     )
     md = audit.render_profile(_profile(), source="artifacts/discover/profile.json", qq=qq)
@@ -468,6 +479,13 @@ def test_render_profile_includes_qq_evidence() -> None:
     assert "How to read (Q-Q)" in md
     assert "fitted reference line" in md
     assert "How to read (distribution)" in md
+    assert "### Distribution diagnostics" in md
+    assert "| Variable | mean | std | skew | kurtosis | zero_rate |" in md
+    assert "| a | 2.5 | 1 | 0.5 | -0.25 | 0.125 |" in md
+    assert "| b | 2.5 | 1 | -0.5 | 0.75 | 0.000 |" in md
+    assert "| disc | 1.5 | 0.5 | 0 | -1.2 | 0.333 |" in md
+    assert "![Per-feature distribution diagnostics — figure 1 of 1](../figures/numeric_diagnostics.png)" in md
+    assert "How to read (diagnostics)" in md
     assert "- const: zero variance" in md
     assert "- disc: discrete (3 unique values)" in md
     assert "- foo_id: name suggests an identifier" in md
@@ -475,6 +493,34 @@ def test_render_profile_includes_qq_evidence() -> None:
     assert "![a, b]" not in md
     assert "{" not in md
     assert "}" not in md
+
+
+def test_render_profile_diagnostics_absent_without_figures() -> None:
+    qq = QqOverview(
+        source_path="data/raw/taxi.csv",
+        total_features=1,
+        plotted_features=1,
+        excluded_features=0,
+        discrete_features=0,
+        non_numeric_columns=[],
+        flagged_id_columns=[],
+        excluded_notes=[],
+        features=[
+            QqFeature(
+                feature="a", n_valid=4, n_excluded=0, mean=2.5, std=1.0,
+                status="plotted", reason=None, figure="figures/numeric_qq_1.png",
+                dist_figure="figures/numeric_dist_1.png",
+                zero_rate=0.125, skew=0.5, kurtosis=-0.25,
+            ),
+        ],
+        figures=["figures/numeric_qq_1.png"],
+        dist_figures=["figures/numeric_dist_1.png"],
+        diagnostics_figures=[],
+    )
+    md = audit.render_profile(_profile(), source="artifacts/discover/profile.json", qq=qq)
+    assert "### Distribution diagnostics" in md
+    assert "![Per-feature distribution diagnostics" not in md
+    assert "How to read (diagnostics)" not in md
 
 
 def test_render_profile_without_qq_has_no_evidence_section() -> None:

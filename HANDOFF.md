@@ -47,6 +47,7 @@ Rationale to preserve: 7+ features don't read overlaid (→ small multiples); th
 9. **Q-Q min/max automation** `2cdc7d7` — features Q-Q independent axes + probplot fit line; groups Q-Q y=x diagonal data-derived.
 10. **Groups Q-Q → small multiples** `00e0234`.
 11. **W1 config + critical fixes** `17153d3` — `configs/step/viz.yaml` + `max_qq_groups`; stats thresholds → params; fixed run_variance (shapiro_alpha→significance_alpha) and run_omnibus (ignored alpha); zero-variance guard; shared plot styling; describe combine (single describe.png); retired legacy `stats describe` output.
+12. **Per-feature distribution diagnostics** — `QqFeature`/`QqOverview` gain optional `skew`/`kurtosis`/`diagnostics_figures`; `DiagnosticsConfig` (`diagnostics` block in `configs/step/viz.yaml`); `_plot_diagnostics_heatmap` renders a single `numeric_diagnostics.png` (per-column z-score over `[skew, kurtosis, zero_rate]`, raw values annotated); `audit.py` renders a `mean`/`std`/`skew`/`kurtosis`/`zero_rate` table + the heatmap on `reports/audit/profile.md`. Visual reference only — no verdicts/thresholds.
 
 ## Current CLI usage
 ```

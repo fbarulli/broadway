@@ -43,6 +43,24 @@ In this figure: passenger_count, trip_distance, total_amount, tip_amount, airpor
 
 How to read (distribution): actual spread and skew in original units; look for heavy tails, multimodality, and gaps.
 
+### Distribution diagnostics
+
+| Variable | mean | std | skew | kurtosis | zero_rate |
+| --- | --- | --- | --- | --- | --- |
+| passenger_count | 1.35 | 0.832 | 3.17 | 11.2 | 0.000 |
+| trip_distance | 3.31 | 4.35 | 2.82 | 9.04 | 0.000 |
+| total_amount | 27 | 22.5 | 2.71 | 21.8 | 0.000 |
+| tip_amount | 3.47 | 5.62 | 42.4 | 3.1e+03 | 0.218 |
+| airport_fee | 0.139 | 0.486 | 2.83 | 7.3 | 0.917 |
+| trip_duration_minutes | 15.5 | 12.6 | 2.51 | 10.6 | 0.000 |
+
+![Per-feature distribution diagnostics — figure 1 of 1](../figures/numeric_diagnostics.png)
+
+In this figure: passenger_count, trip_distance, total_amount, tip_amount, airport_fee, trip_duration_minutes. Chunk 1 of 1; the trailing `_1` in the filename is the chunk number.
+
+How to read (diagnostics): colors are per-column z-scores; cell text is the raw value.
+
+
 Notes:
 - pickup_location_id: declared id
 - dropoff_location_id: declared id

@@ -33,6 +33,10 @@ def _fmt(value: str | None) -> str:
     return "-" if value is None else str(value)
 
 
+def _sig3(x: float | None) -> str:
+    return "-" if x is None else f"{x:.3g}"
+
+
 def _incomplete_answer(source: str) -> str:
     return f"{INCOMPLETE} — artifact not found: {source or 'unknown'}"
 
@@ -101,6 +105,15 @@ def _render_profile_evidence(qq: QqOverview | None) -> list[tuple[str, str]]:
             qq_by_figure.setdefault(feature.figure, []).append(feature.feature)
         if feature.dist_figure:
             dist_by_figure.setdefault(feature.dist_figure, []).append(feature.feature)
+    diag_names = [
+        f.feature
+        for f in qq.features
+        if f.status in ("plotted", "discrete")
+        and f.skew is not None
+        and f.kurtosis is not None
+        and f.zero_rate is not None
+    ]
+    diag_by_figure = {figure: diag_names for figure in qq.diagnostics_figures}
 
     lines: list[str] = []
     if qq.figures:
@@ -122,6 +135,31 @@ def _render_profile_evidence(qq: QqOverview | None) -> list[tuple[str, str]]:
             "How to read (distribution): actual spread and skew in original units; "
             "look for heavy tails, multimodality, and gaps."
         )
+        lines.append("")
+
+    diag_features = [f for f in qq.features if f.status in ("plotted", "discrete")]
+    if diag_features:
+        lines.append("### Distribution diagnostics")
+        lines.append("")
+        lines.append("| Variable | mean | std | skew | kurtosis | zero_rate |")
+        lines.append("| --- | --- | --- | --- | --- | --- |")
+        for f in diag_features:
+            zero_rate = "-" if f.zero_rate is None else f"{f.zero_rate:.3f}"
+            lines.append(
+                f"| {f.feature} | {_sig3(f.mean)} | {_sig3(f.std)} | "
+                f"{_sig3(f.skew)} | {_sig3(f.kurtosis)} | {zero_rate} |"
+            )
+        lines.append("")
+
+    if qq.diagnostics_figures:
+        lines.extend(_render_figure_block(
+            "Per-feature distribution diagnostics", qq.diagnostics_figures, diag_by_figure,
+        ))
+        lines.append(
+            "How to read (diagnostics): colors are per-column z-scores; "
+            "cell text is the raw value."
+        )
+        lines.append("")
 
     notes: list[str] = []
     for feature in qq.features:

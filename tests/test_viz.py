@@ -28,6 +28,9 @@ def test_viz_config_loads_values() -> None:
     assert cfg.dist_figure == "numeric_dist_{fig_num}.png"
     assert cfg.describe_figure == "describe.png"
     assert cfg.normality_figure == "normality_qq.png"
+    assert cfg.diagnostics.colormap == "coolwarm"
+    assert cfg.diagnostics.figure == "numeric_diagnostics.png"
+    assert cfg.diagnostics.annotate is True
 
 
 def test_viz_config_roundtrip() -> None:

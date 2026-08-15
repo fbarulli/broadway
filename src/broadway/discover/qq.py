@@ -17,6 +17,7 @@ from pathlib import Path
 
 import matplotlib
 matplotlib.use("Agg")  # headless; set before pyplot import
+import matplotlib.colors
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -24,7 +25,7 @@ from pydantic import BaseModel, ConfigDict
 from scipy import stats
 
 from broadway import viz
-from broadway.config.viz import QqZonesConfig, load_viz_config
+from broadway.config.viz import DiagnosticsConfig, QqZonesConfig, load_viz_config
 
 
 class QqFeature(BaseModel):
@@ -39,6 +40,8 @@ class QqFeature(BaseModel):
     figure: str
     dist_figure: str = ""
     zero_rate: float | None = None
+    skew: float | None = None
+    kurtosis: float | None = None
 
 
 class QqOverview(BaseModel):
@@ -51,6 +54,7 @@ class QqOverview(BaseModel):
     features: list[QqFeature]
     figures: list[str]
     dist_figures: list[str] = []
+    diagnostics_figures: list[str] = []
     standardization: str = "per-feature z-score"
     discrete_features: int = 0
     non_numeric_columns: list[str] = []
@@ -225,6 +229,51 @@ def _plot_dist_chunk(
     plt.close(fig)
 
 
+def _plot_diagnostics_heatmap(
+    rows: list[tuple[str, float, float, float]],
+    out_path: Path,
+    dpi: int,
+    diag_cfg: DiagnosticsConfig,
+) -> None:
+    n_features = len(rows)
+    names = [r[0] for r in rows]
+    raw = np.array([[r[1], r[2], r[3]] for r in rows], dtype=float)
+    z = np.zeros_like(raw)
+    for col in range(raw.shape[1]):
+        col_vals = raw[:, col]
+        col_std = float(col_vals.std(ddof=0))
+        if col_std == 0.0:
+            z[:, col] = 0.0
+        else:
+            z[:, col] = (col_vals - col_vals.mean()) / col_std
+    fig, ax = plt.subplots(
+        figsize=(8.0, max(2.0, 0.35 * n_features)), layout="constrained",
+    )
+    ax.imshow(
+        z, aspect="auto", cmap=diag_cfg.colormap,
+        norm=matplotlib.colors.TwoSlopeNorm(vcenter=0),
+    )
+    ax.set_xticks(range(raw.shape[1]))
+    ax.set_xticklabels(["skew", "kurtosis", "zero_rate"], fontsize=viz.TICK_FONTSIZE)
+    ax.set_yticks(range(n_features))
+    ax.set_yticklabels(names, fontsize=viz.TICK_FONTSIZE)
+    if diag_cfg.annotate:
+        for i in range(n_features):
+            for j in range(raw.shape[1]):
+                ax.text(
+                    j, i, f"{raw[i, j]:.2f}",
+                    ha="center", va="center", fontsize=viz.TICK_FONTSIZE,
+                )
+    fig.colorbar(ax.images[0], ax=ax)
+    viz.despine(ax)
+    fig.suptitle(
+        "Per-feature distribution diagnostics (per-column z-score)",
+        fontsize=viz.SUPTITLE_FONTSIZE,
+    )
+    fig.savefig(out_path, dpi=dpi)
+    plt.close(fig)
+
+
 def plot_numeric_qq(
     df: pd.DataFrame,
     figures_dir: Path,
@@ -316,6 +365,8 @@ def plot_numeric_qq(
 
         n_unique = int(np.unique(finite).size)
         mean_val = float(finite.mean())
+        skew_val = float(stats.skew(finite))
+        kurt_val = float(stats.kurtosis(finite))
         if n_unique <= min_unique:
             counts, edges = np.histogram(finite, bins=midpoint_bin_edges(finite))
             hists[name] = (counts, edges)
@@ -323,7 +374,7 @@ def plot_numeric_qq(
                 feature=name, n_valid=n_valid, n_excluded=n_excluded,
                 mean=mean_val, std=std_val, status="discrete",
                 reason=f"discrete ({n_unique} unique values)", figure="",
-                zero_rate=zero_rate,
+                zero_rate=zero_rate, skew=skew_val, kurtosis=kurt_val,
             ))
             continue
 
@@ -335,6 +386,7 @@ def plot_numeric_qq(
             feature=name, n_valid=n_valid, n_excluded=n_excluded,
             mean=mean_val, std=std_val, status="plotted",
             reason=None, figure="", zero_rate=zero_rate,
+            skew=skew_val, kurtosis=kurt_val,
         ))
 
     figures_dir.mkdir(parents=True, exist_ok=True)
@@ -383,6 +435,19 @@ def plot_numeric_qq(
             i = name_to_idx[n]
             features[i] = features[i].model_copy(update={"dist_figure": dist_name})
 
+    diag_rows = [
+        (f.feature, f.skew, f.kurtosis, f.zero_rate)
+        for f in features
+        if f.status in ("plotted", "discrete")
+        and f.skew is not None and f.kurtosis is not None and f.zero_rate is not None
+    ]
+    diagnostics_figures: list[str] = []
+    if diag_rows:
+        _plot_diagnostics_heatmap(
+            diag_rows, figures_dir / cfg.diagnostics.figure, dpi, cfg.diagnostics
+        )
+        diagnostics_figures.append(f"figures/{cfg.diagnostics.figure}")
+
     overview = QqOverview(
         source_path=source_path,
         total_features=len(features),
@@ -395,6 +460,7 @@ def plot_numeric_qq(
         features=features,
         figures=figures,
         dist_figures=dist_figures,
+        diagnostics_figures=diagnostics_figures,
         standardization=standardization,
         sample_size=n_rows,
     )
