@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Callable
+
 from broadway.formatting import humanize_float
 from broadway.timeline.models import (
     Alternative,
@@ -264,6 +266,19 @@ def _suggest_not_started(step_id: str, analysis_name: str) -> Suggestion:
     )
 
 
+_DECIDE_SUGGESTERS: dict[str, Callable] = {
+    "decide_omnibus": _suggest_decide_omnibus,
+    "decide_posthoc": _suggest_decide_posthoc,
+}
+_EVIDENCE_SUGGESTERS: dict[str, Callable] = {
+    "describe_groups": _suggest_describe,
+    "normality": _suggest_normality,
+    "variance": _suggest_variance,
+    "omnibus": _suggest_omnibus,
+    "posthoc": _suggest_posthoc,
+}
+
+
 def suggest_after(
     step_id: str,
     steps: list[AnalysisStep],
@@ -271,27 +286,18 @@ def suggest_after(
     cfg: WalkthroughConfig,
     analysis_name: str,
 ) -> Suggestion | None:
-    by_id = {s.step_id: s for s in steps}
-    step = by_id.get(step_id)
     if step_id == "conclusion":
         return None
-    if step_id == "decide_omnibus":
-        return _suggest_decide_omnibus(cfg, analysis_name)
-    if step_id == "decide_posthoc":
-        return _suggest_decide_posthoc(cfg, analysis_name)
+    decide = _DECIDE_SUGGESTERS.get(step_id)
+    if decide is not None:
+        return decide(cfg, analysis_name)
+    step = {s.step_id: s for s in steps}.get(step_id)
     if step is None:
         return _suggest_not_started(step_id, analysis_name)
-    if step.step_id == "describe_groups":
-        return _suggest_describe(step, cfg, analysis_name)
-    if step.step_id == "normality":
-        return _suggest_normality(step, cfg, analysis_name)
-    if step.step_id == "variance":
-        return _suggest_variance(step, cfg, analysis_name)
-    if step.step_id == "omnibus":
-        return _suggest_omnibus(step, cfg, analysis_name)
-    if step.step_id == "posthoc":
-        return _suggest_posthoc(step, cfg, analysis_name)
-    return None
+    suggest = _EVIDENCE_SUGGESTERS.get(step.step_id)
+    if suggest is None:
+        return None
+    return suggest(step, cfg, analysis_name)
 
 
 def suggest_next(
