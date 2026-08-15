@@ -183,22 +183,37 @@ def _draw_qq_markers(ax, osm: np.ndarray, osr: np.ndarray, markers: QqMarkersCon
         )
 
 
-def build_qq_legend_handles(zones: QqZonesConfig, any_shelf: bool) -> list:
+def build_qq_legend_handles(zones: QqZonesConfig, any_shelf: bool, markers: QqMarkersConfig | None = None) -> list:
     mid = int((zones.central_quantiles[1] - zones.central_quantiles[0]) * 100)
     handles = [
-        Patch(facecolor=zones.zone_color, alpha=zones.central_alpha, label=f"middle {mid}%"),
-        Patch(facecolor=zones.zone_color, alpha=zones.tail_alpha, label=f"±{zones.tail_threshold}σ tails"),
+        Line2D([0], [0], color=viz.QQ_REF_LINE_COLOR, linestyle=viz.QQ_REF_LINE_STYLE,
+               linewidth=viz.QQ_REF_LINE_WIDTH, label="fitted reference line"),
     ]
-    if any_shelf:
-        handles.append(Line2D([0], [0], color=zones.shelf_color, linestyle="--", linewidth=1, label="zero-mass shelf"))
+    if zones.enabled:
+        handles.append(Patch(facecolor=zones.zone_color, alpha=zones.central_alpha, label=f"middle {mid}%"))
+        handles.append(Patch(facecolor=zones.zone_color, alpha=zones.tail_alpha, label=f"±{zones.tail_threshold}σ tails"))
+        if any_shelf:
+            handles.append(Line2D([0], [0], color=zones.shelf_color, linestyle="--", linewidth=1, label="zero-mass shelf"))
+    if markers is not None and markers.enabled:
+        if markers.percentile_rings:
+            handles.append(Line2D([0], [0], color=markers.ring_color, linestyle="--", linewidth=0.8,
+                                   label="percentile gridlines"))
+        if markers.tail_highlight:
+            handles.append(Line2D([0], [0], color=markers.tail_color, linewidth=markers.tail_line_width,
+                                   label=f"±{markers.tail_threshold}σ tail boundary"))
+        if markers.robust_line:
+            handles.append(Line2D([0], [0], color=markers.robust_line_color, linewidth=markers.robust_line_width,
+                                   label="robust (IQR) fit"))
     return handles
 
 
-def attach_qq_legend(fig, zones: QqZonesConfig, any_shelf: bool) -> None:
-    if not zones.enabled:
+def attach_qq_legend(fig, zones: QqZonesConfig, any_shelf: bool, markers: QqMarkersConfig | None = None) -> None:
+    handles = build_qq_legend_handles(zones, any_shelf, markers)
+    if not handles:
         return
-    handles = build_qq_legend_handles(zones, any_shelf)
-    fig.legend(handles=handles, loc="lower center", ncol=len(handles), fontsize=viz.TICK_FONTSIZE, frameon=False)
+    ncol = min(len(handles), 4)
+    fig.legend(handles=handles, loc="lower center", ncol=ncol, fontsize=viz.TICK_FONTSIZE,
+               frameon=True, framealpha=0.85)
 
 
 def _plot_chunk(
@@ -251,7 +266,7 @@ def _plot_chunk(
         viz.despine(ax)
     for ax in ax_flat[n:]:
         ax.set_visible(False)
-    attach_qq_legend(fig, zones, any_shelf)
+    attach_qq_legend(fig, zones, any_shelf, markers)
     title = "Per-feature Q-Q plots (standardized)"
     if n_figs > 1:
         title += f" - figure {fig_num} of {n_figs}"
@@ -323,7 +338,7 @@ def _plot_raw_log_pairs(
             ax.grid(True, alpha=viz.GRID_ALPHA)
             ax.tick_params(labelsize=viz.TICK_FONTSIZE)
             viz.despine(ax)
-    attach_qq_legend(fig, zones, any_shelf)
+    attach_qq_legend(fig, zones, any_shelf, markers)
     title = title_prefix
     if n_figs > 1:
         title += f" - figure {fig_num} of {n_figs}"
@@ -453,7 +468,7 @@ def _plot_qq_joint(
         f"Per-group Q-Q plots (per-group standardization) — n = {total:,}",
         fontsize=viz.SUPTITLE_FONTSIZE,
     )
-    attach_qq_legend(fig, zones, any_shelf)
+    attach_qq_legend(fig, zones, any_shelf, markers)
     fig.savefig(out_path, dpi=viz_cfg.dpi)
     plt.close(fig)
     return plotted
@@ -518,22 +533,26 @@ def _plot_diagnostics_heatmap(
     fig, ax = plt.subplots(
         figsize=(8.0, max(2.0, 0.35 * n_features)), layout="constrained",
     )
-    ax.imshow(
-        z, aspect="auto", cmap=diag_cfg.colormap,
-        norm=matplotlib.colors.TwoSlopeNorm(vcenter=0),
+    norm = matplotlib.colors.TwoSlopeNorm(
+        vcenter=0,
+        vmin=z.min() if z.min() < 0 else -1e-9,
+        vmax=z.max() if z.max() > 0 else 1e-9,
     )
+    ax.imshow(z, aspect="auto", cmap=diag_cfg.colormap, norm=norm)
     ax.set_xticks(range(raw.shape[1]))
     ax.set_xticklabels(["skew", "kurtosis", "zero_rate"], fontsize=viz.TICK_FONTSIZE)
     ax.set_yticks(range(n_features))
     ax.set_yticklabels(names, fontsize=viz.TICK_FONTSIZE)
     if diag_cfg.annotate:
+        cmap = plt.get_cmap(diag_cfg.colormap)
         for i in range(n_features):
             for j in range(raw.shape[1]):
-                ax.text(
-                    j, i, f"{raw[i, j]:.2f}",
-                    ha="center", va="center", fontsize=viz.TICK_FONTSIZE,
-                )
-    fig.colorbar(ax.images[0], ax=ax)
+                r, g, b, _ = cmap(norm(z[i, j]))
+                luminance = 0.299 * r + 0.587 * g + 0.114 * b
+                text_color = "black" if luminance > 0.5 else "white"
+                ax.text(j, i, f"{raw[i, j]:.2f}", ha="center", va="center",
+                         fontsize=viz.TICK_FONTSIZE, color=text_color)
+    fig.colorbar(ax.images[0], ax=ax, label="z-score (per-metric, column-standardized)")
     viz.despine(ax)
     fig.suptitle(
         "Per-feature distribution diagnostics (per-column z-score)",

@@ -19,7 +19,9 @@ from broadway.discover.qq import (
     QqFeature,
     QqOverview,
     _plot_chunk,
+    _plot_diagnostics_heatmap,
     _qq_points,
+    build_qq_legend_handles,
     midpoint_bin_edges,
     plot_numeric_qq,
 )
@@ -866,13 +868,13 @@ def test_qq_figure_legend(tmp_path, monkeypatch) -> None:
     _plot_chunk([shelf_trace], tmp_path / "legend_shelf.png", 1, 1, 3.0, 100, "BuPu_r", 10000, zones, _markers_off())
     fig = captured[-1]
     assert len(fig.legends) == 1
-    assert len(fig.legends[0].legend_handles) == 3
+    assert len(fig.legends[0].legend_handles) == 4
 
     no_shelf_trace = ("f", np.array([-1.0, 0.0, 1.0]), np.array([-1.0, 0.0, 1.0]), 1.0, 0.0, 0.0)
     _plot_chunk([no_shelf_trace], tmp_path / "legend_no_shelf.png", 1, 1, 3.0, 100, "BuPu_r", 10000, zones, _markers_off())
     fig = captured[-1]
     assert len(fig.legends) == 1
-    assert len(fig.legends[0].legend_handles) == 2
+    assert len(fig.legends[0].legend_handles) == 3
 
 
 def test_qq_zones_on_joint(tmp_path, monkeypatch) -> None:
@@ -888,7 +890,7 @@ def test_qq_zones_on_joint(tmp_path, monkeypatch) -> None:
         if ax.get_visible():
             assert len(ax.patches) >= 2
     assert len(fig.legends) == 1
-    assert len(fig.legends[0].legend_handles) == 2
+    assert len(fig.legends[0].legend_handles) == 6
 
 
 def test_dist_subplot_titles_are_feature_names_only(tmp_path, monkeypatch) -> None:
@@ -1064,3 +1066,54 @@ def test_qq_markers_on_raw_log_pairs(tmp_path, monkeypatch) -> None:
             l.get_linestyle() == "-" and l.get_color() == markers.robust_line_color
             for l in ax.lines
         )
+
+
+def test_legend_handles_include_reference_line_always() -> None:
+    zones = load_viz_config().qq_zones.model_copy(update={"enabled": False})
+    handles = build_qq_legend_handles(zones, any_shelf=False, markers=None)
+    assert len(handles) == 1
+    assert handles[0].get_label() == "fitted reference line"
+
+
+def test_legend_handles_include_marker_lines_when_enabled() -> None:
+    zones = load_viz_config().qq_zones.model_copy(update={"enabled": False})
+    markers = load_viz_config().qq_markers
+    labels = [h.get_label() for h in build_qq_legend_handles(zones, any_shelf=False, markers=markers)]
+    assert "percentile gridlines" in labels
+    assert "robust (IQR) fit" in labels
+    assert any("tail boundary" in label for label in labels)
+
+
+def test_legend_excludes_marker_lines_when_disabled() -> None:
+    zones = load_viz_config().qq_zones
+    markers = load_viz_config().qq_markers.model_copy(update={"enabled": False})
+    labels = [h.get_label() for h in build_qq_legend_handles(zones, any_shelf=False, markers=markers)]
+    assert not any("percentile" in label for label in labels)
+    assert not any("robust" in label for label in labels)
+    assert not any("tail boundary" in label for label in labels)
+
+
+def test_diagnostics_heatmap_text_contrasts(tmp_path, monkeypatch) -> None:
+    import broadway.discover.qq as qq_module
+
+    captured: list = []
+    monkeypatch.setattr(qq_module.plt, "close", lambda fig: captured.append(fig))
+    diag_cfg = load_viz_config().diagnostics
+    _plot_diagnostics_heatmap(
+        [("lo", -3.0, -3.0, -3.0), ("mid", 0.0, 0.0, 0.0), ("hi", 3.0, 3.0, 3.0)],
+        tmp_path / "diag.png", 72, diag_cfg,
+    )
+    assert {"black", "white"} <= {t.get_color() for t in captured[-1].axes[0].texts}
+
+
+def test_diagnostics_heatmap_colorbar_label(tmp_path, monkeypatch) -> None:
+    import broadway.discover.qq as qq_module
+
+    captured: list = []
+    monkeypatch.setattr(qq_module.plt, "close", lambda fig: captured.append(fig))
+    _plot_diagnostics_heatmap(
+        [("a", 1.0, 1.0, 0.1)],
+        tmp_path / "diag2.png", 72,
+        load_viz_config().diagnostics.model_copy(update={"annotate": False}),
+    )
+    assert captured[-1].axes[-1].get_ylabel() == "z-score (per-metric, column-standardized)"
