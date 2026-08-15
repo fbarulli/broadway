@@ -2,7 +2,7 @@
 
 ## Repository state
 - Active development branch: `taxi`.
-- Suite green: **425 tests**.
+- Suite green: **466 tests**.
 - The 5-part surface-polish follow-up is **complete**.
 - `AGENT_WORKER_CONTRACT.md` added (immutable worker rules).
 - A 3-agent read-only review pass completed.
@@ -48,6 +48,7 @@ Rationale to preserve: 7+ features don't read overlaid (→ small multiples); th
 10. **Groups Q-Q → small multiples** `00e0234`.
 11. **W1 config + critical fixes** `17153d3` — `configs/step/viz.yaml` + `max_qq_groups`; stats thresholds → params; fixed run_variance (shapiro_alpha→significance_alpha) and run_omnibus (ignored alpha); zero-variance guard; shared plot styling; describe combine (single describe.png); retired legacy `stats describe` output.
 12. **Per-feature distribution diagnostics** — `QqFeature`/`QqOverview` gain optional `skew`/`kurtosis`/`diagnostics_figures`; `DiagnosticsConfig` (`diagnostics` block in `configs/step/viz.yaml`); `_plot_diagnostics_heatmap` renders a single `numeric_diagnostics.png` (per-column z-score over `[skew, kurtosis, zero_rate]`, raw values annotated); `audit.py` renders a `mean`/`std`/`skew`/`kurtosis`/`zero_rate` table + the heatmap on `reports/audit/profile.md`. Visual reference only — no verdicts/thresholds.
+13. **Q-Q figure overhaul** (this session, all `taxi`): value-centered discrete bins + config-driven downsampling + single `n` in suptitles `570a9a2`; `tip_amount` added to the working dataset `2b3c216`; contract-driven `ingest` + `columns` command `5b2b824`; config-driven diagnostic zones (tail/central bands, zero-mass shelf) `632afd0`→`d265726`; per-feature distribution diagnostics table + heatmap + decision flags `e90edd8`/`7a669bf`; timeline registry refactor (config-driven decisions + runner/suggestion registries) `e619a4f..8f2effa`; raw-vs-log Q-Q comparison `16db124`/`12fc1a7`; darker categorical palette sampling `4e245b1`; decision-mapped markers (percentile gridlines, tail boundary, robust IQR fit) `75b8e4e`/`d96414f`; all Q-Q rendering consolidated into `qq.py` `32dd1f6`; complete legend (fit/zones/markers) + heatmap annotation contrast `6a9855b`; horizontal raw/log layout (raw top, log bottom, features as columns) `3505570`.
 
 ## Current CLI usage
 ```
@@ -64,13 +65,15 @@ Suggestions are **de-prescribed**: the product prints `--method <method>` templa
 COMPLETE — see "Completed work" items 7–11 (commits `b30fe34`, `2e951cf`, `66b1cec` + `17ca922`, `44fc1fa`).
 
 ## Deferred queue (order confirmed)
-1. **W2 main-sync** — taxi-free `main`; convert/exclude taxi-referencing tests (`test_contracts.py:31` real-parquet load, hardcoded taxi stats in `test_walkthrough.py`/`test_results.py`, `dataset="taxi"` coupling).
-2. **Cleanup/polish slice** — orphaned legacy results-index (`render_index`/`load_stats_sequence`/`RESULT_RENDERERS`), doc drift (`README.md:92`, `stats/API.md:199` still describe retired `stats describe`), taxi strings in `audit.py` ("NYC boroughs"), dead code (`suggest.py` unused cfg, `decide.py::_question_for` re-reads YAML), silent posthoc skip, unlabeled Q-Q truncation.
-3. **LoadAudit / ParsingPolicy**.
-4. **Lineage-viz** (`graph_todo.md`).
-5. Move suggestion templates + effect-size wording into config; delete legacy `report` wrapper.
-6. Pin sample/evidence, then refresh reports (drift follow-up).
-7. W1-flagged: Q-Q style constants Python-vs-YAML decision; hardcoded `figures/` path prefix.
+1. **Replace `total_amount` → `fare_amount`** — remove `total_amount` from the working dataset, add `fare_amount` (base fare) in its place: `features/schema.py` + `configs/dataset/taxi.yaml` + test fixtures, then re-run `ingest` + `profile` + `audit`. Confirmed; next up.
+2. **Q-Q doc pass** — `README.md`/`dataflow.md` Q-Q sections predate the zones/markers/raw-log work (the "overlaid → small multiples" wording was fixed, but the surfaces now carry zones + markers + a raw/log comparison, and `normality_qq` is a 2×n raw/log grid); `stats/API.md` drift; `HANDOFF.md` §"The two Q-Q surfaces" still says "groups Q-Q draws no zones".
+3. **W2 main-sync** — taxi-free `main`; convert/exclude taxi-referencing tests (`test_contracts.py:31` real-parquet load, hardcoded taxi stats in `test_walkthrough.py`/`test_results.py`, `dataset="taxi"` coupling).
+4. **Cleanup/polish slice** — orphaned legacy results-index (`render_index`/`load_stats_sequence`/`RESULT_RENDERERS`), doc drift (`README.md:92`, `stats/API.md:199` still describe retired `stats describe`), taxi strings in `audit.py` ("NYC boroughs"), dead code (`suggest.py` unused cfg, `decide.py::_question_for` re-reads YAML), silent posthoc skip, unlabeled Q-Q truncation.
+5. **LoadAudit / ParsingPolicy**.
+6. **Lineage-viz** (`graph_todo.md`).
+7. Move suggestion templates + effect-size wording into config; delete legacy `report` wrapper.
+8. Pin sample/evidence, then refresh reports (drift follow-up).
+9. W1-flagged: Q-Q style constants Python-vs-YAML decision; hardcoded `figures/` path prefix.
 
 ## Working principles to preserve
 - Results are the primary human-facing product surface. Audit explains what happened to the data. Timeline explains where the analyst is. Evidence reports what diagnostics found. Suggestions guide, never decide. Decisions belong to the analyst and are explicitly recorded. Lineage is provenance, not the workflow UI.
