@@ -22,6 +22,8 @@ def test_viz_config_loads_values() -> None:
     assert cfg.fig_size_per_subplot == 3.0
     assert cfg.dpi == 100
     assert cfg.min_unique_for_qq == 15
+    assert cfg.qq_sample_size == 10000
+    assert cfg.qq_random_state == 42
     assert cfg.qq_figure == "numeric_qq_{fig_num}.png"
     assert cfg.dist_figure == "numeric_dist_{fig_num}.png"
     assert cfg.describe_figure == "describe.png"

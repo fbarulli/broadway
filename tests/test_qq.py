@@ -13,7 +13,14 @@ import broadway.discover.module as discover_module
 from broadway.config.loader import load_config
 from broadway.config.viz import load_viz_config
 from broadway.discover.profile import ColumnProfile, DatasetProfile
-from broadway.discover.qq import QqFeature, QqOverview, _qq_points, _plot_chunk, plot_numeric_qq
+from broadway.discover.qq import (
+    QqFeature,
+    QqOverview,
+    _plot_chunk,
+    _qq_points,
+    midpoint_bin_edges,
+    plot_numeric_qq,
+)
 from broadway.lineage import records
 from broadway.reports import audit
 from broadway.timeline import module as timeline_module
@@ -109,6 +116,22 @@ def test_qq_points_thins_large_input() -> None:
 
     assert osm.size == 2_000
     assert osr.size == 2_000
+
+
+def test_midpoint_bin_edges_three_values() -> None:
+    edges = midpoint_bin_edges(np.array([-1.75, 0, 1.75]))
+    assert np.allclose(edges, [-2.625, -0.875, 0.875, 2.625])
+
+
+def test_midpoint_bin_edges_integer_values() -> None:
+    edges = midpoint_bin_edges(np.array([0, 1, 2]))
+    assert np.allclose(edges, [-0.5, 0.5, 1.5, 2.5])
+
+
+def test_midpoint_bin_edges_counts_land_in_correct_slots() -> None:
+    values = np.array([-1.75, 0, 0, 1.75])
+    counts, edges = np.histogram(values, bins=midpoint_bin_edges(values))
+    assert counts.tolist() == [1, 2, 1]
 
 
 def _qq_df() -> pd.DataFrame:
@@ -430,6 +453,7 @@ def test_render_profile_includes_qq_evidence() -> None:
         ],
         figures=["figures/numeric_qq_1.png"],
         dist_figures=["figures/numeric_dist_1.png"],
+        sample_size=10000,
     )
     md = audit.render_profile(_profile(), source="artifacts/discover/profile.json", qq=qq)
     assert "## Profile evidence" in md
@@ -438,6 +462,7 @@ def test_render_profile_includes_qq_evidence() -> None:
     assert "In this figure: a, b." in md
     assert "In this figure: a, b, disc." in md
     assert "Traces are per-feature z-score." in md
+    assert "Sample size: n = 10,000" in md
     assert "Histograms are in raw units." in md
     assert "How to read (Q-Q)" in md
     assert "fitted reference line" in md
@@ -469,11 +494,31 @@ def test_plot_numeric_qq_defaults_come_from_config() -> None:
     assert sig.parameters["fig_size_per_subplot"].default is None
     assert sig.parameters["dpi"].default is None
     assert sig.parameters["max_points_per_trace"].default is None
+    assert sig.parameters["sample_size"].default is None
+    assert sig.parameters["random_state"].default is None
     assert cfg.max_points_per_trace == 10000
     assert cfg.max_features_per_figure == 12
     assert cfg.fig_size_per_subplot == 3.0
     assert cfg.dpi == 100
     assert cfg.min_unique_for_qq == 15
+    assert cfg.qq_sample_size == 10000
+    assert cfg.qq_random_state == 42
+
+
+def test_plot_numeric_qq_downsamples_to_qq_sample_size(tmp_path) -> None:
+    figures_dir = tmp_path / "reports" / "figures"
+    evidence_path = tmp_path / "artifacts" / "discover" / "qq_overview.json"
+    rng = np.random.default_rng(0)
+    n = 50_000
+    df = pd.DataFrame({"x": rng.normal(0.0, 1.0, n)})
+
+    overview = plot_numeric_qq(df, figures_dir, evidence_path, source_path="data.csv")
+
+    qq_sample_size = load_viz_config().qq_sample_size
+    assert overview.sample_size == qq_sample_size
+    assert overview.sample_size == min(n, qq_sample_size)
+    x = next(f for f in overview.features if f.feature == "x")
+    assert x.n_valid == qq_sample_size
 
 
 def test_qq_subplot_titles_are_feature_names_only(tmp_path, monkeypatch) -> None:
@@ -484,7 +529,7 @@ def test_qq_subplot_titles_are_feature_names_only(tmp_path, monkeypatch) -> None
     traces = [
         ("my_feature", np.array([-1.0, 0.0, 1.0]), np.array([-1.0, 0.0, 1.0]), 1.0, 0.0)
     ]
-    _plot_chunk(traces, tmp_path / "qq_titles.png", 1, 1, 3.0, 100, "BuPu_r")
+    _plot_chunk(traces, tmp_path / "qq_titles.png", 1, 1, 3.0, 100, "BuPu_r", 10000)
     titles = [ax.get_title() for ax in captured[-1].axes]
     assert "my_feature" in titles
     assert not any("(n=" in t for t in titles)
@@ -496,7 +541,7 @@ def test_dist_subplot_titles_are_feature_names_only(tmp_path, monkeypatch) -> No
     captured: list = []
     monkeypatch.setattr(qq_module.plt, "close", lambda fig: captured.append(fig))
     hists = [("my_feature", np.array([1, 2, 3]), np.array([0.0, 1.0, 2.0, 3.0]))]
-    qq_module._plot_dist_chunk(hists, tmp_path / "dist_titles.png", 1, 1, 3.0, 100, "BuPu_r")
+    qq_module._plot_dist_chunk(hists, tmp_path / "dist_titles.png", 1, 1, 3.0, 100, "BuPu_r", 10000)
     titles = [ax.get_title() for ax in captured[-1].axes]
     assert "my_feature" in titles
     assert not any("(n=" in t for t in titles)

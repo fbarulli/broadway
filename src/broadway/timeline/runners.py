@@ -206,12 +206,14 @@ def _plot_qq_joint(
     ax_flat = axes.ravel()
     skipped: list[str] = []
     plotted = 0
+    total = 0
     for name in names:
         vals = np.asarray(groups[name], dtype=float)
         std = vals.std()
         if std == 0.0 or not np.isfinite(std):
             skipped.append(name)
             continue
+        total += len(vals)
         ax = ax_flat[plotted]
         z = (vals - vals.mean()) / std
         (osm, osr), (slope, intercept, _) = stats.probplot(z, dist="norm", fit=True)
@@ -246,7 +248,10 @@ def _plot_qq_joint(
             len(skipped),
             ", ".join(skipped),
         )
-    fig.suptitle("Per-group Q-Q plots (per-group standardization)", fontsize=viz.SUPTITLE_FONTSIZE)
+    fig.suptitle(
+        f"Per-group Q-Q plots (per-group standardization) — n = {total:,}",
+        fontsize=viz.SUPTITLE_FONTSIZE,
+    )
     fig.savefig(out_path, dpi=viz_cfg.dpi, bbox_inches="tight")
     plt.close(fig)
     return plotted

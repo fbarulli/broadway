@@ -54,6 +54,22 @@ class QqOverview(BaseModel):
     discrete_features: int = 0
     non_numeric_columns: list[str] = []
     flagged_id_columns: list[str] = []
+    sample_size: int | None = None
+
+
+def midpoint_bin_edges(values: np.ndarray) -> np.ndarray:
+    """Bin edges centered on the observed unique values of a discrete feature."""
+    vals = np.asarray(values, dtype=float)
+    vals = vals[np.isfinite(vals)]
+    uniq = np.unique(vals)
+    if uniq.size == 0:
+        raise ValueError("cannot build midpoint bin edges from no finite values")
+    if uniq.size == 1:
+        return np.array([uniq[0] - 0.5, uniq[0] + 0.5])
+    interior = (uniq[:-1] + uniq[1:]) / 2
+    left = uniq[0] - (uniq[1] - uniq[0]) / 2
+    right = uniq[-1] + (uniq[-1] - uniq[-2]) / 2
+    return np.concatenate([[left], interior, [right]])
 
 
 def _numeric_cols(df: pd.DataFrame, cols: list[str] | None) -> list[str]:
@@ -97,13 +113,14 @@ def _plot_chunk(
     subplot_size: float,
     dpi: int,
     palette: str,
+    n_rows: int,
 ) -> None:
     n = len(traces)
-    n_rows, n_cols = _grid_dims(n)
+    grid_rows, grid_cols = _grid_dims(n)
     colors = viz.palette_colors(n, palette)
     fig, axes = plt.subplots(
-        n_rows, n_cols,
-        figsize=(n_cols * subplot_size, n_rows * subplot_size),
+        grid_rows, grid_cols,
+        figsize=(grid_cols * subplot_size, grid_rows * subplot_size),
         squeeze=False,
         layout="constrained",
     )
@@ -134,6 +151,7 @@ def _plot_chunk(
     title = "Per-feature Q-Q plots (standardized)"
     if n_figs > 1:
         title += f" - figure {fig_num} of {n_figs}"
+    title += f" — n = {n_rows:,}"
     fig.suptitle(title, fontsize=viz.SUPTITLE_FONTSIZE)
     fig.savefig(out_path, dpi=dpi)
     plt.close(fig)
@@ -147,13 +165,14 @@ def _plot_dist_chunk(
     subplot_size: float,
     dpi: int,
     palette: str,
+    n_rows: int,
 ) -> None:
     n = len(hists)
-    n_rows, n_cols = _grid_dims(n)
+    grid_rows, grid_cols = _grid_dims(n)
     colors = viz.palette_colors(n, palette)
     fig, axes = plt.subplots(
-        n_rows, n_cols,
-        figsize=(n_cols * subplot_size, n_rows * subplot_size),
+        grid_rows, grid_cols,
+        figsize=(grid_cols * subplot_size, grid_rows * subplot_size),
         squeeze=False,
         layout="constrained",
     )
@@ -171,6 +190,7 @@ def _plot_dist_chunk(
     title = "Per-feature distributions (raw units)"
     if n_figs > 1:
         title += f" - figure {fig_num} of {n_figs}"
+    title += f" — n = {n_rows:,}"
     fig.suptitle(title, fontsize=viz.SUPTITLE_FONTSIZE)
     fig.savefig(out_path, dpi=dpi)
     plt.close(fig)
@@ -191,6 +211,8 @@ def plot_numeric_qq(
     max_points_per_trace: int | None = None,
     standardization: str = "per-feature z-score",
     palette: str | None = None,
+    sample_size: int | None = None,
+    random_state: int | None = None,
 ) -> QqOverview:
     cfg = load_viz_config()
     figures_dir = Path(figures_dir)
@@ -207,12 +229,20 @@ def plot_numeric_qq(
     if palette is None:
         palette = cfg.palette
     min_unique = _resolve_min_unique(min_unique_for_qq, cfg.min_unique_for_qq)
+    if sample_size is None:
+        sample_size = cfg.qq_sample_size
+    if random_state is None:
+        random_state = cfg.qq_random_state
 
     features: list[QqFeature] = []
     traces: dict[str, tuple[np.ndarray, np.ndarray, float, float]] = {}
     hists: dict[str, tuple[np.ndarray, np.ndarray]] = {}
     excluded_notes: list[str] = []
     flagged_id_columns: list[str] = []
+
+    if len(df) > sample_size:
+        df = df.sample(n=sample_size, random_state=random_state)
+    n_rows = int(len(df))
 
     numeric_cols = _numeric_cols(df, cols)
     non_numeric_columns = [c for c in df.columns if c not in numeric_cols]
@@ -256,9 +286,7 @@ def plot_numeric_qq(
         n_unique = int(np.unique(finite).size)
         mean_val = float(finite.mean())
         if n_unique <= min_unique:
-            lo = int(np.floor(finite.min()))
-            hi = int(np.ceil(finite.max()))
-            counts, edges = np.histogram(finite, bins=np.arange(lo, hi + 2))
+            counts, edges = np.histogram(finite, bins=midpoint_bin_edges(finite))
             hists[name] = (counts, edges)
             features.append(QqFeature(
                 feature=name, n_valid=n_valid, n_excluded=n_excluded,
@@ -302,7 +330,7 @@ def plot_numeric_qq(
         _plot_chunk(
             [(n, *traces[n]) for n in chunk],
             figures_dir / basename,
-            fig_num, len(qq_chunks), fig_size_per_subplot, dpi, palette,
+            fig_num, len(qq_chunks), fig_size_per_subplot, dpi, palette, n_rows,
         )
         for n in chunk:
             i = name_to_idx[n]
@@ -316,7 +344,7 @@ def plot_numeric_qq(
         _plot_dist_chunk(
             [(n, *hists[n]) for n in chunk],
             figures_dir / basename,
-            fig_num, len(dist_chunks), fig_size_per_subplot, dpi, palette,
+            fig_num, len(dist_chunks), fig_size_per_subplot, dpi, palette, n_rows,
         )
         for n in chunk:
             i = name_to_idx[n]
@@ -335,6 +363,7 @@ def plot_numeric_qq(
         figures=figures,
         dist_figures=dist_figures,
         standardization=standardization,
+        sample_size=n_rows,
     )
     evidence_path.write_text(overview.model_dump_json(indent=2), encoding="utf-8")
     return overview

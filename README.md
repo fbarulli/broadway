@@ -214,6 +214,12 @@ section on `reports/audit/profile.md`, from the `QqOverview` record
 (`artifacts/discover/qq_overview.json`), with how-to-read lines and
 standardization notes (Q-Q = per-feature z-score, distribution = raw units).
 
+The discover Q-Q/distribution figures downsample the input to a configured
+sample size (`qq_sample_size`, 10,000) computed once per figure and show a
+single `n = …` in the figure suptitle. Discrete (low-cardinality) distributions
+use value-centered bins (midpoint bin edges) so bars center on the observed
+unique values rather than an integer range.
+
 Suggestions are de-prescribed: `suggest.py` emits
 `ds-pipeline decide --analysis <a> --method <method> --reason "..."` (never a
 pre-filled method), and the post-hoc gate adds `--kind posthoc`.

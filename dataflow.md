@@ -106,6 +106,10 @@ The `audit` command renders the feature grids in a "Profile evidence" section
 on `reports/audit/profile.md` from the `QqOverview` record
 (`artifacts/discover/qq_overview.json`), with how-to-read lines and
 standardization notes (Q-Q = per-feature z-score, distribution = raw units).
+The discover Q-Q/distribution figures downsample the input to a configured
+sample size (`qq_sample_size`, 10,000) once per figure and show a single
+`n = …` in the suptitle; discrete distributions use midpoint bin edges so bars
+center on the observed unique values (min/max auto-derived from the data).
 Suggestions are de-prescribed: `suggest.py` emits
 `ds-pipeline decide --analysis <a> --method <method> --reason "..."` (never a
 pre-filled method) and adds `--kind posthoc` at the post-hoc gate.

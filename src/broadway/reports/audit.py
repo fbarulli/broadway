@@ -105,6 +105,8 @@ def _render_profile_evidence(qq: QqOverview | None) -> list[tuple[str, str]]:
     lines: list[str] = []
     if qq.figures:
         lines.append(f"Traces are {qq.standardization}.")
+        if qq.sample_size is not None:
+            lines.append(f"Sample size: n = {qq.sample_size:,}")
         lines.append("")
         lines.extend(_render_figure_block("Per-feature Q-Q plots", qq.figures, qq_by_figure))
         lines.append(

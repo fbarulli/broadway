@@ -17,6 +17,8 @@ class VizConfig(BaseModel):
     fig_size_per_subplot: float
     dpi: int
     min_unique_for_qq: int
+    qq_sample_size: int
+    qq_random_state: int
     qq_figure: str
     dist_figure: str
     describe_figure: str
