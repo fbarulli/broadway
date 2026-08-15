@@ -1,8 +1,9 @@
 """04: fit OLS on cleaned fares, show residuals, then run Breusch-Pagan.
 
 Fits fare_amount ~ trip_distance on the cleaned sample, plots the
-residuals-vs-fitted, and runs the Breusch-Pagan test, visualizing the p-value
-as the shaded tails of a standard normal (z) distribution.
+residuals-vs-fitted, and runs the Breusch-Pagan test, visualizing the verdict
+against the standard normal rejection region (|z| > 1.96) with the observed
+statistic annotated.
 """
 
 from pathlib import Path
@@ -47,17 +48,24 @@ def main() -> None:
     ax_resid.set_title("residuals vs fitted")
     ax_resid.grid(True, alpha=0.3)
 
+    z_crit = stats.norm.ppf(1 - ALPHA / 2)
     z_obs = float(np.sqrt(lm_stat))
-    span = max(4.0, z_obs + 1.0)
-    x = np.linspace(-span, span, 500)
+    x = np.linspace(-4, 4, 500)
     pdf = stats.norm.pdf(x)
     ax_bp.plot(x, pdf, color="black")
     fill_color = "#d62728" if reject else "#aaaaaa"
-    ax_bp.fill_between(x, pdf, where=(x <= -z_obs), color=fill_color, alpha=0.4)
-    ax_bp.fill_between(x, pdf, where=(x >= z_obs), color=fill_color, alpha=0.4)
-    ax_bp.axvline(-z_obs, color="black", linestyle="--", linewidth=1)
-    ax_bp.axvline(z_obs, color="black", linestyle="--", linewidth=1)
+    ax_bp.fill_between(x, pdf, where=(x <= -z_crit), color=fill_color, alpha=0.4)
+    ax_bp.fill_between(x, pdf, where=(x >= z_crit), color=fill_color, alpha=0.4)
+    ax_bp.axvline(-z_crit, color="black", linestyle="--", linewidth=1)
+    ax_bp.axvline(z_crit, color="black", linestyle="--", linewidth=1)
     verdict = "reject H0 (heteroskedastic)" if reject else "fail to reject H0 (homoskedastic)"
+    ax_bp.annotate(
+        f"observed z = {z_obs:.1f}",
+        xy=(3.9, 0.08), xytext=(2.0, 0.22),
+        ha="right", va="bottom",
+        arrowprops=dict(arrowstyle="->", color="black"),
+        fontsize=9,
+    )
     ax_bp.set_xlabel("z-score")
     ax_bp.set_ylabel("density (standard normal)")
     ax_bp.set_title(f"p = {p_value:.4f} → {verdict}")
