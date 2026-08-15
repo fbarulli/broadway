@@ -1,4 +1,4 @@
-"""07: histogram of fare_amount for airport pickups/dropoffs."""
+"""09: histogram of fare_amount for airport pickups/dropoffs."""
 
 from pathlib import Path
 
