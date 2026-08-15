@@ -210,8 +210,8 @@ def _plot_chunk(
     plt.close(fig)
 
 
-def _plot_log_chunk(
-    pairs: list[tuple[str, tuple, tuple]],
+def _plot_raw_log_pairs(
+    pairs: list[tuple[str, tuple, tuple, float, float]],
     out_path: Path,
     fig_num: int,
     n_figs: int,
@@ -220,18 +220,27 @@ def _plot_log_chunk(
     palette: str,
     n_rows: int,
     zones: QqZonesConfig,
+    title_prefix: str,
 ) -> None:
     n = len(pairs)
     colors = viz.palette_colors(n, palette)
     fig, axes = plt.subplots(
         n, 2,
         figsize=(2 * subplot_size, n * subplot_size),
+        sharex="row",
+        sharey="row",
         squeeze=False,
         layout="constrained",
     )
+    axes[0][0].set_title("raw", fontsize=viz.TITLE_FONTSIZE)
+    axes[0][1].set_title("log", fontsize=viz.TITLE_FONTSIZE)
     any_shelf = False
-    for i, (name, raw_trace, log_trace) in enumerate(pairs):
-        for col, (trace, suffix) in enumerate(((raw_trace, "raw"), (log_trace, "log"))):
+    for i, (name, raw_trace, log_trace, raw_skew, log_skew) in enumerate(pairs):
+        axes[i][0].text(
+            -0.3, 0.5, name, va="center", ha="center", rotation=90,
+            transform=axes[i][0].transAxes, fontsize=viz.TITLE_FONTSIZE,
+        )
+        for col, (trace, log_panel) in enumerate(((raw_trace, False), (log_trace, True))):
             osm, osr, slope, intercept = trace
             ax = axes[i][col]
             ax.scatter(
@@ -251,14 +260,18 @@ def _plot_log_chunk(
                 zorder=2,
             )
             any_shelf = draw_qq_zones(ax, zones, None, draw_shelf=False) or any_shelf
+            if log_panel:
+                ax.text(
+                    0.03, 0.97, f"skew {raw_skew:.2f} → {log_skew:.2f}",
+                    transform=ax.transAxes, va="top", fontsize=viz.TICK_FONTSIZE,
+                )
             ax.set_xlabel(viz.QQ_XLABEL, fontsize=viz.LABEL_FONTSIZE)
             ax.set_ylabel(viz.QQ_YLABEL, fontsize=viz.LABEL_FONTSIZE)
-            ax.set_title(f"{name} ({suffix})", fontsize=viz.TITLE_FONTSIZE)
             ax.grid(True, alpha=viz.GRID_ALPHA)
             ax.tick_params(labelsize=viz.TICK_FONTSIZE)
             viz.despine(ax)
     attach_qq_legend(fig, zones, any_shelf)
-    title = "Per-feature Q-Q (raw vs log-transformed)"
+    title = title_prefix
     if n_figs > 1:
         title += f" - figure {fig_num} of {n_figs}"
     title += f" — n = {n_rows:,}"
@@ -393,7 +406,7 @@ def plot_numeric_qq(
     features: list[QqFeature] = []
     traces: dict[str, tuple[np.ndarray, np.ndarray, float, float, float | None]] = {}
     hists: dict[str, tuple[np.ndarray, np.ndarray]] = {}
-    log_pairs: dict[str, tuple[tuple, tuple]] = {}
+    log_pairs: dict[str, tuple[tuple, tuple, float, float]] = {}
     excluded_notes: list[str] = []
     flagged_id_columns: list[str] = []
 
@@ -483,6 +496,8 @@ def plot_numeric_qq(
             log_pairs[name] = (
                 (osm, osr, slope, intercept),
                 (log_osm, log_osr, log_slope, log_intercept),
+                skew_val,
+                log_skew_val,
             )
         counts, edges = np.histogram(finite, bins="auto")
         hists[name] = (counts, edges)
@@ -552,11 +567,12 @@ def plot_numeric_qq(
             basename = cfg.qq_log_figure.format(fig_num=fig_num)
             log_name = f"figures/{basename}"
             log_figures.append(log_name)
-            _plot_log_chunk(
+            _plot_raw_log_pairs(
                 [(n, *log_pairs[n]) for n in chunk],
                 figures_dir / basename,
                 fig_num, len(log_chunks), fig_size_per_subplot, dpi, palette, n_rows,
                 cfg.qq_zones,
+                title_prefix="Per-feature Q-Q (raw vs log-transformed)",
             )
             for n in chunk:
                 i = name_to_idx[n]

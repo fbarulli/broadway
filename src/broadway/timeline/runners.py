@@ -18,7 +18,12 @@ from broadway.analysis.contracts import AnalysisContract
 from broadway.config.schema import PipelineConfig
 from broadway.config.viz import load_viz_config
 from broadway.data.loader import canonical_path
-from broadway.discover.qq import attach_qq_legend, draw_qq_zones
+from broadway.discover.qq import (
+    _plot_raw_log_pairs,
+    _qq_points,
+    attach_qq_legend,
+    draw_qq_zones,
+)
 from broadway.lineage.models import SampleSpec
 from broadway.reports.results import humanize_float, humanize_pvalue
 from broadway.stats.anova import run_anova, run_kruskal, run_welch
@@ -186,8 +191,37 @@ def run_describe(
     )
 
 
+def _qq_log_pairs(
+    groups: dict[str, np.ndarray], names: list[str], max_points_per_trace: int
+) -> tuple[list[tuple[str, tuple, tuple, float, float]], list[str], int]:
+    pairs: list[tuple[str, tuple, tuple, float, float]] = []
+    skipped: list[str] = []
+    total = 0
+    for name in names:
+        vals = np.asarray(groups[name], dtype=float)
+        std = vals.std()
+        if std == 0.0 or not np.isfinite(std):
+            skipped.append(name)
+            continue
+        total += len(vals)
+        log_vals = np.log(vals)
+        pairs.append(
+            (
+                name,
+                _qq_points(vals, max_points_per_trace),
+                _qq_points(log_vals, max_points_per_trace),
+                float(stats.skew(vals)),
+                float(stats.skew(log_vals)),
+            )
+        )
+    return pairs, skipped, total
+
+
 def _plot_qq_joint(
-    groups: dict[str, np.ndarray], out_path: Path, max_groups: int | None = None
+    groups: dict[str, np.ndarray],
+    out_path: Path,
+    max_groups: int | None = None,
+    show_log: bool = False,
 ) -> int:
     if max_groups is None:
         max_groups = load_walkthrough_config().max_qq_groups
@@ -195,6 +229,20 @@ def _plot_qq_joint(
     zones = viz_cfg.qq_zones
     names = list(groups)[:max_groups]
     n = len(names)
+    if show_log:
+        pairs, skipped, total = _qq_log_pairs(groups, names, viz_cfg.max_points_per_trace)
+        if skipped:
+            logger.warning(
+                "Q-Q plot skipped %d zero-variance group(s): %s",
+                len(skipped),
+                ", ".join(skipped),
+            )
+        _plot_raw_log_pairs(
+            pairs, out_path, 1, 1, viz_cfg.fig_size_per_subplot, viz_cfg.dpi,
+            viz_cfg.palette, total, zones,
+            title_prefix="Per-group Q-Q (raw vs log-transformed)",
+        )
+        return len(pairs)
     n_cols = max(1, int(np.ceil(np.sqrt(n))))
     n_rows = max(1, int(np.ceil(n / n_cols)))
     colors = viz.palette_colors(n)
@@ -274,12 +322,19 @@ def run_normality(
     source: str,
     sample_name: str | None,
 ) -> AnalysisStep:
+    viz_cfg = load_viz_config()
     result = check_normality(groups)
     figures_dir.mkdir(parents=True, exist_ok=True)
     thresholds = _thresholds()
     max_qq_groups = thresholds.max_qq_groups
-    normality_figure = load_viz_config().normality_figure
-    _plot_qq_joint(groups, figures_dir / normality_figure, max_qq_groups)
+    normality_figure = viz_cfg.normality_figure
+    pooled = np.concatenate(list(groups.values()))
+    show_log = bool(
+        pooled.size > 1
+        and pooled.min() > 0
+        and float(stats.skew(pooled)) > viz_cfg.diagnostics.thresholds.skew
+    )
+    _plot_qq_joint(groups, figures_dir / normality_figure, max_qq_groups, show_log=show_log)
     figure_path = f"figures/{normality_figure}"
     figure_refs = [FigureRef(path=figure_path, caption=QQ_CAPTION)]
     evidence = NormalityEvidence(

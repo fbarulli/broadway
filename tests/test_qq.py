@@ -96,6 +96,54 @@ def test_run_normality_caps_at_twelve_groups(tmp_path, monkeypatch) -> None:
     assert "15" in step.result_summary["truncation"]
 
 
+def test_run_normality_raw_log_pairs_for_skewed_positive(tmp_path, monkeypatch) -> None:
+    import broadway.timeline.runners as runners_module
+
+    monkeypatch.setattr(timeline_module, "TIMELINE_DIR", tmp_path / "timeline")
+    cfg = _cfg()
+    rng = np.random.default_rng(0)
+    groups = {g: np.exp(rng.normal(0.0, 1.0, 500)) for g in ("A", "B", "C")}
+    figures_dir = tmp_path / "reports" / "figures"
+    out_dir = tmp_path / "timeline" / "taxi_hypothesis"
+    captured: list = []
+    monkeypatch.setattr(runners_module.plt, "close", lambda fig: captured.append(fig))
+
+    step = runners.run_normality(
+        cfg.analysis, 2, "q?", groups, out_dir, figures_dir, "canonical", None
+    )
+
+    assert (figures_dir / "normality_qq.png").exists()
+    fig = captured[-1]
+    assert len(fig.axes) == 2 * len(groups)
+    log_axes = [fig.axes[i] for i in range(1, 2 * len(groups), 2)]
+    for ax in log_axes:
+        assert any("skew" in t for t in [t.get_text() for t in ax.texts])
+    assert step.result_summary.get("standardization") == "per-group z-score"
+
+
+def test_run_normality_raw_only_for_non_positive_target(tmp_path, monkeypatch) -> None:
+    import broadway.timeline.runners as runners_module
+
+    monkeypatch.setattr(timeline_module, "TIMELINE_DIR", tmp_path / "timeline")
+    cfg = _cfg()
+    rng = np.random.default_rng(0)
+    groups = {
+        g: np.concatenate([[0.0], rng.normal(10.0, 2.0, 29)]) for g in ("A", "B", "C")
+    }
+    figures_dir = tmp_path / "reports" / "figures"
+    out_dir = tmp_path / "timeline" / "taxi_hypothesis"
+    captured: list = []
+    monkeypatch.setattr(runners_module.plt, "close", lambda fig: captured.append(fig))
+
+    runners.run_normality(
+        cfg.analysis, 2, "q?", groups, out_dir, figures_dir, "canonical", None
+    )
+
+    fig = captured[-1]
+    assert len(fig.axes) == 4
+    assert not any("skew" in t for ax in fig.axes for t in [t.get_text() for t in ax.texts])
+
+
 def test_qq_points_returns_fit_line_params() -> None:
     rng = np.random.default_rng(0)
     vals = rng.normal(0.0, 1.0, 200)
@@ -326,6 +374,42 @@ def test_plot_numeric_qq_no_log_figure_when_no_qualifying(tmp_path) -> None:
     assert overview.log_figures == []
     assert list(figures_dir.glob("numeric_qq_log_*.png")) == []
     assert all(f.log_figure == "" for f in overview.features)
+
+
+def test_plot_raw_log_pairs_shared_axes_and_skew(tmp_path, monkeypatch) -> None:
+    import broadway.discover.qq as qq_module
+
+    rng = np.random.default_rng(0)
+    zones = load_viz_config().qq_zones
+    pairs = []
+    for i in range(3):
+        vals = np.exp(rng.normal(0.0, 1.0, 200))
+        pairs.append(
+            (
+                f"f{i}",
+                _qq_points(vals, 10000),
+                _qq_points(np.log(vals), 10000),
+                float(stats.skew(vals)),
+                float(stats.skew(np.log(vals))),
+            )
+        )
+    captured: list = []
+    monkeypatch.setattr(qq_module.plt, "close", lambda fig: captured.append(fig))
+    qq_module._plot_raw_log_pairs(
+        pairs, tmp_path / "pairs.png", 1, 1, 3.0, 100, "BuPu_r", 600,
+        zones, title_prefix="Per-feature Q-Q (raw vs log-transformed)",
+    )
+    fig = captured[-1]
+    assert len(fig.axes) == 2 * 3
+    ax_raw = fig.axes[0]
+    ax_log = fig.axes[1]
+    assert ax_raw.get_xlim() == ax_log.get_xlim()
+    assert ax_raw.get_ylim() == ax_log.get_ylim()
+    assert ax_raw.get_title() == "raw"
+    assert ax_log.get_title() == "log"
+    assert "f0" in [t.get_text() for t in ax_raw.texts]
+    assert any("skew" in t for t in [t.get_text() for t in ax_log.texts])
+    assert not any("skew" in t for t in [t.get_text() for t in ax_raw.texts])
 
 
 def test_plot_numeric_qq_discrete_right_skewed_no_log_figure(tmp_path) -> None:

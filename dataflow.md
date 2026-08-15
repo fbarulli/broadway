@@ -89,8 +89,8 @@ one-line "How to read" caption) on `AnalysisStep.figures`; `timeline.md` embeds
 them as `![caption](figures/...)` and `results/` pages as
 `![caption](../figures/...)` (one link depth deeper).
 
-Two Q-Q surfaces answer "is this normal?" at different scopes and deliberately
-diverge in layout:
+Two Q-Q surfaces answer "is this normal?" at different scopes and converge on
+small multiples:
 
 - **Features Q-Q** (`src/broadway/discover/qq.py::plot_numeric_qq`) is the
   profile surface: **small multiples** — one subplot per numeric feature
@@ -99,8 +99,8 @@ diverge in layout:
   zero-variance features are recorded, not plotted; the grid chunks into
   multiple PNGs beyond 12 features per figure.
 - **Groups Q-Q** (`src/broadway/timeline/runners.py::run_normality`) is the
-  normality gate: a **single overlaid figure**, one trace per group, per-group
-  z-score — because ~5 groups read fine overlaid (capped at 12 groups).
+  normality gate: **small multiples**, one subplot per group, per-group z-score
+  (capped at 12 groups).
 
 The `audit` command renders the feature grids in a "Profile evidence" section
 on `reports/audit/profile.md` from the `QqOverview` record
