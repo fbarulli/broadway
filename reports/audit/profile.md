@@ -33,7 +33,7 @@ Sample size: n = 10,000
 
 In this figure: trip_distance, total_amount, tip_amount, trip_duration_minutes. Chunk 1 of 1; the trailing `_1` in the filename is the chunk number.
 
-How to read (Q-Q): points should follow the fitted reference line; S-curves indicate tail behavior; curvature indicates skew.
+How to read (Q-Q): points should follow the fitted reference line; S-curves indicate tail behavior; curvature indicates skew. Shaded bands mark the middle 50% (centre) and the ±1.96σ tails; the red dashed horizontal line is the zero-mass shelf (a flat clump of dots = a spike of exact zeros).
 
 Histograms are in raw units.
 

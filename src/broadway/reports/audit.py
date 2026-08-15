@@ -14,6 +14,7 @@ from typing import Any
 
 from broadway.cleaning.models import StructuralCleanResult
 from broadway.config.loader import load_config
+from broadway.config.viz import load_viz_config
 from broadway.data.join_audit import JoinAuditReport
 from broadway.data.lookup_value_audit import LookupValueAuditReport
 from broadway.discover.profile import DatasetProfile
@@ -122,9 +123,13 @@ def _render_profile_evidence(qq: QqOverview | None) -> list[tuple[str, str]]:
             lines.append(f"Sample size: n = {qq.sample_size:,}")
         lines.append("")
         lines.extend(_render_figure_block("Per-feature Q-Q plots", qq.figures, qq_by_figure))
+        zones = load_viz_config().qq_zones
+        mid = int((zones.central_quantiles[1] - zones.central_quantiles[0]) * 100)
         lines.append(
             "How to read (Q-Q): points should follow the fitted reference line; "
-            "S-curves indicate tail behavior; curvature indicates skew."
+            "S-curves indicate tail behavior; curvature indicates skew. "
+            f"Shaded bands mark the middle {mid}% (centre) and the ±{zones.tail_threshold}σ tails; "
+            "the red dashed horizontal line is the zero-mass shelf (a flat clump of dots = a spike of exact zeros)."
         )
         lines.append("")
     if qq.dist_figures:

@@ -185,6 +185,8 @@ def _plot_chunk(
     if n_figs > 1:
         title += f" - figure {fig_num} of {n_figs}"
     title += f" — n = {n_rows:,}"
+    mid = int((zones.central_quantiles[1] - zones.central_quantiles[0]) * 100)
+    title += f"\nshaded = middle {mid}% (centre) / ±{zones.tail_threshold}σ tails; red dashed h-line = zero-mass shelf"
     fig.suptitle(title, fontsize=viz.SUPTITLE_FONTSIZE)
     fig.savefig(out_path, dpi=dpi)
     plt.close(fig)
