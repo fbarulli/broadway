@@ -292,30 +292,26 @@ def _plot_raw_log_pairs(
     n = len(pairs)
     colors = viz.palette_colors(n, palette)
     fig, axes = plt.subplots(
-        n, 2,
-        figsize=(2 * subplot_size, n * subplot_size),
-        sharex="row",
-        sharey="row",
+        2, n,
+        figsize=(n * subplot_size, 2 * subplot_size),
+        sharex="col",
+        sharey="col",
         squeeze=False,
         layout="constrained",
     )
-    axes[0][0].set_title("raw", fontsize=viz.TITLE_FONTSIZE)
-    axes[0][1].set_title("log", fontsize=viz.TITLE_FONTSIZE)
     any_shelf = False
-    for i, (name, raw_trace, log_trace, raw_skew, log_skew) in enumerate(pairs):
-        axes[i][0].text(
-            -0.3, 0.5, name, va="center", ha="center", rotation=90,
-            transform=axes[i][0].transAxes, fontsize=viz.TITLE_FONTSIZE,
-        )
-        for col, (trace, log_panel) in enumerate(((raw_trace, False), (log_trace, True))):
+    for j, (name, raw_trace, log_trace, raw_skew, log_skew) in enumerate(pairs):
+        axes[0][j].set_title(name, fontsize=viz.TITLE_FONTSIZE)
+        skew_str = f"skew {raw_skew:.2f} → {log_skew:.2f}"
+        for row, trace in enumerate((raw_trace, log_trace)):
             osm, osr, slope, intercept = trace
-            ax = axes[i][col]
+            ax = axes[row][j]
             ax.scatter(
                 osm, osr,
                 s=viz.QQ_SCATTER_SIZE,
                 alpha=viz.QQ_SCATTER_ALPHA,
                 edgecolor=viz.QQ_SCATTER_EDGE_COLOR,
-                color=colors[i],
+                color=colors[j],
                 zorder=3,
             )
             xs = np.array([osm.min(), osm.max()])
@@ -328,16 +324,13 @@ def _plot_raw_log_pairs(
             )
             any_shelf = draw_qq_zones(ax, zones, None, draw_shelf=False) or any_shelf
             _draw_qq_markers(ax, osm, osr, markers)
-            if log_panel:
-                ax.text(
-                    0.03, 0.97, f"skew {raw_skew:.2f} → {log_skew:.2f}",
-                    transform=ax.transAxes, va="top", fontsize=viz.TICK_FONTSIZE,
-                )
-            ax.set_xlabel(viz.QQ_XLABEL, fontsize=viz.LABEL_FONTSIZE)
-            ax.set_ylabel(viz.QQ_YLABEL, fontsize=viz.LABEL_FONTSIZE)
+            ax.set_xlabel(skew_str, fontsize=viz.LABEL_FONTSIZE)
+            ax.set_ylabel("", fontsize=viz.LABEL_FONTSIZE)
             ax.grid(True, alpha=viz.GRID_ALPHA)
             ax.tick_params(labelsize=viz.TICK_FONTSIZE)
             viz.despine(ax)
+    axes[0][0].set_ylabel("Sample quantiles (z)", fontsize=viz.LABEL_FONTSIZE)
+    axes[1][0].set_ylabel("Sample quantiles (z)", fontsize=viz.LABEL_FONTSIZE)
     attach_qq_legend(fig, zones, any_shelf, markers)
     title = title_prefix
     if n_figs > 1:
@@ -401,7 +394,7 @@ def _plot_qq_joint(
             pairs, out_path, 1, 1, viz_cfg.fig_size_per_subplot, viz_cfg.dpi,
             viz_cfg.palette, total, zones,
             markers,
-            title_prefix="Per-group Q-Q (raw vs log-transformed)",
+            title_prefix="normality qq — raw vs log",
         )
         return len(pairs)
     n_cols = max(1, int(np.ceil(np.sqrt(n))))
@@ -772,7 +765,7 @@ def plot_numeric_qq(
                 fig_num, len(log_chunks), fig_size_per_subplot, dpi, palette, n_rows,
                 cfg.qq_zones,
                 cfg.qq_markers,
-                title_prefix="Per-feature Q-Q (raw vs log-transformed)",
+                title_prefix="feature qq — raw vs log",
             )
             for n in chunk:
                 i = name_to_idx[n]

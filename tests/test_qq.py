@@ -120,10 +120,11 @@ def test_run_normality_raw_log_pairs_for_skewed_positive(tmp_path, monkeypatch) 
 
     assert (figures_dir / "normality_qq.png").exists()
     fig = captured[-1]
-    assert len(fig.axes) == 2 * len(groups)
-    log_axes = [fig.axes[i] for i in range(1, 2 * len(groups), 2)]
+    n = len(groups)
+    assert len(fig.axes) == 2 * n
+    log_axes = fig.axes[n:]
     for ax in log_axes:
-        assert any("skew" in t for t in [t.get_text() for t in ax.texts])
+        assert "skew" in ax.get_xlabel()
     assert step.result_summary.get("standardization") == "per-group z-score"
 
 
@@ -408,14 +409,51 @@ def test_plot_raw_log_pairs_shared_axes_and_skew(tmp_path, monkeypatch) -> None:
     fig = captured[-1]
     assert len(fig.axes) == 2 * 3
     ax_raw = fig.axes[0]
-    ax_log = fig.axes[1]
+    ax_log = fig.axes[3]
     assert ax_raw.get_xlim() == ax_log.get_xlim()
     assert ax_raw.get_ylim() == ax_log.get_ylim()
-    assert ax_raw.get_title() == "raw"
-    assert ax_log.get_title() == "log"
-    assert "f0" in [t.get_text() for t in ax_raw.texts]
-    assert any("skew" in t for t in [t.get_text() for t in ax_log.texts])
-    assert not any("skew" in t for t in [t.get_text() for t in ax_raw.texts])
+    assert ax_raw.get_title() == "f0"
+    assert ax_log.get_title() == ""
+    assert ax_raw.get_ylabel() == "Sample quantiles (z)"
+    assert ax_log.get_ylabel() == "Sample quantiles (z)"
+    assert "skew" in ax_raw.get_xlabel()
+    assert "skew" in ax_log.get_xlabel()
+    assert not any("skew" in t.get_text() for ax in fig.axes for t in ax.texts)
+
+
+def test_plot_raw_log_pairs_layout_raw_top_log_bottom(tmp_path, monkeypatch) -> None:
+    import broadway.discover.qq as qq_module
+
+    rng = np.random.default_rng(0)
+    zones = load_viz_config().qq_zones
+    names = ["alpha", "beta", "gamma"]
+    pairs = []
+    for name in names:
+        vals = np.exp(rng.normal(0.0, 1.0, 200))
+        pairs.append(
+            (
+                name,
+                _qq_points(vals, 10000),
+                _qq_points(np.log(vals), 10000),
+                float(stats.skew(vals)),
+                float(stats.skew(np.log(vals))),
+            )
+        )
+    captured: list = []
+    monkeypatch.setattr(qq_module.plt, "close", lambda fig: captured.append(fig))
+    qq_module._plot_raw_log_pairs(
+        pairs, tmp_path / "pairs.png", 1, 1, 3.0, 100, "BuPu_r", 600,
+        zones, _markers_off(), title_prefix="feature qq — raw vs log",
+    )
+    fig = captured[-1]
+    n = len(names)
+    assert len(fig.axes) == 2 * n
+    top_row = fig.axes[:n]
+    bottom_row = fig.axes[n:]
+    assert [ax.get_title() for ax in top_row] == names
+    assert all(ax.get_title() == "" for ax in bottom_row)
+    for ax in top_row + bottom_row:
+        assert "skew" in ax.get_xlabel()
 
 
 def test_plot_numeric_qq_discrete_right_skewed_no_log_figure(tmp_path) -> None:
