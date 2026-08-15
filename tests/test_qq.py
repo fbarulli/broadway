@@ -909,23 +909,6 @@ def _marker_trace(n: int = 5000):
     return ("f", osm, osr, slope, intercept, 0.0)
 
 
-def _tail_collections(ax):
-    import matplotlib.colors as mcolors
-
-    tail_rgba = mcolors.to_rgba(load_viz_config().qq_markers.tail_color)
-    out = []
-    for c in ax.collections:
-        if len(c.get_offsets()) == 0:
-            continue
-        try:
-            rgba = np.asarray(c.get_edgecolors())[0]
-        except IndexError:
-            continue
-        if np.allclose(rgba, tail_rgba):
-            out.append(c)
-    return out
-
-
 def test_qq_markers_rings_robust_tail_present(tmp_path, monkeypatch) -> None:
     import broadway.discover.qq as qq_module
 
@@ -942,13 +925,68 @@ def test_qq_markers_rings_robust_tail_present(tmp_path, monkeypatch) -> None:
         l for l in ax.lines
         if l.get_linestyle() == "-" and l.get_color() == markers.robust_line_color
     ]
-    assert robust
-    rings = [
+    assert len(robust) == 1
+    gridlines = [
         l for l in ax.lines
-        if l.get_marker() == "o" and l.get_linestyle().lower() in ("none", "")
+        if l.get_linestyle() == "--" and l.get_color() == markers.ring_color
     ]
-    assert len(rings) == len(markers.percentiles)
-    assert _tail_collections(ax)
+    assert len(gridlines) == len(markers.percentiles)
+    for l, p in zip(gridlines, markers.percentiles):
+        assert np.allclose(l.get_xdata(), stats.norm.ppf(p))
+    tail_lines = [
+        l for l in ax.lines
+        if l.get_linestyle() == "-" and l.get_color() == markers.tail_color
+    ]
+    assert len(tail_lines) == 2
+
+
+def test_qq_markers_robust_line_spans_axes(tmp_path, monkeypatch) -> None:
+    import broadway.discover.qq as qq_module
+
+    markers = load_viz_config().qq_markers
+    zones = load_viz_config().qq_zones
+    captured: list = []
+    monkeypatch.setattr(qq_module.plt, "close", lambda fig: captured.append(fig))
+    draw_xlims: list[tuple[float, float]] = []
+    orig_draw = qq_module._draw_qq_markers
+
+    def spy(ax, osm, osr, markers):
+        draw_xlims.append(ax.get_xlim())
+        return orig_draw(ax, osm, osr, markers)
+
+    monkeypatch.setattr(qq_module, "_draw_qq_markers", spy)
+    _plot_chunk(
+        [_marker_trace()], tmp_path / "markers.png", 1, 1, 3.0, 100, "BuPu_r", 5000,
+        zones, markers,
+    )
+    ax = captured[-1].axes[0]
+    robust = [
+        l for l in ax.lines
+        if l.get_linestyle() == "-" and l.get_color() == markers.robust_line_color
+    ]
+    assert len(robust) == 1
+    assert np.allclose(robust[0].get_xdata(), draw_xlims[0])
+
+
+def test_qq_markers_tail_lines_at_threshold(tmp_path, monkeypatch) -> None:
+    import broadway.discover.qq as qq_module
+
+    markers = load_viz_config().qq_markers
+    zones = load_viz_config().qq_zones
+    captured: list = []
+    monkeypatch.setattr(qq_module.plt, "close", lambda fig: captured.append(fig))
+    _plot_chunk(
+        [_marker_trace()], tmp_path / "markers_tail.png", 1, 1, 3.0, 100, "BuPu_r", 5000,
+        zones, markers,
+    )
+    ax = captured[-1].axes[0]
+    tail_lines = [
+        l for l in ax.lines
+        if l.get_linestyle() == "-" and l.get_color() == markers.tail_color
+    ]
+    assert len(tail_lines) == 2
+    xs = sorted(round(float(l.get_xdata()[0]), 6) for l in tail_lines)
+    assert xs == sorted([round(markers.tail_threshold, 6), round(-markers.tail_threshold, 6)])
 
 
 def test_qq_markers_toggles_off(tmp_path, monkeypatch) -> None:
@@ -970,29 +1008,13 @@ def test_qq_markers_toggles_off(tmp_path, monkeypatch) -> None:
         for l in ax.lines
     )
     assert not any(
-        l.get_marker() == "o" and l.get_linestyle().lower() in ("none", "")
+        l.get_linestyle() == "--" and l.get_color() == markers.ring_color
         for l in ax.lines
     )
-    assert _tail_collections(ax) == []
-
-
-def test_qq_markers_tail_highlight_correctness(tmp_path, monkeypatch) -> None:
-    import broadway.discover.qq as qq_module
-
-    markers = load_viz_config().qq_markers
-    zones = load_viz_config().qq_zones
-    captured: list = []
-    monkeypatch.setattr(qq_module.plt, "close", lambda fig: captured.append(fig))
-    _plot_chunk(
-        [_marker_trace()], tmp_path / "markers_tail.png", 1, 1, 3.0, 100, "BuPu_r", 5000,
-        zones, markers,
+    assert not any(
+        l.get_linestyle() == "-" and l.get_color() == markers.tail_color
+        for l in ax.lines
     )
-    ax = captured[-1].axes[0]
-    colls = _tail_collections(ax)
-    assert colls
-    offs = np.concatenate([c.get_offsets() for c in colls])
-    assert offs.shape[0] > 0
-    assert np.all(np.abs(offs[:, 0]) > markers.tail_threshold)
 
 
 def test_qq_markers_on_joint_raw_path(tmp_path, monkeypatch) -> None:

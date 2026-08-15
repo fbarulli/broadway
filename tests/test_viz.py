@@ -63,12 +63,11 @@ def test_qq_markers_config_parses() -> None:
     assert markers.robust_line is True
     assert markers.percentiles == [0.5, 0.9, 0.99, 0.999]
     assert markers.tail_threshold == 3.09
-    assert markers.ring_color == "#000000"
-    assert markers.ring_size == 4
+    assert markers.ring_color == "#aaaaaa"
     assert markers.tail_color == "#d62728"
-    assert markers.tail_size == 12
-    assert markers.robust_line_color == "#333333"
-    assert markers.robust_line_width == 1.2
+    assert markers.tail_line_width == 1.0
+    assert markers.robust_line_color == "#1f77b4"
+    assert markers.robust_line_width == 2.5
 
 
 def test_qq_markers_config_forbids_unknown_key() -> None:
@@ -77,14 +76,13 @@ def test_qq_markers_config_forbids_unknown_key() -> None:
             enabled=True,
             percentile_rings=True,
             percentiles=[0.5, 0.9, 0.99, 0.999],
-            ring_color="#000000",
-            ring_size=4,
+            ring_color="#aaaaaa",
             tail_highlight=True,
             tail_threshold=3.09,
             tail_color="#d62728",
-            tail_size=12,
+            tail_line_width=1.0,
             robust_line=True,
-            robust_line_color="#333333",
-            robust_line_width=1.2,
+            robust_line_color="#1f77b4",
+            robust_line_width=2.5,
             unknown_key="nope",
         )

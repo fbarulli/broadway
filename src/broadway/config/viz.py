@@ -28,11 +28,10 @@ class QqMarkersConfig(BaseModel):
     percentile_rings: bool
     percentiles: list[float]
     ring_color: str
-    ring_size: float
     tail_highlight: bool
     tail_threshold: float
     tail_color: str
-    tail_size: float
+    tail_line_width: float
     robust_line: bool
     robust_line_color: str
     robust_line_width: float

@@ -144,32 +144,38 @@ def _draw_qq_markers(ax, osm: np.ndarray, osr: np.ndarray, markers: QqMarkersCon
         return
     if markers.percentile_rings:
         for p in markers.percentiles:
-            ax.plot(
-                [stats.norm.ppf(p)],
-                [np.quantile(osr, p)],
-                marker="o",
-                linestyle="none",
-                markerfacecolor="none",
-                markeredgecolor=markers.ring_color,
-                markersize=markers.ring_size,
-                zorder=4,
+            ax.axvline(
+                x=stats.norm.ppf(p),
+                color=markers.ring_color,
+                linestyle="--",
+                linewidth=0.8,
+                alpha=0.6,
+                zorder=0,
             )
     if markers.tail_highlight:
-        mask = np.abs(osm) > markers.tail_threshold
-        ax.scatter(
-            osm[mask],
-            osr[mask],
-            facecolor="none",
-            edgecolor=markers.tail_color,
-            s=markers.tail_size,
+        ax.axvline(
+            x=-markers.tail_threshold,
+            color=markers.tail_color,
+            linestyle="-",
+            linewidth=markers.tail_line_width,
+            zorder=4,
+        )
+        ax.axvline(
+            x=markers.tail_threshold,
+            color=markers.tail_color,
+            linestyle="-",
+            linewidth=markers.tail_line_width,
             zorder=4,
         )
     if markers.robust_line:
         q1 = (stats.norm.ppf(0.25), np.quantile(osr, 0.25))
         q3 = (stats.norm.ppf(0.75), np.quantile(osr, 0.75))
+        slope = (q3[1] - q1[1]) / (q3[0] - q1[0])
+        intercept = q1[1] - slope * q1[0]
+        xmin, xmax = ax.get_xlim()
         ax.plot(
-            [q1[0], q3[0]],
-            [q1[1], q3[1]],
+            [xmin, xmax],
+            [slope * xmin + intercept, slope * xmax + intercept],
             color=markers.robust_line_color,
             linestyle="-",
             linewidth=markers.robust_line_width,
