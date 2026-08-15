@@ -23,3 +23,8 @@ diagnostics:
   colormap: coolwarm
   figure: numeric_diagnostics.png
   annotate: true
+  thresholds:
+    zero_rate: 0.05
+    skew: 1.0
+    kurtosis: 3.0
+    max_p99_ratio: 10.0

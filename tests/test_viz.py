@@ -31,6 +31,10 @@ def test_viz_config_loads_values() -> None:
     assert cfg.diagnostics.colormap == "coolwarm"
     assert cfg.diagnostics.figure == "numeric_diagnostics.png"
     assert cfg.diagnostics.annotate is True
+    assert cfg.diagnostics.thresholds.zero_rate == 0.05
+    assert cfg.diagnostics.thresholds.skew == 1.0
+    assert cfg.diagnostics.thresholds.kurtosis == 3.0
+    assert cfg.diagnostics.thresholds.max_p99_ratio == 10.0
 
 
 def test_viz_config_roundtrip() -> None:

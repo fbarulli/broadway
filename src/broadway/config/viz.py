@@ -21,12 +21,22 @@ class QqZonesConfig(BaseModel):
     shelf_color: str
 
 
+class DiagnosticsThresholds(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    zero_rate: float
+    skew: float
+    kurtosis: float
+    max_p99_ratio: float
+
+
 class DiagnosticsConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     colormap: str
     figure: str
     annotate: bool
+    thresholds: DiagnosticsThresholds
 
 
 class VizConfig(BaseModel):

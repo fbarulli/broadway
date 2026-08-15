@@ -146,13 +146,24 @@ def _render_profile_evidence(qq: QqOverview | None) -> list[tuple[str, str]]:
     if diag_features:
         lines.append("### Distribution diagnostics")
         lines.append("")
-        lines.append("| Variable | mean | std | skew | kurtosis | zero_rate |")
-        lines.append("| --- | --- | --- | --- | --- | --- |")
+        lines.append("| Variable | n | mean | std | skew | excess_kurtosis | zero_rate | p99/median | max/median | log_skew |")
+        lines.append("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |")
         for f in diag_features:
             zero_rate = "-" if f.zero_rate is None else f"{f.zero_rate:.3f}"
+            p99_ratio = (
+                _sig3(f.p99 / f.median)
+                if f.median is not None and f.p99 is not None and f.median > 0
+                else "-"
+            )
+            max_ratio = (
+                _sig3(f.max / f.median)
+                if f.median is not None and f.max is not None and f.median > 0
+                else "-"
+            )
             lines.append(
-                f"| {f.feature} | {_sig3(f.mean)} | {_sig3(f.std)} | "
-                f"{_sig3(f.skew)} | {_sig3(f.kurtosis)} | {zero_rate} |"
+                f"| {f.feature} | {f.n_valid} | {_sig3(f.mean)} | {_sig3(f.std)} | "
+                f"{_sig3(f.skew)} | {_sig3(f.kurtosis)} | {zero_rate} | "
+                f"{p99_ratio} | {max_ratio} | {_sig3(f.log_skew)} |"
             )
         lines.append("")
 
@@ -165,6 +176,17 @@ def _render_profile_evidence(qq: QqOverview | None) -> list[tuple[str, str]]:
             "cell text is the raw value."
         )
         lines.append("")
+
+    lines.append("### Decision flags")
+    lines.append("")
+    flagged = [(f.feature, f.flags) for f in qq.features if f.flags]
+    if flagged:
+        for name, fls in flagged:
+            for fl in fls:
+                lines.append(f"- {name}: {fl}")
+    else:
+        lines.append("none")
+    lines.append("")
 
     notes: list[str] = []
     for feature in qq.features:

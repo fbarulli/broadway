@@ -42,6 +42,11 @@ class QqFeature(BaseModel):
     zero_rate: float | None = None
     skew: float | None = None
     kurtosis: float | None = None
+    median: float | None = None
+    p99: float | None = None
+    max: float | None = None
+    log_skew: float | None = None
+    flags: list[str] = []
 
 
 class QqOverview(BaseModel):
@@ -313,6 +318,7 @@ def plot_numeric_qq(
         sample_size = cfg.qq_sample_size
     if random_state is None:
         random_state = cfg.qq_random_state
+    thresholds = cfg.diagnostics.thresholds
 
     features: list[QqFeature] = []
     traces: dict[str, tuple[np.ndarray, np.ndarray, float, float, float | None]] = {}
@@ -369,6 +375,23 @@ def plot_numeric_qq(
         mean_val = float(finite.mean())
         skew_val = float(stats.skew(finite))
         kurt_val = float(stats.kurtosis(finite))
+        median_val = float(np.median(finite))
+        p99_val = float(np.percentile(finite, 99))
+        max_val = float(finite.max())
+        log_skew_val = (
+            float(stats.skew(np.log(finite)))
+            if (skew_val > thresholds.skew and finite.min() > 0)
+            else None
+        )
+        flags: list[str] = []
+        if zero_rate > thresholds.zero_rate:
+            flags.append(f"zero_rate {zero_rate:.3f} exceeds {thresholds.zero_rate}")
+        if skew_val > thresholds.skew:
+            flags.append(f"skew {skew_val:.2f} exceeds {thresholds.skew}")
+        if kurt_val > thresholds.kurtosis:
+            flags.append(f"kurtosis {kurt_val:.2f} exceeds {thresholds.kurtosis}")
+        if p99_val > 0 and (max_val / p99_val) > thresholds.max_p99_ratio:
+            flags.append(f"max/p99 ratio {max_val / p99_val:.1f} exceeds {thresholds.max_p99_ratio}")
         if n_unique <= min_unique:
             counts, edges = np.histogram(finite, bins=midpoint_bin_edges(finite))
             hists[name] = (counts, edges)
@@ -377,6 +400,8 @@ def plot_numeric_qq(
                 mean=mean_val, std=std_val, status="discrete",
                 reason=f"discrete ({n_unique} unique values)", figure="",
                 zero_rate=zero_rate, skew=skew_val, kurtosis=kurt_val,
+                median=median_val, p99=p99_val, max=max_val,
+                log_skew=log_skew_val, flags=flags,
             ))
             continue
 
@@ -389,6 +414,8 @@ def plot_numeric_qq(
             mean=mean_val, std=std_val, status="plotted",
             reason=None, figure="", zero_rate=zero_rate,
             skew=skew_val, kurtosis=kurt_val,
+            median=median_val, p99=p99_val, max=max_val,
+            log_skew=log_skew_val, flags=flags,
         ))
 
     figures_dir.mkdir(parents=True, exist_ok=True)

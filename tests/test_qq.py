@@ -265,6 +265,36 @@ def test_plot_numeric_qq_discrete_feature(tmp_path) -> None:
     assert (figures_dir / "numeric_dist_1.png").exists()
 
 
+def test_plot_numeric_qq_distribution_metrics_and_flags(tmp_path) -> None:
+    figures_dir = tmp_path / "reports" / "figures"
+    evidence_path = tmp_path / "artifacts" / "discover" / "qq_overview.json"
+    rng = np.random.default_rng(0)
+    df = pd.DataFrame(
+        {
+            "skewed_positive": np.exp(rng.normal(0.0, 1.0, 500)),
+            "zero_inflated": np.concatenate(
+                [np.zeros(300), rng.normal(1.0, 0.1, 200)]
+            ),
+        }
+    )
+
+    overview = plot_numeric_qq(df, figures_dir, evidence_path, source_path="data.csv")
+
+    skewed = next(f for f in overview.features if f.feature == "skewed_positive")
+    inflated = next(f for f in overview.features if f.feature == "zero_inflated")
+
+    for f in (skewed, inflated):
+        assert f.median is not None
+        assert f.p99 is not None
+        assert f.max is not None
+        assert f.flags != []
+
+    assert skewed.log_skew is not None
+    assert inflated.log_skew is None
+    assert any("skew" in fl for fl in skewed.flags)
+    assert any("zero_rate" in fl for fl in inflated.flags)
+
+
 def test_plot_numeric_qq_declared_id_excluded(tmp_path) -> None:
     figures_dir = tmp_path / "reports" / "figures"
     evidence_path = tmp_path / "artifacts" / "discover" / "qq_overview.json"
@@ -444,6 +474,7 @@ def test_render_profile_includes_qq_evidence() -> None:
                 status="plotted", reason=None, figure="figures/numeric_qq_1.png",
                 dist_figure="figures/numeric_dist_1.png",
                 zero_rate=0.125, skew=0.5, kurtosis=-0.25,
+                flags=["skew 0.50 exceeds 1.0"],
             ),
             QqFeature(
                 feature="b", n_valid=4, n_excluded=0, mean=2.5, std=1.0,
@@ -480,12 +511,14 @@ def test_render_profile_includes_qq_evidence() -> None:
     assert "fitted reference line" in md
     assert "How to read (distribution)" in md
     assert "### Distribution diagnostics" in md
-    assert "| Variable | mean | std | skew | kurtosis | zero_rate |" in md
-    assert "| a | 2.5 | 1 | 0.5 | -0.25 | 0.125 |" in md
-    assert "| b | 2.5 | 1 | -0.5 | 0.75 | 0.000 |" in md
-    assert "| disc | 1.5 | 0.5 | 0 | -1.2 | 0.333 |" in md
+    assert "| Variable | n | mean | std | skew | excess_kurtosis | zero_rate | p99/median | max/median | log_skew |" in md
+    assert "| a | 4 | 2.5 | 1 | 0.5 | -0.25 | 0.125 | - | - | - |" in md
+    assert "| b | 4 | 2.5 | 1 | -0.5 | 0.75 | 0.000 | - | - | - |" in md
+    assert "| disc | 4 | 1.5 | 0.5 | 0 | -1.2 | 0.333 | - | - | - |" in md
     assert "![Per-feature distribution diagnostics — figure 1 of 1](../figures/numeric_diagnostics.png)" in md
     assert "How to read (diagnostics)" in md
+    assert "### Decision flags" in md
+    assert "- a: skew 0.50 exceeds 1.0" in md
     assert "- const: zero variance" in md
     assert "- disc: discrete (3 unique values)" in md
     assert "- foo_id: name suggests an identifier" in md

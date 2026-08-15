@@ -45,20 +45,38 @@ How to read (distribution): actual spread and skew in original units; look for h
 
 ### Distribution diagnostics
 
-| Variable | mean | std | skew | kurtosis | zero_rate |
-| --- | --- | --- | --- | --- | --- |
-| passenger_count | 1.35 | 0.832 | 3.17 | 11.2 | 0.000 |
-| trip_distance | 3.31 | 4.35 | 2.82 | 9.04 | 0.000 |
-| total_amount | 27 | 22.5 | 2.71 | 21.8 | 0.000 |
-| tip_amount | 3.47 | 5.62 | 42.4 | 3.1e+03 | 0.218 |
-| airport_fee | 0.139 | 0.486 | 2.83 | 7.3 | 0.917 |
-| trip_duration_minutes | 15.5 | 12.6 | 2.51 | 10.6 | 0.000 |
+| Variable | n | mean | std | skew | excess_kurtosis | zero_rate | p99/median | max/median | log_skew |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| passenger_count | 10000 | 1.35 | 0.832 | 3.17 | 11.2 | 0.000 | 5 | 6 | 2.05 |
+| trip_distance | 10000 | 3.31 | 4.35 | 2.82 | 9.04 | 0.000 | 11.8 | 26.8 | 0.528 |
+| total_amount | 10000 | 27 | 22.5 | 2.71 | 21.8 | 0.000 | 5.1 | 22.5 | - |
+| tip_amount | 10000 | 3.47 | 5.62 | 42.4 | 3.1e+03 | 0.218 | 6.01 | 148 | - |
+| airport_fee | 10000 | 0.139 | 0.486 | 2.83 | 7.3 | 0.917 | - | - | - |
+| trip_duration_minutes | 10000 | 15.5 | 12.6 | 2.51 | 10.6 | 0.000 | 5.31 | 13.6 | -0.0499 |
 
 ![Per-feature distribution diagnostics — figure 1 of 1](../figures/numeric_diagnostics.png)
 
 In this figure: passenger_count, trip_distance, total_amount, tip_amount, airport_fee, trip_duration_minutes. Chunk 1 of 1; the trailing `_1` in the filename is the chunk number.
 
 How to read (diagnostics): colors are per-column z-scores; cell text is the raw value.
+
+### Decision flags
+
+- passenger_count: skew 3.17 exceeds 1.0
+- passenger_count: kurtosis 11.17 exceeds 3.0
+- trip_distance: skew 2.82 exceeds 1.0
+- trip_distance: kurtosis 9.04 exceeds 3.0
+- total_amount: skew 2.71 exceeds 1.0
+- total_amount: kurtosis 21.78 exceeds 3.0
+- tip_amount: zero_rate 0.218 exceeds 0.05
+- tip_amount: skew 42.43 exceeds 1.0
+- tip_amount: kurtosis 3103.29 exceeds 3.0
+- tip_amount: max/p99 ratio 24.6 exceeds 10.0
+- airport_fee: zero_rate 0.917 exceeds 0.05
+- airport_fee: skew 2.83 exceeds 1.0
+- airport_fee: kurtosis 7.30 exceeds 3.0
+- trip_duration_minutes: skew 2.51 exceeds 1.0
+- trip_duration_minutes: kurtosis 10.63 exceeds 3.0
 
 
 Notes:
