@@ -7,4 +7,5 @@ RAW_DIR = HERE.parents[2] / "data" / "raw"
 RESULTS = HERE.parents[2] / "experiments" / "results" / HERE.parents[0].name / HERE.name
 CLEAN_PARQUET = RESULTS / "sample_clean.parquet"
 FULL_PARQUET = RESULTS / "full_sample.parquet"
+RATECODE1_PARQUET = RESULTS / "ratecode1_sample.parquet"
 TESTS_JSON = RESULTS / "tests.json"
