@@ -18,6 +18,7 @@ from broadway.analysis.contracts import AnalysisContract
 from broadway.config.schema import PipelineConfig
 from broadway.config.viz import load_viz_config
 from broadway.data.loader import canonical_path
+from broadway.discover.qq import attach_qq_legend, draw_qq_zones
 from broadway.lineage.models import SampleSpec
 from broadway.reports.results import humanize_float, humanize_pvalue
 from broadway.stats.anova import run_anova, run_kruskal, run_welch
@@ -191,6 +192,7 @@ def _plot_qq_joint(
     if max_groups is None:
         max_groups = load_walkthrough_config().max_qq_groups
     viz_cfg = load_viz_config()
+    zones = viz_cfg.qq_zones
     names = list(groups)[:max_groups]
     n = len(names)
     n_cols = max(1, int(np.ceil(np.sqrt(n))))
@@ -205,6 +207,7 @@ def _plot_qq_joint(
     )
     ax_flat = axes.ravel()
     skipped: list[str] = []
+    any_shelf = False
     plotted = 0
     total = 0
     for name in names:
@@ -224,6 +227,7 @@ def _plot_qq_joint(
             alpha=viz.QQ_SCATTER_ALPHA,
             edgecolor=viz.QQ_SCATTER_EDGE_COLOR,
             color=colors[plotted],
+            zorder=3,
         )
         xs = np.array([osm.min(), osm.max()])
         ax.plot(
@@ -232,7 +236,9 @@ def _plot_qq_joint(
             color=viz.QQ_REF_LINE_COLOR,
             linestyle=viz.QQ_REF_LINE_STYLE,
             linewidth=viz.QQ_REF_LINE_WIDTH,
+            zorder=2,
         )
+        any_shelf = draw_qq_zones(ax, zones, None, draw_shelf=False) or any_shelf
         ax.set_xlabel(viz.QQ_XLABEL, fontsize=viz.LABEL_FONTSIZE)
         ax.set_ylabel(viz.QQ_YLABEL, fontsize=viz.LABEL_FONTSIZE)
         ax.set_title(name, fontsize=viz.TITLE_FONTSIZE)
@@ -252,7 +258,8 @@ def _plot_qq_joint(
         f"Per-group Q-Q plots (per-group standardization) — n = {total:,}",
         fontsize=viz.SUPTITLE_FONTSIZE,
     )
-    fig.savefig(out_path, dpi=viz_cfg.dpi, bbox_inches="tight")
+    attach_qq_legend(fig, zones, any_shelf)
+    fig.savefig(out_path, dpi=viz_cfg.dpi)
     plt.close(fig)
     return plotted
 

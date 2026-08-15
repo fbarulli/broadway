@@ -704,7 +704,27 @@ def test_qq_zero_mass_shelf_backward_compat(tmp_path, monkeypatch) -> None:
     assert len(ax.lines) == 1
 
 
-def test_qq_zones_not_on_joint(tmp_path, monkeypatch) -> None:
+def test_qq_figure_legend(tmp_path, monkeypatch) -> None:
+    import broadway.discover.qq as qq_module
+
+    zones = load_viz_config().qq_zones
+    captured: list = []
+    monkeypatch.setattr(qq_module.plt, "close", lambda fig: captured.append(fig))
+
+    shelf_trace = ("f", np.array([-1.0, 0.0, 1.0]), np.array([-1.0, 0.0, 1.0]), 1.0, 0.0, 0.5)
+    _plot_chunk([shelf_trace], tmp_path / "legend_shelf.png", 1, 1, 3.0, 100, "BuPu_r", 10000, zones)
+    fig = captured[-1]
+    assert len(fig.legends) == 1
+    assert len(fig.legends[0].legend_handles) == 3
+
+    no_shelf_trace = ("f", np.array([-1.0, 0.0, 1.0]), np.array([-1.0, 0.0, 1.0]), 1.0, 0.0, 0.0)
+    _plot_chunk([no_shelf_trace], tmp_path / "legend_no_shelf.png", 1, 1, 3.0, 100, "BuPu_r", 10000, zones)
+    fig = captured[-1]
+    assert len(fig.legends) == 1
+    assert len(fig.legends[0].legend_handles) == 2
+
+
+def test_qq_zones_on_joint(tmp_path, monkeypatch) -> None:
     import broadway.timeline.runners as runners_module
 
     rng = np.random.default_rng(0)
@@ -714,8 +734,10 @@ def test_qq_zones_not_on_joint(tmp_path, monkeypatch) -> None:
     runners._plot_qq_joint(groups, tmp_path / "joint.png")
     fig = captured[-1]
     for ax in fig.axes:
-        assert len(ax.patches) == 0
-        assert len(ax.lines) == (1 if ax.get_visible() else 0)
+        if ax.get_visible():
+            assert len(ax.patches) >= 2
+    assert len(fig.legends) == 1
+    assert len(fig.legends[0].legend_handles) == 2
 
 
 def test_dist_subplot_titles_are_feature_names_only(tmp_path, monkeypatch) -> None:

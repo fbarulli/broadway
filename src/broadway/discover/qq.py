@@ -19,6 +19,8 @@ import matplotlib
 matplotlib.use("Agg")  # headless; set before pyplot import
 import matplotlib.colors
 import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
+from matplotlib.patches import Patch
 import numpy as np
 import pandas as pd
 from pydantic import BaseModel, ConfigDict
@@ -115,6 +117,39 @@ def _grid_dims(n: int) -> tuple[int, int]:
     return n_rows, n_cols
 
 
+def draw_qq_zones(ax, zones: QqZonesConfig, zero_rate: float | None, draw_shelf: bool = True) -> bool:
+    """Draw central/tail bands and (optionally) the zero-mass shelf. Return True if a shelf was drawn."""
+    if not zones.enabled:
+        return False
+    xmin, xmax = ax.get_xlim()
+    ymin, ymax = ax.get_ylim()
+    ax.axvspan(xmin, -zones.tail_threshold, color=zones.zone_color, alpha=zones.tail_alpha, zorder=0)
+    ax.axvspan(zones.tail_threshold, xmax, color=zones.zone_color, alpha=zones.tail_alpha, zorder=0)
+    ax.axvspan(stats.norm.ppf(zones.central_quantiles[0]), stats.norm.ppf(zones.central_quantiles[1]), color=zones.zone_color, alpha=zones.central_alpha, zorder=0)
+    if draw_shelf and zero_rate is not None and zero_rate > zones.zero_mass_threshold and ymin <= 0 <= ymax:
+        ax.axhline(y=0, color=zones.shelf_color, linestyle="--", linewidth=1, alpha=0.7, zorder=2)
+        return True
+    return False
+
+
+def build_qq_legend_handles(zones: QqZonesConfig, any_shelf: bool) -> list:
+    mid = int((zones.central_quantiles[1] - zones.central_quantiles[0]) * 100)
+    handles = [
+        Patch(facecolor=zones.zone_color, alpha=zones.central_alpha, label=f"middle {mid}%"),
+        Patch(facecolor=zones.zone_color, alpha=zones.tail_alpha, label=f"±{zones.tail_threshold}σ tails"),
+    ]
+    if any_shelf:
+        handles.append(Line2D([0], [0], color=zones.shelf_color, linestyle="--", linewidth=1, label="zero-mass shelf"))
+    return handles
+
+
+def attach_qq_legend(fig, zones: QqZonesConfig, any_shelf: bool) -> None:
+    if not zones.enabled:
+        return
+    handles = build_qq_legend_handles(zones, any_shelf)
+    fig.legend(handles=handles, loc="lower center", ncol=len(handles), fontsize=viz.TICK_FONTSIZE, frameon=False)
+
+
 def _plot_chunk(
     traces: list[tuple[str, np.ndarray, np.ndarray, float, float, float | None]],
     out_path: Path,
@@ -136,6 +171,7 @@ def _plot_chunk(
         layout="constrained",
     )
     ax_flat = axes.ravel()
+    any_shelf = False
     for color, ax, (name, osm, osr, slope, intercept, zero_rate) in zip(colors, ax_flat, traces):
         ax.scatter(
             osm, osr,
@@ -145,8 +181,6 @@ def _plot_chunk(
             color=color,
             zorder=3,
         )
-        xmin, xmax = ax.get_xlim()
-        ymin, ymax = ax.get_ylim()
         xs = np.array([osm.min(), osm.max()])
         ax.plot(
             xs, slope * xs + intercept,
@@ -155,29 +189,7 @@ def _plot_chunk(
             linewidth=viz.QQ_REF_LINE_WIDTH,
             zorder=2,
         )
-        if zones.enabled:
-            ax.axvspan(
-                xmin, -zones.tail_threshold,
-                color=zones.zone_color, alpha=zones.tail_alpha, zorder=0,
-            )
-            ax.axvspan(
-                zones.tail_threshold, xmax,
-                color=zones.zone_color, alpha=zones.tail_alpha, zorder=0,
-            )
-            ax.axvspan(
-                stats.norm.ppf(zones.central_quantiles[0]),
-                stats.norm.ppf(zones.central_quantiles[1]),
-                color=zones.zone_color, alpha=zones.central_alpha, zorder=0,
-            )
-            if (
-                zero_rate is not None
-                and zero_rate > zones.zero_mass_threshold
-                and ymin <= 0 <= ymax
-            ):
-                ax.axhline(
-                    y=0, color=zones.shelf_color,
-                    linestyle="--", linewidth=1, alpha=0.7, zorder=2,
-                )
+        any_shelf = draw_qq_zones(ax, zones, zero_rate) or any_shelf
         ax.set_xlabel(viz.QQ_XLABEL, fontsize=viz.LABEL_FONTSIZE)
         ax.set_ylabel(viz.QQ_YLABEL, fontsize=viz.LABEL_FONTSIZE)
         ax.set_title(name, fontsize=viz.TITLE_FONTSIZE)
@@ -186,12 +198,11 @@ def _plot_chunk(
         viz.despine(ax)
     for ax in ax_flat[n:]:
         ax.set_visible(False)
+    attach_qq_legend(fig, zones, any_shelf)
     title = "Per-feature Q-Q plots (standardized)"
     if n_figs > 1:
         title += f" - figure {fig_num} of {n_figs}"
     title += f" — n = {n_rows:,}"
-    mid = int((zones.central_quantiles[1] - zones.central_quantiles[0]) * 100)
-    title += f"\nshaded = middle {mid}% (centre) / ±{zones.tail_threshold}σ tails; red dashed h-line = zero-mass shelf"
     fig.suptitle(title, fontsize=viz.SUPTITLE_FONTSIZE)
     fig.savefig(out_path, dpi=dpi)
     plt.close(fig)
