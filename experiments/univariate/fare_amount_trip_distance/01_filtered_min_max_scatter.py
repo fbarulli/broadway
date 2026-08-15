@@ -1,9 +1,8 @@
-"""Step 1: clean the raw fare_amount vs trip_distance relationship and plot it.
+"""01: clean the raw fare_amount vs trip_distance relationship and plot it.
 
-Draws a random 50k sample (no boroughs, no stratification) via the generic
-read_sample loader, filters out garbage, saves the cleaned sample, and renders a
-density scatter of trip_distance (x) vs fare_amount (y). Results are written to
-experiments/results/<category>/<name>/ (gitignored).
+Draws a random 50k sample via the generic read_sample loader, filters out
+garbage, saves the cleaned sample, and renders a density scatter of
+trip_distance (x) vs fare_amount (y).
 """
 
 from pathlib import Path
@@ -13,10 +12,10 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pandas as pd
 
+from _common import CLEAN_PARQUET, RESULTS
 from project.data import read_training_sample
 
-HERE = Path(__file__).resolve().parent
-RESULTS = HERE.parents[2] / "experiments" / "results" / HERE.parents[0].name / HERE.name
+OUT = RESULTS / f"{Path(__file__).stem}.png"
 
 SAMPLE_SIZE = 50_000
 MIN_FARE = 2.50
@@ -26,7 +25,7 @@ MAX_DISTANCE = 50.0
 
 def clean(df: pd.DataFrame) -> pd.DataFrame:
     return df[
-          (df["fare_amount"] > MIN_FARE)
+        (df["fare_amount"] > MIN_FARE)
         & (df["trip_distance"] > MIN_DISTANCE)
         & (df["trip_distance"] <= MAX_DISTANCE)
     ]
@@ -57,13 +56,13 @@ def main() -> None:
         sample=SAMPLE_SIZE, columns=["fare_amount", "trip_distance"]
     )
     cleaned = clean(raw)
-    cleaned.to_parquet(RESULTS / "sample_clean.parquet")
-    scatter(cleaned, RESULTS / "01_filtered_min_max_scatter.png")
+    cleaned.to_parquet(CLEAN_PARQUET)
+    scatter(cleaned, OUT)
     print(f"random sample rows: {len(raw)}")
     print(f"rows after filter: {len(cleaned)}")
     print(f"rows removed: {len(raw) - len(cleaned)}")
-    print(f"wrote {RESULTS / 'sample_clean.parquet'}")
-    print(f"wrote {RESULTS / '01_filtered_min_max_scatter.png'}")
+    print(f"wrote {CLEAN_PARQUET}")
+    print(f"wrote {OUT}")
 
 
 if __name__ == "__main__":

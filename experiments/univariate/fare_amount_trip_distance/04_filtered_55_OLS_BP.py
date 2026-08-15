@@ -14,20 +14,19 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
+from _common import CLEAN_PARQUET, RESULTS
 from broadway.stats.regression import bp_jb, fit_ols
 
-HERE = Path(__file__).resolve().parent
-RESULTS = HERE.parents[2] / "experiments" / "results" / HERE.parents[0].name / HERE.name
+OUT = RESULTS / f"{Path(__file__).stem}.png"
 
 METERED_CUTOFF = 55.0
 ALPHA = 0.05
 
 
 def load_metered() -> pd.DataFrame:
-    path = RESULTS / "sample_clean.parquet"
-    if not path.exists():
-        raise FileNotFoundError(f"{path} not found — run 01_filtered_min_max_scatter.py first")
-    df = pd.read_parquet(path)
+    if not CLEAN_PARQUET.exists():
+        raise FileNotFoundError(f"{CLEAN_PARQUET} not found — run 01_filtered_min_max_scatter.py first")
+    df = pd.read_parquet(CLEAN_PARQUET)
     return df[df["fare_amount"] < METERED_CUTOFF]
 
 
@@ -64,12 +63,12 @@ def main() -> None:
     ax_bp.grid(True, alpha=0.3)
 
     fig.tight_layout()
-    fig.savefig(RESULTS / "04_filtered_55_OLS_BP.png", dpi=150)
+    fig.savefig(OUT, dpi=150)
     plt.close(fig)
 
     print(f"metered rows: {len(metered)}")
     print(f"Breusch-Pagan p-value: {p_value:.4f}")
-    print(f"wrote {RESULTS / '04_filtered_55_OLS_BP.png'}")
+    print(f"wrote {OUT}")
 
 
 if __name__ == "__main__":
