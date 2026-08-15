@@ -19,6 +19,10 @@ columns:
     dtype: int32
     null_count: 0
     role: feature
+  tip_amount:
+    dtype: float64
+    null_count: 0
+    role: feature
   total_amount:
     dtype: float64
     null_count: 0

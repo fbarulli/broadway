@@ -45,6 +45,7 @@ def raw_trips() -> pd.DataFrame:
             "DOLocationID": [1, 2, 3, 4, 5],
             "passenger_count": [1.0, 2.0, 1.0, 3.0, 1.0],
             "total_amount": [25.0, 20.0, 10.0, 35.0, 15.0],
+            "tip_amount": [0.0, 1.5, 0.0, 2.0, 0.0],
             "Airport_fee": [0.0, 0.0, 1.25, 0.0, 0.0],
         }
     )

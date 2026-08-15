@@ -2,7 +2,7 @@
 
 ## Answer
 
-The dataset has 8545833 rows and 8 columns.
+The dataset has 8545833 rows and 9 columns.
 
 ## Key evidence
 
@@ -16,6 +16,7 @@ The dataset has 8545833 rows and 8 columns.
 | pickup_location_id | int32 | 0 | 257 | 1 | 265 |
 | dropoff_location_id | int32 | 0 | 261 | 1 | 265 |
 | total_amount | float64 | 0 | 23975 | -1000.0 | 1021.99 |
+| tip_amount | float64 | 0 | 5132 | -300.0 | 999.99 |
 | airport_fee | float64 | 0 | 3 | -1.75 | 1.75 |
 | trip_duration_minutes | float64 | 0 | 8721 | 1.0 | 179.71666666666667 |
 
@@ -26,10 +27,11 @@ none
 ## Profile evidence
 
 Traces are per-feature z-score.
+Sample size: n = 10,000
 
 ![Per-feature Q-Q plots — figure 1 of 1](../figures/numeric_qq_1.png)
 
-In this figure: trip_distance, total_amount, trip_duration_minutes. Chunk 1 of 1; the trailing `_1` in the filename is the chunk number.
+In this figure: trip_distance, total_amount, tip_amount, trip_duration_minutes. Chunk 1 of 1; the trailing `_1` in the filename is the chunk number.
 
 How to read (Q-Q): points should follow the fitted reference line; S-curves indicate tail behavior; curvature indicates skew.
 
@@ -37,7 +39,7 @@ Histograms are in raw units.
 
 ![Per-feature distributions — figure 1 of 1](../figures/numeric_dist_1.png)
 
-In this figure: passenger_count, trip_distance, total_amount, airport_fee, trip_duration_minutes. Chunk 1 of 1; the trailing `_1` in the filename is the chunk number.
+In this figure: passenger_count, trip_distance, total_amount, tip_amount, airport_fee, trip_duration_minutes. Chunk 1 of 1; the trailing `_1` in the filename is the chunk number.
 
 How to read (distribution): actual spread and skew in original units; look for heavy tails, multimodality, and gaps.
 

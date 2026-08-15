@@ -43,7 +43,7 @@ It hard-fails on any column mismatch via `validate_raw_schema`
 (`features/contracts.py`): exactly `RAW_FEATURES + [TARGET]`, no nulls, strict
 dtypes.
 
-Expected 8 columns (`features/schema.py`):
+Expected 9 columns (`features/schema.py`):
 
 - `pickup_datetime`
 - `passenger_count`
@@ -51,6 +51,7 @@ Expected 8 columns (`features/schema.py`):
 - `pickup_location_id`
 - `dropoff_location_id`
 - `total_amount`
+- `tip_amount`
 - `airport_fee`
 - `trip_duration_minutes` (target)
 
@@ -109,7 +110,7 @@ uv run pytest -q
 
 ## Key column facts (what "correct" means)
 
-- **Contract source of truth:** `configs/dataset/taxi.yaml` — 8 columns, each
+- **Contract source of truth:** `configs/dataset/taxi.yaml` — 9 columns, each
   with `dtype`, `null_count`, and `role`.
 - **Raw-boundary check** (`contracts`) verifies **presence + nulls only**;
   dtype is intentionally deferred (`contracts/checks.py`).

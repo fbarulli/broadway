@@ -22,6 +22,7 @@ RAW_FEATURES = [
     "pickup_location_id",
     "dropoff_location_id",
     "total_amount",
+    "tip_amount",
     "airport_fee",
 ]
 
@@ -32,6 +33,7 @@ RAW_FEATURE_TYPES = {
     "pickup_location_id": int,
     "dropoff_location_id": int,
     "total_amount": float,
+    "tip_amount": float,
     "airport_fee": float,
 }
 
