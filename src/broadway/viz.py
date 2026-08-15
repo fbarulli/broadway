@@ -30,7 +30,7 @@ def default_palette() -> str:
 def palette_colors(n: int, palette: str | None = None) -> list:
     if palette is None:
         palette = default_palette()
-    return sns.color_palette(palette, n)
+    return sns.color_palette(palette, n + 3)[:n]
 
 
 def despine(ax: Axes) -> None:
