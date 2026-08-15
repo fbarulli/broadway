@@ -64,14 +64,13 @@ Suggestions are **de-prescribed**: the product prints `--method <method>` templa
 COMPLETE — see "Completed work" items 7–11 (commits `b30fe34`, `2e951cf`, `66b1cec` + `17ca922`, `44fc1fa`).
 
 ## Deferred queue (order confirmed)
-1. **Registry refactor** — method allowlists (`decide.py::ALLOWED_METHODS` vs `walkthrough.py::_OMNIBUS_METHODS`) + `EXECUTABLE_STEPS`/`_STEP_ACTION`/`PARENTS_BY_KIND` → registry/flow config.
-2. **W2 main-sync** — taxi-free `main`; convert/exclude taxi-referencing tests (`test_contracts.py:31` real-parquet load, hardcoded taxi stats in `test_walkthrough.py`/`test_results.py`, `dataset="taxi"` coupling).
-3. **Cleanup/polish slice** — orphaned legacy results-index (`render_index`/`load_stats_sequence`/`RESULT_RENDERERS`), doc drift (`README.md:92`, `stats/API.md:199` still describe retired `stats describe`), taxi strings in `audit.py` ("NYC boroughs"), dead code (`suggest.py` unused cfg, `decide.py::_question_for` re-reads YAML), silent posthoc skip, unlabeled Q-Q truncation.
-4. **LoadAudit / ParsingPolicy**.
-5. **Lineage-viz** (`graph_todo.md`).
-6. Move suggestion templates + effect-size wording into config; delete legacy `report` wrapper.
-7. Pin sample/evidence, then refresh reports (drift follow-up).
-8. W1-flagged: Q-Q style constants Python-vs-YAML decision; hardcoded `figures/` path prefix.
+1. **W2 main-sync** — taxi-free `main`; convert/exclude taxi-referencing tests (`test_contracts.py:31` real-parquet load, hardcoded taxi stats in `test_walkthrough.py`/`test_results.py`, `dataset="taxi"` coupling).
+2. **Cleanup/polish slice** — orphaned legacy results-index (`render_index`/`load_stats_sequence`/`RESULT_RENDERERS`), doc drift (`README.md:92`, `stats/API.md:199` still describe retired `stats describe`), taxi strings in `audit.py` ("NYC boroughs"), dead code (`suggest.py` unused cfg, `decide.py::_question_for` re-reads YAML), silent posthoc skip, unlabeled Q-Q truncation.
+3. **LoadAudit / ParsingPolicy**.
+4. **Lineage-viz** (`graph_todo.md`).
+5. Move suggestion templates + effect-size wording into config; delete legacy `report` wrapper.
+6. Pin sample/evidence, then refresh reports (drift follow-up).
+7. W1-flagged: Q-Q style constants Python-vs-YAML decision; hardcoded `figures/` path prefix.
 
 ## Working principles to preserve
 - Results are the primary human-facing product surface. Audit explains what happened to the data. Timeline explains where the analyst is. Evidence reports what diagnostics found. Suggestions guide, never decide. Decisions belong to the analyst and are explicitly recorded. Lineage is provenance, not the workflow UI.

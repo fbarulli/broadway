@@ -241,13 +241,13 @@ broadway/
       module.py             # ds-pipeline lineage command
     timeline/               # hypothesis walkthrough: step sequence + decision gates (the "analysis timeline")
       models.py             # StepStatus / AnalysisStep / AnalysisDecision / Suggestion / Alternative (Pydantic)
-      sequence.py           # WalkthroughSequence / WalkthroughConfig + loaders (configs/flow/hypothesis_walkthrough.yaml, configs/step/walkthrough.yaml)
+      sequence.py           # WalkthroughSequence / DecisionSpec / WalkthroughConfig.decisions / WalkthroughStepConfig.action + loaders (configs/flow/hypothesis_walkthrough.yaml, configs/step/walkthrough.yaml)
       module.py             # steps_dir/decisions_dir + save/load AnalysisStep / AnalysisDecision (artifacts/timeline/<analysis>/)
       evidence.py           # typed evidence: NormalityEvidence / VarianceEvidence / PosthocEvidence / ConclusionEvidence
       runners.py            # run_describe/run_normality/run_variance/run_omnibus/run_posthoc/run_conclusion (one runner per evidence step)
-      walkthrough.py        # ds-pipeline walkthrough: advances the sequence, stops at decision gates, captures failures
-      decide.py             # ds-pipeline decide: record() an AnalysisDecision (method allowlist per kind)
-      suggest.py            # suggest_after / suggest_next: deterministic next-action suggestion layer
+      walkthrough.py        # ds-pipeline walkthrough: _STEP_RUNNERS executor registry, advances the sequence, stops at decision gates, captures failures
+      decide.py             # ds-pipeline decide: record() an AnalysisDecision (methods + parents from config-driven decision registry)
+      suggest.py            # suggest_after / suggest_next via _DECIDE_SUGGESTERS / _EVIDENCE_SUGGESTERS registries
     reports/                # human-facing product surface (index + timeline + per-step markdown + figures)
       paths.py              # REPORTS_DIR / RESULTS_DIR / FIGURES_DIR / AUDIT_DIR / TIMELINE_PATH / INDEX_PATH (owns the surface paths)
       markdown.py           # render_result(title, sections) -> markdown
