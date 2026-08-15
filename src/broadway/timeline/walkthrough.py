@@ -2,7 +2,12 @@ from __future__ import annotations
 
 import logging
 import traceback
+from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Callable
+
+import numpy as np
+import pandas as pd
 
 from broadway.analysis.contracts import AnalysisContract, AnalysisMode, require_mode
 from broadway.config.schema import PipelineConfig
@@ -18,6 +23,7 @@ from broadway.timeline.models import AnalysisDecision, AnalysisStep, StepStatus,
 from broadway.timeline.sequence import (
     WalkthroughConfig,
     WalkthroughSequence,
+    WalkthroughStepConfig,
     load_walkthrough_config,
     load_walkthrough_sequence,
 )
@@ -26,7 +32,28 @@ logger = logging.getLogger(__name__)
 
 TIMELINE_DIR = timeline_module.TIMELINE_DIR
 
-EXECUTABLE_STEPS = {"describe_groups", "normality", "variance", "omnibus", "posthoc", "conclusion"}
+
+@dataclass
+class StepContext:
+    analysis: AnalysisContract
+    df: pd.DataFrame
+    groups: dict[str, np.ndarray]
+    group_column: str
+    source_group_column: str
+    group_values: list[str]
+    target: str
+    source_path: str
+    sample_name: str | None
+    source: str
+    out_dir: Path
+    figures_dir: Path
+    attrition: dict
+    sequence: WalkthroughSequence
+    thresholds: WalkthroughConfig
+
+
+class _StopWalkthrough(Exception):
+    pass
 
 
 def _resolved_decision(analysis: str, kind: str) -> AnalysisDecision | None:
@@ -169,6 +196,93 @@ def _warn_stale_decisions(analysis: str) -> None:
                 break
 
 
+def _run_describe(
+    analysis: AnalysisContract, step: WalkthroughStepConfig, ctx: StepContext
+) -> AnalysisStep:
+    return runners.run_describe(
+        analysis, step.order, step.question, ctx.df, ctx.group_column,
+        ctx.source_group_column, ctx.group_values, ctx.target, ctx.source_path,
+        ctx.sample_name, ctx.source, ctx.out_dir, ctx.figures_dir, ctx.attrition,
+    )
+
+
+def _run_normality(
+    analysis: AnalysisContract, step: WalkthroughStepConfig, ctx: StepContext
+) -> AnalysisStep:
+    return runners.run_normality(
+        analysis, step.order, step.question, ctx.groups, ctx.out_dir,
+        ctx.figures_dir, ctx.source, ctx.sample_name,
+    )
+
+
+def _run_variance(
+    analysis: AnalysisContract, step: WalkthroughStepConfig, ctx: StepContext
+) -> AnalysisStep:
+    return runners.run_variance(
+        analysis, step.order, step.question, ctx.groups, ctx.out_dir, ctx.source, ctx.sample_name,
+    )
+
+
+def _run_omnibus(
+    analysis: AnalysisContract, step: WalkthroughStepConfig, ctx: StepContext
+) -> AnalysisStep:
+    decision = _resolved_decision(analysis.name, "omnibus")
+    if decision is None:
+        print("no omnibus decision recorded")
+        _write_timeline(analysis, ctx.sequence, ctx.thresholds)
+        raise _StopWalkthrough()
+    return runners.run_omnibus(
+        analysis, step.order, step.question, ctx.groups, decision.method,
+        ctx.out_dir, ctx.source, ctx.sample_name,
+    )
+
+
+def _run_posthoc(
+    analysis: AnalysisContract, step: WalkthroughStepConfig, ctx: StepContext
+) -> AnalysisStep | None:
+    omnibus_step = timeline_module.load_step(analysis.name, "omnibus")
+    if (
+        omnibus_step is not None
+        and omnibus_step.result_summary.get("passed") is False
+    ):
+        logger.info("post-hoc not warranted: omnibus not significant")
+        return None
+    decision = _resolved_decision(analysis.name, "posthoc")
+    if decision is None:
+        print("no posthoc decision recorded")
+        _write_timeline(analysis, ctx.sequence, ctx.thresholds)
+        raise _StopWalkthrough()
+    return runners.run_posthoc(
+        analysis, step.order, step.question, ctx.df, ctx.source_group_column, ctx.target,
+        decision.method, ctx.out_dir, ctx.source, ctx.sample_name,
+    )
+
+
+def _run_conclusion(
+    analysis: AnalysisContract, step: WalkthroughStepConfig, ctx: StepContext
+) -> AnalysisStep:
+    omnibus_step = timeline_module.load_step(analysis.name, "omnibus")
+    if omnibus_step is None:
+        print("no omnibus evidence recorded")
+        _write_timeline(analysis, ctx.sequence, ctx.thresholds)
+        raise _StopWalkthrough()
+    posthoc_step = timeline_module.load_step(analysis.name, "posthoc")
+    return runners.run_conclusion(
+        analysis, step.order, step.question, omnibus_step, posthoc_step,
+        ctx.out_dir, ctx.source, ctx.sample_name,
+    )
+
+
+_STEP_RUNNERS: dict[str, Callable] = {
+    "describe_groups": _run_describe,
+    "normality": _run_normality,
+    "variance": _run_variance,
+    "omnibus": _run_omnibus,
+    "posthoc": _run_posthoc,
+    "conclusion": _run_conclusion,
+}
+
+
 def run(cfg: PipelineConfig, sample: SampleSpec | None, force: bool) -> None:
     analysis = require_mode(cfg.analysis, AnalysisMode.HYPOTHESIS)
     if analysis.hypothesis is None:
@@ -185,6 +299,23 @@ def run(cfg: PipelineConfig, sample: SampleSpec | None, force: bool) -> None:
     source_path = sample.path if sample else str(runners.canonical_path(cfg.dataset, cfg.environment))
     group_values = analysis.hypothesis.group_values
     target = cfg.dataset.target
+    ctx = StepContext(
+        analysis=analysis,
+        df=df,
+        groups=groups,
+        group_column=group_column,
+        source_group_column=source_group_column,
+        group_values=group_values,
+        target=target,
+        source_path=source_path,
+        sample_name=sample_name,
+        source=source,
+        out_dir=out_dir,
+        figures_dir=figures_dir,
+        attrition=attrition,
+        sequence=sequence,
+        thresholds=thresholds,
+    )
 
     completed = 0
     for step in sorted(sequence.steps, key=lambda s: s.order):
@@ -228,72 +359,23 @@ def run(cfg: PipelineConfig, sample: SampleSpec | None, force: bool) -> None:
             if decision_suggestion is not None:
                 _print_suggestion(decision_suggestion)
             return
-        if step.id not in EXECUTABLE_STEPS:
+        if step.id not in _STEP_RUNNERS:
             _write_timeline(analysis, sequence, thresholds)
             print(f"step '{step.id}' not yet implemented; stopping.")
             return
         if not force and timeline_module.load_step(analysis.name, step.id) is not None:
             logger.info("skipped %s (already exists)", step.id)
             continue
+        executor = _STEP_RUNNERS[step.id]
         try:
-            if step.id == "describe_groups":
-                step_result = runners.run_describe(
-                    analysis, step.order, step.question, df, group_column,
-                    source_group_column, group_values, target, source_path,
-                    sample_name, source, out_dir, figures_dir, attrition,
-                )
-            elif step.id == "normality":
-                step_result = runners.run_normality(
-                    analysis, step.order, step.question, groups, out_dir,
-                    figures_dir, source, sample_name,
-                )
-            elif step.id == "variance":
-                step_result = runners.run_variance(
-                    analysis, step.order, step.question, groups, out_dir, source, sample_name,
-                )
-            elif step.id == "omnibus":
-                decision = _resolved_decision(analysis.name, "omnibus")
-                if decision is None:
-                    print("no omnibus decision recorded")
-                    _write_timeline(analysis, sequence, thresholds)
-                    return
-                step_result = runners.run_omnibus(
-                    analysis, step.order, step.question, groups, decision.method,
-                    out_dir, source, sample_name,
-                )
-            elif step.id == "posthoc":
-                omnibus_step = timeline_module.load_step(analysis.name, "omnibus")
-                if (
-                    omnibus_step is not None
-                    and omnibus_step.result_summary.get("passed") is False
-                ):
-                    logger.info("post-hoc not warranted: omnibus not significant")
-                    continue
-                decision = _resolved_decision(analysis.name, "posthoc")
-                if decision is None:
-                    print("no posthoc decision recorded")
-                    _write_timeline(analysis, sequence, thresholds)
-                    return
-                step_result = runners.run_posthoc(
-                    analysis, step.order, step.question, df, source_group_column, target,
-                    decision.method, out_dir, source, sample_name,
-                )
-            elif step.id == "conclusion":
-                omnibus_step = timeline_module.load_step(analysis.name, "omnibus")
-                if omnibus_step is None:
-                    print("no omnibus evidence recorded")
-                    _write_timeline(analysis, sequence, thresholds)
-                    return
-                posthoc_step = timeline_module.load_step(analysis.name, "posthoc")
-                step_result = runners.run_conclusion(
-                    analysis, step.order, step.question, omnibus_step, posthoc_step,
-                    out_dir, source, sample_name,
-                )
-            else:
-                continue
+            step_result = executor(analysis, step, ctx)
+        except _StopWalkthrough:
+            return
         except Exception as exc:
             _handle_failure(analysis, step, exc, source, sample_name)
             return
+        if step_result is None:
+            continue
         timeline_module.save_step(step_result)
         completed += 1
         step_suggestion = suggest.suggest_after(
