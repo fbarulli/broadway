@@ -295,6 +295,62 @@ def test_plot_numeric_qq_distribution_metrics_and_flags(tmp_path) -> None:
     assert any("zero_rate" in fl for fl in inflated.flags)
 
 
+def test_plot_numeric_qq_log_figure_generated(tmp_path) -> None:
+    figures_dir = tmp_path / "reports" / "figures"
+    evidence_path = tmp_path / "artifacts" / "discover" / "qq_overview.json"
+    rng = np.random.default_rng(0)
+    df = pd.DataFrame({"skewed_positive": np.exp(rng.normal(0.0, 1.0, 500))})
+
+    overview = plot_numeric_qq(df, figures_dir, evidence_path, source_path="data.csv")
+
+    assert overview.log_figures == ["figures/numeric_qq_log_1.png"]
+    assert (figures_dir / "numeric_qq_log_1.png").exists()
+    skewed = next(f for f in overview.features if f.feature == "skewed_positive")
+    assert skewed.log_figure == "figures/numeric_qq_log_1.png"
+    assert skewed.status == "plotted"
+
+
+def test_plot_numeric_qq_no_log_figure_when_no_qualifying(tmp_path) -> None:
+    figures_dir = tmp_path / "reports" / "figures"
+    evidence_path = tmp_path / "artifacts" / "discover" / "qq_overview.json"
+    rng = np.random.default_rng(0)
+    df = pd.DataFrame(
+        {
+            "normal": rng.normal(0.0, 1.0, 200),
+            "negative": -np.exp(rng.normal(0.0, 1.0, 200)),
+        }
+    )
+
+    overview = plot_numeric_qq(df, figures_dir, evidence_path, source_path="data.csv")
+
+    assert overview.log_figures == []
+    assert list(figures_dir.glob("numeric_qq_log_*.png")) == []
+    assert all(f.log_figure == "" for f in overview.features)
+
+
+def test_plot_numeric_qq_discrete_right_skewed_no_log_figure(tmp_path) -> None:
+    figures_dir = tmp_path / "reports" / "figures"
+    evidence_path = tmp_path / "artifacts" / "discover" / "qq_overview.json"
+    rng = np.random.default_rng(0)
+    df = pd.DataFrame(
+        {
+            "passenger_count": rng.choice(
+                [1, 2, 3, 4, 5], size=200, p=[0.7, 0.15, 0.08, 0.05, 0.02]
+            ).astype(float),
+            "skewed_positive": np.exp(rng.normal(0.0, 1.0, 200)),
+        }
+    )
+
+    overview = plot_numeric_qq(df, figures_dir, evidence_path, source_path="data.csv")
+
+    pc = next(f for f in overview.features if f.feature == "passenger_count")
+    assert pc.status == "discrete"
+    assert pc.log_figure == ""
+    assert overview.log_figures == ["figures/numeric_qq_log_1.png"]
+    log_names = [f.feature for f in overview.features if f.log_figure]
+    assert log_names == ["skewed_positive"]
+
+
 def test_plot_numeric_qq_declared_id_excluded(tmp_path) -> None:
     figures_dir = tmp_path / "reports" / "figures"
     evidence_path = tmp_path / "artifacts" / "discover" / "qq_overview.json"
@@ -473,6 +529,7 @@ def test_render_profile_includes_qq_evidence() -> None:
                 feature="a", n_valid=4, n_excluded=0, mean=2.5, std=1.0,
                 status="plotted", reason=None, figure="figures/numeric_qq_1.png",
                 dist_figure="figures/numeric_dist_1.png",
+                log_figure="figures/numeric_qq_log_1.png",
                 zero_rate=0.125, skew=0.5, kurtosis=-0.25,
                 flags=["skew 0.50 exceeds 1.0"],
             ),
@@ -495,15 +552,20 @@ def test_render_profile_includes_qq_evidence() -> None:
         ],
         figures=["figures/numeric_qq_1.png"],
         dist_figures=["figures/numeric_dist_1.png"],
+        log_figures=["figures/numeric_qq_log_1.png"],
         diagnostics_figures=["figures/numeric_diagnostics.png"],
         sample_size=10000,
     )
     md = audit.render_profile(_profile(), source="artifacts/discover/profile.json", qq=qq)
     assert "## Profile evidence" in md
     assert "![Per-feature Q-Q plots — figure 1 of 1](../figures/numeric_qq_1.png)" in md
+    assert "![Per-feature Q-Q (raw vs log) — figure 1 of 1](../figures/numeric_qq_log_1.png)" in md
     assert "![Per-feature distributions — figure 1 of 1](../figures/numeric_dist_1.png)" in md
     assert "In this figure: a, b." in md
     assert "In this figure: a, b, disc." in md
+    assert "In this figure: a." in md
+    assert "How to read (raw vs log)" in md
+    assert "logging is a viable remediation" in md
     assert "Traces are per-feature z-score." in md
     assert "Sample size: n = 10,000" in md
     assert "Histograms are in raw units." in md

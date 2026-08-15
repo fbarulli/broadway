@@ -101,11 +101,14 @@ def _render_profile_evidence(qq: QqOverview | None) -> list[tuple[str, str]]:
         return []
     qq_by_figure: dict[str, list[str]] = {}
     dist_by_figure: dict[str, list[str]] = {}
+    log_by_figure: dict[str, list[str]] = {}
     for feature in qq.features:
         if feature.figure:
             qq_by_figure.setdefault(feature.figure, []).append(feature.feature)
         if feature.dist_figure:
             dist_by_figure.setdefault(feature.dist_figure, []).append(feature.feature)
+        if feature.log_figure:
+            log_by_figure.setdefault(feature.log_figure, []).append(feature.feature)
     diag_names = [
         f.feature
         for f in qq.features
@@ -130,6 +133,14 @@ def _render_profile_evidence(qq: QqOverview | None) -> list[tuple[str, str]]:
             "S-curves indicate tail behavior; curvature indicates skew. "
             f"Shaded bands mark the middle {mid}% (centre) and the ±{zones.tail_threshold}σ tails; "
             "the red dashed horizontal line is the zero-mass shelf (a flat clump of dots = a spike of exact zeros)."
+        )
+        lines.append("")
+    if qq.log_figures:
+        lines.extend(_render_figure_block("Per-feature Q-Q (raw vs log)", qq.log_figures, log_by_figure))
+        lines.append(
+            "How to read (raw vs log): the skewed, strictly-positive features re-plotted "
+            "after a log transform; compare raw (left) to log (right) — if the right tail "
+            "straightens toward the reference line, logging is a viable remediation."
         )
         lines.append("")
     if qq.dist_figures:

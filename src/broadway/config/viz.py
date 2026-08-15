@@ -51,6 +51,7 @@ class VizConfig(BaseModel):
     qq_sample_size: int
     qq_random_state: int
     qq_figure: str
+    qq_log_figure: str
     dist_figure: str
     describe_figure: str
     normality_figure: str

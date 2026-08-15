@@ -7,6 +7,7 @@ min_unique_for_qq: 15
 qq_sample_size: 10000
 qq_random_state: 42
 qq_figure: numeric_qq_{fig_num}.png
+qq_log_figure: numeric_qq_log_{fig_num}.png
 dist_figure: numeric_dist_{fig_num}.png
 describe_figure: describe.png
 normality_figure: normality_qq.png

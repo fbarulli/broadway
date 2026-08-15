@@ -35,6 +35,12 @@ In this figure: trip_distance, total_amount, tip_amount, trip_duration_minutes. 
 
 How to read (Q-Q): points should follow the fitted reference line; S-curves indicate tail behavior; curvature indicates skew. Shaded bands mark the middle 50% (centre) and the ±1.96σ tails; the red dashed horizontal line is the zero-mass shelf (a flat clump of dots = a spike of exact zeros).
 
+![Per-feature Q-Q (raw vs log) — figure 1 of 1](../figures/numeric_qq_log_1.png)
+
+In this figure: trip_distance, trip_duration_minutes. Chunk 1 of 1; the trailing `_1` in the filename is the chunk number.
+
+How to read (raw vs log): the skewed, strictly-positive features re-plotted after a log transform; compare raw (left) to log (right) — if the right tail straightens toward the reference line, logging is a viable remediation.
+
 Histograms are in raw units.
 
 ![Per-feature distributions — figure 1 of 1](../figures/numeric_dist_1.png)

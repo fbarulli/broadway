@@ -41,6 +41,7 @@ class QqFeature(BaseModel):
     reason: str | None
     figure: str
     dist_figure: str = ""
+    log_figure: str = ""
     zero_rate: float | None = None
     skew: float | None = None
     kurtosis: float | None = None
@@ -61,6 +62,7 @@ class QqOverview(BaseModel):
     features: list[QqFeature]
     figures: list[str]
     dist_figures: list[str] = []
+    log_figures: list[str] = []
     diagnostics_figures: list[str] = []
     standardization: str = "per-feature z-score"
     discrete_features: int = 0
@@ -208,6 +210,63 @@ def _plot_chunk(
     plt.close(fig)
 
 
+def _plot_log_chunk(
+    pairs: list[tuple[str, tuple, tuple]],
+    out_path: Path,
+    fig_num: int,
+    n_figs: int,
+    subplot_size: float,
+    dpi: int,
+    palette: str,
+    n_rows: int,
+    zones: QqZonesConfig,
+) -> None:
+    n = len(pairs)
+    colors = viz.palette_colors(n, palette)
+    fig, axes = plt.subplots(
+        n, 2,
+        figsize=(2 * subplot_size, n * subplot_size),
+        squeeze=False,
+        layout="constrained",
+    )
+    any_shelf = False
+    for i, (name, raw_trace, log_trace) in enumerate(pairs):
+        for col, (trace, suffix) in enumerate(((raw_trace, "raw"), (log_trace, "log"))):
+            osm, osr, slope, intercept = trace
+            ax = axes[i][col]
+            ax.scatter(
+                osm, osr,
+                s=viz.QQ_SCATTER_SIZE,
+                alpha=viz.QQ_SCATTER_ALPHA,
+                edgecolor=viz.QQ_SCATTER_EDGE_COLOR,
+                color=colors[i],
+                zorder=3,
+            )
+            xs = np.array([osm.min(), osm.max()])
+            ax.plot(
+                xs, slope * xs + intercept,
+                color=viz.QQ_REF_LINE_COLOR,
+                linestyle=viz.QQ_REF_LINE_STYLE,
+                linewidth=viz.QQ_REF_LINE_WIDTH,
+                zorder=2,
+            )
+            any_shelf = draw_qq_zones(ax, zones, None, draw_shelf=False) or any_shelf
+            ax.set_xlabel(viz.QQ_XLABEL, fontsize=viz.LABEL_FONTSIZE)
+            ax.set_ylabel(viz.QQ_YLABEL, fontsize=viz.LABEL_FONTSIZE)
+            ax.set_title(f"{name} ({suffix})", fontsize=viz.TITLE_FONTSIZE)
+            ax.grid(True, alpha=viz.GRID_ALPHA)
+            ax.tick_params(labelsize=viz.TICK_FONTSIZE)
+            viz.despine(ax)
+    attach_qq_legend(fig, zones, any_shelf)
+    title = "Per-feature Q-Q (raw vs log-transformed)"
+    if n_figs > 1:
+        title += f" - figure {fig_num} of {n_figs}"
+    title += f" — n = {n_rows:,}"
+    fig.suptitle(title, fontsize=viz.SUPTITLE_FONTSIZE)
+    fig.savefig(out_path, dpi=dpi)
+    plt.close(fig)
+
+
 def _plot_dist_chunk(
     hists: list[tuple[str, np.ndarray, np.ndarray]],
     out_path: Path,
@@ -334,6 +393,7 @@ def plot_numeric_qq(
     features: list[QqFeature] = []
     traces: dict[str, tuple[np.ndarray, np.ndarray, float, float, float | None]] = {}
     hists: dict[str, tuple[np.ndarray, np.ndarray]] = {}
+    log_pairs: dict[str, tuple[tuple, tuple]] = {}
     excluded_notes: list[str] = []
     flagged_id_columns: list[str] = []
 
@@ -389,11 +449,11 @@ def plot_numeric_qq(
         median_val = float(np.median(finite))
         p99_val = float(np.percentile(finite, 99))
         max_val = float(finite.max())
-        log_skew_val = (
-            float(stats.skew(np.log(finite)))
-            if (skew_val > thresholds.skew and finite.min() > 0)
-            else None
-        )
+        log_vals = None
+        log_skew_val = None
+        if skew_val > thresholds.skew and finite.min() > 0:
+            log_vals = np.log(finite)
+            log_skew_val = float(stats.skew(log_vals))
         flags: list[str] = []
         if zero_rate > thresholds.zero_rate:
             flags.append(f"zero_rate {zero_rate:.3f} exceeds {thresholds.zero_rate}")
@@ -418,6 +478,12 @@ def plot_numeric_qq(
 
         osm, osr, slope, intercept = _qq_points(finite, max_points_per_trace)
         traces[name] = (osm, osr, slope, intercept, zero_rate)
+        if log_vals is not None:
+            log_osm, log_osr, log_slope, log_intercept = _qq_points(log_vals, max_points_per_trace)
+            log_pairs[name] = (
+                (osm, osr, slope, intercept),
+                (log_osm, log_osr, log_slope, log_intercept),
+            )
         counts, edges = np.histogram(finite, bins="auto")
         hists[name] = (counts, edges)
         features.append(QqFeature(
@@ -475,6 +541,27 @@ def plot_numeric_qq(
             i = name_to_idx[n]
             features[i] = features[i].model_copy(update={"dist_figure": dist_name})
 
+    log_figures: list[str] = []
+    if log_pairs:
+        log_names = list(log_pairs.keys())
+        log_chunks = [
+            log_names[i : i + max_features_per_figure]
+            for i in range(0, len(log_names), max_features_per_figure)
+        ]
+        for fig_num, chunk in enumerate(log_chunks, start=1):
+            basename = cfg.qq_log_figure.format(fig_num=fig_num)
+            log_name = f"figures/{basename}"
+            log_figures.append(log_name)
+            _plot_log_chunk(
+                [(n, *log_pairs[n]) for n in chunk],
+                figures_dir / basename,
+                fig_num, len(log_chunks), fig_size_per_subplot, dpi, palette, n_rows,
+                cfg.qq_zones,
+            )
+            for n in chunk:
+                i = name_to_idx[n]
+                features[i] = features[i].model_copy(update={"log_figure": log_name})
+
     diag_rows = [
         (f.feature, f.skew, f.kurtosis, f.zero_rate)
         for f in features
@@ -500,6 +587,7 @@ def plot_numeric_qq(
         features=features,
         figures=figures,
         dist_figures=dist_figures,
+        log_figures=log_figures,
         diagnostics_figures=diagnostics_figures,
         standardization=standardization,
         sample_size=n_rows,
