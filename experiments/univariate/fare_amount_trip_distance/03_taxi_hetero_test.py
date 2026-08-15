@@ -23,7 +23,7 @@ METERED_CUTOFF = 55.0
 def load_metered() -> pd.DataFrame:
     path = RESULTS / "sample_clean.parquet"
     if not path.exists():
-        raise FileNotFoundError(f"{path} not found — run step1_clean_scatter.py first")
+        raise FileNotFoundError(f"{path} not found — run 01_taxi_clean_scatter.py first")
     df = pd.read_parquet(path)
     return df[df["fare_amount"] < METERED_CUTOFF]
 
@@ -43,13 +43,13 @@ def plot_histogram(metered: pd.DataFrame, out_path: Path) -> None:
 def main() -> None:
     RESULTS.mkdir(parents=True, exist_ok=True)
     metered = load_metered()
-    plot_histogram(metered, RESULTS / "step3_hetero.png")
+    plot_histogram(metered, RESULTS / "03_taxi_hetero_test.png")
 
     model = fit_ols(metered, "fare_amount ~ trip_distance")
     result = bp_jb(model)
     print(f"metered rows: {len(metered)}")
     print(f"Breusch-Pagan p-value: {result['bp_pval']:.4f}")
-    print(f"wrote {RESULTS / 'step3_hetero.png'}")
+    print(f"wrote {RESULTS / '03_taxi_hetero_test.png'}")
 
 
 if __name__ == "__main__":

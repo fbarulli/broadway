@@ -58,12 +58,12 @@ def main() -> None:
     )
     cleaned = clean(raw)
     cleaned.to_parquet(RESULTS / "sample_clean.parquet")
-    scatter(cleaned, RESULTS / "step1_clean_scatter.png")
+    scatter(cleaned, RESULTS / "01_taxi_clean_scatter.png")
     print(f"random sample rows: {len(raw)}")
     print(f"rows after filter: {len(cleaned)}")
     print(f"rows removed: {len(raw) - len(cleaned)}")
     print(f"wrote {RESULTS / 'sample_clean.parquet'}")
-    print(f"wrote {RESULTS / 'step1_clean_scatter.png'}")
+    print(f"wrote {RESULTS / '01_taxi_clean_scatter.png'}")
 
 
 if __name__ == "__main__":

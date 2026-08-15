@@ -21,7 +21,7 @@ METERED_CUTOFF = 55.0
 def load_cleaned() -> pd.DataFrame:
     path = RESULTS / "sample_clean.parquet"
     if not path.exists():
-        raise FileNotFoundError(f"{path} not found — run step1_clean_scatter.py first")
+        raise FileNotFoundError(f"{path} not found — run 01_taxi_clean_scatter.py first")
     return pd.read_parquet(path)
 
 
@@ -56,11 +56,11 @@ def main() -> None:
     RESULTS.mkdir(parents=True, exist_ok=True)
     df = load_cleaned()
     metered, flat = split(df)
-    plot_split(metered, flat, RESULTS / "step2_metered.png")
+    plot_split(metered, flat, RESULTS / "02_taxi_split_scatter.png")
     print(f"cleaned rows: {len(df)}")
     print(f"metered (< ${METERED_CUTOFF:.0f}): {len(metered)}")
     print(f"flat (>= ${METERED_CUTOFF:.0f}): {len(flat)}")
-    print(f"wrote {RESULTS / 'step2_metered.png'}")
+    print(f"wrote {RESULTS / '02_taxi_split_scatter.png'}")
 
 
 if __name__ == "__main__":
