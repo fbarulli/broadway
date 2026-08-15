@@ -17,6 +17,13 @@ If you catch yourself writing `if feature == "tip_amount"`, or "monetary feature
 
 The platform provides generic machinery. The dataset and the analyst provide the specifics.
 
+## The three layers
+
+- `src/broadway/` — data-agnostic platform machinery. Reusable on any dataset: sampling, structural cleaning, splits, lookup joins, stats, renderers, lineage. Test: could this run on another dataset with zero code changes? If not, it does not belong in `src`. No column names, thresholds, or dataset terms.
+- `project/` — dataset binding: config plus thin glue. Contains the dataset contract, feature registry, and thin wrappers binding `src` machinery to this dataset, e.g. `read_training_sample = read_sample(_contract, seed=RANDOM_STATE)`. No new platform logic.
+- `experiments/` — analysis scratch space. Specific questions, domain-specific filters, plots, and one-off exploration. Promote a pattern to `src` only after repeated concrete use.
+- Tiebreaker: if it names a column or hardcodes a threshold, it is not `src`. It belongs in `project/` config or an experiment.
+
 ## Architectural principles
 
 **Config over hardcoded policy.** Thresholds, filenames, sample sizes, palettes, gates — all in YAML. Code carries no analytical policy. If a number affects the analysis, it's config.
@@ -69,7 +76,7 @@ Three roles:
 
 - **Tests:** synthetic data, no taxi coupling in platform tests. No pixel assertions for figures — test structure (counts, zorder, presence). Backward-compat tests for old evidence.
 - **Visuals:** restraint. Don't overwhelm the figure. Every visual layer behind a config toggle. Captions are fixed prose in code; numeric values derived from config.
-- **Experiments:** scratch work lives in `/tmp` or gitignored dirs, never committed surfaces. Clean up scaffolding when the layout settles. Experiment plumbing stays out of production `src/`.
+- **Experiments:** scripts live under `experiments/<category>/<name>/` (committed); outputs live under gitignored `experiments/results/<category>/<name>/`. Experiment plumbing stays out of production `src/`.
 - **Docs:** live with the code. A renamed/moved/retired surface without a doc update is a bug in the same commit.
 
 ## What we refuse
