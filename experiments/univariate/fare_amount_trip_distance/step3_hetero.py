@@ -43,13 +43,13 @@ def plot_histogram(metered: pd.DataFrame, out_path: Path) -> None:
 def main() -> None:
     RESULTS.mkdir(parents=True, exist_ok=True)
     metered = load_metered()
-    plot_histogram(metered, RESULTS / "plot_histogram.png")
+    plot_histogram(metered, RESULTS / "step3_hetero.png")
 
     model = fit_ols(metered, "fare_amount ~ trip_distance")
     result = bp_jb(model)
     print(f"metered rows: {len(metered)}")
     print(f"Breusch-Pagan p-value: {result['bp_pval']:.4f}")
-    print(f"wrote {RESULTS / 'plot_histogram.png'}")
+    print(f"wrote {RESULTS / 'step3_hetero.png'}")
 
 
 if __name__ == "__main__":
