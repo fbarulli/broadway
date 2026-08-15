@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import inspect
 
+import pytest
+from pydantic import ValidationError
+
 from broadway import viz
-from broadway.config.viz import VizConfig, load_viz_config
+from broadway.config.viz import QqMarkersConfig, VizConfig, load_viz_config
 
 
 def test_palette_is_bupu_r() -> None:
@@ -49,3 +52,39 @@ def test_palette_colors_returns_requested_count() -> None:
 def test_despine_is_callable() -> None:
     assert callable(viz.despine)
     assert "ax" in inspect.signature(viz.despine).parameters
+
+
+def test_qq_markers_config_parses() -> None:
+    cfg = load_viz_config()
+    markers = cfg.qq_markers
+    assert markers.enabled is True
+    assert markers.percentile_rings is True
+    assert markers.tail_highlight is True
+    assert markers.robust_line is True
+    assert markers.percentiles == [0.5, 0.9, 0.99, 0.999]
+    assert markers.tail_threshold == 3.09
+    assert markers.ring_color == "#000000"
+    assert markers.ring_size == 4
+    assert markers.tail_color == "#d62728"
+    assert markers.tail_size == 12
+    assert markers.robust_line_color == "#333333"
+    assert markers.robust_line_width == 1.2
+
+
+def test_qq_markers_config_forbids_unknown_key() -> None:
+    with pytest.raises(ValidationError):
+        QqMarkersConfig(
+            enabled=True,
+            percentile_rings=True,
+            percentiles=[0.5, 0.9, 0.99, 0.999],
+            ring_color="#000000",
+            ring_size=4,
+            tail_highlight=True,
+            tail_threshold=3.09,
+            tail_color="#d62728",
+            tail_size=12,
+            robust_line=True,
+            robust_line_color="#333333",
+            robust_line_width=1.2,
+            unknown_key="nope",
+        )

@@ -34,6 +34,10 @@ def _cfg():
     return load_config("stats", dataset="taxi", analysis="taxi_hypothesis")
 
 
+def _markers_off():
+    return load_viz_config().qq_markers.model_copy(update={"enabled": False})
+
+
 def _profile():
     return DatasetProfile(
         name="taxi",
@@ -397,7 +401,7 @@ def test_plot_raw_log_pairs_shared_axes_and_skew(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(qq_module.plt, "close", lambda fig: captured.append(fig))
     qq_module._plot_raw_log_pairs(
         pairs, tmp_path / "pairs.png", 1, 1, 3.0, 100, "BuPu_r", 600,
-        zones, title_prefix="Per-feature Q-Q (raw vs log-transformed)",
+        zones, _markers_off(), title_prefix="Per-feature Q-Q (raw vs log-transformed)",
     )
     fig = captured[-1]
     assert len(fig.axes) == 2 * 3
@@ -758,6 +762,7 @@ def test_qq_subplot_titles_are_feature_names_only(tmp_path, monkeypatch) -> None
     _plot_chunk(
         traces, tmp_path / "qq_titles.png", 1, 1, 3.0, 100, "BuPu_r", 10000,
         load_viz_config().qq_zones,
+        _markers_off(),
     )
     titles = [ax.get_title() for ax in captured[-1].axes]
     assert "my_feature" in titles
@@ -796,7 +801,7 @@ def test_qq_zones_enabled_draws_bands(tmp_path, monkeypatch) -> None:
     traces = [
         ("f", np.array([-1.0, 0.0, 1.0]), np.array([-1.0, 0.0, 1.0]), 1.0, 0.0, 0.0)
     ]
-    _plot_chunk(traces, tmp_path / "zones_on.png", 1, 1, 3.0, 100, "BuPu_r", 10000, zones)
+    _plot_chunk(traces, tmp_path / "zones_on.png", 1, 1, 3.0, 100, "BuPu_r", 10000, zones, _markers_off())
     ax = captured[-1].axes[0]
     assert len(ax.patches) >= 2
     assert all(p.get_zorder() == 0 for p in ax.patches)
@@ -811,7 +816,7 @@ def test_qq_zones_disabled(tmp_path, monkeypatch) -> None:
     traces = [
         ("f", np.array([-1.0, 0.0, 1.0]), np.array([-1.0, 0.0, 1.0]), 1.0, 0.0, 0.05)
     ]
-    _plot_chunk(traces, tmp_path / "zones_off.png", 1, 1, 3.0, 100, "BuPu_r", 10000, zones)
+    _plot_chunk(traces, tmp_path / "zones_off.png", 1, 1, 3.0, 100, "BuPu_r", 10000, zones, _markers_off())
     ax = captured[-1].axes[0]
     assert len(ax.patches) == 0
     assert len(ax.lines) == 1
@@ -826,12 +831,12 @@ def test_qq_zero_mass_shelf_drawn(tmp_path, monkeypatch) -> None:
 
     captured: list = []
     monkeypatch.setattr(qq_module.plt, "close", lambda fig: captured.append(fig))
-    _plot_chunk([trace_high], tmp_path / "shelf_on.png", 1, 1, 3.0, 100, "BuPu_r", 10000, zones)
+    _plot_chunk([trace_high], tmp_path / "shelf_on.png", 1, 1, 3.0, 100, "BuPu_r", 10000, zones, _markers_off())
     ax = captured[-1].axes[0]
     assert len(ax.lines) == 2
     assert any(l.get_color() == zones.shelf_color for l in ax.lines)
 
-    _plot_chunk([trace_low], tmp_path / "shelf_off.png", 1, 1, 3.0, 100, "BuPu_r", 10000, zones)
+    _plot_chunk([trace_low], tmp_path / "shelf_off.png", 1, 1, 3.0, 100, "BuPu_r", 10000, zones, _markers_off())
     ax = captured[-1].axes[0]
     assert len(ax.lines) == 1
 
@@ -845,7 +850,7 @@ def test_qq_zero_mass_shelf_backward_compat(tmp_path, monkeypatch) -> None:
     traces = [
         ("f", np.array([-1.0, 0.0, 1.0]), np.array([-1.0, 0.0, 1.0]), 1.0, 0.0, None)
     ]
-    _plot_chunk(traces, tmp_path / "shelf_none.png", 1, 1, 3.0, 100, "BuPu_r", 10000, zones)
+    _plot_chunk(traces, tmp_path / "shelf_none.png", 1, 1, 3.0, 100, "BuPu_r", 10000, zones, _markers_off())
     ax = captured[-1].axes[0]
     assert len(ax.lines) == 1
 
@@ -858,13 +863,13 @@ def test_qq_figure_legend(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(qq_module.plt, "close", lambda fig: captured.append(fig))
 
     shelf_trace = ("f", np.array([-1.0, 0.0, 1.0]), np.array([-1.0, 0.0, 1.0]), 1.0, 0.0, 0.5)
-    _plot_chunk([shelf_trace], tmp_path / "legend_shelf.png", 1, 1, 3.0, 100, "BuPu_r", 10000, zones)
+    _plot_chunk([shelf_trace], tmp_path / "legend_shelf.png", 1, 1, 3.0, 100, "BuPu_r", 10000, zones, _markers_off())
     fig = captured[-1]
     assert len(fig.legends) == 1
     assert len(fig.legends[0].legend_handles) == 3
 
     no_shelf_trace = ("f", np.array([-1.0, 0.0, 1.0]), np.array([-1.0, 0.0, 1.0]), 1.0, 0.0, 0.0)
-    _plot_chunk([no_shelf_trace], tmp_path / "legend_no_shelf.png", 1, 1, 3.0, 100, "BuPu_r", 10000, zones)
+    _plot_chunk([no_shelf_trace], tmp_path / "legend_no_shelf.png", 1, 1, 3.0, 100, "BuPu_r", 10000, zones, _markers_off())
     fig = captured[-1]
     assert len(fig.legends) == 1
     assert len(fig.legends[0].legend_handles) == 2
@@ -896,3 +901,144 @@ def test_dist_subplot_titles_are_feature_names_only(tmp_path, monkeypatch) -> No
     titles = [ax.get_title() for ax in captured[-1].axes]
     assert "my_feature" in titles
     assert not any("(n=" in t for t in titles)
+
+
+def _marker_trace(n: int = 5000):
+    rng = np.random.default_rng(0)
+    osm, osr, slope, intercept = _qq_points(rng.normal(0.0, 1.0, n), 10000)
+    return ("f", osm, osr, slope, intercept, 0.0)
+
+
+def _tail_collections(ax):
+    import matplotlib.colors as mcolors
+
+    tail_rgba = mcolors.to_rgba(load_viz_config().qq_markers.tail_color)
+    out = []
+    for c in ax.collections:
+        if len(c.get_offsets()) == 0:
+            continue
+        try:
+            rgba = np.asarray(c.get_edgecolors())[0]
+        except IndexError:
+            continue
+        if np.allclose(rgba, tail_rgba):
+            out.append(c)
+    return out
+
+
+def test_qq_markers_rings_robust_tail_present(tmp_path, monkeypatch) -> None:
+    import broadway.discover.qq as qq_module
+
+    markers = load_viz_config().qq_markers
+    zones = load_viz_config().qq_zones
+    captured: list = []
+    monkeypatch.setattr(qq_module.plt, "close", lambda fig: captured.append(fig))
+    _plot_chunk(
+        [_marker_trace()], tmp_path / "markers.png", 1, 1, 3.0, 100, "BuPu_r", 5000,
+        zones, markers,
+    )
+    ax = captured[-1].axes[0]
+    robust = [
+        l for l in ax.lines
+        if l.get_linestyle() == "-" and l.get_color() == markers.robust_line_color
+    ]
+    assert robust
+    rings = [
+        l for l in ax.lines
+        if l.get_marker() == "o" and l.get_linestyle().lower() in ("none", "")
+    ]
+    assert len(rings) == len(markers.percentiles)
+    assert _tail_collections(ax)
+
+
+def test_qq_markers_toggles_off(tmp_path, monkeypatch) -> None:
+    import broadway.discover.qq as qq_module
+
+    zones = load_viz_config().qq_zones
+    markers = load_viz_config().qq_markers.model_copy(
+        update={"percentile_rings": False, "tail_highlight": False, "robust_line": False}
+    )
+    captured: list = []
+    monkeypatch.setattr(qq_module.plt, "close", lambda fig: captured.append(fig))
+    _plot_chunk(
+        [_marker_trace()], tmp_path / "markers_off.png", 1, 1, 3.0, 100, "BuPu_r", 5000,
+        zones, markers,
+    )
+    ax = captured[-1].axes[0]
+    assert not any(
+        l.get_linestyle() == "-" and l.get_color() == markers.robust_line_color
+        for l in ax.lines
+    )
+    assert not any(
+        l.get_marker() == "o" and l.get_linestyle().lower() in ("none", "")
+        for l in ax.lines
+    )
+    assert _tail_collections(ax) == []
+
+
+def test_qq_markers_tail_highlight_correctness(tmp_path, monkeypatch) -> None:
+    import broadway.discover.qq as qq_module
+
+    markers = load_viz_config().qq_markers
+    zones = load_viz_config().qq_zones
+    captured: list = []
+    monkeypatch.setattr(qq_module.plt, "close", lambda fig: captured.append(fig))
+    _plot_chunk(
+        [_marker_trace()], tmp_path / "markers_tail.png", 1, 1, 3.0, 100, "BuPu_r", 5000,
+        zones, markers,
+    )
+    ax = captured[-1].axes[0]
+    colls = _tail_collections(ax)
+    assert colls
+    offs = np.concatenate([c.get_offsets() for c in colls])
+    assert offs.shape[0] > 0
+    assert np.all(np.abs(offs[:, 0]) > markers.tail_threshold)
+
+
+def test_qq_markers_on_joint_raw_path(tmp_path, monkeypatch) -> None:
+    import broadway.timeline.runners as runners_module
+
+    rng = np.random.default_rng(0)
+    groups = {g: rng.normal(float(i), 1.0, 300) for i, g in enumerate(["A", "B"])}
+    captured: list = []
+    monkeypatch.setattr(runners_module.plt, "close", lambda fig: captured.append(fig))
+    runners._plot_qq_joint(groups, tmp_path / "joint_markers.png")
+    fig = captured[-1]
+    robust_color = load_viz_config().qq_markers.robust_line_color
+    assert any(
+        l.get_linestyle() == "-" and l.get_color() == robust_color
+        for ax in fig.axes for l in ax.lines
+    )
+
+
+def test_qq_markers_on_raw_log_pairs(tmp_path, monkeypatch) -> None:
+    import broadway.discover.qq as qq_module
+
+    markers = load_viz_config().qq_markers
+    zones = load_viz_config().qq_zones
+    rng = np.random.default_rng(0)
+    pairs = []
+    for i in range(2):
+        vals = np.exp(rng.normal(0.0, 1.0, 500))
+        pairs.append(
+            (
+                f"f{i}",
+                _qq_points(vals, 10000),
+                _qq_points(np.log(vals), 10000),
+                float(stats.skew(vals)),
+                float(stats.skew(np.log(vals))),
+            )
+        )
+    captured: list = []
+    monkeypatch.setattr(qq_module.plt, "close", lambda fig: captured.append(fig))
+    qq_module._plot_raw_log_pairs(
+        pairs, tmp_path / "pairs_markers.png", 1, 1, 3.0, 100, "BuPu_r", 1000,
+        zones, markers, title_prefix="Per-feature Q-Q (raw vs log-transformed)",
+    )
+    fig = captured[-1]
+    assert len(fig.axes) == 2 * 2
+    for ax in fig.axes:
+        assert any(
+            l.get_linestyle() == "-" and l.get_color() == markers.robust_line_color
+            for l in ax.lines
+        )

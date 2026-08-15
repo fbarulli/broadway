@@ -21,6 +21,23 @@ class QqZonesConfig(BaseModel):
     shelf_color: str
 
 
+class QqMarkersConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool
+    percentile_rings: bool
+    percentiles: list[float]
+    ring_color: str
+    ring_size: float
+    tail_highlight: bool
+    tail_threshold: float
+    tail_color: str
+    tail_size: float
+    robust_line: bool
+    robust_line_color: str
+    robust_line_width: float
+
+
 class DiagnosticsThresholds(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -56,6 +73,7 @@ class VizConfig(BaseModel):
     describe_figure: str
     normality_figure: str
     qq_zones: QqZonesConfig
+    qq_markers: QqMarkersConfig
     diagnostics: DiagnosticsConfig
 
 

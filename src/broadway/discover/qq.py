@@ -27,7 +27,7 @@ from pydantic import BaseModel, ConfigDict
 from scipy import stats
 
 from broadway import viz
-from broadway.config.viz import DiagnosticsConfig, QqZonesConfig, load_viz_config
+from broadway.config.viz import DiagnosticsConfig, QqMarkersConfig, QqZonesConfig, load_viz_config
 
 
 class QqFeature(BaseModel):
@@ -134,6 +134,45 @@ def draw_qq_zones(ax, zones: QqZonesConfig, zero_rate: float | None, draw_shelf:
     return False
 
 
+def _draw_qq_markers(ax, osm: np.ndarray, osr: np.ndarray, markers: QqMarkersConfig) -> None:
+    """Draw decision-mapped markers on a standardized Q-Q surface."""
+    if not markers.enabled:
+        return
+    if markers.percentile_rings:
+        for p in markers.percentiles:
+            ax.plot(
+                [stats.norm.ppf(p)],
+                [np.quantile(osr, p)],
+                marker="o",
+                linestyle="none",
+                markerfacecolor="none",
+                markeredgecolor=markers.ring_color,
+                markersize=markers.ring_size,
+                zorder=4,
+            )
+    if markers.tail_highlight:
+        mask = np.abs(osm) > markers.tail_threshold
+        ax.scatter(
+            osm[mask],
+            osr[mask],
+            facecolor="none",
+            edgecolor=markers.tail_color,
+            s=markers.tail_size,
+            zorder=4,
+        )
+    if markers.robust_line:
+        q1 = (stats.norm.ppf(0.25), np.quantile(osr, 0.25))
+        q3 = (stats.norm.ppf(0.75), np.quantile(osr, 0.75))
+        ax.plot(
+            [q1[0], q3[0]],
+            [q1[1], q3[1]],
+            color=markers.robust_line_color,
+            linestyle="-",
+            linewidth=markers.robust_line_width,
+            zorder=2,
+        )
+
+
 def build_qq_legend_handles(zones: QqZonesConfig, any_shelf: bool) -> list:
     mid = int((zones.central_quantiles[1] - zones.central_quantiles[0]) * 100)
     handles = [
@@ -162,6 +201,7 @@ def _plot_chunk(
     palette: str,
     n_rows: int,
     zones: QqZonesConfig,
+    markers: QqMarkersConfig,
 ) -> None:
     n = len(traces)
     grid_rows, grid_cols = _grid_dims(n)
@@ -192,6 +232,7 @@ def _plot_chunk(
             zorder=2,
         )
         any_shelf = draw_qq_zones(ax, zones, zero_rate) or any_shelf
+        _draw_qq_markers(ax, osm, osr, markers)
         ax.set_xlabel(viz.QQ_XLABEL, fontsize=viz.LABEL_FONTSIZE)
         ax.set_ylabel(viz.QQ_YLABEL, fontsize=viz.LABEL_FONTSIZE)
         ax.set_title(name, fontsize=viz.TITLE_FONTSIZE)
@@ -220,6 +261,7 @@ def _plot_raw_log_pairs(
     palette: str,
     n_rows: int,
     zones: QqZonesConfig,
+    markers: QqMarkersConfig,
     title_prefix: str,
 ) -> None:
     n = len(pairs)
@@ -260,6 +302,7 @@ def _plot_raw_log_pairs(
                 zorder=2,
             )
             any_shelf = draw_qq_zones(ax, zones, None, draw_shelf=False) or any_shelf
+            _draw_qq_markers(ax, osm, osr, markers)
             if log_panel:
                 ax.text(
                     0.03, 0.97, f"skew {raw_skew:.2f} → {log_skew:.2f}",
@@ -537,6 +580,7 @@ def plot_numeric_qq(
             figures_dir / basename,
             fig_num, len(qq_chunks), fig_size_per_subplot, dpi, palette, n_rows,
             cfg.qq_zones,
+            cfg.qq_markers,
         )
         for n in chunk:
             i = name_to_idx[n]
@@ -572,6 +616,7 @@ def plot_numeric_qq(
                 figures_dir / basename,
                 fig_num, len(log_chunks), fig_size_per_subplot, dpi, palette, n_rows,
                 cfg.qq_zones,
+                cfg.qq_markers,
                 title_prefix="Per-feature Q-Q (raw vs log-transformed)",
             )
             for n in chunk:

@@ -16,9 +16,10 @@ from scipy import stats
 from broadway import viz
 from broadway.analysis.contracts import AnalysisContract
 from broadway.config.schema import PipelineConfig
-from broadway.config.viz import load_viz_config
+from broadway.config.viz import QqMarkersConfig, load_viz_config
 from broadway.data.loader import canonical_path
 from broadway.discover.qq import (
+    _draw_qq_markers,
     _plot_raw_log_pairs,
     _qq_points,
     attach_qq_legend,
@@ -222,11 +223,14 @@ def _plot_qq_joint(
     out_path: Path,
     max_groups: int | None = None,
     show_log: bool = False,
+    markers: QqMarkersConfig | None = None,
 ) -> int:
     if max_groups is None:
         max_groups = load_walkthrough_config().max_qq_groups
     viz_cfg = load_viz_config()
     zones = viz_cfg.qq_zones
+    if markers is None:
+        markers = viz_cfg.qq_markers
     names = list(groups)[:max_groups]
     n = len(names)
     if show_log:
@@ -240,6 +244,7 @@ def _plot_qq_joint(
         _plot_raw_log_pairs(
             pairs, out_path, 1, 1, viz_cfg.fig_size_per_subplot, viz_cfg.dpi,
             viz_cfg.palette, total, zones,
+            markers,
             title_prefix="Per-group Q-Q (raw vs log-transformed)",
         )
         return len(pairs)
@@ -287,6 +292,7 @@ def _plot_qq_joint(
             zorder=2,
         )
         any_shelf = draw_qq_zones(ax, zones, None, draw_shelf=False) or any_shelf
+        _draw_qq_markers(ax, osm, osr, markers)
         ax.set_xlabel(viz.QQ_XLABEL, fontsize=viz.LABEL_FONTSIZE)
         ax.set_ylabel(viz.QQ_YLABEL, fontsize=viz.LABEL_FONTSIZE)
         ax.set_title(name, fontsize=viz.TITLE_FONTSIZE)
@@ -334,7 +340,7 @@ def run_normality(
         and pooled.min() > 0
         and float(stats.skew(pooled)) > viz_cfg.diagnostics.thresholds.skew
     )
-    _plot_qq_joint(groups, figures_dir / normality_figure, max_qq_groups, show_log=show_log)
+    _plot_qq_joint(groups, figures_dir / normality_figure, max_qq_groups, show_log=show_log, markers=viz_cfg.qq_markers)
     figure_path = f"figures/{normality_figure}"
     figure_refs = [FigureRef(path=figure_path, caption=QQ_CAPTION)]
     evidence = NormalityEvidence(
