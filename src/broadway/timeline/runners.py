@@ -16,15 +16,9 @@ from scipy import stats
 from broadway import viz
 from broadway.analysis.contracts import AnalysisContract
 from broadway.config.schema import PipelineConfig
-from broadway.config.viz import QqMarkersConfig, load_viz_config
+from broadway.config.viz import load_viz_config
 from broadway.data.loader import canonical_path
-from broadway.discover.qq import (
-    _draw_qq_markers,
-    _plot_raw_log_pairs,
-    _qq_points,
-    attach_qq_legend,
-    draw_qq_zones,
-)
+from broadway.discover.qq import _plot_qq_joint
 from broadway.lineage.models import SampleSpec
 from broadway.reports.results import humanize_float, humanize_pvalue
 from broadway.stats.anova import run_anova, run_kruskal, run_welch
@@ -190,132 +184,6 @@ def run_describe(
         decision_required=False,
         performed_at=now_iso(),
     )
-
-
-def _qq_log_pairs(
-    groups: dict[str, np.ndarray], names: list[str], max_points_per_trace: int
-) -> tuple[list[tuple[str, tuple, tuple, float, float]], list[str], int]:
-    pairs: list[tuple[str, tuple, tuple, float, float]] = []
-    skipped: list[str] = []
-    total = 0
-    for name in names:
-        vals = np.asarray(groups[name], dtype=float)
-        std = vals.std()
-        if std == 0.0 or not np.isfinite(std):
-            skipped.append(name)
-            continue
-        total += len(vals)
-        log_vals = np.log(vals)
-        pairs.append(
-            (
-                name,
-                _qq_points(vals, max_points_per_trace),
-                _qq_points(log_vals, max_points_per_trace),
-                float(stats.skew(vals)),
-                float(stats.skew(log_vals)),
-            )
-        )
-    return pairs, skipped, total
-
-
-def _plot_qq_joint(
-    groups: dict[str, np.ndarray],
-    out_path: Path,
-    max_groups: int | None = None,
-    show_log: bool = False,
-    markers: QqMarkersConfig | None = None,
-) -> int:
-    if max_groups is None:
-        max_groups = load_walkthrough_config().max_qq_groups
-    viz_cfg = load_viz_config()
-    zones = viz_cfg.qq_zones
-    if markers is None:
-        markers = viz_cfg.qq_markers
-    names = list(groups)[:max_groups]
-    n = len(names)
-    if show_log:
-        pairs, skipped, total = _qq_log_pairs(groups, names, viz_cfg.max_points_per_trace)
-        if skipped:
-            logger.warning(
-                "Q-Q plot skipped %d zero-variance group(s): %s",
-                len(skipped),
-                ", ".join(skipped),
-            )
-        _plot_raw_log_pairs(
-            pairs, out_path, 1, 1, viz_cfg.fig_size_per_subplot, viz_cfg.dpi,
-            viz_cfg.palette, total, zones,
-            markers,
-            title_prefix="Per-group Q-Q (raw vs log-transformed)",
-        )
-        return len(pairs)
-    n_cols = max(1, int(np.ceil(np.sqrt(n))))
-    n_rows = max(1, int(np.ceil(n / n_cols)))
-    colors = viz.palette_colors(n)
-    fig, axes = plt.subplots(
-        n_rows,
-        n_cols,
-        figsize=(n_cols * viz_cfg.fig_size_per_subplot, n_rows * viz_cfg.fig_size_per_subplot),
-        squeeze=False,
-        layout="constrained",
-    )
-    ax_flat = axes.ravel()
-    skipped: list[str] = []
-    any_shelf = False
-    plotted = 0
-    total = 0
-    for name in names:
-        vals = np.asarray(groups[name], dtype=float)
-        std = vals.std()
-        if std == 0.0 or not np.isfinite(std):
-            skipped.append(name)
-            continue
-        total += len(vals)
-        ax = ax_flat[plotted]
-        z = (vals - vals.mean()) / std
-        (osm, osr), (slope, intercept, _) = stats.probplot(z, dist="norm", fit=True)
-        ax.scatter(
-            osm,
-            osr,
-            s=viz.QQ_SCATTER_SIZE,
-            alpha=viz.QQ_SCATTER_ALPHA,
-            edgecolor=viz.QQ_SCATTER_EDGE_COLOR,
-            color=colors[plotted],
-            zorder=3,
-        )
-        xs = np.array([osm.min(), osm.max()])
-        ax.plot(
-            xs,
-            slope * xs + intercept,
-            color=viz.QQ_REF_LINE_COLOR,
-            linestyle=viz.QQ_REF_LINE_STYLE,
-            linewidth=viz.QQ_REF_LINE_WIDTH,
-            zorder=2,
-        )
-        any_shelf = draw_qq_zones(ax, zones, None, draw_shelf=False) or any_shelf
-        _draw_qq_markers(ax, osm, osr, markers)
-        ax.set_xlabel(viz.QQ_XLABEL, fontsize=viz.LABEL_FONTSIZE)
-        ax.set_ylabel(viz.QQ_YLABEL, fontsize=viz.LABEL_FONTSIZE)
-        ax.set_title(name, fontsize=viz.TITLE_FONTSIZE)
-        ax.grid(True, alpha=viz.GRID_ALPHA)
-        ax.tick_params(labelsize=viz.TICK_FONTSIZE)
-        viz.despine(ax)
-        plotted += 1
-    for ax in ax_flat[plotted:]:
-        ax.set_visible(False)
-    if skipped:
-        logger.warning(
-            "Q-Q plot skipped %d zero-variance group(s): %s",
-            len(skipped),
-            ", ".join(skipped),
-        )
-    fig.suptitle(
-        f"Per-group Q-Q plots (per-group standardization) — n = {total:,}",
-        fontsize=viz.SUPTITLE_FONTSIZE,
-    )
-    attach_qq_legend(fig, zones, any_shelf)
-    fig.savefig(out_path, dpi=viz_cfg.dpi)
-    plt.close(fig)
-    return plotted
 
 
 def run_normality(
