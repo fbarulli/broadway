@@ -2,10 +2,8 @@
 
 import pandas as pd
 
-from _common import RESULTS
+from _common import FULL_PARQUET, RESULTS
 from project.data import read_training_sample
-
-FULL_PARQUET = RESULTS / "full_sample.parquet"
 
 SAMPLE_SIZE = 50_000
 MIN_FARE = 2.50
