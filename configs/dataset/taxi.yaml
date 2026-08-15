@@ -7,6 +7,10 @@ columns:
     dtype: int32
     null_count: 0
     role: feature
+  fare_amount:
+    dtype: float64
+    null_count: 0
+    role: feature
   passenger_count:
     dtype: float64
     null_count: 0
@@ -17,14 +21,6 @@ columns:
     role: datetime
   pickup_location_id:
     dtype: int32
-    null_count: 0
-    role: feature
-  tip_amount:
-    dtype: float64
-    null_count: 0
-    role: feature
-  total_amount:
-    dtype: float64
     null_count: 0
     role: feature
   trip_distance:

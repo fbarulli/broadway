@@ -53,8 +53,7 @@ def raw_trips() -> pd.DataFrame:
             "PULocationID": pd.Series([1, 2, 3, 4, 5], dtype="int32"),
             "DOLocationID": pd.Series([1, 2, 3, 4, 5], dtype="int32"),
             "passenger_count": [1.0, 2.0, 1.0, 3.0, 1.0],
-            "total_amount": [25.0, 20.0, 10.0, 35.0, 15.0],
-            "tip_amount": [0.0, 1.5, 0.0, 2.0, 0.0],
+            "fare_amount": [20.0, 15.0, 8.0, 30.0, 12.0],
             "Airport_fee": [0.0, 0.0, 1.25, 0.0, 0.0],
         }
     )
