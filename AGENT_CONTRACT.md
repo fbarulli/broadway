@@ -29,6 +29,11 @@ Development happens on `taxi`; the `main` split already happened, don't redo it.
   right number of agents, and **surfaces decisions** to the user.
 - Agents (Task tool, `subagent_type="general"`) implement, run the full suite,
   fix failures, then **commit + push** to `taxi`.
+- Break work into small, single-purpose agent tasks with SHORT instructions (no
+  long monolithic contracts). Every agent instruction must carry the immutable
+  worker rules from `AGENT_WORKER_CONTRACT.md` (or a hard reference to it).
+- Agents REPORT problems/blockers rather than silently working around them; the
+  main agent surfaces those to the user.
 
 ## 4. Decisions
 
@@ -41,14 +46,16 @@ Development happens on `taxi`; the `main` split already happened, don't redo it.
 - Independent tasks → **parallel** agents.
 - Dependent tasks → run only after upstream agents have **committed + pushed**.
 - If two agents both commit/push, **sequence them** (avoid git races).
+- Read-only review agents (`subagent_type="explore"`) may run in parallel and
+  never commit; dispatch them after substantial work to audit the changes and
+  report findings (they do not self-fix).
 
 ## 6. Coding style (for sub-agents)
 
-- Type hints on all public functions.
-- Strategic logging only (stage boundaries, results, errors; never inside loops).
-- Catch exceptions only when recoverable; let everything else bubble up.
-- YAML = single source of truth: no `get(key, default)`, no hardcoded values.
-- ~25-line functions; single responsibility; no dead/noise code.
+The immutable coding rules live in `AGENT_WORKER_CONTRACT.md` (type hints on
+public functions, strategic logging only, catch only recoverable exceptions,
+YAML single source of truth, ~25-line single-responsibility functions, no dead
+code). Every agent instruction references it.
 
 ## 7. Docs & file taxonomy
 
@@ -58,8 +65,9 @@ Development happens on `taxi`; the `main` split already happened, don't redo it.
   `README.md` must be current at ALL times (test counts, commands, paths).
 
 - **Scratch (NEVER touch)** — `01.md`, `TODO_*.md`, `GOALS.md`, `LEARN.md`,
-  `trust.md`, `synth.md`, `SENIOR.md`, `project.md`, `HANDOFF.md`, `FEEDBACK.md`,
+  `trust.md`, `synth.md`, `SENIOR.md`, `project.md`, `FEEDBACK.md`,
   `DATA_VALIDATION.md`, `GENERAL_TODO.md`, `project/STATS.md`.
+- `HANDOFF.md` is maintained on explicit user request (it is not scratch anymore).
 
 ## 8. Git policy
 
@@ -83,6 +91,7 @@ Development happens on `taxi`; the `main` split already happened, don't redo it.
 cd /home/opc/ONE/broad-way && uv run pytest -q
 ```
 Must be green after every change.
+No broken intermediate state — every commit must leave the suite green.
 
 ## 11. Quick reference
 

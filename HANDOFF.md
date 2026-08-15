@@ -2,9 +2,11 @@
 
 ## Repository state
 - Active development branch: `taxi`.
-- Suite green. Last confirmed count: **384 tests** after the Plotly/EDA-removal commit; Q-Q/distribution/docs tests added since — run the full suite to confirm the current total.
+- Suite green: **425 tests**.
+- The 5-part surface-polish follow-up is **complete**.
+- `AGENT_WORKER_CONTRACT.md` added (immutable worker rules).
+- A 3-agent read-only review pass completed.
 - The walkthrough/timeline system is mature and dogfooded. Plotly and the `eda` package are fully removed.
-- Current work: about to start a **5-part surface-polish follow-up** (the active next slice). Nothing in it has been executed yet.
 
 ## Product hierarchy & report surfaces
 Hierarchy: **Audit → Timeline → Evidence → Suggestion → Decision → Result.**
@@ -18,11 +20,11 @@ Single-owner surfaces (each has exactly one writer-of-record):
 
 Guardrail: `tests/test_surface_integrity.py` enforces (a) every relative markdown link in tracked reports/docs resolves, and (b) size caps — **5 MB HTML / 2 MB PNG**. Keep this test meaningful; don't raise caps to pass it.
 
-## The two Q-Q surfaces (deliberate divergence — documented, not drift)
+## The two Q-Q surfaces (converged on small multiples — documented, not drift)
 - **Features Q-Q** — from `discover`/`profile`, rendered on `reports/audit/profile.md` under "Profile evidence". **Small multiples**: one subplot per numeric feature, adaptive grid, figure scales to fill the screen. Built in `src/broadway/discover/qq.py`.
-- **Groups Q-Q** — from the walkthrough normality step, on the timeline/results. **Single overlaid figure**, one trace per group. Correct because group count is low (5); a deliberate choice, not an accident.
+- **Groups Q-Q** — from the walkthrough normality step, on the timeline/results. **Small multiples (one subplot per group)**, a deliberate convergence for consistency (made in commit `00e0234`).
 
-Rationale to preserve: 7+ features don't read overlaid (→ small multiples); 5 groups read fine overlaid (→ single figure). If the overlaid groups plot ever stops reading well, converge on small multiples — but record the reason.
+Rationale to preserve: 7+ features don't read overlaid (→ small multiples); the groups plot now converges on the same small-multiples layout so both Q-Q surfaces render consistently. If either surface ever stops reading well, record the reason before diverging again.
 
 ## Dataset context (taxi)
 - Analysis `taxi_hypothesis`, sample `taxi_diagnostic`, dataset `taxi`. Outcome: `trip_duration_minutes`.
@@ -40,6 +42,11 @@ Rationale to preserve: 7+ features don't read overlaid (→ small multiples); 5 
    - `bb730e0` Joint Q-Q (Option C): normality gate → one joint-per-group Q-Q; removed the 5 individual `normality_*.png`.
    - `0cf67fa` Removed Plotly + `eda` (Option A), added `test_surface_integrity.py`, swept stale artifacts (619 MB `eda.html` gone).
 6. **Small-multiples Q-Q + distribution grid** for the profile surface (per-feature subplots, adaptive grid, screen-filling, Q-Q point-thinned). Evidence models `QqFeature` / `QqOverview` (pydantic); one shared per-feature processing pass feeds both grids so order/exclusions match by construction; figure assignment keyed by feature name (never position); `source_path` is a required keyword-only arg; no input mutation. Followed by a docs re-sync and a dogfood pass.
+7. **5-part surface polish** (all `taxi`): console humanize + de-prescribe `b30fe34`; posthoc pairs + effect sizes `2e951cf`; profile figures overhaul (seaborn→main dep, discrete/ID detection, automated bins, constrained layout) `66b1cec` + `17ca922`; timeline/results polish (human slug filenames, labeled statistics, eta²→omega² caveat to conclusion) `44fc1fa`.
+8. **Kruskal epsilon²** `86df9f6` — `epsilon_squared()` `(H-k+1)/(N-k)` clamped [0,1]; Kruskal no longer emits eta²/omega²; backward-compat for old "not_computed" evidence.
+9. **Q-Q min/max automation** `2cdc7d7` — features Q-Q independent axes + probplot fit line; groups Q-Q y=x diagonal data-derived.
+10. **Groups Q-Q → small multiples** `00e0234`.
+11. **W1 config + critical fixes** `17153d3` — `configs/step/viz.yaml` + `max_qq_groups`; stats thresholds → params; fixed run_variance (shapiro_alpha→significance_alpha) and run_omnibus (ignored alpha); zero-variance guard; shared plot styling; describe combine (single describe.png); retired legacy `stats describe` output.
 
 ## Current CLI usage
 ```
@@ -53,33 +60,17 @@ uv run ds-pipeline walkthrough --analysis taxi_hypothesis --dataset taxi --sampl
 Suggestions are **de-prescribed**: the product prints `--method <method>` templates, never a pre-filled method. `discover`/`profile` generate the Profile-evidence figures (`src/broadway/discover/qq.py`).
 
 ## Immediate work left — 5-part surface-polish plan
-All surface-polish, smaller than the deferred architecture work. Execute in order; one commit per part; suite green each time.
-
-**1. Console humanization + de-prescribe (shipped-invariant bug).**
-- `timeline/walkthrough.py::_print_decision_required`: change the gate's `Next:` line from `--method welch` to `--method <method>` (the Suggestion block is already de-prescribed; the `Next:` line is the contradiction). Verify the posthoc gate's `--kind <kind> --method <method>` and leave it.
-- Humanize the console gate + suggestion rationale (3 sig figs, p floored `< 0.001`; no raw `p_value=0.0` / `statistic=4199.71…`). Reuse `humanize_float`/`humanize_pvalue` — **prefer extracting them to a shared formatting module** rather than importing `reports` into `timeline` (wrong direction); never duplicate.
-
-**2. Posthoc completeness.**
-- Render the actual significant pairs on `results/posthoc.md` + the timeline posthoc section: a table of `a vs b`, p, Cohen's d, Hedges' g, note. Answer the step's own question ("which pairs differ"). Show the denominator too ("17 of N pairs significant").
-
-**3. Profile figures overhaul.**
-- Seaborn: `sns.despine()` per subplot; `sns.set_palette("BuPu_r")` default (overridable); `sns.histplot` for the distribution grid. **Decision: promote seaborn to a main dependency** (matplotlib is already core; profile figures are core flow).
-- Automated bins: continuous → `bins='auto'`; discrete/integer → integer-aligned bins / `histplot(discrete=True)`.
-- Title overlap: `plt.subplots(..., layout='constrained')`, drop manual `tight_layout`/`subplots_adjust`.
-- **Discrete Q-Q detection:** `n_unique <= MIN_UNIQUE_FOR_QQ` (default 15, overridable via env var `BROADWAY_QQ_MIN_UNIQUE`, mirroring `BROADWAY_IDENTIFIER_THRESHOLD`) → exclude from the Q-Q grid, keep in the distribution grid with integer bins, note *"excluded from Q-Q: discrete (N unique values)"*. **No transforms, no jitter** (they don't remove ties).
-- **ID columns:** exclude by explicit declaration (`id_cols`/`exclude_from_profiling`) sourced from **per-dataset config (YAML)** and passed as an explicit param to `plot_numeric_qq` — ID-ness is authored intent, not a global. A `*_id` name heuristic may **flag/suggest only, never silently exclude**.
-- Friendly captions (not raw comma lists), datetime-absent note (8 cols → 7 features explained), chunk/exclusion explanation (`_1` suffix + excluded features).
-
-**4. Timeline/results polish.** Trust items first, cosmetic after.
-- Trust: carry the η²→ω² "report ω²" caveat through to `conclusion.md`; label statistics (`F =`, `Levene statistic =`, `Welch`).
-- Then: link `evidence_refs` (inline/link, not raw JSON filenames); human step names in result filenames/titles (replace `omnibus.md`/`posthoc.md`/`describe_groups.md` — update results renderer, orphan deletion, and `test_surface_integrity.py` links **together**); dedup `total_n`/`n_total`; fix `imbalance_ratio` precision; Q-Q legend (trace → group); reconcile "unlisted group" vs "Unknown".
+COMPLETE — see "Completed work" items 7–11 (commits `b30fe34`, `2e951cf`, `66b1cec` + `17ca922`, `44fc1fa`).
 
 ## Deferred queue (order confirmed)
-1. **Kruskal ε²** (rank-based effect size — smallest hole).
-2. **Registry refactor** — a `STEP_REGISTRY` replacing the `if/elif` dispatch in `walkthrough.py`/`suggest.py` (do this **before** adding any new step).
-3. **LoadAudit / ParsingPolicy** (the loader walkthrough; trace physical read → parsing → raw validation → canonicalization).
-4. **Lineage-viz** (`graph_todo.md`) — `reports/lineage/graph.md` currently shows only data-prep, is stale/unrelated.
-- Also pending: move suggestion templates + effect-size wording into config; delete the legacy `report` wrapper.
+1. **Registry refactor** — method allowlists (`decide.py::ALLOWED_METHODS` vs `walkthrough.py::_OMNIBUS_METHODS`) + `EXECUTABLE_STEPS`/`_STEP_ACTION`/`PARENTS_BY_KIND` → registry/flow config.
+2. **W2 main-sync** — taxi-free `main`; convert/exclude taxi-referencing tests (`test_contracts.py:31` real-parquet load, hardcoded taxi stats in `test_walkthrough.py`/`test_results.py`, `dataset="taxi"` coupling).
+3. **Cleanup/polish slice** — orphaned legacy results-index (`render_index`/`load_stats_sequence`/`RESULT_RENDERERS`), doc drift (`README.md:92`, `stats/API.md:199` still describe retired `stats describe`), taxi strings in `audit.py` ("NYC boroughs"), dead code (`suggest.py` unused cfg, `decide.py::_question_for` re-reads YAML), silent posthoc skip, unlabeled Q-Q truncation.
+4. **LoadAudit / ParsingPolicy**.
+5. **Lineage-viz** (`graph_todo.md`).
+6. Move suggestion templates + effect-size wording into config; delete legacy `report` wrapper.
+7. Pin sample/evidence, then refresh reports (drift follow-up).
+8. W1-flagged: Q-Q style constants Python-vs-YAML decision; hardcoded `figures/` path prefix.
 
 ## Working principles to preserve
 - Results are the primary human-facing product surface. Audit explains what happened to the data. Timeline explains where the analyst is. Evidence reports what diagnostics found. Suggestions guide, never decide. Decisions belong to the analyst and are explicitly recorded. Lineage is provenance, not the workflow UI.
