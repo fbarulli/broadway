@@ -35,6 +35,21 @@ Development happens on `taxi`; the `main` split already happened, don't redo it.
 - Agents REPORT problems/blockers rather than silently working around them; the
   main agent surfaces those to the user.
 
+## 3a. Dispatch workflow (planning vs. contracting)
+
+- Author the full task sequence up front (coarse plan): names, scope,
+  dependencies, order, stop-gates.
+- Author each detailed agent contract **just-in-time**, after the previous
+  task's commit is green and pushed — not batched up front.
+- Contracts describe the **target end-state**, not brittle line numbers, and
+  state invariants explicitly: suite green, no surface-ownership changes, no
+  silent policy, backward compatibility.
+- Re-read the 1–3 files a task touches immediately before dispatching.
+- Batch detailed contracts only when ALL hold: ≤3 tasks, disjoint files, no
+  shared evidence/config/renderer contracts, no symbol-renaming refactor.
+- When a deferred item is completed and verified, **remove** it from the queue;
+  git history is the record — no inline `DONE` markers.
+
 ## 4. Decisions
 
 - **ALWAYS present decisions to the user; NEVER decide unilaterally.**

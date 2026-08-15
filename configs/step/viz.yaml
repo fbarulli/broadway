@@ -15,8 +15,8 @@ qq_zones:
   central_quantiles: [0.25, 0.75]
   tail_threshold: 1.96
   zero_mass_threshold: 0.05
-  central_alpha: 0.08
-  tail_alpha: 0.04
+  central_alpha: 0.15
+  tail_alpha: 0.08
   zone_color: "#999999"
   shelf_color: "#d62728"
 diagnostics:

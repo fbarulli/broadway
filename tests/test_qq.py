@@ -591,8 +591,8 @@ def test_qq_zones_config_loaded() -> None:
     assert zones.central_quantiles == [0.25, 0.75]
     assert zones.tail_threshold == 1.96
     assert zones.zero_mass_threshold == 0.05
-    assert zones.central_alpha == 0.08
-    assert zones.tail_alpha == 0.04
+    assert zones.central_alpha == 0.15
+    assert zones.tail_alpha == 0.08
     assert zones.shelf_color == "#d62728"
     with pytest.raises(ValidationError):
         QqZonesConfig(
@@ -600,12 +600,27 @@ def test_qq_zones_config_loaded() -> None:
             central_quantiles=[0.25, 0.75],
             tail_threshold=1.96,
             zero_mass_threshold=0.05,
-            central_alpha=0.08,
-            tail_alpha=0.04,
+            central_alpha=0.15,
+            tail_alpha=0.08,
             zone_color="#999999",
             shelf_color="#d62728",
             unknown_key="nope",
         )
+
+
+def test_qq_zones_enabled_draws_bands(tmp_path, monkeypatch) -> None:
+    import broadway.discover.qq as qq_module
+
+    captured: list = []
+    monkeypatch.setattr(qq_module.plt, "close", lambda fig: captured.append(fig))
+    zones = load_viz_config().qq_zones
+    traces = [
+        ("f", np.array([-1.0, 0.0, 1.0]), np.array([-1.0, 0.0, 1.0]), 1.0, 0.0, 0.0)
+    ]
+    _plot_chunk(traces, tmp_path / "zones_on.png", 1, 1, 3.0, 100, "BuPu_r", 10000, zones)
+    ax = captured[-1].axes[0]
+    assert len(ax.patches) >= 2
+    assert all(p.get_zorder() == 0 for p in ax.patches)
 
 
 def test_qq_zones_disabled(tmp_path, monkeypatch) -> None:
