@@ -28,18 +28,6 @@ TIMELINE_DIR = timeline_module.TIMELINE_DIR
 
 EXECUTABLE_STEPS = {"describe_groups", "normality", "variance", "omnibus", "posthoc", "conclusion"}
 
-_OMNIBUS_METHODS = ["welch", "anova", "kruskal"]
-_POSTHOC_METHODS = ["games_howell"]
-
-_STEP_ACTION = {
-    "describe_groups": "describing the groups",
-    "normality": "running normality diagnostics",
-    "variance": "checking variance homogeneity",
-    "omnibus": "running the principal analysis",
-    "posthoc": "running post-hoc comparisons",
-    "conclusion": "drawing the conclusion",
-}
-
 
 def _resolved_decision(analysis: str, kind: str) -> AnalysisDecision | None:
     for decision in timeline_module.load_decisions(analysis):
@@ -81,7 +69,7 @@ def _handle_failure(
     failures_dir = TIMELINE_DIR / analysis.name / "failures"
     failures_dir.mkdir(parents=True, exist_ok=True)
     (failures_dir / f"{step.id}.log").write_text(traceback.format_exc(), encoding="utf-8")
-    what = _STEP_ACTION.get(step.id, step.id)
+    what = getattr(step, "action", step.id)
     message = f"step '{step.label}' failed while attempting {what}"
     failed = AnalysisStep(
         analysis=analysis.name,
@@ -116,7 +104,7 @@ def _print_suggestion(suggestion: Suggestion, include_rationale: bool = False) -
 
 
 def _print_decision_required(
-    analysis: AnalysisContract, steps: list[AnalysisStep]
+    analysis: AnalysisContract, steps: list[AnalysisStep], thresholds: WalkthroughConfig
 ) -> None:
     by_id = {s.step_id: s for s in steps}
     lines = ["=" * 60, "DECISION REQUIRED — decide_omnibus", "=" * 60, ""]
@@ -143,7 +131,7 @@ def _print_decision_required(
         )
     lines.append("")
     lines.append("Eligible methods:")
-    for method in _OMNIBUS_METHODS:
+    for method in thresholds.decisions["omnibus"].methods:
         lines.append(f"  - {method}")
     lines.append("")
     lines.append(
@@ -152,12 +140,14 @@ def _print_decision_required(
     print("\n".join(lines))
 
 
-def _print_posthoc_decision_required(analysis: AnalysisContract) -> None:
+def _print_posthoc_decision_required(
+    analysis: AnalysisContract, thresholds: WalkthroughConfig
+) -> None:
     lines = ["=" * 60, "DECISION REQUIRED — decide_posthoc", "=" * 60, ""]
     lines.append(f"Goal: {analysis.goal}")
     lines.append("")
     lines.append("Eligible post-hoc methods:")
-    for method in _POSTHOC_METHODS:
+    for method in thresholds.decisions["posthoc"].methods:
         lines.append(f"  - {method}")
     lines.append("")
     lines.append(
@@ -214,9 +204,11 @@ def run(cfg: PipelineConfig, sample: SampleSpec | None, force: bool) -> None:
                 continue
             _write_timeline(analysis, sequence, thresholds)
             if kind == "omnibus":
-                _print_decision_required(analysis, timeline_module.load_steps(analysis.name))
+                _print_decision_required(
+                    analysis, timeline_module.load_steps(analysis.name), thresholds
+                )
             elif kind == "posthoc":
-                _print_posthoc_decision_required(analysis)
+                _print_posthoc_decision_required(analysis, thresholds)
             else:
                 print("=" * 60)
                 print(f"DECISION REQUIRED — {step.id}")

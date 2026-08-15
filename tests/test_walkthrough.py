@@ -11,6 +11,7 @@ from broadway.reports import paths
 from broadway.timeline import decide, module, runners, walkthrough
 from broadway.timeline.evidence import ConclusionEvidence, PosthocEvidence
 from broadway.timeline.models import AnalysisDecision, AnalysisStep, StepStatus
+from broadway.timeline.sequence import load_walkthrough_config
 
 
 def _setup(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -126,7 +127,7 @@ def test_decision_gate_humanizes_and_deprescribes(
         ),
     ]
 
-    walkthrough._print_decision_required(analysis, steps)
+    walkthrough._print_decision_required(analysis, steps, load_walkthrough_config())
     out = capsys.readouterr().out
 
     assert "DECISION REQUIRED" in out
