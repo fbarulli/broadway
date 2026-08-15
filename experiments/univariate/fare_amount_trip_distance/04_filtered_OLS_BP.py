@@ -1,8 +1,8 @@
-"""04: fit OLS on metered fares, show residuals, then run Breusch-Pagan.
+"""04: fit OLS on cleaned fares, show residuals, then run Breusch-Pagan.
 
-Fits fare_amount ~ trip_distance on metered fares (fare_amount < $55), plots
-the residuals-vs-fitted, and runs the Breusch-Pagan test, visualizing the
-p-value as the shaded tail of a chi-square(1) distribution.
+Fits fare_amount ~ trip_distance on the cleaned sample, plots the
+residuals-vs-fitted, and runs the Breusch-Pagan test, visualizing the p-value
+as the shaded tail of a chi-square(1) distribution.
 """
 
 from pathlib import Path
@@ -19,22 +19,20 @@ from broadway.stats.regression import bp_jb, fit_ols
 
 OUT = RESULTS / f"{Path(__file__).stem}.png"
 
-METERED_CUTOFF = 55.0
 ALPHA = 0.05
 
 
-def load_metered() -> pd.DataFrame:
+def load_cleaned() -> pd.DataFrame:
     if not CLEAN_PARQUET.exists():
         raise FileNotFoundError(f"{CLEAN_PARQUET} not found — run 01_filtered_min_max_scatter.py first")
-    df = pd.read_parquet(CLEAN_PARQUET)
-    return df[df["fare_amount"] < METERED_CUTOFF]
+    return pd.read_parquet(CLEAN_PARQUET)
 
 
 def main() -> None:
     RESULTS.mkdir(parents=True, exist_ok=True)
-    metered = load_metered()
+    df = load_cleaned()
 
-    model = fit_ols(metered, "fare_amount ~ trip_distance")
+    model = fit_ols(df, "fare_amount ~ trip_distance")
     result = bp_jb(model)
     lm_stat = result["bp_stat"]
     p_value = result["bp_pval"]
@@ -66,7 +64,7 @@ def main() -> None:
     fig.savefig(OUT, dpi=150)
     plt.close(fig)
 
-    print(f"metered rows: {len(metered)}")
+    print(f"cleaned rows: {len(df)}")
     print(f"Breusch-Pagan p-value: {p_value:.4f}")
     print(f"wrote {OUT}")
 
