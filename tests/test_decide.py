@@ -20,7 +20,6 @@ def test_record_writes_valid_decision(tmp_path: Path, monkeypatch: pytest.Monkey
         "omnibus",
         "welch",
         "non-normal",
-        ["describe_groups", "normality", "variance"],
     )
     module.save_decision(decision)
     loaded = module.load_decision("taxi_hypothesis", "omnibus")
@@ -37,15 +36,15 @@ def test_record_writes_valid_decision(tmp_path: Path, monkeypatch: pytest.Monkey
 def test_record_rejects_invalid_method() -> None:
     analysis = _analysis()
     with pytest.raises(ValueError):
-        decide.record(analysis, "omnibus", "games_howell", "x", ["describe_groups"])
+        decide.record(analysis, "omnibus", "games_howell", "x")
     with pytest.raises(ValueError):
-        decide.record(analysis, "posthoc", "welch", "x", ["omnibus"])
+        decide.record(analysis, "posthoc", "welch", "x")
 
 
 def test_record_rejects_unknown_kind() -> None:
     analysis = _analysis()
     with pytest.raises(ValueError):
-        decide.record(analysis, "bogus", "welch", "x", [])
+        decide.record(analysis, "bogus", "welch", "x")
 
 
 def test_decisions_config_and_step_actions() -> None:

@@ -175,8 +175,7 @@ def main() -> None:
             "stats", dataset=args.dataset, analysis=args.analysis, environment=args.environment,
         )
         analysis = require_mode(cfg.analysis, AnalysisMode.HYPOTHESIS)
-        parents = decide_module.PARENTS_BY_KIND[args.kind]
-        decision = decide_module.record(analysis, args.kind, args.method, args.reason, parents)
+        decision = decide_module.record(analysis, args.kind, args.method, args.reason)
         timeline_module.save_decision(decision)
         print(
             f"recorded decision '{decision.kind}' (method={decision.method}) "

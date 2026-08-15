@@ -164,7 +164,6 @@ def test_walkthrough_resume_past_gate(
 
     decision = decide.record(
         cfg.analysis, "omnibus", "welch", "non-normal",
-        ["describe_groups", "normality", "variance"],
     )
     module.save_decision(decision)
 
@@ -401,7 +400,6 @@ def test_walkthrough_end_to_end(
 
     omnibus = decide.record(
         cfg.analysis, "omnibus", "welch", "non-normal",
-        ["describe_groups", "normality", "variance"],
     )
     module.save_decision(omnibus)
 
@@ -412,7 +410,7 @@ def test_walkthrough_end_to_end(
     assert "games_howell" in out
 
     posthoc = decide.record(
-        cfg.analysis, "posthoc", "games_howell", "significant omnibus", ["omnibus"],
+        cfg.analysis, "posthoc", "games_howell", "significant omnibus",
     )
     module.save_decision(posthoc)
 
@@ -454,7 +452,6 @@ def test_walkthrough_posthoc_gated_on_insignificant_omnibus(
 
     omnibus = decide.record(
         cfg.analysis, "omnibus", "welch", "normal",
-        ["describe_groups", "normality", "variance"],
     )
     module.save_decision(omnibus)
 

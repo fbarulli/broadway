@@ -4,17 +4,7 @@ from datetime import datetime, timezone
 
 from broadway.analysis.contracts import AnalysisContract
 from broadway.timeline.models import AnalysisDecision
-from broadway.timeline.sequence import load_walkthrough_sequence
-
-ALLOWED_METHODS: dict[str, frozenset[str]] = {
-    "omnibus": frozenset({"welch", "anova", "kruskal"}),
-    "posthoc": frozenset({"games_howell"}),
-}
-
-PARENTS_BY_KIND: dict[str, list[str]] = {
-    "omnibus": ["describe_groups", "normality", "variance"],
-    "posthoc": ["omnibus"],
-}
+from broadway.timeline.sequence import load_walkthrough_config, load_walkthrough_sequence
 
 
 def _question_for(kind: str) -> str:
@@ -29,15 +19,14 @@ def record(
     kind: str,
     method: str,
     reason: str,
-    parents: list[str],
 ) -> AnalysisDecision:
-    allowed = ALLOWED_METHODS.get(kind)
-    if allowed is None:
+    spec = load_walkthrough_config().decisions.get(kind)
+    if spec is None:
         raise ValueError(f"unknown decision kind '{kind}'")
-    if method not in allowed:
+    if method not in spec.methods:
         raise ValueError(
             f"method '{method}' is not allowed for kind '{kind}'; "
-            f"allowed: {sorted(allowed)}"
+            f"allowed: {spec.methods}"
         )
     return AnalysisDecision(
         analysis=analysis.name,
@@ -47,6 +36,6 @@ def record(
         method=method,
         reason=[reason],
         status="resolved",
-        parents=parents,
+        parents=list(spec.parents),
         decided_at=datetime.now(timezone.utc).isoformat(),
     )
