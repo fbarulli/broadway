@@ -29,6 +29,9 @@ def _build_parser() -> argparse.ArgumentParser:
     discover.add_argument("--datetime-column", type=str, default=None)
     discover.add_argument("--ignore-columns", nargs="*", default=[])
 
+    columns = sub.add_parser("columns")
+    columns.add_argument("--csv", type=str, required=True)
+
     lineage = sub.add_parser("lineage")
     lineage.add_argument("--analysis", type=str, required=True)
     lineage.add_argument("--dataset", type=str, required=True)
@@ -45,7 +48,8 @@ def _build_parser() -> argparse.ArgumentParser:
     audit.add_argument("--analysis", type=str, default=None)
     audit.add_argument("--environment", type=str, default=DEFAULT_ENVIRONMENT)
 
-    sub.add_parser("ingest")
+    ingest = sub.add_parser("ingest")
+    ingest.add_argument("--dataset", type=str, required=True)
 
     init = sub.add_parser("init")
     init.add_argument("csv")
@@ -102,6 +106,10 @@ def main() -> None:
         from broadway.discover.module import run
 
         run(args.csv, args.target, args.task, args.datetime_column, args.ignore_columns)
+    elif args.step == "columns":
+        from broadway.discover.columns import run
+
+        run(args.csv)
     elif args.step == "lineage":
         from broadway.lineage.module import run
 
@@ -130,7 +138,7 @@ def main() -> None:
     elif args.step == "ingest":
         from broadway.etl.process import process_data
 
-        process_data()
+        process_data(args.dataset)
     elif args.step == "init":
         from broadway.onboard.module import init
 

@@ -7,6 +7,8 @@ import pytest
 
 import broadway.etl.process_config as process_config
 import broadway.lineage.records as lineage_records
+from broadway.config.loader import load_config
+from broadway.config.schema import DatasetContract
 from broadway.etl.process import (
     compute_trip_duration,
     filter_valid_duration,
@@ -29,6 +31,13 @@ from broadway.lineage.models import LineageRecord
 
 
 @pytest.fixture
+def contract() -> DatasetContract:
+    cfg = load_config("contracts", dataset="taxi", experiment="taxi")
+    assert cfg.dataset is not None
+    return cfg.dataset
+
+
+@pytest.fixture
 def raw_trips() -> pd.DataFrame:
     return pd.DataFrame(
         {
@@ -41,8 +50,8 @@ def raw_trips() -> pd.DataFrame:
                 ["2024-01-01 10:20", "2024-01-01 10:50", "2024-01-01 13:00",
                  "2024-01-01 13:30", "2024-01-01 14:10"]
             ),
-            "PULocationID": [1, 2, 3, 4, 5],
-            "DOLocationID": [1, 2, 3, 4, 5],
+            "PULocationID": pd.Series([1, 2, 3, 4, 5], dtype="int32"),
+            "DOLocationID": pd.Series([1, 2, 3, 4, 5], dtype="int32"),
             "passenger_count": [1.0, 2.0, 1.0, 3.0, 1.0],
             "total_amount": [25.0, 20.0, 10.0, 35.0, 15.0],
             "tip_amount": [0.0, 1.5, 0.0, 2.0, 0.0],
@@ -68,7 +77,7 @@ def test_filter_valid_trips(raw_trips: pd.DataFrame) -> None:
 
 def test_compute_trip_duration(raw_trips: pd.DataFrame) -> None:
     valid = raw_trips.head(1).copy()
-    result = compute_trip_duration(valid)
+    result = compute_trip_duration(valid, TARGET)
     assert TARGET in result.columns
     assert float(result[TARGET].iloc[0]) == pytest.approx(20.0)
 
@@ -83,7 +92,7 @@ def test_filter_valid_duration() -> None:
             (min_trip_duration_minutes + max_trip_duration_minutes) / 2,
         ]
     })
-    filtered = filter_valid_duration(df)
+    filtered = filter_valid_duration(df, TARGET)
     assert len(filtered) == 3
     assert float(filtered[TARGET].min()) >= min_trip_duration_minutes
     assert float(filtered[TARGET].max()) <= max_trip_duration_minutes
@@ -102,13 +111,14 @@ def test_rename_columns() -> None:
     assert "dropoff_location_id" in result.columns
 
 
-def test_select_and_clean_columns(raw_trips: pd.DataFrame) -> None:
+def test_select_and_clean_columns(raw_trips: pd.DataFrame, contract: DatasetContract) -> None:
     renamed = rename_columns(raw_trips)
     renamed[TARGET] = [10.0, 20.0, None, 30.0, 40.0]
-    result = select_and_clean_columns(renamed)
+    result = select_and_clean_columns(renamed, contract)
     assert TARGET in result.columns
     assert result[TARGET].notna().all()
     assert len(result) < len(renamed)
+    assert set(result.columns) == set(contract.columns.keys())
 
 
 def test_process_data_writes_ingest_lineage(
@@ -125,7 +135,7 @@ def test_process_data_writes_ingest_lineage(
     monkeypatch.setattr(process_config, "processed_dir", str(processed_dir))
     monkeypatch.setattr(lineage_records, "LINEAGE_DIR", lineage_dir)
 
-    process_data()
+    process_data("taxi")
 
     training_path = processed_dir / "training_data.parquet"
     assert training_path.exists()

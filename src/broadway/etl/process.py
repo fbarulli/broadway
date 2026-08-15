@@ -2,12 +2,15 @@ import logging
 import os
 from pathlib import Path
 
+import pandera as pa
 import pandas as pd
 import polars as pl
+import yaml
 
+from broadway.config.loader import CONFIGS_DIR
+from broadway.config.schema import DatasetContract
+from broadway.contracts.pandera import build_raw_schema, pandera_dtype
 from broadway.etl import process_config as cfg
-from broadway.features.contracts import validate_raw_schema
-from broadway.features.schema import RAW_FEATURES, TARGET
 from broadway.lineage.ids import node_id
 from broadway.lineage.records import write_record
 
@@ -49,18 +52,18 @@ def filter_valid_trips(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def compute_trip_duration(df: pd.DataFrame) -> pd.DataFrame:
-    df[TARGET] = (
+def compute_trip_duration(df: pd.DataFrame, target: str) -> pd.DataFrame:
+    df[target] = (
         df["tpep_dropoff_datetime"] - df["tpep_pickup_datetime"]
     ).dt.total_seconds() / 60
     return df
 
 
-def filter_valid_duration(df: pd.DataFrame) -> pd.DataFrame:
+def filter_valid_duration(df: pd.DataFrame, target: str) -> pd.DataFrame:
     n_before = len(df)
     df = df[
-        (df[TARGET] >= cfg.min_trip_duration_minutes) &
-        (df[TARGET] <= cfg.max_trip_duration_minutes)
+        (df[target] >= cfg.min_trip_duration_minutes) &
+        (df[target] <= cfg.max_trip_duration_minutes)
     ].copy()
     logger.info(f"After duration filter: {len(df)} ({n_before - len(df)} dropped)")
     return df
@@ -84,11 +87,27 @@ def rename_columns(df: pd.DataFrame) -> pd.DataFrame:
     return df.rename(columns=cfg.rename_map)
 
 
-def select_and_clean_columns(df: pd.DataFrame) -> pd.DataFrame:
+def select_and_clean_columns(df: pd.DataFrame, contract: DatasetContract) -> pd.DataFrame:
+    cols = list(contract.columns.keys())
+    missing = [c for c in cols if c not in df.columns]
+    if missing:
+        raise ValueError(f"raw data missing required contract column(s): {sorted(missing)}")
+    extra = [c for c in df.columns if c not in cols]
+    if extra:
+        logger.info(f"dropping extra column(s) not in contract: {sorted(extra)}")
     n_before = len(df)
-    df = df[RAW_FEATURES + [TARGET]].dropna()
+    df = df[cols].dropna()
     logger.info(f"After dropna: {len(df)} ({n_before - len(df)} dropped)")
     return df
+
+
+def validate_contract_schema(df: pd.DataFrame, contract: DatasetContract) -> None:
+    for name, col in contract.columns.items():
+        if not col.dtype.strip():
+            raise ValueError(f"column '{name}' is missing a dtype in the dataset contract")
+        if pandera_dtype(col.dtype) is pa.Object:
+            raise ValueError(f"column '{name}' has unsupported dtype '{col.dtype}'")
+    build_raw_schema(contract).validate(df)
 
 
 def save_processed_data(df: pd.DataFrame) -> None:
@@ -99,8 +118,15 @@ def save_processed_data(df: pd.DataFrame) -> None:
     logger.info(f"Processed data saved to {processed_file} ({len(df)} rows)")
 
 
-def process_data() -> None:
+def _load_contract(dataset: str) -> DatasetContract:
+    path = CONFIGS_DIR / "dataset" / f"{dataset}.yaml"
+    return DatasetContract(**yaml.safe_load(path.read_text()))
+
+
+def process_data(dataset: str) -> None:
     logger.info("Processing data...")
+
+    contract = _load_contract(dataset)
 
     files = get_raw_files()
     df = read_raw_data(files)
@@ -108,27 +134,22 @@ def process_data() -> None:
 
     logger.info("Filtering invalid trips...")
     df = filter_valid_trips(df)
-    df = compute_trip_duration(df)
-    df = filter_valid_duration(df)
+    df = compute_trip_duration(df, contract.target)
+    df = filter_valid_duration(df, contract.target)
     df = filter_valid_passenger_count(df)
 
     df = rename_columns(df)
-    df = select_and_clean_columns(df)
+    df = select_and_clean_columns(df, contract)
 
-    validate_raw_schema(df)
+    validate_contract_schema(df, contract)
 
     save_processed_data(df)
 
     processed_path = Path(cfg.processed_dir) / cfg.processed_file
     write_record(
-        node_id("ingest", "taxi"),
+        node_id("ingest", dataset),
         "ingest",
         str(processed_path),
-        [node_id("dataset", "taxi")],
+        [node_id("dataset", dataset)],
     )
     logger.info("ingest lineage record written")
-
-
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
-    process_data()

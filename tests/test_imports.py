@@ -33,12 +33,11 @@ def test_core_imports() -> None:
 
 
 def test_features_imports(features_cfg, project_cfg) -> None:
-    from broadway.features.schema import RAW_FEATURES, TARGET
+    from broadway.features.schema import TARGET
     from project.ml_pipeline import FeaturePipeline
     from project.features import ENGINEERED_FEATURES
 
     assert isinstance(ENGINEERED_FEATURES, tuple)
-    assert isinstance(RAW_FEATURES, list)
     assert isinstance(TARGET, str)
     pipeline = FeaturePipeline(
         lookup_path=project_cfg.lookup_path,

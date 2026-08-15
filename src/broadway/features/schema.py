@@ -9,33 +9,10 @@ their name/dtype/schema views from a single ``FEATURE_SPECS`` dict.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
 
 import pandera as pa
 
 from broadway.contracts.pandera import pandera_dtype
-
-RAW_FEATURES = [
-    "pickup_datetime",
-    "passenger_count",
-    "trip_distance",
-    "pickup_location_id",
-    "dropoff_location_id",
-    "total_amount",
-    "tip_amount",
-    "airport_fee",
-]
-
-RAW_FEATURE_TYPES = {
-    "pickup_datetime": datetime,
-    "passenger_count": float,
-    "trip_distance": float,
-    "pickup_location_id": int,
-    "dropoff_location_id": int,
-    "total_amount": float,
-    "tip_amount": float,
-    "airport_fee": float,
-}
 
 STREAM_FEATURE_TYPES = {
     "pickup_location_id": int,

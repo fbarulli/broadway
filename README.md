@@ -85,7 +85,8 @@ Every step except `discover` takes the same three flags.
 | discover | `ds-pipeline discover --csv … --target … --task …` | `configs/dataset/<name>.yaml` + `artifacts/discover/profile.json` | works |
 | init | `ds-pipeline init <csv> --name <n> …` | `configs/{dataset,analysis,experiment}/<n>.yaml` + `artifacts/discover/profile.json` + profile lineage sidecar | works (interactive or flag-driven) |
 | profile | `ds-pipeline profile --dataset <d>` | `artifacts/discover/profile.json` (re-profile observed facts) | works |
-| ingest | `ds-pipeline ingest` | `data/processed/training_data.parquet` (~8.5M rows, 9 cols) + `ingest:taxi` lineage record | works (Polars; CI-gated) |
+| columns | `ds-pipeline columns --csv <path>` | prints `name: dtype` per source column (read-only) | works |
+| ingest | `ds-pipeline ingest --dataset <d>` | `data/processed/training_data.parquet` (~8.5M rows, 9 cols) + `ingest:<d>` lineage record | works (Polars; CI-gated; contract-driven) |
 | etl | `ds-pipeline etl --dataset <d> --experiment <e>` | cleaned + split parquet + `JoinAudit`/`LookupValueAudit` (`join`/`lookup_value` lineage nodes) | works |
 | contracts | `ds-pipeline contracts …` | pass/fail validation | works |
 | features | `ds-pipeline features …` | fitted feature pipeline | works |
@@ -328,6 +329,11 @@ normalized to canonical `datetime64` at the schema boundary
 `lookup_tables` entries support `value_policies` (per-column sentinel values)
 and `na_values` (authored NA tokens) — both owned by the config, not inferred
 from pandas defaults.
+
+The raw feature schema comes from `configs/dataset/<name>.yaml`, not code:
+adding or removing a raw feature means editing that YAML (probe the source
+file's dtypes with `ds-pipeline columns --csv <path>`), then re-running
+`ds-pipeline ingest --dataset <name>` + `profile`. No code change required.
 
 Typed step outputs follow `artifacts/<step>/` and reports follow
 `reports/`.

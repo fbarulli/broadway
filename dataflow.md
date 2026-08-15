@@ -139,6 +139,7 @@ broadway/
       contracts.py          # AnalysisContract / HypothesisConfig / AnalysisMode + require_mode
     discover/               # read CSV/parquet → infer contract + observed profile
       module.py             # run(): writes configs/dataset/<name>.yaml + artifacts/discover/profile.json
+      columns.py            # run(): prints `name: dtype` per source column (read-only)
       profile.py            # DatasetProfile / ColumnProfile (observed facts; identifier_score is descriptive only)
       qq.py                 # plot_numeric_qq: per-feature Q-Q small multiples + per-feature distribution grid (QqOverview evidence)
     onboard/                # onboarding/scaffolding (ds-pipeline init) + semantic inference hints
@@ -158,7 +159,7 @@ broadway/
       models.py             # ParseFailure / StructuralCleanResult (typed evidence)
       structural.py         # standardize_missing / parse_datetime / parse_numeric
     etl/                    # ingest (raw → processed) + config-driven etl pipeline step
-      process.py            # process_data(): yellow_tripdata_*.parquet → training_data.parquet (ingest step)
+      process.py            # process_data(dataset): yellow_tripdata_*.parquet → training_data.parquet (contract-driven ingest step)
       process_config.py     # reads configs/project/taxi.yaml + configs/step/etl.yaml
       module.py             # etl step: load_with_audit → canonicalize → validate → split → join/lookup_value lineage
     stats/                  # pandas/numpy stats library (no Spark)
@@ -287,7 +288,7 @@ broadway/
 | `time_series.plot_acf(resid, ...)` | `plot_acf` | `src/broadway/stats/time_series.py` |
 | `baseline.train_lgbm(X, y, ...)` | `train_lgbm` | `src/broadway/stats/baseline.py` |
 | `baseline.evaluate(model, ...)` | `evaluate` | `src/broadway/stats/baseline.py` |
-| `etl.process.process_data()` | `process_data` | `src/broadway/etl/process.py` |
+| `etl.process.process_data(dataset)` | `process_data` | `src/broadway/etl/process.py` |
 | `reports.describe.render(summary)` | `render` | `src/broadway/reports/describe.py` |
 | `reports.describe.headline(summary)` | `headline` | `src/broadway/reports/describe.py` |
 | `reports.index.render_index(question, stats_dir)` | `render_index` | `src/broadway/reports/index.py` |
@@ -317,7 +318,7 @@ through ingest and the etl step:
 
 ```
 data/raw/yellow_tripdata_*.parquet
-        │  ingest (process_data: Polars scan → CI-gated sample → clean → save)
+        │  ingest (process_data: Polars scan → CI-gated sample → clean → contract-validate → save)
         ▼
 data/processed/training_data.parquet     (~8.5M rows, 9 cols)
         │  etl (load_with_audit → canonicalize → validate → split)
@@ -436,7 +437,7 @@ The node chain begins `dataset → ingest → join → {etl, lookup_value}`, the
 | Goal | Change |
 |---|---|
 | New config knob | `configs/step/stats.yaml` + matching field in `StatsStep` (`schema.py`) + constant in `data.py` |
-| New DataFrame contract | add the column to `configs/dataset/taxi.yaml` — `build_raw_schema` regenerates the raw schema; call `Schema.validate(df)` at the stage boundary |
+| New raw feature | edit `configs/dataset/<name>.yaml` (dtype via `ds-pipeline columns --csv <path>`), then re-run `ingest` + `profile` — no code change |
 | New loader | add function in `project/data.py`; reuse `read_training_data` / `_join_boroughs` |
 | New statistical test | add function in `src/broadway/stats/` (pandas/numpy only) + document in `API.md` |
 | New experiment script | add `project/scripts/NN_*.py`; import from `project.data` and `broadway.stats` |

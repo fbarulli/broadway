@@ -29,21 +29,30 @@ Prints the arrow schema, row count, sample rows, and column names of
 `data/processed/training_data.parquet`. Implemented in `inspect_schema`
 (`project/data.py`).
 
+To list the columns + dtypes of a source file (read-only, no writes):
+
+```bash
+uv run ds-pipeline columns --csv <path>
+```
+
 ### 2. Rebuild the raw data (`ingest`)
 
 ```bash
-uv run ds-pipeline ingest
+uv run ds-pipeline ingest --dataset taxi
 ```
 
 Reads `data/raw/yellow_tripdata_*.parquet`, filters/renames, then enforces the
-exact schema. Produces `data/processed/training_data.parquet` and writes the
-`ingest:taxi` lineage record.
+exact schema from `configs/dataset/taxi.yaml`. Produces
+`data/processed/training_data.parquet` and writes the `ingest:taxi` lineage
+record.
 
-It hard-fails on any column mismatch via `validate_raw_schema`
-(`features/contracts.py`): exactly `RAW_FEATURES + [TARGET]`, no nulls, strict
-dtypes.
+It hard-fails on any column mismatch via the contract-driven validation in
+`etl/process.py`: every column in the contract must be present (extra columns
+are dropped, missing ones raise), dtypes must match exactly (`build_raw_schema`
+→ `validate`), and any column missing a dtype or carrying an unsupported dtype
+raises.
 
-Expected 9 columns (`features/schema.py`):
+Expected columns come from `configs/dataset/taxi.yaml` (9 columns):
 
 - `pickup_datetime`
 - `passenger_count`
