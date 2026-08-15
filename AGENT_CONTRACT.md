@@ -45,6 +45,14 @@ Development happens on `taxi`; the `main` split already happened, don't redo it.
   state invariants explicitly: suite green, no surface-ownership changes, no
   silent policy, backward compatibility.
 - Re-read the 1–3 files a task touches immediately before dispatching.
+- Every contract must be **self-contained** — enumerate two things up front so
+  the worker executes, not explores: (a) the **complete edit list** (each file
+  with its exact current content and its replacement — never just "update the
+  columns"), and (b) the **complete regenerated-artifact list** (every tracked
+  file the command sequence rewrites, e.g. `reports/audit/*` and
+  `reports/figures/*.png`, derived from the writers in the code). If a worker
+  has to search to locate a target or a side-effect, the contract was
+  incomplete.
 - Batch detailed contracts only when ALL hold: ≤3 tasks, disjoint files, no
   shared evidence/config/renderer contracts, no symbol-renaming refactor.
 - When a deferred item is completed and verified, **remove** it from the queue;
