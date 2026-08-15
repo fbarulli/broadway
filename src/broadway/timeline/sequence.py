@@ -16,12 +16,20 @@ class WalkthroughStepConfig(BaseModel):
     order: int
     question: str
     kind: Literal["evidence", "decision", "analysis"]
+    action: str = ""
 
 
 class WalkthroughSequence(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     steps: list[WalkthroughStepConfig]
+
+
+class DecisionSpec(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    methods: list[str]
+    parents: list[str]
 
 
 class WalkthroughConfig(BaseModel):
@@ -33,6 +41,7 @@ class WalkthroughConfig(BaseModel):
     imbalance_ratio_threshold: float
     significance_alpha: float
     max_qq_groups: int
+    decisions: dict[str, DecisionSpec] = {}
 
 
 def load_walkthrough_sequence() -> WalkthroughSequence:
