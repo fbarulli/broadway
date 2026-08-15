@@ -52,7 +52,7 @@ are dropped, missing ones raise), dtypes must match exactly (`build_raw_schema`
 → `validate`), and any column missing a dtype or carrying an unsupported dtype
 raises.
 
-Expected columns come from `configs/dataset/taxi.yaml` (8 columns):
+Expected columns come from `configs/dataset/taxi.yaml` (7 columns):
 
 - `pickup_datetime`
 - `passenger_count`
@@ -60,7 +60,6 @@ Expected columns come from `configs/dataset/taxi.yaml` (8 columns):
 - `pickup_location_id`
 - `dropoff_location_id`
 - `fare_amount`
-- `airport_fee`
 - `trip_duration_minutes` (target)
 
 ### 3. Canonicalize + split (`etl`)
@@ -118,7 +117,7 @@ uv run pytest -q
 
 ## Key column facts (what "correct" means)
 
-- **Contract source of truth:** `configs/dataset/taxi.yaml` — 8 columns, each
+- **Contract source of truth:** `configs/dataset/taxi.yaml` — 7 columns, each
   with `dtype`, `null_count`, and `role`.
 - **Raw-boundary check** (`contracts`) verifies **presence + nulls only**;
   dtype is intentionally deferred (`contracts/checks.py`).

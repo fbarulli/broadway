@@ -86,7 +86,7 @@ Every step except `discover` takes the same three flags.
 | init | `ds-pipeline init <csv> --name <n> …` | `configs/{dataset,analysis,experiment}/<n>.yaml` + `artifacts/discover/profile.json` + profile lineage sidecar | works (interactive or flag-driven) |
 | profile | `ds-pipeline profile --dataset <d>` | `artifacts/discover/profile.json` (re-profile observed facts) | works |
 | columns | `ds-pipeline columns --csv <path>` | prints `name: dtype` per source column (read-only) | works |
-| ingest | `ds-pipeline ingest --dataset <d>` | `data/processed/training_data.parquet` (~8.5M rows, 8 cols) + `ingest:<d>` lineage record | works (Polars; CI-gated; contract-driven) |
+| ingest | `ds-pipeline ingest --dataset <d>` | `data/processed/training_data.parquet` (~8.5M rows, 7 cols) + `ingest:<d>` lineage record | works (Polars; CI-gated; contract-driven) |
 | etl | `ds-pipeline etl --dataset <d> --experiment <e>` | cleaned + split parquet + `JoinAudit`/`LookupValueAudit` (`join`/`lookup_value` lineage nodes) | works |
 | contracts | `ds-pipeline contracts …` | pass/fail validation | works |
 | features | `ds-pipeline features …` | fitted feature pipeline | works |

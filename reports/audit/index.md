@@ -3,15 +3,15 @@
 ## Data used
 
 - rows_in: 8545833
-- rows_out (canonical): 8545832
-- rows_dropped_total: 1
+- rows_out (canonical): 8545665
+- rows_dropped_total: 168
 
 Dataset status: READY WITH WARNINGS
 All required audit artifacts are present, but one or more deterministic evidence checks reported non-zero deficiencies.
 
 ## What changed
 
-- exact-duplicate rows dropped: 1
+- exact-duplicate rows dropped: 168
 
 ## Enrichment quality
 

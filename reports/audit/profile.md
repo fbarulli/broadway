@@ -2,7 +2,7 @@
 
 ## Answer
 
-The dataset has 8545833 rows and 8 columns.
+The dataset has 8545833 rows and 7 columns.
 
 ## Key evidence
 
@@ -10,7 +10,6 @@ The dataset has 8545833 rows and 8 columns.
 
 | Variable | Type | Missing | Unique | Min | Max |
 | --- | --- | --- | --- | --- | --- |
-| airport_fee | float64 | 0 | 3 | -1.75 | 1.75 |
 | dropoff_location_id | int32 | 0 | 261 | 1 | 265 |
 | fare_amount | float64 | 0 | 3277 | -999.0 | 999.0 |
 | passenger_count | float64 | 0 | 6 | 1.0 | 6.0 |
@@ -44,7 +43,7 @@ Histograms are in raw units.
 
 ![Per-feature distributions — figure 1 of 1](../figures/numeric_dist_1.png)
 
-In this figure: airport_fee, fare_amount, passenger_count, trip_distance, trip_duration_minutes. Chunk 1 of 1; the trailing `_1` in the filename is the chunk number.
+In this figure: fare_amount, passenger_count, trip_distance, trip_duration_minutes. Chunk 1 of 1; the trailing `_1` in the filename is the chunk number.
 
 How to read (distribution): actual spread and skew in original units; look for heavy tails, multimodality, and gaps.
 
@@ -52,7 +51,6 @@ How to read (distribution): actual spread and skew in original units; look for h
 
 | Variable | n | mean | std | skew | excess_kurtosis | zero_rate | p99/median | max/median | log_skew |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| airport_fee | 10000 | 0.139 | 0.486 | 2.83 | 7.3 | 0.917 | - | - | - |
 | fare_amount | 10000 | 18.1 | 17.5 | 2.41 | 14.5 | 0.000 | 5.48 | 20.7 | - |
 | passenger_count | 10000 | 1.35 | 0.832 | 3.17 | 11.2 | 0.000 | 5 | 6 | 2.05 |
 | trip_distance | 10000 | 3.31 | 4.35 | 2.82 | 9.04 | 0.000 | 11.8 | 26.8 | 0.528 |
@@ -60,15 +58,12 @@ How to read (distribution): actual spread and skew in original units; look for h
 
 ![Per-feature distribution diagnostics — figure 1 of 1](../figures/numeric_diagnostics.png)
 
-In this figure: airport_fee, fare_amount, passenger_count, trip_distance, trip_duration_minutes. Chunk 1 of 1; the trailing `_1` in the filename is the chunk number.
+In this figure: fare_amount, passenger_count, trip_distance, trip_duration_minutes. Chunk 1 of 1; the trailing `_1` in the filename is the chunk number.
 
 How to read (diagnostics): colors are per-column z-scores; cell text is the raw value.
 
 ### Decision flags
 
-- airport_fee: zero_rate 0.917 exceeds 0.05
-- airport_fee: skew 2.83 exceeds 1.0
-- airport_fee: kurtosis 7.30 exceeds 3.0
 - fare_amount: skew 2.41 exceeds 1.0
 - fare_amount: kurtosis 14.54 exceeds 3.0
 - passenger_count: skew 3.17 exceeds 1.0
@@ -82,7 +77,6 @@ How to read (diagnostics): colors are per-column z-scores; cell text is the raw 
 Notes:
 - dropoff_location_id: declared id
 - pickup_location_id: declared id
-- airport_fee: discrete (3 unique values) (excluded from Q-Q, kept as a bar chart in the distribution grid)
 - passenger_count: discrete (6 unique values) (excluded from Q-Q, kept as a bar chart in the distribution grid)
 - not profiled (non-numeric): pickup_datetime
 
