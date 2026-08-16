@@ -14,24 +14,11 @@ import pandas as pd
 from statsmodels.regression.linear_model import RegressionResultsWrapper
 
 from _common import RESULTS, WORKING_DATASET, load_metered
-from _ols_bp import fit_log_hc3, plot_log_resid_qq
+from _ols_bp import CAP_QUANTILE, fit_log_hc3, plot_log_resid_qq, winsorize
 from _tests import write_tests_json
 from broadway.stats.regression import bp_jb
 
 OUT = RESULTS / f"{Path(__file__).stem}.png"
-
-CAP_QUANTILE = 0.995  # winsorization cap, just below the outlier threshold
-CAPPED_COLUMNS = ("fare_amount", "trip_distance")
-
-
-def winsorize(df: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
-    """Cap the capped columns at their 99.5th percentiles; return df + caps."""
-    caps = {col: float(df[col].quantile(CAP_QUANTILE)) for col in CAPPED_COLUMNS}
-    out = df.copy()
-    for col, cap in caps.items():
-        out[col] = out[col].clip(upper=cap)
-    n_capped = {col: int((df[col] > cap).sum()) for col, cap in caps.items()}
-    return out, {"caps": caps, "n_capped": n_capped}
 
 
 def summarize(model: RegressionResultsWrapper) -> dict:

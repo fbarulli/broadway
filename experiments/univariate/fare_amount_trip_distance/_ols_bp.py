@@ -1,4 +1,4 @@
-"""Shared analysis/plot helpers for this experiment (reused by 04, 13, 18-22)."""
+"""Shared analysis/plot helpers for this experiment (reused by 04, 13, 18-27)."""
 
 from pathlib import Path
 
@@ -78,6 +78,20 @@ def fit_log_hc3(df: pd.DataFrame) -> RegressionResultsWrapper:
     y = np.log1p(df["fare_amount"])
     X = sm.add_constant(df[["trip_distance", "duration_minutes"]])
     return sm.OLS(y, X).fit(cov_type="HC3")
+
+
+CAP_QUANTILE = 0.995  # winsorization cap (steps 26/27)
+CAPPED_COLUMNS = ("fare_amount", "trip_distance")
+
+
+def winsorize(df: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
+    """Cap the capped columns at their 99.5th percentiles; return df + caps."""
+    caps = {col: float(df[col].quantile(CAP_QUANTILE)) for col in CAPPED_COLUMNS}
+    out = df.copy()
+    for col, cap in caps.items():
+        out[col] = out[col].clip(upper=cap)
+    n_capped = {col: int((df[col] > cap).sum()) for col, cap in caps.items()}
+    return out, {"caps": caps, "n_capped": n_capped}
 
 
 def add_log_predictions(df: pd.DataFrame) -> pd.DataFrame:
