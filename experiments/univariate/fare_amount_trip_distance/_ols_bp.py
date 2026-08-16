@@ -1,4 +1,4 @@
-"""Shared OLS + Breusch-Pagan analysis/plot for this experiment (reused by 04, 13, 18, 19)."""
+"""Shared analysis/plot helpers for this experiment (reused by 04, 13, 18-22)."""
 
 from pathlib import Path
 
@@ -16,6 +16,15 @@ from matplotlib.lines import Line2D
 from statsmodels.regression.linear_model import RegressionResultsWrapper
 
 ALPHA = 0.05
+
+
+def modified_zscore(series: pd.Series) -> pd.Series:
+    """Robust standardized score from median and MAD: 0.6745 * (x - median) / MAD."""
+    med = series.median()
+    mad = (series - med).abs().median()
+    if mad == 0:
+        return pd.Series(0.0, index=series.index)
+    return 0.6745 * (series - med) / mad
 
 
 def _fmt_p(p: float) -> str:
