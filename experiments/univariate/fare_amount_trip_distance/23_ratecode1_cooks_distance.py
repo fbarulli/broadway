@@ -15,8 +15,9 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 from _common import RESULTS, WORKING_DATASET, load_metered
-from _ols_bp import fit_log_hc3
+from _ols_bp import attach_stats_legend, fit_log_hc3
 from _tests import write_tests_json
+from broadway.stats.regression import bp_jb
 
 OUT = RESULTS / f"{Path(__file__).stem}.png"
 
@@ -33,6 +34,7 @@ def main() -> None:
     print(f"influential trips (Cook's D > 4/n = {threshold:.2e}): {n_influential} of {n}")
 
     fig, ax = plt.subplots(figsize=(12, 6.5))
+    fig.subplots_adjust(bottom=0.30, top=0.90)
     ax.axhline(threshold, color="red", linestyle="--", linewidth=1,
                label=f"threshold 4/n = {threshold:.2e}")
     ax.scatter(model.fittedvalues, cooks, s=5, alpha=0.2, color="gray")
@@ -42,7 +44,7 @@ def main() -> None:
     ax.set_ylabel("Cook's distance")
     ax.set_title(f"Cook's distance — log-fare model (N={n})")
     ax.legend()
-    fig.tight_layout()
+    attach_stats_legend(fig, bp_jb(model))
     fig.savefig(OUT, dpi=150)
     plt.close(fig)
     print(f"wrote {OUT}")
