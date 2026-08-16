@@ -1,7 +1,7 @@
 """01: filter the raw fare_amount vs trip_distance relationship and plot it.
 
 Draws a random 50k sample via the generic read_sample loader, filters out
-garbage, saves the filtered sample (sample_50k.parquet), and renders a
+garbage, saves the filtered sample (sample50k.parquet), and renders a
 density scatter of trip_distance (x) vs fare_amount (y).
 """
 

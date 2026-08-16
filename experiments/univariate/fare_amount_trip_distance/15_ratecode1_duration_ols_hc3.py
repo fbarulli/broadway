@@ -5,7 +5,7 @@ duration (derived from pickup/dropoff datetimes, non-positive durations
 dropped) as a second predictor, and fits BOTH plain OLS and HC3 so the
 robust standard errors can be compared directly. HC3 changes only
 SEs/p-values/CIs — never coefficients or R^2. Also renders the
-residuals-vs-fitted scatter for the HC3 fit.
+residuals-vs-fitted and residual Q-Q plots side by side for the HC3 fit.
 """
 
 from pathlib import Path
@@ -14,19 +14,10 @@ import pandas as pd
 import statsmodels.api as sm
 from statsmodels.regression.linear_model import RegressionResultsWrapper
 
-from _common import RATECODE1_PARQUET, RESULTS
-from _ols_bp import plot_resid_vs_fitted
+from _common import RESULTS, load_metered
+from _ols_bp import plot_resid_vs_fitted_qq
 
 OUT = RESULTS / f"{Path(__file__).stem}.png"
-
-
-def load_metered() -> pd.DataFrame:
-    df = pd.read_parquet(RATECODE1_PARQUET)
-    df["trip_duration"] = (
-        df["tpep_dropoff_datetime"] - df["tpep_pickup_datetime"]
-    ).dt.total_seconds()
-    df["duration_minutes"] = df["trip_duration"] / 60
-    return df[df["trip_duration"] > 0]
 
 
 def fit_both(df: pd.DataFrame) -> tuple[RegressionResultsWrapper, RegressionResultsWrapper]:
@@ -66,7 +57,7 @@ def main() -> None:
         "valid under the heteroskedasticity Breusch-Pagan rejects."
     )
 
-    plot_resid_vs_fitted(hc3, OUT, suptitle="RatecodeID == 1, distance + duration (HC3)")
+    plot_resid_vs_fitted_qq(hc3, OUT, suptitle="RatecodeID == 1, distance + duration (HC3)")
     print(f"wrote {OUT}")
 
 

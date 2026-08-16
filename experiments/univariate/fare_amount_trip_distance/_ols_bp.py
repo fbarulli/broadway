@@ -40,6 +40,24 @@ def plot_resid_vs_fitted(
     plt.close(fig)
 
 
+def plot_resid_vs_fitted_qq(
+    model: RegressionResultsWrapper,
+    out_path: Path,
+    suptitle: str | None = None,
+) -> None:
+    """Residuals-vs-fitted and residual Q-Q plot, side by side."""
+    fig, (ax_resid, ax_qq) = plt.subplots(1, 2, figsize=(14, 6))
+    draw_resid_vs_fitted(ax_resid, model)
+    stats.probplot(model.resid, dist="norm", plot=ax_qq)
+    ax_qq.set_title("Q-Q plot (residuals)")
+    ax_qq.grid(True, alpha=0.3)
+    if suptitle is not None:
+        fig.suptitle(suptitle)
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=150)
+    plt.close(fig)
+
+
 def fit_and_plot_ols_bp(
     df: pd.DataFrame,
     formula: str,

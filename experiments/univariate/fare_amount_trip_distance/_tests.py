@@ -1,8 +1,10 @@
 """Shared test-result persistence: one JSON per dataset, self-describing.
 
-Each tests_<dataset>.json carries the dataset name, row count, source
-script, timestamp, the X/Y analyzed, and the transformations that built the
-dataset — so every results file is identifiable and trackable on its own.
+Each <dataset>.json (e.g. sample50k.json) carries the dataset name, row
+count, source script, timestamp, the X/Y analyzed, and the transformations
+that built the dataset — so every results file is identifiable and
+trackable on its own. The dataset name is the filename; the experiment
+folder is the context, so no tests_ prefix is needed.
 """
 
 import json
@@ -13,7 +15,7 @@ from _common import DATASET_META, RESULTS
 
 
 def tests_path_for(dataset: Path) -> Path:
-    return RESULTS / f"tests_{dataset.stem}.json"
+    return RESULTS / f"{dataset.stem}.json"
 
 
 def write_tests_json(
