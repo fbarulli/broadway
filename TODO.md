@@ -81,6 +81,16 @@ Update freely; remove entries when done (git history is the record).
   Standing rules still apply: config files only (no env), single source of
   truth, data-agnostic, fail-loud, no drift-type additions without asking.
 
+- **Auto-teardown + fast verification entry point** (2026-08-16, `cc99dab`):
+  finished Jobs self-delete via `ttlSecondsAfterFinished: 600` on all four
+  `k8s/optuna/` Job manifests (verified live: completed jobs + pods gone from
+  the cluster ~10 min after finish); `k8s/optuna/teardown.sh` removes the
+  whole stack and the kind cluster on demand;
+  `verify_experiments.py` at the repo root is a ~seconds entry point that
+  syntax-compiles every experiment script, validates all YAML configs through
+  `require_keys`, imports the shared experiment modules, and spot-checks
+  structural invariants (no training, no figures, no cluster).
+
 ## Next
 
 - **Step 23 standardization** — Cook's index plot is single-panel; decide:
