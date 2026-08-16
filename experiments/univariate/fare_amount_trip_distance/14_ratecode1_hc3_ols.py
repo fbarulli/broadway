@@ -7,10 +7,15 @@ makes the standard errors (and hence p-values/CIs) valid despite
 heteroskedasticity. Uses the same ratecode1 dataset as 11/12/13.
 """
 
+from pathlib import Path
+
 import polars as pl
 import statsmodels.api as sm
 
-from _common import RATECODE1_PARQUET
+from _common import RATECODE1_PARQUET, RESULTS
+from _ols_bp import plot_resid_vs_fitted
+
+OUT = RESULTS / f"{Path(__file__).stem}.png"
 
 
 def main() -> None:
@@ -29,6 +34,9 @@ def main() -> None:
         "(step 13); only std err / t / p-values change — they are now valid "
         "despite the heteroskedasticity Breusch-Pagan keeps rejecting."
     )
+
+    plot_resid_vs_fitted(model, OUT, suptitle="RatecodeID == 1 (HC3)")
+    print(f"wrote {OUT}")
 
 
 if __name__ == "__main__":

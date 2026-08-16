@@ -10,8 +10,34 @@ import pandas as pd
 from scipy import stats
 
 from broadway.stats.regression import bp_jb, fit_ols
+from statsmodels.regression.linear_model import RegressionResultsWrapper
 
 ALPHA = 0.05
+
+
+def draw_resid_vs_fitted(ax, model: RegressionResultsWrapper) -> None:
+    """Draw the residuals-vs-fitted panel on an existing axis."""
+    ax.scatter(model.fittedvalues, model.resid, s=2, alpha=0.2)
+    ax.axhline(0, color="red", linewidth=1)
+    ax.set_xlabel("fitted values")
+    ax.set_ylabel("residuals")
+    ax.set_title("residuals vs fitted")
+    ax.grid(True, alpha=0.3)
+
+
+def plot_resid_vs_fitted(
+    model: RegressionResultsWrapper,
+    out_path: Path,
+    suptitle: str | None = None,
+) -> None:
+    """Standalone residuals-vs-fitted scatter for a fitted model."""
+    fig, ax = plt.subplots(figsize=(7, 6))
+    draw_resid_vs_fitted(ax, model)
+    if suptitle is not None:
+        fig.suptitle(suptitle)
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=150)
+    plt.close(fig)
 
 
 def fit_and_plot_ols_bp(
@@ -33,12 +59,7 @@ def fit_and_plot_ols_bp(
 
     fig, (ax_resid, ax_bp) = plt.subplots(1, 2, figsize=(14, 6))
 
-    ax_resid.scatter(model.fittedvalues, model.resid, s=2, alpha=0.2)
-    ax_resid.axhline(0, color="red", linewidth=1)
-    ax_resid.set_xlabel("fitted values")
-    ax_resid.set_ylabel("residuals")
-    ax_resid.set_title("residuals vs fitted")
-    ax_resid.grid(True, alpha=0.3)
+    draw_resid_vs_fitted(ax_resid, model)
 
     z_crit = stats.norm.ppf(1 - ALPHA / 2)
     z_obs = float(np.sqrt(lm_stat))
