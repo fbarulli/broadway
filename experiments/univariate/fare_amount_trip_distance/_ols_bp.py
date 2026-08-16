@@ -23,11 +23,11 @@ def _fmt_p(p: float) -> str:
 
 
 def attach_stats_legend(fig, result: dict) -> None:
-    """Bottom-center figure legend with BP/JB/skew/kurtosis, platform style.
+    """Bottom legend with BP/JB/skew/kurtosis, outside the axes.
 
-    Mirrors src/broadway/discover/qq.py::attach_qq_legend: a figure-level
-    legend (loc="lower center", horizontal columns, framed) that sits in its
-    own space below the axes instead of overlapping the graphs.
+    Mirrors src/broadway/discover/qq.py::attach_qq_legend (figure-level,
+    horizontal columns, framed), but anchored in the bottom band reserved by
+    subplots_adjust(bottom=...) — the legend never overlaps the graphs.
     """
     handles = [
         Line2D([0], [0], color="none", label=f"Breusch-Pagan: stat={result['bp_stat']:.2f}, {_fmt_p(result['bp_pval'])}"),
@@ -37,6 +37,7 @@ def attach_stats_legend(fig, result: dict) -> None:
     fig.legend(
         handles=handles,
         loc="lower center",
+        bbox_to_anchor=(0.5, 0.07),
         ncol=len(handles),
         fontsize=9,
         frameon=True,
@@ -58,10 +59,11 @@ def plot_log_resid_qq(
 ) -> None:
     """Log-fare model: seaborn residuals-vs-fitted + residual Q-Q, side by side.
 
-    The diagnostics legend is a figure-level legend at the bottom center
-    (platform style), so it never overlaps the graphs.
+    The figure is taller than the axes and subplots_adjust reserves a bottom
+    band, so the diagnostics legend sits outside the graphs in its own space.
     """
-    fig, (ax_resid, ax_qq) = plt.subplots(1, 2, figsize=(14, 6.5), layout="constrained")
+    fig, (ax_resid, ax_qq) = plt.subplots(1, 2, figsize=(14, 7.5))
+    fig.subplots_adjust(bottom=0.30, top=0.90)
     sns.scatterplot(x=model.fittedvalues, y=model.resid, alpha=0.2, s=10, ax=ax_resid)
     ax_resid.axhline(0, color="red", linestyle="--")
     ax_resid.set_xlabel("Predicted Log-Fare")
