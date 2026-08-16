@@ -1,4 +1,4 @@
-"""Shared OLS + Breusch-Pagan analysis/plot for this experiment (reused by 04 and 13)."""
+"""Shared OLS + Breusch-Pagan analysis/plot for this experiment (reused by 04, 13, 18, 19)."""
 
 from pathlib import Path
 
@@ -7,12 +7,43 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import seaborn as sns
+import statsmodels.api as sm
 from scipy import stats
 
 from broadway.stats.regression import bp_jb, fit_ols
 from statsmodels.regression.linear_model import RegressionResultsWrapper
 
 ALPHA = 0.05
+
+
+def fit_log_hc3(df: pd.DataFrame) -> RegressionResultsWrapper:
+    """OLS on log1p(fare_amount) ~ trip_distance + duration_minutes, HC3 SEs."""
+    y = np.log1p(df["fare_amount"])
+    X = sm.add_constant(df[["trip_distance", "duration_minutes"]])
+    return sm.OLS(y, X).fit(cov_type="HC3")
+
+
+def plot_log_resid_qq(
+    model: RegressionResultsWrapper,
+    out_path: Path,
+    suptitle: str | None = None,
+) -> None:
+    """Log-fare model: seaborn residuals-vs-fitted + residual Q-Q, side by side."""
+    fig, (ax_resid, ax_qq) = plt.subplots(1, 2, figsize=(14, 6))
+    sns.scatterplot(x=model.fittedvalues, y=model.resid, alpha=0.2, s=10, ax=ax_resid)
+    ax_resid.axhline(0, color="red", linestyle="--")
+    ax_resid.set_xlabel("Predicted Log-Fare")
+    ax_resid.set_ylabel("Residual")
+    ax_resid.grid(True, alpha=0.3)
+    sm.qqplot(model.resid, line="s", ax=ax_qq)
+    ax_qq.set_title("Q-Q plot (residuals)")
+    ax_qq.grid(True, alpha=0.3)
+    n = int(model.nobs)
+    fig.suptitle(f"{suptitle} (N={n})" if suptitle else f"N={n}")
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=150)
+    plt.close(fig)
 
 
 def draw_resid_vs_fitted(ax, model: RegressionResultsWrapper) -> None:
