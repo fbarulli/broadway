@@ -120,7 +120,7 @@ def process_category(df: pd.DataFrame, col: str, cfg: dict,
 
 def main() -> None:
     cfg = load_config()
-    df = load_metered_categorical()
+    df = load_metered_categorical(cfg)
     RESULTS.mkdir(parents=True, exist_ok=True)
 
     columns = detect_categoricals(df, cfg)

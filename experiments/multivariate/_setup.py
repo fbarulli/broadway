@@ -2,7 +2,8 @@
 
 The working dataset loader and its constants are OWNED by the univariate
 experiment's `_common.py` (single source of truth) — loaded here under an
-explicit module name (importlib) rather than duplicated or shadowed. This
+explicit module name (importlib) rather than duplicated or shadowed. The
+zone-lookup path/columns are owned by `project.data` and reused here. This
 module is deliberately NOT named `_common` because the univariate modules
 import `_common` by name; a same-named module here would shadow them.
 """
@@ -14,6 +15,8 @@ from pathlib import Path
 
 import pandas as pd
 import yaml
+
+from project.data import LOOKUP_PATH, ZONE_BOROUGH_COL, ZONE_ID_COL
 
 HERE = Path(__file__).resolve().parent
 RESULTS = HERE.parents[0] / "results" / "multivariate"
@@ -46,9 +49,22 @@ def load_config() -> dict:
         return yaml.safe_load(fh)
 
 
-def load_metered_categorical() -> pd.DataFrame:
-    """Metered rows + derived categoricals (pickup_hour, time_bucket)."""
+def load_zones() -> pd.DataFrame:
+    """LocationID -> Borough lookup (path/columns owned by project.data)."""
+    return pd.read_csv(LOOKUP_PATH, usecols=[ZONE_ID_COL, ZONE_BOROUGH_COL])
+
+
+def add_borough(df: pd.DataFrame, cfg: dict) -> pd.DataFrame:
+    """Join pickup borough onto the metered rows (join_on/column from config)."""
+    spec = cfg["borough"]
+    return df.merge(load_zones(), left_on=spec["join_on"],
+                    right_on=ZONE_ID_COL, how="left").rename(
+                        columns={ZONE_BOROUGH_COL: spec["column"]})
+
+
+def load_metered_categorical(cfg: dict) -> pd.DataFrame:
+    """Metered rows + derived categoricals (pickup_hour, time_bucket, borough)."""
     df = load_metered()
     df["pickup_hour"] = df["tpep_pickup_datetime"].dt.hour
     df["time_bucket"] = df["pickup_hour"].map(time_bucket)
-    return df
+    return add_borough(df, cfg)
