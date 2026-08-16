@@ -3,6 +3,7 @@
 # experiment's _common.py (single source of truth) and imported.
 target: fare_amount
 value_counts_head: 15
+sample_role: diagnostic
 categorical:
   max_unique_for_int: 50        # int columns with <= this many unique values count as categorical
   exclude: [RatecodeID]         # constant in the working dataset (unique == 1)

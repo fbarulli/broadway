@@ -9,6 +9,7 @@ import `_common` by name; a same-named module here would shadow them.
 
 import importlib.util
 import sys
+import types
 from pathlib import Path
 
 import pandas as pd
@@ -20,7 +21,7 @@ RESULTS = HERE.parents[0] / "results" / "multivariate"
 UNIVARIATE = HERE.parents[0] / "univariate" / "fare_amount_trip_distance"
 
 
-def _load_univariate_module(module_name: str, filename: str):
+def _load_univariate_module(module_name: str, filename: str) -> types.ModuleType:
     """Load a univariate experiment module under a unique name (no shadowing)."""
     spec = importlib.util.spec_from_file_location(
         module_name, UNIVARIATE / filename)

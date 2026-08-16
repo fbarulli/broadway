@@ -21,14 +21,14 @@ import pandas as pd
 from _setup import RESULTS, WORKING_DATASET, load_config, load_metered_categorical
 from broadway.stats.describe import describe, plot_describe_figures
 
-SAMPLE_NAME = "ratecode1_sample"
-SAMPLE_ROLE = "diagnostic"
+SAMPLE_NAME = WORKING_DATASET.stem
+CSV_STEM = Path(__file__).stem
 
 
 def detect_categoricals(df: pd.DataFrame, cfg: dict) -> list[str]:
     """Auto-detect categorical columns (config thresholds; constants skipped)."""
     max_unique = cfg["categorical"]["max_unique_for_int"]
-    exclude = set(cfg["categorical"].get("exclude", []))
+    exclude = set(cfg["categorical"]["exclude"])
     detected = []
     for col in df.columns:
         if col in exclude:
@@ -40,16 +40,18 @@ def detect_categoricals(df: pd.DataFrame, cfg: dict) -> list[str]:
                   or (dtype.startswith("int") and 1 < n_unique <= max_unique))
         if is_cat and n_unique > 1:
             detected.append(col)
-    for col in cfg["categorical"].get("extra_categories", []):
+    for col in cfg["categorical"]["extra_categories"]:
         if col in df.columns and col not in detected and df[col].nunique() > 1:
             detected.append(col)
     return detected
 
 
-def label(value, col: str, cfg: dict) -> str:
+def label(value: object, col: str, cfg: dict) -> str:
     """Human label for a category value when configured (else raw)."""
-    labels = cfg.get("labels", {}).get(col, {})
-    return f"{value} ({labels[value]})" if value in labels else str(value)
+    labels = cfg["labels"].get(col)
+    if labels is not None and value in labels:
+        return f"{value} ({labels[value]})"
+    return str(value)
 
 
 def category_stats(df: pd.DataFrame, col: str, cfg: dict) -> dict:
@@ -78,10 +80,42 @@ def render_describe_figure(df: pd.DataFrame, col: str, cfg: dict,
     plot_df[col] = plot_df[col].astype(str)
     group_values = [str(g) for g in df[col].value_counts().head(top_n).index]
     summary = describe(plot_df, col, col, group_values, target,
-                       str(WORKING_DATASET), SAMPLE_NAME, SAMPLE_ROLE)
+                       str(WORKING_DATASET), SAMPLE_NAME, cfg["sample_role"])
     plot_describe_figures(plot_df, col, col, group_values, target,
                           summary, out_path)
     return summary.model_dump()
+
+
+def process_category(df: pd.DataFrame, col: str, cfg: dict,
+                     evidence: dict) -> None:
+    """Print, figure, CSV, and evidence block for one category."""
+    stats = category_stats(df, col, cfg)
+    print(f"\n--- {col} ---")
+    for g, c in stats["counts"].items():
+        print(f"  {label(g, col, cfg)}: {c}")
+    print(pd.Series({label(g, col, cfg): v
+                     for g, v in stats["median_fare"].items()})
+          .rename("median fare").to_string())
+
+    summary = render_describe_figure(df, col, cfg, RESULTS / f"{col}_describe.png")
+    print(f"imbalance ratio: {summary['imbalance_ratio']} | "
+          f"groups: {len(summary['groups'])} | wrote {col}_describe.png")
+
+    stats["proportions"] = {g: summary["proportions"][str(g)]
+                            for g in stats["counts"]}
+    stats["imbalance_ratio"] = summary["imbalance_ratio"]
+    evidence[col] = stats
+
+    pd.DataFrame([
+        {
+            "value": label(g, col, cfg), "count": stats["counts"][g],
+            "proportion": stats["proportions"][g],
+            "median_fare": stats["median_fare"][g],
+            "mean_fare": stats["mean_fare"][g],
+            "std_fare": stats["std_fare"][g],
+        }
+        for g in stats["counts"]
+    ]).to_csv(RESULTS / f"{CSV_STEM}_{col}.csv", index=False)
 
 
 def main() -> None:
@@ -94,46 +128,19 @@ def main() -> None:
 
     evidence = {}
     for col in columns:
-        print(f"\n--- {col} ---")
-        stats = category_stats(df, col, cfg)
-        for g, c in stats["counts"].items():
-            print(f"  {label(g, col, cfg)}: {c}")
-        print(pd.Series({label(g, col, cfg): v
-                         for g, v in stats["median_fare"].items()})
-              .rename("median fare").to_string())
-
-        summary = render_describe_figure(
-            df, col, cfg, RESULTS / f"{col}_describe.png")
-        print(f"imbalance ratio: {summary['imbalance_ratio']} | "
-              f"groups: {len(summary['groups'])} | wrote {col}_describe.png")
-
-        stats["proportions"] = {g: summary["proportions"][str(g)]
-                                for g in stats["counts"]}
-        stats["imbalance_ratio"] = summary["imbalance_ratio"]
-        evidence[col] = stats
-
-        pd.DataFrame([
-            {
-                "value": label(g, col, cfg), "count": stats["counts"][g],
-                "proportion": stats["proportions"].get(g),
-                "median_fare": stats["median_fare"].get(g),
-                "mean_fare": stats["mean_fare"].get(g),
-                "std_fare": stats["std_fare"].get(g),
-            }
-            for g in stats["counts"]
-        ]).to_csv(RESULTS / f"01_categorical_breakdown_{col}.csv", index=False)
+        process_category(df, col, cfg, evidence)
 
     payload = {
         "dataset": WORKING_DATASET.name,
-        "source_script": "01_categorical_breakdown.py",
+        "source_script": Path(__file__).name,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "target": cfg["target"],
         "categories": evidence,
     }
-    out = RESULTS / "ratecode1_sample.json"
+    out = RESULTS / f"{SAMPLE_NAME}.json"
     out.write_text(json.dumps(payload, indent=2))
     print(f"\nwrote {out}")
-    print(f"wrote CSVs: {sorted(p.name for p in RESULTS.glob('01_categorical_breakdown_*.csv'))}")
+    print(f"wrote CSVs: {sorted(p.name for p in RESULTS.glob(f'{CSV_STEM}_*.csv'))}")
 
 
 if __name__ == "__main__":
