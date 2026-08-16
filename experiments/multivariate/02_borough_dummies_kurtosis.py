@@ -25,7 +25,7 @@ from _setup import (
 from broadway.stats.regression import bp_jb
 
 CSV_STEM = Path(__file__).stem
-METRICS = ("kurtosis", "jb_stat", "bp_stat", "rsquared")
+METRICS = ("kurtosis", "skew", "jb_stat", "bp_stat", "rsquared")
 
 
 def fit_with_dummies(df: pd.DataFrame, cfg: dict, use_borough: bool):
@@ -52,11 +52,12 @@ def fit_with_dummies(df: pd.DataFrame, cfg: dict, use_borough: bool):
 
 
 def summarize(model) -> dict:
-    """Residual diagnostics (kurtosis/JB/BP) + R^2 for one fit."""
+    """Residual diagnostics (kurtosis/skew/JB/BP) + R^2 for one fit."""
     diag = bp_jb(model)
     return {
         "rsquared": float(model.rsquared),
         "kurtosis": diag["kurtosis"],
+        "skew": diag["skew"],
         "jb_stat": diag["jb_stat"],
         "bp_stat": diag["bp_stat"],
         "n_params": int(model.params.size),

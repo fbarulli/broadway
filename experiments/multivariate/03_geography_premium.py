@@ -31,6 +31,19 @@ from broadway.stats.regression import bp_jb
 
 CSV_STEM = Path(__file__).stem
 BOROUGH_PREFIX = "borough_"
+DIAGNOSTIC_METRICS = ("kurtosis", "skew", "jb_stat", "bp_stat", "rsquared")
+
+
+def diagnostics(model) -> dict:
+    """Residual diagnostics (kurtosis/skew/JB/BP) + R^2 for one HC3 fit."""
+    diag = bp_jb(model)
+    return {
+        "rsquared": float(model.rsquared),
+        "kurtosis": diag["kurtosis"],
+        "skew": diag["skew"],
+        "jb_stat": diag["jb_stat"],
+        "bp_stat": diag["bp_stat"],
+    }
 
 
 def fit_baseline(df: pd.DataFrame, cfg: dict):
@@ -104,13 +117,11 @@ def main() -> None:
     geo = fit_geo(df, cfg)
     table = premium_table(geo, cfg)
 
-    before, after = bp_jb(base), bp_jb(geo)
+    before = diagnostics(base)
+    after = diagnostics(geo)
     print(f"\n{'metric':<10}{'without':>12}{'with':>12}")
-    for label, b, a in (("kurtosis", before["kurtosis"], after["kurtosis"]),
-                        ("jb_stat", before["jb_stat"], after["jb_stat"]),
-                        ("bp_stat", before["bp_stat"], after["bp_stat"]),
-                        ("rsquared", base.rsquared, geo.rsquared)):
-        print(f"{label:<10}{b:>12.4g}{a:>12.4g}")
+    for m in DIAGNOSTIC_METRICS:
+        print(f"{m:<10}{before[m]:>12.4g}{after[m]:>12.4g}")
 
     print("\n=== per-borough premium vs "
           f"{cfg['borough_dummies']['reference']} (HC3) ===")
@@ -125,10 +136,10 @@ def main() -> None:
                    f"with '{cfg['geography_premium']['missing_label']}'"),
         "n": int(len(df)),
         "reference_borough": cfg["borough_dummies"]["reference"],
-        "kurtosis_without": before["kurtosis"],
-        "kurtosis_with": after["kurtosis"],
-        "rsquared_without": float(base.rsquared),
-        "rsquared_with": float(geo.rsquared),
+        "without_borough": before,
+        "with_borough": after,
+        "deltas": {m: round(float(after[m] - before[m]), 4)
+                   for m in DIAGNOSTIC_METRICS},
         "premiums": table.to_dict("records"),
     }
 
@@ -145,6 +156,14 @@ def main() -> None:
     csv = RESULTS / f"{CSV_STEM}.csv"
     table.to_csv(csv, index=False)
     print(f"wrote {csv}")
+
+    diag_csv = RESULTS / f"{CSV_STEM}_diagnostics.csv"
+    pd.DataFrame([
+        {"metric": m, "without_borough": before[m],
+         "with_borough": after[m], "delta": payload["deltas"][m]}
+        for m in DIAGNOSTIC_METRICS
+    ]).to_csv(diag_csv, index=False)
+    print(f"wrote {diag_csv}")
 
 
 if __name__ == "__main__":
