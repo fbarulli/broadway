@@ -1,12 +1,13 @@
 """04: baseline sample setup — leak-free target/features + time-based holdout.
 
-Builds the ML baseline sample per config: population A (manhattan_sample) or
-B (borough-stratified); target total_amount; features incl. the derived
-pickup_weekday. Drops rows with a missing target, adds the option-C
+Builds the ML baseline sample for EVERY configured population (A = Manhattan-
+heavy, B = borough-stratified, C = Manhattan + outer-borough weighting): drops
+rows with a missing target, derives pickup_weekday, adds the option-C
 sample_weight column, sorts by the config datetime column and splits 80/20
 chronologically (test = the future, forecasting-style). Fails loudly on
-missing features or an empty split; persists train/test parquets plus a
-manifest JSON and a tracked split CSV.
+missing features or an empty split; persists per-sample train/test parquets,
+per-sample manifest JSONs, and one tracked split CSV with a row per
+population.
 """
 
 import json
@@ -34,15 +35,17 @@ def ensure_features(df: pd.DataFrame, cfg: dict) -> None:
         raise ValueError(f"baseline sample missing feature(s): {missing}")
 
 
-def add_weights(df: pd.DataFrame, cfg: dict) -> pd.DataFrame:
-    """Option C: penalty weight for non-reference-borough trips."""
-    spec = cfg["baseline"]["weighting"]
-    if not spec["enabled"]:
+def add_weights(df: pd.DataFrame, cfg: dict, spec: dict) -> pd.DataFrame:
+    """Option C: penalty weight for trips to non-reference boroughs."""
+    weighting = spec["weighting"]
+    if not weighting["enabled"]:
         return df
     ref = cfg["borough_dummies"]["reference"]
-    col = cfg["borough"]["pickup"]["column"]
+    col = weighting["column"]
+    if col not in df.columns:
+        raise ValueError(f"weighting column '{col}' not in sample")
     return df.assign(sample_weight=np.where(df[col] == ref, 1.0,
-                                            spec["outer_weight"]))
+                                            weighting["outer_weight"]))
 
 
 def time_split(df: pd.DataFrame, cfg: dict) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -53,46 +56,52 @@ def time_split(df: pd.DataFrame, cfg: dict) -> tuple[pd.DataFrame, pd.DataFrame]
     return ordered.iloc[:cutoff], ordered.iloc[cutoff:]
 
 
-def main() -> None:
-    cfg = load_config()
-    RESULTS.mkdir(parents=True, exist_ok=True)
-
-    df = load_baseline_sample(cfg)
+def build_population(cfg: dict, name: str, spec: dict) -> dict:
+    """Build one population's split; returns its manifest."""
+    df = load_baseline_sample(cfg, spec)
     df = derive_weekday(df, cfg)
     ensure_features(df, cfg)
     target = cfg["baseline"]["target"]
     df = df.dropna(subset=[target]).copy()
     if df.empty:
-        raise ValueError("baseline sample empty after target dropna")
-    df = add_weights(df, cfg)
+        raise ValueError(f"population {name}: sample empty after target dropna")
+    df = add_weights(df, cfg, spec)
     train_df, test_df = time_split(df, cfg)
 
-    dt_col = cfg["baseline"]["datetime_column"]
-    print(f"Train: {len(train_df)} rows, Test: {len(test_df)} rows")
-    print(f"Test period: {test_df[dt_col].min()} to {test_df[dt_col].max()}")
-
-    sample_name = cfg["sample"]["name"]
+    sample_name = spec["sample_name"]
     train_df.to_parquet(RESULTS / f"{sample_name}_train.parquet")
     test_df.to_parquet(RESULTS / f"{sample_name}_test.parquet")
 
+    dt_col = cfg["baseline"]["datetime_column"]
     manifest = {
-        "population": cfg["baseline"]["population"],
+        "population": name,
+        "sample_name": sample_name,
+        "source": spec["source"],
         "target": target,
         "features": cfg["baseline"]["features"],
-        "datetime_column": dt_col,
         "test_fraction": cfg["baseline"]["test_fraction"],
         "n_train": int(len(train_df)),
         "n_test": int(len(test_df)),
         "test_start": str(test_df[dt_col].min()),
         "test_end": str(test_df[dt_col].max()),
-        "weighted": cfg["baseline"]["weighting"]["enabled"],
+        "weighted": spec["weighting"]["enabled"],
     }
     out = RESULTS / f"{sample_name}_baseline_split.json"
     out.write_text(json.dumps(manifest, indent=2))
-    print(f"wrote {out}")
+    print(f"population {name}: train {manifest['n_train']} / test "
+          f"{manifest['n_test']} | test period "
+          f"{manifest['test_start']} to {manifest['test_end']}")
+    return manifest
 
+
+def main() -> None:
+    cfg = load_config()
+    RESULTS.mkdir(parents=True, exist_ok=True)
+
+    manifests = [build_population(cfg, name, spec)
+                 for name, spec in cfg["baseline"]["populations"].items()]
     csv = RESULTS / f"{CSV_STEM}_split.csv"
-    pd.DataFrame([manifest]).to_csv(csv, index=False)
+    pd.DataFrame(manifests).to_csv(csv, index=False)
     print(f"wrote {csv}")
 
 

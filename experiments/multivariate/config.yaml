@@ -26,14 +26,28 @@ baseline:
   datetime_column: tpep_pickup_datetime
   test_fraction: 0.2
   seed: 42
-  population: A                    # A = manhattan_sample | B = borough-stratified
+  missing_label: Unmapped         # for NaN categorical feature values
   features: [trip_distance, duration_minutes, passenger_count, pickup_hour,
              pickup_weekday, pickup_borough, dropoff_borough, payment_type]
-  stratified:
-    per_borough: 2500
-  weighting:                       # option C: penalty for outer-borough trips
-    enabled: false
-    outer_weight: 5.0
+  categorical_features: [pickup_borough, dropoff_borough, payment_type]
+  populations:
+    A:
+      sample_name: manhattan_sample
+      source: manhattan
+      weighting: {enabled: false, outer_weight: 1.0, column: dropoff_borough}
+    B:
+      sample_name: stratified_sample
+      source: stratified
+      per_borough: 2500
+      weighting: {enabled: false, outer_weight: 1.0, column: dropoff_borough}
+    C:
+      sample_name: weighted_sample
+      source: manhattan
+      weighting: {enabled: true, outer_weight: 5.0, column: dropoff_borough}
+  lgbm:
+    n_estimators: 100
+    learning_rate: 0.1
+    max_depth: 5
 labels:
   VendorID: {1: creative_mobile, 2: verifone}
   store_and_fwd_flag: {Y: stored, N: not_stored}

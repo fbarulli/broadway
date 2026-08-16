@@ -1,2 +1,4 @@
-population,target,features,datetime_column,test_fraction,n_train,n_test,test_start,test_end,weighted
-A,total_amount,"['trip_distance', 'duration_minutes', 'passenger_count', 'pickup_hour', 'pickup_weekday', 'pickup_borough', 'dropoff_borough', 'payment_type']",tpep_pickup_datetime,0.2,31834,7959,2024-03-14 10:59:07,2024-03-31 23:46:54,False
+population,sample_name,source,target,features,test_fraction,n_train,n_test,test_start,test_end,weighted
+A,manhattan_sample,manhattan,total_amount,"['trip_distance', 'duration_minutes', 'passenger_count', 'pickup_hour', 'pickup_weekday', 'pickup_borough', 'dropoff_borough', 'payment_type']",0.2,31834,7959,2024-03-14 10:59:07,2024-03-31 23:46:54,False
+B,stratified_sample,stratified,total_amount,"['trip_distance', 'duration_minutes', 'passenger_count', 'pickup_hour', 'pickup_weekday', 'pickup_borough', 'dropoff_borough', 'payment_type']",0.2,4202,1051,2024-03-13 21:21:55,2024-03-31 23:47:08,False
+C,weighted_sample,manhattan,total_amount,"['trip_distance', 'duration_minutes', 'passenger_count', 'pickup_hour', 'pickup_weekday', 'pickup_borough', 'dropoff_borough', 'payment_type']",0.2,31834,7959,2024-03-14 10:59:07,2024-03-31 23:46:54,True

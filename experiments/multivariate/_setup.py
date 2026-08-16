@@ -137,28 +137,27 @@ def build_borough_dummies(df: pd.DataFrame, cfg: dict) -> pd.DataFrame:
                           drop_first=True, dtype=float)
 
 
-def load_stratified_sample(cfg: dict) -> pd.DataFrame:
+def load_stratified_sample(cfg: dict, per_borough: int) -> pd.DataFrame:
     """Borough-stratified sample of the metered data (population B)."""
     df = load_metered()
     df["pickup_hour"] = df["tpep_pickup_datetime"].dt.hour
     df["time_bucket"] = df["pickup_hour"].map(time_bucket)
     df = add_boroughs(df, cfg)
     col = cfg["borough"]["pickup"]["column"]
-    per = cfg["baseline"]["stratified"]["per_borough"]
     seed = cfg["baseline"]["seed"]
-    groups = [group.sample(n=min(per, len(group)), random_state=seed)
+    groups = [group.sample(n=min(per_borough, len(group)), random_state=seed)
               for _, group in df.groupby(col)]
     out = pd.concat(groups).sample(frac=1.0, random_state=seed).reset_index(drop=True)
     print(f"stratified sample ({col}): {len(out)} rows")
     return out
 
 
-def load_baseline_sample(cfg: dict) -> pd.DataFrame:
-    """The ML baseline sample per config population (A = manhattan, B = stratified)."""
-    population = cfg["baseline"]["population"]
-    if population == "A":
+def load_baseline_sample(cfg: dict, spec: dict) -> pd.DataFrame:
+    """Load a baseline population's sample (source from the population spec)."""
+    source = spec["source"]
+    if source == "manhattan":
         return load_manhattan_sample(cfg)
-    if population == "B":
-        return load_stratified_sample(cfg)
-    raise ValueError(f"unknown baseline population '{population}' "
-                     "(expected 'A' or 'B')")
+    if source == "stratified":
+        return load_stratified_sample(cfg, spec["per_borough"])
+    raise ValueError(f"unknown baseline source '{source}' "
+                     "(expected 'manhattan' or 'stratified')")
