@@ -1,8 +1,8 @@
-"""01: clean the raw fare_amount vs trip_distance relationship and plot it.
+"""01: filter the raw fare_amount vs trip_distance relationship and plot it.
 
 Draws a random 50k sample via the generic read_sample loader, filters out
-garbage, saves the cleaned sample, and renders a density scatter of
-trip_distance (x) vs fare_amount (y).
+garbage, saves the filtered sample (sample_50k.parquet), and renders a
+density scatter of trip_distance (x) vs fare_amount (y).
 """
 
 from pathlib import Path
@@ -23,7 +23,7 @@ MIN_DISTANCE = 0.0
 MAX_DISTANCE = 50.0
 
 
-def clean(df: pd.DataFrame) -> pd.DataFrame:
+def filter_df(df: pd.DataFrame) -> pd.DataFrame:
     return df[
         (df["fare_amount"] > MIN_FARE)
         & (df["trip_distance"] > MIN_DISTANCE)
@@ -55,12 +55,12 @@ def main() -> None:
     raw = read_training_sample(
         sample=SAMPLE_SIZE, columns=["fare_amount", "trip_distance"]
     )
-    cleaned = clean(raw)
-    cleaned.to_parquet(CLEAN_PARQUET)
-    scatter(cleaned, OUT)
+    filtered = filter_df(raw)
+    filtered.to_parquet(CLEAN_PARQUET)
+    scatter(filtered, OUT)
     print(f"random sample rows: {len(raw)}")
-    print(f"rows after filter: {len(cleaned)}")
-    print(f"rows removed: {len(raw) - len(cleaned)}")
+    print(f"rows after filter: {len(filtered)}")
+    print(f"rows removed: {len(raw) - len(filtered)}")
     print(f"wrote {CLEAN_PARQUET}")
     print(f"wrote {OUT}")
 

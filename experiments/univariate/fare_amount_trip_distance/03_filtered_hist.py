@@ -1,4 +1,4 @@
-"""03: histogram of cleaned fare_amount (all fares, no cutoff)."""
+"""03: histogram of filtered fare_amount (all fares, no cutoff)."""
 
 from pathlib import Path
 
@@ -12,7 +12,7 @@ from _common import CLEAN_PARQUET, RESULTS
 OUT = RESULTS / f"{Path(__file__).stem}.png"
 
 
-def load_cleaned() -> pd.DataFrame:
+def load_filtered() -> pd.DataFrame:
     if not CLEAN_PARQUET.exists():
         raise FileNotFoundError(f"{CLEAN_PARQUET} not found — run 01_filtered_min_max_scatter.py first")
     return pd.read_parquet(CLEAN_PARQUET)
@@ -25,7 +25,7 @@ def plot_histogram(df: pd.DataFrame, out_path: Path) -> None:
     ax.set_xlim(float(values.min()), float(values.max()))
     ax.set_xlabel("fare_amount ($)")
     ax.set_ylabel("count")
-    ax.set_title("fare_amount histogram (cleaned)")
+    ax.set_title("fare_amount histogram (filtered)")
     ax.grid(True, alpha=0.3)
     fig.tight_layout()
     fig.savefig(out_path, dpi=150)
@@ -34,9 +34,9 @@ def plot_histogram(df: pd.DataFrame, out_path: Path) -> None:
 
 def main() -> None:
     RESULTS.mkdir(parents=True, exist_ok=True)
-    df = load_cleaned()
+    df = load_filtered()
     plot_histogram(df, OUT)
-    print(f"cleaned rows: {len(df)}")
+    print(f"filtered rows: {len(df)}")
     print(f"wrote {OUT}")
 
 

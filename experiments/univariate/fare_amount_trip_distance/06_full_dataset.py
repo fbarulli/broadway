@@ -11,7 +11,7 @@ MIN_DISTANCE = 0.0
 MAX_DISTANCE = 50.0
 
 
-def clean(df: pd.DataFrame) -> pd.DataFrame:
+def filter_df(df: pd.DataFrame) -> pd.DataFrame:
     return df[
         (df["fare_amount"] > MIN_FARE)
         & (df["trip_distance"] > MIN_DISTANCE)
@@ -22,10 +22,10 @@ def clean(df: pd.DataFrame) -> pd.DataFrame:
 def main() -> None:
     RESULTS.mkdir(parents=True, exist_ok=True)
     raw = read_training_sample(sample=SAMPLE_SIZE)
-    cleaned = clean(raw)
-    cleaned.to_parquet(FULL_PARQUET)
-    print(f"full-feature rows: {len(cleaned)}")
-    print(f"columns: {list(cleaned.columns)}")
+    filtered = filter_df(raw)
+    filtered.to_parquet(FULL_PARQUET)
+    print(f"full-feature rows: {len(filtered)}")
+    print(f"columns: {list(filtered.columns)}")
     print(f"wrote {FULL_PARQUET}")
 
 

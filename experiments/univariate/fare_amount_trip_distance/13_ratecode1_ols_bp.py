@@ -1,7 +1,7 @@
 """13: repeat 04 (OLS + Breusch-Pagan) on the RatecodeID == 1 dataset.
 
 Same analysis as 04_filtered_OLS_BP.py, but on the standard-metered-trip
-subset built by 11_ratecode1_dataset.py instead of the full cleaned sample.
+subset built by 11_ratecode1_dataset.py instead of the filtered 50k sample.
 """
 
 from pathlib import Path

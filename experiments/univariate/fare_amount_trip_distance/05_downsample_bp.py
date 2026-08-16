@@ -1,7 +1,7 @@
 """05: downsample to N=300 and run Breusch-Pagan (small-sample contrast).
 
-Results are persisted per-dataset to tests_sample_clean.json (tied to
-sample_clean.parquet) with provenance metadata.
+Results are persisted per-dataset to tests_sample_50k.json (tied to
+sample_50k.parquet) with provenance metadata.
 """
 
 import pandas as pd
