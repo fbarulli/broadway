@@ -1,0 +1,14 @@
+# Tutorial working dataset (ratecode1) — single source of truth.
+# Consumed by project/working.py; all three experiments (univariate,
+# multivariate, mlflow) load through it. Nothing is hardcoded in code.
+parquet: experiments/results/univariate/fare_amount_trip_distance/ratecode1_sample.parquet
+columns:
+  fare: fare_amount
+  pickup_datetime: tpep_pickup_datetime
+  dropoff_datetime: tpep_dropoff_datetime
+min_fare: 2.50               # base fare; below this = voided rides
+max_duration_minutes: 240    # 4h cap for realistic NYC trips
+time_buckets:                # hour -> bucket boundaries (NYC surcharge rules)
+  day: {start: 6, end: 16}
+  peak: {start: 16, end: 20}
+time_bucket_default: overnight

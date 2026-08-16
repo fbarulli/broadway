@@ -52,11 +52,16 @@ def compile_experiments() -> list[str]:
 def validate_configs() -> list[str]:
     """Validate the YAML configs against require_keys; return problems."""
     problems = []
-    for cfg_path in (MULTIVARIATE / "config.yaml",):
-        cfg = yaml.safe_load(cfg_path.read_text())
+    for name, keys in (
+        ("multivariate.yaml", ["target", "categorical", "sample", "baseline"]),
+        ("working.yaml", ["parquet", "columns", "min_fare",
+                          "max_duration_minutes", "time_buckets"]),
+        ("mlflow.yaml", ["sample_size", "test_fraction", "seed",
+                         "continuous_features", "categorical_features"]),
+    ):
+        cfg = yaml.safe_load((ROOT / "configs" / "experiments" / name).read_text())
         try:
-            require_keys(cfg, ["target", "categorical", "sample", "baseline"],
-                         f"{cfg_path.name}")
+            require_keys(cfg, keys, name)
         except ValueError as exc:
             problems.append(str(exc))
     k8s_cfg = yaml.safe_load((ROOT / "k8s" / "optuna" / "configmap.yaml")

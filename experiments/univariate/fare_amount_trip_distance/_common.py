@@ -1,23 +1,29 @@
-"""Shared paths, constants, and dataset loaders for this experiment (no analysis logic)."""
+"""Shared paths, constants, and dataset loaders for this experiment (no analysis logic).
+
+The working-dataset binding (parquet path, filters, loaders, time_bucket) is
+OWNED by `project.working` (single source of truth, config-driven) and
+re-exported here so the step scripts keep their `from _common import ...`
+imports unchanged. Only experiment-layout paths and per-dataset evidence
+provenance (DATASET_META) stay local.
+"""
 
 from pathlib import Path
 
-import pandas as pd
+from project.working import (
+    MAX_DURATION_MINUTES,
+    MIN_FARE,
+    WORKING_DATASET,
+    load_metered,
+    load_working,
+    time_bucket,
+)
 
 HERE = Path(__file__).resolve().parent
 RAW_DIR = HERE.parents[2] / "data" / "raw"
 RESULTS = HERE.parents[2] / "experiments" / "results" / HERE.parents[0].name / HERE.name
 CLEAN_PARQUET = RESULTS / "sample50k.parquet"
 FULL_PARQUET = RESULTS / "full_sample.parquet"
-RATECODE1_PARQUET = RESULTS / "ratecode1_sample.parquet"
-
-# The single working dataset all analysis steps operate on from now on.
-# sample50k / full_sample are retired (steps 01-10 kept as history).
-WORKING_DATASET = RATECODE1_PARQUET
-
-# Dataset-level filter knobs (no hardcoded values in loaders).
-MIN_FARE = 2.50  # base fare; below this = voided rides
-MAX_DURATION_MINUTES = 240  # 4h cap for realistic NYC trips
+RATECODE1_PARQUET = WORKING_DATASET  # kept as the historical alias
 
 # Per-dataset provenance: how the dataset was built (transformations) and the
 # X/Y it is analyzed with. Keyed by parquet stem; used by _tests.py to make
@@ -80,19 +86,3 @@ DATASET_META = {
         },
     },
 }
-
-
-def load_working() -> pd.DataFrame:
-    """Working dataset (ratecode1) with dataset-level filters applied."""
-    df = pd.read_parquet(WORKING_DATASET)
-    return df[df["fare_amount"] > MIN_FARE]
-
-
-def load_metered() -> pd.DataFrame:
-    """Working dataset + duration derived; duration filters applied."""
-    df = load_working()
-    df["trip_duration"] = (
-        df["tpep_dropoff_datetime"] - df["tpep_pickup_datetime"]
-    ).dt.total_seconds()
-    df["duration_minutes"] = df["trip_duration"] / 60
-    return df[(df["trip_duration"] > 0) & (df["duration_minutes"] < MAX_DURATION_MINUTES)]

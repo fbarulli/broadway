@@ -16,7 +16,7 @@ from broadway.stats.regression import bp_jb, fit_ols
 from matplotlib.lines import Line2D
 from statsmodels.regression.linear_model import RegressionResultsWrapper
 
-from _common import load_working
+from _common import load_working, time_bucket
 
 ALPHA = 0.05
 
@@ -133,15 +133,6 @@ def standardized_coefs(model: RegressionResultsWrapper, df: pd.DataFrame) -> dic
     return _robust.standardized_coefs(
         model, df, ["trip_distance", "duration_minutes"], "fare_amount"
     )
-
-
-def time_bucket(hour: int) -> str:
-    """NYC-style surcharge bucket: day (6-15, ref), peak (16-19, +$1.00), overnight (else, +$0.50)."""
-    if 6 <= hour < 16:
-        return "day"
-    if 16 <= hour < 20:
-        return "peak"
-    return "overnight"
 
 
 def fit_time_bucket(df: pd.DataFrame, target: str = "fare_amount") -> RegressionResultsWrapper:

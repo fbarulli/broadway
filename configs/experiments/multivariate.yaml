@@ -1,7 +1,7 @@
 # Multivariate categorical breakdown — analysis policy (data-agnostic knobs).
-# The dataset loader/filters are NOT here: they are owned by the univariate
-# experiment's _common.py (single source of truth) and imported. The zone
-# lookup path/columns are owned by project.data and reused here.
+# The dataset loader/filters are NOT here: they are owned by project/working.py
+# (single source of truth, configs/experiments/working.yaml) and imported. The
+# zone lookup path/columns are owned by project.data and reused here.
 target: fare_amount
 value_counts_head: 15
 sample_role: diagnostic

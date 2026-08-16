@@ -1,0 +1,9 @@
+# mlflow model-battle experiment — run knobs (data-agnostic).
+# The dataset loader/filters/time_bucket are owned by project/working.py
+# (configs/experiments/working.yaml). Model recipes stay in code: they
+# reference the platform model registry / sklearn classes.
+sample_size: 1000
+test_fraction: 0.2
+seed: 42
+continuous_features: [trip_distance, duration_minutes, pickup_hour]
+categorical_features: [time_bucket]
