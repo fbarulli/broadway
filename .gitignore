@@ -25,3 +25,4 @@ graphify-out/
 .mplconfig/
 diagnostics_experiment/
 legend_experiment/
+.coverage
