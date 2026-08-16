@@ -136,7 +136,7 @@ def main() -> None:
 
         audit_run(args.dataset, args.analysis, args.environment)
     elif args.step == "ingest":
-        from broadway.etl.process import process_data
+        from project.etl.process import process_data
 
         process_data(args.dataset)
     elif args.step == "init":

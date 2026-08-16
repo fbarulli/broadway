@@ -31,7 +31,7 @@ def _audit(rows_in=100, rows_out=100, dropped=0, unexplained=0, reasons=None, pa
         ),
         parse_failures=parse_failures if parse_failures is not None else [],
         missing_encodings={},
-        canonical_path="data/processed/taxi_canonical.parquet",
+        canonical_path="data/processed/test_canonical.parquet",
     )
 
 
@@ -40,7 +40,7 @@ def _join_report(unmatched=0):
         joins=[
             JoinAudit(
                 lookup="pickup_location_id",
-                lookup_path="data/raw/taxi_zone_lookup.csv",
+                lookup_path="data/raw/test_zone_lookup.csv",
                 left_key="pickup_location_id",
                 right_key="LocationID",
                 rows_attempted=5,
@@ -58,7 +58,7 @@ def _lookup_report(affected_rows=0):
         lookups=[
             LookupValueAudit(
                 lookup="pickup_location_id",
-                lookup_path="data/raw/taxi_zone_lookup.csv",
+                lookup_path="data/raw/test_zone_lookup.csv",
                 matched=100,
                 na_values=[],
                 columns=[
@@ -78,7 +78,7 @@ def _lookup_report(affected_rows=0):
 
 def _profile(identifier_score=0.5):
     return DatasetProfile(
-        name="taxi",
+        name="test",
         path="data/processed/training_data.parquet",
         row_count=10,
         columns={
@@ -109,7 +109,7 @@ def test_render_join_distinguishes_rows_from_events() -> None:
         joins=[
             JoinAudit(
                 lookup="pickup_location_id",
-                lookup_path="data/raw/taxi_zone_lookup.csv",
+                lookup_path="data/raw/test_zone_lookup.csv",
                 left_key="pickup_location_id",
                 right_key="LocationID",
                 rows_attempted=5,
@@ -120,7 +120,7 @@ def test_render_join_distinguishes_rows_from_events() -> None:
             ),
             JoinAudit(
                 lookup="dropoff_location_id",
-                lookup_path="data/raw/taxi_zone_lookup.csv",
+                lookup_path="data/raw/test_zone_lookup.csv",
                 left_key="dropoff_location_id",
                 right_key="LocationID",
                 rows_attempted=5,
@@ -142,7 +142,7 @@ def test_join_counts_raises_on_divergent_row_counts() -> None:
         joins=[
             JoinAudit(
                 lookup="pickup_location_id",
-                lookup_path="data/raw/taxi_zone_lookup.csv",
+                lookup_path="data/raw/test_zone_lookup.csv",
                 left_key="pickup_location_id",
                 right_key="LocationID",
                 rows_attempted=5,
@@ -153,7 +153,7 @@ def test_join_counts_raises_on_divergent_row_counts() -> None:
             ),
             JoinAudit(
                 lookup="dropoff_location_id",
-                lookup_path="data/raw/taxi_zone_lookup.csv",
+                lookup_path="data/raw/test_zone_lookup.csv",
                 left_key="dropoff_location_id",
                 right_key="LocationID",
                 rows_attempted=4,
@@ -187,9 +187,9 @@ def test_render_profile_high_identifier() -> None:
 def test_run_writes_five_markdown_files(
     tmp_path, monkeypatch
 ) -> None:
-    clean_path = tmp_path / "taxi_clean.json"
-    join_path = tmp_path / "taxi_join_audit.json"
-    lookup_path = tmp_path / "taxi_lookup_value_audit.json"
+    clean_path = tmp_path / "test_clean.json"
+    join_path = tmp_path / "test_join_audit.json"
+    lookup_path = tmp_path / "test_lookup_value_audit.json"
     profile_path = tmp_path / "profile.json"
 
     clean_path.write_text(_audit().model_dump_json(), encoding="utf-8")
@@ -198,7 +198,7 @@ def test_run_writes_five_markdown_files(
     profile_path.write_text(_profile().model_dump_json(), encoding="utf-8")
 
     fake_cfg = SimpleNamespace(
-        dataset=SimpleNamespace(name="taxi"),
+        dataset=SimpleNamespace(name="test"),
         environment=SimpleNamespace(data_dir=str(tmp_path), processed_subdir="processed"),
     )
     audit_dir = tmp_path / "audit"
@@ -212,7 +212,7 @@ def test_run_writes_five_markdown_files(
     monkeypatch.setattr(audit, "_evidence_paths", lambda cfg: paths)
     monkeypatch.setattr(audit, "AUDIT_DIR", audit_dir)
 
-    audit.run("taxi", None, "development")
+    audit.run("test", None, "development")
 
     for name in ("index.md", "profile.md", "transform.md", "join.md", "lookup_values.md"):
         assert (audit_dir / name).exists(), name

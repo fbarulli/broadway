@@ -19,16 +19,16 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_sample_spec_validation() -> None:
-    spec = SampleSpec(name="taxi", role="estimation", path="data/x.parquet")
-    assert spec.name == "taxi"
+    spec = SampleSpec(name="test", role="estimation", path="data/x.parquet")
+    assert spec.name == "test"
     assert spec.role == "estimation"
     assert spec.description is None
     assert spec.column_mapping == {}
 
     with pytest.raises(ValidationError):
-        SampleSpec(name="taxi", role="bogus", path="data/x.parquet")
+        SampleSpec(name="test", role="bogus", path="data/x.parquet")
     with pytest.raises(ValidationError):
-        SampleSpec(name="taxi", role="diagnostic")
+        SampleSpec(name="test", role="diagnostic")
     with pytest.raises(ValidationError):
         SampleSpec(role="diagnostic", path="data/x.parquet")
 
@@ -87,18 +87,18 @@ def _setup_test_cfg(
     (configs_dir / "analysis" / "sample_hypothesis.yaml").write_text(
         "name: sample_hypothesis\n"
         "mode: hypothesis\n"
-        "goal: test whether trip duration differs across boroughs\n"
-        "row_definition: one completed taxi trip\n"
-        "decision_moment: post-hoc analysis of historical trips\n"
+        "goal: test whether price differs across neighborhoods\n"
+        "row_definition: one listing\n"
+        "decision_moment: post-hoc analysis\n"
         "available_info:\n"
-        "  - Borough\n"
+        "  - neighborhood\n"
         "leakage_notes: []\n"
         "success_criterion: report effect size\n"
         "hypothesis:\n"
-        "  group_column: Borough\n"
+        "  group_column: neighborhood\n"
         "  group_values:\n"
-        "    - Manhattan\n"
-        "    - Brooklyn\n",
+        "    - A\n"
+        "    - B\n",
         encoding="utf-8",
     )
     monkeypatch.setattr(loader, "CONFIGS_DIR", configs_dir)
@@ -109,15 +109,15 @@ def test_describe_run_stamps_sample(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _setup_test_cfg(tmp_path, monkeypatch)
-    cfg = load_config("stats", dataset="taxi", analysis="sample_hypothesis")
+    cfg = load_config("stats", dataset="test", analysis="sample_hypothesis")
     assert cfg.dataset is not None
     assert cfg.stats is not None
 
     sample_path = tmp_path / "sample.parquet"
     pd.DataFrame(
         {
-            "Borough": ["Manhattan", "Manhattan", "Brooklyn", "Brooklyn", "Brooklyn"],
-            "trip_duration_minutes": [10.0, 12.0, 20.0, 22.0, 24.0],
+            "neighborhood": ["A", "A", "B", "B", "B"],
+            "price": [10.0, 12.0, 20.0, 22.0, 24.0],
         }
     ).to_parquet(sample_path, index=False)
 
@@ -125,7 +125,7 @@ def test_describe_run_stamps_sample(
         update={"stats": cfg.stats.model_copy(update={"output_dir": str(tmp_path)})}
     )
     sample = SampleSpec(
-        name="taxi_estimation",
+        name="test_estimation",
         role="estimation",
         path=str(sample_path),
         description="canonical sample",
@@ -134,7 +134,7 @@ def test_describe_run_stamps_sample(
     describe_module.run(cfg, sample)
 
     summary = json.loads((tmp_path / "describe.json").read_text())
-    assert summary["sample_name"] == "taxi_estimation"
+    assert summary["sample_name"] == "test_estimation"
     assert summary["sample_role"] == "estimation"
     assert summary["source_path"] == str(sample_path)
 
@@ -143,15 +143,15 @@ def test_describe_lineage_sidecar_stamps_sample(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _setup_test_cfg(tmp_path, monkeypatch)
-    cfg = load_config("stats", dataset="taxi", analysis="sample_hypothesis")
+    cfg = load_config("stats", dataset="test", analysis="sample_hypothesis")
     assert cfg.dataset is not None
     assert cfg.stats is not None
 
     sample_path = tmp_path / "sample.parquet"
     pd.DataFrame(
         {
-            "Borough": ["Manhattan", "Manhattan", "Brooklyn", "Brooklyn", "Brooklyn"],
-            "trip_duration_minutes": [10.0, 12.0, 20.0, 22.0, 24.0],
+            "neighborhood": ["A", "A", "B", "B", "B"],
+            "price": [10.0, 12.0, 20.0, 22.0, 24.0],
         }
     ).to_parquet(sample_path, index=False)
 
@@ -159,7 +159,7 @@ def test_describe_lineage_sidecar_stamps_sample(
         update={"stats": cfg.stats.model_copy(update={"output_dir": str(tmp_path)})}
     )
     sample = SampleSpec(
-        name="taxi_estimation",
+        name="test_estimation",
         role="estimation",
         path=str(sample_path),
     )
@@ -168,5 +168,5 @@ def test_describe_lineage_sidecar_stamps_sample(
 
     record_path = tmp_path / "lineage" / "records" / "describe_sample_hypothesis.json"
     record = json.loads(record_path.read_text())
-    assert record["sample_name"] == "taxi_estimation"
+    assert record["sample_name"] == "test_estimation"
     assert record["sample_role"] == "estimation"

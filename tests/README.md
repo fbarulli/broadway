@@ -10,7 +10,7 @@ proof that `src/broadway/**` needs no edits when the dataset is swapped.
 YAML → Pydantic loading and dataframe contract enforcement.
 
 - `test_config.py` — every step type loads from YAML; missing/invalid config raises.
-- `test_contracts.py` — real-data columns/dtypes/nulls validated per `configs/dataset/taxi.yaml`.
+- `test_contracts.py` — generated-data columns/nulls validated per `configs/dataset/test.yaml` (never real data).
 - `test_pandera_schemas.py` — raw schema generated from `DatasetContract.columns`.
 - `test_analysis_contract.py` — `AnalysisContract` validation + `require_mode` guardrails.
 - `test_training_contracts.py`, `test_evaluate_contracts.py` — `TrainingResult` / `EvaluationResult` models.
@@ -20,9 +20,12 @@ YAML → Pydantic loading and dataframe contract enforcement.
 Ingest, structural cleaning, joins, and the dataset loaders.
 
 - `test_process.py` — ETL function units (`filter_valid_trips`, `compute_trip_duration`, …) on synthetic frames.
-- `test_taxi_data.py` — mode-keyed cache + stratified/time-slice loaders against real data.
 - `test_structural_cleaning.py` — `standardize_missing`, `parse_datetime`, duplicate/target-null removal, `StructuralCleanResult`.
 - `test_join_audit.py`, `test_lookup_value_audit.py` — `JoinAudit` / `LookupValueAudit` evidence.
+
+> **Taxi-layer tests** (`project/tests/`) cover the taxi ETL (`project/etl/`)
+> and project config consistency with generated data. Platform tests never
+> touch project-level data or configs — enforced by `test_platform_hygiene.py`.
 
 ## Lineage
 

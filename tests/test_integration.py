@@ -17,12 +17,9 @@ def tmp_dataset(tmp_path: Path) -> Path:
     rows = 100
     df = pd.DataFrame(
         {
-            "trip_distance": [1.0 + i * 0.3 for i in range(rows)],
-            "trip_duration_minutes": [5.0 + i * 0.2 for i in range(rows)],
-            "passenger_count": [1.0] * rows,
-            "pickup_location_id": [i % 10 for i in range(rows)],
-            "dropoff_location_id": [i % 8 for i in range(rows)],
-            "pickup_datetime": pd.date_range("2024-01-01", periods=rows, freq="h"),
+            "rooms": [1 + i % 6 for i in range(rows)],
+            "area": [30.0 + i * 1.5 for i in range(rows)],
+            "price": [100.0 + i * 8.0 for i in range(rows)],
         }
     )
     f = tmp_path / "training_data.parquet"
@@ -30,8 +27,12 @@ def tmp_dataset(tmp_path: Path) -> Path:
     return f
 
 
+def _cfg():
+    return load_config("full", dataset="test", experiment="baseline", analysis="test")
+
+
 def test_pipeline_on_synthetic_data(tmp_dataset: Path) -> None:
-    cfg = load_config("full", dataset="taxi", experiment="taxi", analysis="taxi")
+    cfg = _cfg()
     df, _ = clean(pd.read_parquet(tmp_dataset), cfg.dataset)
     target = cfg.dataset.target
     assert not df[target].isna().any()
@@ -40,24 +41,26 @@ def test_pipeline_on_synthetic_data(tmp_dataset: Path) -> None:
     assert len(train_df) > 0 and len(val_df) > 0
     assert len(train_df) + len(val_df) == len(df)
     dt_col = cfg.dataset.datetime_column
-    X_train = train_df.drop(columns=[target, dt_col])
+    drop_cols = [target] + ([dt_col] if dt_col else [])
+    X_train = train_df.drop(columns=drop_cols)
     y_train = train_df[target]
     model, result = train(cfg.experiment.model.type, X_train, y_train)
     assert result.train_time_seconds >= 0
-    X_val = val_df.drop(columns=[target, dt_col])
+    X_val = val_df.drop(columns=drop_cols)
     y_val = val_df[target]
     y_pred = model.predict(X_val)
     metrics = compute_metrics(y_val.values, y_pred)
     assert metrics["rmse"] >= 0 and metrics["r2"] >= -1 and metrics["mae"] >= 0
-    assert metrics["rmse"] < 10, f"RMSE too high on synthetic data: {metrics['rmse']}"
+    assert metrics["rmse"] < 100, f"RMSE too high on synthetic data: {metrics['rmse']}"
 
 
 def test_linear_model_coefficients(tmp_dataset: Path) -> None:
-    cfg = load_config("full", dataset="taxi", experiment="taxi", analysis="taxi")
+    cfg = _cfg()
     df, _ = clean(pd.read_parquet(tmp_dataset), cfg.dataset)
     target = cfg.dataset.target
     dt_col = cfg.dataset.datetime_column
-    X = df.drop(columns=[target, dt_col])
+    drop_cols = [target] + ([dt_col] if dt_col else [])
+    X = df.drop(columns=drop_cols)
     y = df[target]
     model, _ = train(cfg.experiment.model.type, X, y)
     assert hasattr(model, "coef_")

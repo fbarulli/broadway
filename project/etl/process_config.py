@@ -1,4 +1,4 @@
-"""Config for etl/process.py — reads taxi knobs from configs/project/taxi.yaml
+"""Config for project/etl/process.py — reads taxi knobs from configs/project/taxi.yaml
 and generic etl knobs from configs/step/etl.yaml."""
 
 import yaml

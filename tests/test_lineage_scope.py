@@ -16,75 +16,75 @@ def _node(node_id: str) -> LineageNode:
 
 def _graph() -> LineageGraph:
     nodes = [
-        _node("dataset:taxi"),
-        _node("ingest:taxi"),
-        _node("etl:taxi"),
-        _node("describe:taxi_hypothesis"),
-        _node("stats:taxi_hypothesis"),
-        _node("analysis:taxi_hypothesis"),
-        _node("analysis:taxi"),
-        _node("training:taxi"),
+        _node("dataset:test"),
+        _node("ingest:test"),
+        _node("etl:test"),
+        _node("describe:test_hypothesis"),
+        _node("stats:test_hypothesis"),
+        _node("analysis:test_hypothesis"),
+        _node("analysis:test"),
+        _node("training:test"),
         _node("slice:airport"),
         _node("decision:keep"),
     ]
     edges = [
-        LineageEdge(source="dataset:taxi", target="ingest:taxi", relation="produces"),
-        LineageEdge(source="ingest:taxi", target="etl:taxi", relation="produces"),
-        LineageEdge(source="etl:taxi", target="describe:taxi_hypothesis", relation="produces"),
-        LineageEdge(source="etl:taxi", target="stats:taxi_hypothesis", relation="produces"),
+        LineageEdge(source="dataset:test", target="ingest:test", relation="produces"),
+        LineageEdge(source="ingest:test", target="etl:test", relation="produces"),
+        LineageEdge(source="etl:test", target="describe:test_hypothesis", relation="produces"),
+        LineageEdge(source="etl:test", target="stats:test_hypothesis", relation="produces"),
         LineageEdge(
-            source="analysis:taxi_hypothesis", target="describe:taxi_hypothesis", relation="produces"
+            source="analysis:test_hypothesis", target="describe:test_hypothesis", relation="produces"
         ),
         LineageEdge(
-            source="analysis:taxi_hypothesis", target="stats:taxi_hypothesis", relation="produces"
+            source="analysis:test_hypothesis", target="stats:test_hypothesis", relation="produces"
         ),
-        LineageEdge(source="analysis:taxi", target="training:taxi", relation="produces"),
-        LineageEdge(source="etl:taxi", target="training:taxi", relation="produces"),
-        LineageEdge(source="slice:airport", target="dataset:taxi", relation="filters"),
+        LineageEdge(source="analysis:test", target="training:test", relation="produces"),
+        LineageEdge(source="etl:test", target="training:test", relation="produces"),
+        LineageEdge(source="slice:airport", target="dataset:test", relation="filters"),
         LineageEdge(source="slice:airport", target="decision:keep", relation="raises"),
     ]
     return LineageGraph(nodes=nodes, edges=edges)
 
 
 def test_scope_graph_by_analysis_and_dataset() -> None:
-    scoped = scope_graph(_graph(), analysis="taxi_hypothesis", dataset="taxi")
+    scoped = scope_graph(_graph(), analysis="test_hypothesis", dataset="test")
     node_ids = {n.id for n in scoped.nodes}
 
     for expected in {
-        "dataset:taxi",
-        "etl:taxi",
-        "describe:taxi_hypothesis",
-        "stats:taxi_hypothesis",
-        "analysis:taxi_hypothesis",
+        "dataset:test",
+        "etl:test",
+        "describe:test_hypothesis",
+        "stats:test_hypothesis",
+        "analysis:test_hypothesis",
         "slice:airport",
         "decision:keep",
     }:
         assert expected in node_ids
 
-    assert "training:taxi" not in node_ids
-    assert "analysis:taxi" not in node_ids
+    assert "training:test" not in node_ids
+    assert "analysis:test" not in node_ids
 
 
 def test_scope_graph_by_dataset_only() -> None:
-    scoped = scope_graph(_graph(), dataset="taxi")
+    scoped = scope_graph(_graph(), dataset="test")
     node_ids = {n.id for n in scoped.nodes}
 
-    for expected in {"dataset:taxi", "ingest:taxi", "etl:taxi", "slice:airport", "decision:keep"}:
+    for expected in {"dataset:test", "ingest:test", "etl:test", "slice:airport", "decision:keep"}:
         assert expected in node_ids
 
     for absent in {
-        "analysis:taxi",
-        "analysis:taxi_hypothesis",
-        "describe:taxi_hypothesis",
-        "stats:taxi_hypothesis",
-        "training:taxi",
+        "analysis:test",
+        "analysis:test_hypothesis",
+        "describe:test_hypothesis",
+        "stats:test_hypothesis",
+        "training:test",
     }:
         assert absent not in node_ids
 
 
 def test_scope_graph_wrong_dataset_raises() -> None:
     try:
-        scope_graph(_graph(), analysis="taxi_hypothesis", dataset="taxi_other")
+        scope_graph(_graph(), analysis="test_hypothesis", dataset="test_other")
     except LineageScopeError:
         pass
     else:

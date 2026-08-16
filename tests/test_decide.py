@@ -10,7 +10,7 @@ from broadway.timeline.sequence import load_walkthrough_config, load_walkthrough
 
 
 def _analysis():
-    return load_config("stats", dataset="taxi", analysis="taxi_hypothesis").analysis
+    return load_config("stats", dataset="test", analysis="test_hypothesis").analysis
 
 
 def test_record_writes_valid_decision(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -22,7 +22,7 @@ def test_record_writes_valid_decision(tmp_path: Path, monkeypatch: pytest.Monkey
         "non-normal",
     )
     module.save_decision(decision)
-    loaded = module.load_decision("taxi_hypothesis", "omnibus")
+    loaded = module.load_decision("test_hypothesis", "omnibus")
     assert loaded is not None
     assert loaded == decision
     assert loaded.kind == "omnibus"

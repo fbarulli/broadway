@@ -122,13 +122,13 @@ class TestDiscoverCLI:
 
 class TestTrainCLI:
     def test_train_dispatches_to_pipeline(self) -> None:
-        result = _run("train", "--dataset", "taxi", "--experiment", "taxi")
+        result = _run("train", "--dataset", "test", "--experiment", "baseline")
         assert result.returncode != 2, (
             f"argparse error (exit 2): {result.stderr}"
         )
 
     def test_train_without_dataset_still_dispatches(self) -> None:
-        result = _run("train", "--experiment", "taxi")
+        result = _run("train", "--experiment", "baseline")
         assert result.returncode not in (2,), (
             f"argparse error (exit 2), should have dispatched: {result.stderr}"
         )
@@ -136,7 +136,7 @@ class TestTrainCLI:
 
 class TestWalkthroughCLI:
     def test_walkthrough_requires_dataset(self) -> None:
-        result = _run("walkthrough", "--analysis", "taxi_hypothesis")
+        result = _run("walkthrough", "--analysis", "test_hypothesis")
         assert result.returncode == 2
         assert "required" in result.stderr.lower()
 

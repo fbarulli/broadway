@@ -7,34 +7,34 @@ from broadway.lineage.models import LineageEdge, LineageGraph, LineageNode
 def test_to_mermaid_renders_nodes_and_edges() -> None:
     graph = LineageGraph(
         nodes=[
-            LineageNode(id="dataset:taxi", kind="dataset", label="taxi", status="produced"),
+            LineageNode(id="dataset:test", kind="dataset", label="test", status="produced"),
             LineageNode(
-                id="baseline:taxi", kind="baseline", label="baseline:taxi", status="produced"
+                id="baseline:test", kind="baseline", label="baseline:test", status="produced"
             ),
         ],
-        edges=[LineageEdge(source="dataset:taxi", target="baseline:taxi", relation="produced_by")],
+        edges=[LineageEdge(source="dataset:test", target="baseline:test", relation="produced_by")],
     )
     output = to_mermaid(graph)
     assert output.startswith("flowchart LR")
-    assert 'dataset_taxi["taxi"]' in output
-    assert "dataset_taxi -->|produced_by| baseline_taxi" in output
+    assert 'dataset_test["test"]' in output
+    assert "dataset_test -->|produced_by| baseline_test" in output
 
 
 def test_to_mermaid_renders_sample_suffix() -> None:
     graph = LineageGraph(
         nodes=[
-            LineageNode(id="dataset:taxi", kind="dataset", label="taxi", status="produced"),
+            LineageNode(id="dataset:test", kind="dataset", label="test", status="produced"),
             LineageNode(
-                id="describe:taxi",
+                id="describe:test",
                 kind="describe",
-                label="describe:taxi",
+                label="describe:test",
                 status="produced",
-                sample_name="taxi_diagnostic",
+                sample_name="test_diagnostic",
                 sample_role="diagnostic",
             ),
         ],
         edges=[],
     )
     output = to_mermaid(graph)
-    assert "describe_taxi[\"describe:taxi (sample=taxi_diagnostic, role=diagnostic)\"]" in output
-    assert 'dataset_taxi["taxi"]' in output
+    assert "describe_test[\"describe:test (sample=test_diagnostic, role=diagnostic)\"]" in output
+    assert 'dataset_test["test"]' in output

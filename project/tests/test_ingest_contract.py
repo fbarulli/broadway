@@ -5,7 +5,7 @@ import pandas as pd
 import pytest
 
 from broadway.config.schema import ColumnRole, ColumnSchema, DatasetContract
-from broadway.etl.process import (
+from project.etl.process import (
     select_and_clean_columns,
     validate_contract_schema,
 )

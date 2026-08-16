@@ -28,9 +28,9 @@ def test_log_dataset_records_param_and_lineage(tmp_path: Path) -> None:
     source = tmp_path / "train.parquet"
     pd.DataFrame({"a": [1, 2, 3], "b": [4.0, 5.0, 6.0]}).to_parquet(source, index=False)
     with mlflow.start_run() as run:
-        log_dataset("taxi-train", str(source), context="train")
+        log_dataset("test-train", str(source), context="train")
     run_obj = mlflow.tracking.MlflowClient().get_run(run.info.run_id)
-    assert run_obj.data.params["dataset_id"] == "taxi-train"
+    assert run_obj.data.params["dataset_id"] == "test-train"
     inputs = run_obj.inputs.dataset_inputs
     assert len(inputs) == 1
     assert str(source) in inputs[0].dataset.source
@@ -45,8 +45,8 @@ def test_log_dataset_missing_source_warns_and_continues(
     missing = tmp_path / "missing.parquet"
     with mlflow.start_run() as run:
         with caplog.at_level(logging.WARNING, logger=_LOGGER_NAME):
-            log_dataset("taxi-train", str(missing), context="train")
+            log_dataset("test-train", str(missing), context="train")
     assert "missing.parquet" in caplog.text
     run_obj = mlflow.tracking.MlflowClient().get_run(run.info.run_id)
-    assert run_obj.data.params["dataset_id"] == "taxi-train"
+    assert run_obj.data.params["dataset_id"] == "test-train"
     assert run_obj.inputs.dataset_inputs == []

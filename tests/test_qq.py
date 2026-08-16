@@ -33,7 +33,7 @@ from broadway.timeline.evidence import NormalityEvidence
 
 
 def _cfg():
-    return load_config("stats", dataset="taxi", analysis="taxi_hypothesis")
+    return load_config("stats", dataset="test", analysis="test_hypothesis")
 
 
 def _markers_off():
@@ -42,7 +42,7 @@ def _markers_off():
 
 def _profile():
     return DatasetProfile(
-        name="taxi",
+        name="test",
         path="data/processed/training_data.parquet",
         row_count=10,
         columns={
@@ -66,7 +66,7 @@ def test_run_normality_produces_single_joint_qq(tmp_path, monkeypatch) -> None:
     rng = np.random.default_rng(0)
     groups = {g: rng.normal(10.0, 2.0, 30) for g in ("A", "B", "C")}
     figures_dir = tmp_path / "reports" / "figures"
-    out_dir = tmp_path / "timeline" / "taxi_hypothesis"
+    out_dir = tmp_path / "timeline" / "test_hypothesis"
 
     step = runners.run_normality(
         cfg.analysis, 2, "q?", groups, out_dir, figures_dir, "canonical", None
@@ -94,7 +94,7 @@ def test_run_normality_caps_at_twelve_groups(tmp_path, monkeypatch) -> None:
     figures_dir = tmp_path / "reports" / "figures"
 
     step = runners.run_normality(
-        cfg.analysis, 2, "q?", groups, tmp_path / "timeline" / "taxi_hypothesis",
+        cfg.analysis, 2, "q?", groups, tmp_path / "timeline" / "test_hypothesis",
         figures_dir, "canonical", None,
     )
     assert "truncation" in step.result_summary
@@ -110,7 +110,7 @@ def test_run_normality_raw_log_pairs_for_skewed_positive(tmp_path, monkeypatch) 
     rng = np.random.default_rng(0)
     groups = {g: np.exp(rng.normal(0.0, 1.0, 500)) for g in ("A", "B", "C")}
     figures_dir = tmp_path / "reports" / "figures"
-    out_dir = tmp_path / "timeline" / "taxi_hypothesis"
+    out_dir = tmp_path / "timeline" / "test_hypothesis"
     captured: list = []
     monkeypatch.setattr(runners_module.plt, "close", lambda fig: captured.append(fig))
 
@@ -138,7 +138,7 @@ def test_run_normality_raw_only_for_non_positive_target(tmp_path, monkeypatch) -
         g: np.concatenate([[0.0], rng.normal(10.0, 2.0, 29)]) for g in ("A", "B", "C")
     }
     figures_dir = tmp_path / "reports" / "figures"
-    out_dir = tmp_path / "timeline" / "taxi_hypothesis"
+    out_dir = tmp_path / "timeline" / "test_hypothesis"
     captured: list = []
     monkeypatch.setattr(runners_module.plt, "close", lambda fig: captured.append(fig))
 
@@ -566,10 +566,10 @@ def test_plot_numeric_qq_source_path_is_data_path(tmp_path) -> None:
     evidence_path = tmp_path / "artifacts" / "discover" / "qq_overview.json"
 
     overview = plot_numeric_qq(
-        _qq_columns(2), figures_dir, evidence_path, source_path="data/raw/taxi.parquet"
+        _qq_columns(2), figures_dir, evidence_path, source_path="data/raw/sample.parquet"
     )
 
-    assert overview.source_path == "data/raw/taxi.parquet"
+    assert overview.source_path == "data/raw/sample.parquet"
     assert overview.source_path != str(evidence_path)
 
 
@@ -644,7 +644,7 @@ def test_discover_profile_writes_qq_overview(tmp_path, monkeypatch) -> None:
 
 def test_render_profile_includes_qq_evidence() -> None:
     qq = QqOverview(
-        source_path="data/raw/taxi.csv",
+        source_path="data/raw/sample.csv",
         total_features=5,
         plotted_features=2,
         excluded_features=1,
@@ -720,7 +720,7 @@ def test_render_profile_includes_qq_evidence() -> None:
 
 def test_render_profile_diagnostics_absent_without_figures() -> None:
     qq = QqOverview(
-        source_path="data/raw/taxi.csv",
+        source_path="data/raw/sample.csv",
         total_features=1,
         plotted_features=1,
         excluded_features=0,

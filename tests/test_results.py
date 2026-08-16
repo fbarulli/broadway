@@ -25,7 +25,7 @@ from broadway.timeline.sequence import load_walkthrough_sequence
 
 def _step(**overrides) -> AnalysisStep:
     base = {
-        "analysis": "taxi",
+        "analysis": "test",
         "step_id": "describe_groups",
         "order": 1,
         "question": "Do the groups contain enough observations?",
@@ -184,7 +184,7 @@ def test_render_results_conclusion_shows_effect_size_caveat() -> None:
             "omega_squared": 0.098765,
         },
     )
-    page = render_results("taxi", seq, [conclusion], [])["conclusion.md"]
+    page = render_results("test", seq, [conclusion], [])["conclusion.md"]
     assert "## Effect size" in page
     assert "omega²" in page
     assert "the more conservative estimate" in page
@@ -192,7 +192,7 @@ def test_render_results_conclusion_shows_effect_size_caveat() -> None:
 
 def test_render_results_index_and_pages() -> None:
     seq = load_walkthrough_sequence()
-    pages = render_results("taxi", seq, _full_steps(), [])
+    pages = render_results("test", seq, _full_steps(), [])
     assert set(pages) == {
         "index.md",
         "describe-groups.md",
@@ -241,7 +241,7 @@ def test_render_results_kruskal_epsilon_squared() -> None:
             },
         )
     ]
-    pages = render_results("taxi", seq, steps, [])
+    pages = render_results("test", seq, steps, [])
     assert "rank-based ε²" in pages["principal-analysis.md"]
     assert "proportion of variance in ranks" in pages["principal-analysis.md"]
 
@@ -262,13 +262,13 @@ def test_render_results_kruskal_not_computed_backward_compat() -> None:
             },
         )
     ]
-    pages = render_results("taxi", seq, steps, [])
+    pages = render_results("test", seq, steps, [])
     assert "deliberately not computed" in pages["principal-analysis.md"]
 
 
 def test_rendered_output_plain_text_no_glyphs_or_literals() -> None:
     seq = load_walkthrough_sequence()
-    pages = render_results("taxi", seq, _full_steps(), [])
+    pages = render_results("test", seq, _full_steps(), [])
     for content in pages.values():
         assert "{" not in content
         assert "}" not in content
@@ -286,7 +286,7 @@ def test_write_results_orphan_deletion(tmp_path: Path, monkeypatch: pytest.Monke
     (results_dir / "index.md").write_text("old index", encoding="utf-8")
 
     seq = load_walkthrough_sequence()
-    write_results("taxi", seq, [_step(step_id="describe_groups", order=1)], [])
+    write_results("test", seq, [_step(step_id="describe_groups", order=1)], [])
 
     assert (results_dir / "index.md").exists()
     assert (results_dir / "describe-groups.md").exists()
@@ -304,7 +304,7 @@ def test_write_results_failed_step_has_no_page(
 
     seq = load_walkthrough_sequence()
     steps = [_step(step_id="describe_groups", order=1, status=StepStatus.FAILED)]
-    write_results("taxi", seq, steps, [])
+    write_results("test", seq, steps, [])
 
     assert not (results_dir / "describe-groups.md").exists()
     idx = (results_dir / "index.md").read_text()
@@ -318,7 +318,7 @@ def test_render_results_decision_awaiting() -> None:
         _step(step_id="normality", order=2, method="check_normality", result_summary={}),
         _step(step_id="variance", order=3, method="levene", result_summary={}),
     ]
-    idx = render_results("taxi", seq, steps, [])["index.md"]
+    idx = render_results("test", seq, steps, [])["index.md"]
     assert "| Choose principal method | awaiting decision |" in idx
 
 
@@ -331,7 +331,7 @@ def test_posthoc_headline_and_rows() -> None:
 
 def test_posthoc_step_page_renders_significant_pairs() -> None:
     seq = load_walkthrough_sequence()
-    pages = render_results("taxi", seq, [_posthoc_step()], [])
+    pages = render_results("test", seq, [_posthoc_step()], [])
     page = pages["post-hoc-comparisons.md"]
     assert "## Significant pairs" in page
     assert "2 of 3 pairs significant" in page
@@ -355,7 +355,7 @@ def test_posthoc_step_page_zero_significant_pairs() -> None:
             "significant_pair_details": [],
         },
     )
-    page = render_results("taxi", seq, [step], [])["post-hoc-comparisons.md"]
+    page = render_results("test", seq, [step], [])["post-hoc-comparisons.md"]
     assert "## Significant pairs" in page
     assert "0 of 3 pairs significant" in page
     assert "none" in page
@@ -373,7 +373,7 @@ def test_humanize_summary_does_not_leak_pair_list() -> None:
 
 def test_render_timeline_posthoc_bullet() -> None:
     seq = load_walkthrough_sequence()
-    timeline = render_timeline("taxi", seq, [_posthoc_step()], [])
+    timeline = render_timeline("test", seq, [_posthoc_step()], [])
     assert "2 of 3 pairs significant:" in timeline
     assert "Manhattan vs Brooklyn: p < 0.001, Cohen's d 1.23, Hedges' g 1.24" in timeline
     assert "Queens vs Bronx: p 0.010, Cohen's d 0.5, Hedges' g 0.49" in timeline

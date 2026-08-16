@@ -20,7 +20,7 @@ def test_build_profile_fields() -> None:
             ),
         }
     )
-    profile = build_profile("taxi", "data.csv", df)
+    profile = build_profile("test", "data.csv", df)
     assert isinstance(profile, DatasetProfile)
     assert profile.row_count == 4
     assert set(profile.columns) == {"id", "value", "group", "ts"}
@@ -39,7 +39,7 @@ def test_build_profile_datetime_min_max() -> None:
             )
         }
     )
-    profile = build_profile("taxi", "data.csv", df)
+    profile = build_profile("test", "data.csv", df)
     ts = profile.columns["ts"]
     assert ts.dtype.startswith("datetime64")
     assert ts.datetime_min is not None
@@ -54,7 +54,7 @@ def test_build_profile_null_count() -> None:
         }
     )
     df.loc[0, "value"] = None
-    profile = build_profile("taxi", "data.csv", df)
+    profile = build_profile("test", "data.csv", df)
     assert profile.columns["value"].null_count == 1
 
 

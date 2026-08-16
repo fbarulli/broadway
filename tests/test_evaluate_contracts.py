@@ -250,7 +250,7 @@ def _make_config(tmp_path: Path) -> PipelineConfig:
         evaluate=evaluate_step,
         baseline=baseline_step,
         analysis=AnalysisContract(
-            name="taxi",
+            name="test",
             mode=AnalysisMode.PREDICTION,
             goal="predict price",
             row_definition="one row",

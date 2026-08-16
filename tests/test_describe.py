@@ -140,22 +140,22 @@ def test_describe_run_column_mapping(
     shutil.copytree(REPO_ROOT / "configs" / "dataset", configs_dir / "dataset")
     shutil.copytree(REPO_ROOT / "configs" / "step", configs_dir / "step")
     (configs_dir / "analysis").mkdir(parents=True)
-    (configs_dir / "analysis" / "borough_hypothesis.yaml").write_text(
-        "name: borough_hypothesis\n"
+    (configs_dir / "analysis" / "neighborhood_hypothesis.yaml").write_text(
+        "name: neighborhood_hypothesis\n"
         "mode: hypothesis\n"
-        "goal: test whether price differs across boroughs\n"
+        "goal: test whether price differs across neighborhoods\n"
         "row_definition: one listing\n"
         "decision_moment: post-hoc\n"
         "available_info:\n"
-        "  - Borough\n"
+        "  - neighborhood\n"
         "leakage_notes: []\n"
         "success_criterion: report effect size\n"
         "hypothesis:\n"
-        "  group_column: Borough\n"
+        "  group_column: neighborhood\n"
         "  group_values:\n"
-        "    - Manhattan\n"
-        "    - Brooklyn\n"
-        "    - Queens\n",
+        "    - A\n"
+        "    - B\n"
+        "    - C\n",
         encoding="utf-8",
     )
     monkeypatch.setattr(loader, "CONFIGS_DIR", configs_dir)
@@ -163,14 +163,14 @@ def test_describe_run_column_mapping(
     monkeypatch.setattr(paths, "RESULTS_DIR", tmp_path / "reports" / "results")
     monkeypatch.setattr(paths, "FIGURES_DIR", tmp_path / "reports" / "figures")
 
-    cfg = load_config("stats", dataset="test", analysis="borough_hypothesis")
+    cfg = load_config("stats", dataset="test", analysis="neighborhood_hypothesis")
     assert cfg.dataset is not None
     assert cfg.stats is not None
 
     sample_path = tmp_path / "mapped_sample.parquet"
     pd.DataFrame(
         {
-            "pickup_borough": ["Manhattan", "Manhattan", "Brooklyn", "Brooklyn", "Brooklyn"],
+            "source_neighborhood": ["A", "A", "B", "B", "B"],
             "price": [100, 110, 200, 210, 220],
         }
     ).to_parquet(sample_path, index=False)
@@ -179,20 +179,20 @@ def test_describe_run_column_mapping(
         update={"stats": cfg.stats.model_copy(update={"output_dir": str(tmp_path)})}
     )
     sample = SampleSpec(
-        name="taxi_diagnostic",
+        name="test_diagnostic",
         role="diagnostic",
         path=str(sample_path),
         description="mapped sample",
-        column_mapping={"Borough": "pickup_borough"},
+        column_mapping={"neighborhood": "source_neighborhood"},
     )
 
     run(cfg, sample)
 
     summary = json.loads((tmp_path / "describe.json").read_text())
-    assert summary["group_column"] == "Borough"
-    assert summary["source_group_column"] == "pickup_borough"
-    assert set(summary["groups"]) == {"Manhattan", "Brooklyn", "Queens"}
-    assert summary["groups"]["Manhattan"]["n"] == 2
-    assert summary["groups"]["Brooklyn"]["n"] == 3
-    assert summary["groups"]["Queens"]["n"] == 0
-    assert "Queens" in summary["absent_groups"]
+    assert summary["group_column"] == "neighborhood"
+    assert summary["source_group_column"] == "source_neighborhood"
+    assert set(summary["groups"]) == {"A", "B", "C"}
+    assert summary["groups"]["A"]["n"] == 2
+    assert summary["groups"]["B"]["n"] == 3
+    assert summary["groups"]["C"]["n"] == 0
+    assert "C" in summary["absent_groups"]

@@ -10,7 +10,7 @@ import yaml
 from broadway.config.loader import CONFIGS_DIR
 from broadway.config.schema import DatasetContract
 from broadway.contracts.pandera import build_raw_schema, pandera_dtype
-from broadway.etl import process_config as cfg
+from project.etl import process_config as cfg
 from broadway.lineage.ids import node_id
 from broadway.lineage.records import write_record
 
