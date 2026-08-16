@@ -5,8 +5,8 @@ Update freely; remove entries when done (git history is the record).
 
 ## Current
 
-- **Project-style refactor — DONE** (waves 1-3 all merged, pushed to `taxi`;
-  see Completed below). What remains from that stream is parked here:
+- **Project-style refactor** — waves 1-3 merged (k8s/optuna/mlflow finalized,
+  auto-teardown + `verify_experiments.py` in). What remains from that stream:
   - `project/` single-loader dataset binding: one loader for all experiments
     (univariate `_common.py`, multivariate `_setup.py`, mlflow `_common.py`
     still each carry loader logic — move to one project-level binding).
@@ -34,32 +34,6 @@ Update freely; remove entries when done (git history is the record).
   Scope to be set by the user: platform `src/broadway/stats` testing vs.
   hypothesis tests on the taxi data vs. tutorial continuation. Do not start
   until the specific direction is given.
-
-## Completed (Wave 3, 2026-08-16)
-
-- **K8s + Optuna + MLflow finalization** — 3 optuna worker Jobs (one per model)
-  completed on the kind cluster; studies + trials in the optuna DB, mlflow runs
-  (params/metrics/dataset lineage) in the mlflow DB; endpoint logging on every
-  pod. Root cause of the original saga: **optuna and mlflow shared one postgres
-  database and clashed over Alembic's `alembic_version` table** — fixed by
-  separate `optuna`/`mlflow` databases (init script creates the second). Other
-  fixes: `optuna-init` Job creates studies once; config/secret mounted as
-  FILES (zero env vars); workers use `broadway.training.optuna_worker` +
-  `mlflow_utils` (Wave-1 src); base image + separate mlflow/worker images;
-  mlflow 3.15 everywhere; Job completion semantics (no infinite restarts);
-  postgres + mlflow PVCs (durable); `k8s/optuna/` manifests committed.
-  Standing rules still apply: config files only (no env), single source of
-  truth, data-agnostic, fail-loud, no drift-type additions without asking.
-
-- **Auto-teardown + fast verification entry point** (2026-08-16, `cc99dab`):
-  finished Jobs self-delete via `ttlSecondsAfterFinished: 600` on all four
-  `k8s/optuna/` Job manifests (verified live: completed jobs + pods gone from
-  the cluster ~10 min after finish); `k8s/optuna/teardown.sh` removes the
-  whole stack and the kind cluster on demand;
-  `verify_experiments.py` at the repo root is a ~seconds entry point that
-  syntax-compiles every experiment script, validates all YAML configs through
-  `require_keys`, imports the shared experiment modules, and spot-checks
-  structural invariants (no training, no figures, no cluster).
 
 ## Next
 
