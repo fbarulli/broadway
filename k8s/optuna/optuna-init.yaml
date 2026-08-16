@@ -1,12 +1,14 @@
 # optuna-init Job — creates the configured studies ONCE (schema-race fix).
 # Workers later only load_if_exists. Completion semantics: restartPolicy
-# Never + backoffLimit bounds retries (no infinite restarts).
+# Never + backoffLimit bounds retries (no infinite restarts);
+# ttlSecondsAfterFinished auto-deletes the Job 10 min after completion.
 apiVersion: batch/v1
 kind: Job
 metadata:
   name: optuna-init
 spec:
   backoffLimit: 2
+  ttlSecondsAfterFinished: 600
   template:
     spec:
       restartPolicy: Never

@@ -1,12 +1,14 @@
 # Three optuna worker Jobs — one pod per model, run to completion.
 # Config/credentials come from mounted FILES; restartPolicy Never +
-# backoffLimit bounds retries (no infinite restarts).
+# backoffLimit bounds retries (no infinite restarts);
+# ttlSecondsAfterFinished auto-deletes each Job 10 min after completion.
 apiVersion: batch/v1
 kind: Job
 metadata:
   name: optuna-ols
 spec:
   backoffLimit: 2
+  ttlSecondsAfterFinished: 600
   template:
     spec:
       restartPolicy: Never
@@ -31,6 +33,7 @@ metadata:
   name: optuna-lgbm
 spec:
   backoffLimit: 2
+  ttlSecondsAfterFinished: 600
   template:
     spec:
       restartPolicy: Never
@@ -55,6 +58,7 @@ metadata:
   name: optuna-xgb
 spec:
   backoffLimit: 2
+  ttlSecondsAfterFinished: 600
   template:
     spec:
       restartPolicy: Never
