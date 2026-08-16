@@ -168,6 +168,18 @@ def main() -> None:
     print("NOTE: dictionary surcharge would be day=0, peak=1.00 (weekday), "
           "overnight=0.50; the data does not show this.")
 
+    # Clean-rows structure: rows where `extra` is a dictionary-plausible surcharge
+    clean_mask = df["extra"].round(2).isin([0, 0.5, 1.0, 1.5])
+    clean = df[clean_mask]
+    clean = clean.assign(weekday=clean["tpep_pickup_datetime"].dt.weekday < 5)
+    hour_wk = {h: round(float(clean[(clean["pickup_hour"] == h) & clean["weekday"]]
+                               ["extra"].mean()), 3) for h in range(24)}
+    hour_we = {h: round(float(clean[(clean["pickup_hour"] == h) & ~clean["weekday"]]
+                               ["extra"].mean()), 3) for h in range(24)}
+    print("\n=== clean-`extra` rows: mean extra by hour (weekday | weekend) ===")
+    print("structure: +$1.00 overnight (20-23h, 0-5h), $0.00 6-19h — no peak surcharge")
+    print("  " + " ".join(f"{h:2d}h:{hour_wk[h]:+.2f}/{hour_we[h]:+.2f}" for h in range(24)))
+
     fig, ((ax_profile, ax_effects), (ax_forest, ax_extra)) = plt.subplots(
         2, 2, figsize=(16, 11))
     draw_hourly_profile(ax_profile, df)
@@ -219,6 +231,15 @@ def main() -> None:
                     b: round(float(extra_by[(extra_by["bucket"] == b)
                                             & ~extra_by["weekday"]]["extra"].mean()), 3)
                     for b in ("day", "peak", "overnight")
+                },
+                "clean_rows": {
+                    "share": round(float(clean_mask.mean()), 3),
+                    "rule": ("clean rows show +$1.00 overnight (8pm-6am = hours "
+                             "20-23 + 0-5), $0.00 for 6-19h; no peak-weekday "
+                             "surcharge in `extra`; the assumed +$1.00 peak / "
+                             "+$0.50 overnight rules do NOT match the data"),
+                    "mean_extra_by_hour_weekday": hour_wk,
+                    "mean_extra_by_hour_weekend": hour_we,
                 },
             },
         }
