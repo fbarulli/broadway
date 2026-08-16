@@ -1,0 +1,247 @@
+"""01: MLflow model battle — OLS / LGBM / XGBoost (+ Ridge / RandomForest in parallel).
+
+Every model run is tracked in MLflow (local file store `mlruns/`): the FULL
+constructor params (the recipe — NOT the fitted artifact; the model pkl is
+never logged), every regression metric plus binarized ROC/PR AUC, and
+metadata (training time, prediction time, model size in bytes). Uses a
+seeded 80/20 holdout on a 1000-row sample through sklearn Pipelines (the
+categorical branch is ready for future pipeline steps), RFECV feature
+selection with a plot, and an end-to-end Optuna single trial wired to
+MLflow via the official callback.
+"""
+
+import pickle
+import time
+from pathlib import Path
+
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import mlflow
+import optuna
+import pandas as pd
+from joblib import Parallel, delayed
+from optuna.integration.mlflow import MLflowCallback
+from sklearn.feature_selection import RFECV
+from sklearn.metrics import mean_absolute_error
+
+from _common import (
+    BONUS_MODELS,
+    CATEGORICAL_FEATURES,
+    CONTINUOUS_FEATURES,
+    MODELS,
+    MLRUNS,
+    RESULTS,
+    SEED,
+    binary_metrics,
+    binary_threshold,
+    load_sample,
+    make_pipeline,
+    regression_metrics,
+    split_data,
+)
+from broadway.training.mlflow_utils import (
+    log_metrics,
+    log_params,
+    setup_mlflow,
+)
+from broadway.training.models.registry import get_model
+
+EXPERIMENT = "ratecode1_model_battle"
+
+
+def _make_model(factory: str | type, params: dict) -> object:
+    """Build a model from the platform registry (str key) or a class."""
+    if isinstance(factory, str):
+        return get_model(factory, **params)
+    return factory(**params)
+
+
+def fit_and_evaluate(name: str, factory: str | type, params: dict,
+                     X_train, X_test, y_train, y_test, threshold: float) -> dict:
+    """Fit pipeline, time it, compute holdout metrics + size; returns summary."""
+    model = _make_model(factory, params)
+    pipe = make_pipeline(model)
+    t0 = time.perf_counter()
+    pipe.fit(X_train, y_train)
+    t1 = time.perf_counter()
+    preds = pipe.predict(X_test)
+    t2 = time.perf_counter()
+    metrics = regression_metrics(y_test, preds)
+    metrics.update(binary_metrics(y_test, preds, threshold))
+    return {
+        "name": name,
+        "params": pipe.named_steps["model"].get_params(),
+        "train_time_s": round(t1 - t0, 4),
+        "predict_time_s": round(t2 - t1, 4),
+        "model_size_bytes": len(pickle.dumps(pipe)),
+        "metrics": metrics,
+    }
+
+
+def log_run(summary: dict, n_train: int, n_test: int) -> None:
+    """One MLflow run per model: params, metrics, metadata — no artifact."""
+    with mlflow.start_run(run_name=summary["name"]):
+        log_params(summary["params"])
+        log_params({
+            "features": ",".join(CONTINUOUS_FEATURES + CATEGORICAL_FEATURES),
+            "n_train": n_train,
+            "n_test": n_test,
+        })
+        log_metrics(summary["metrics"])
+        log_metrics({
+            "train_time_s": summary["train_time_s"],
+            "predict_time_s": summary["predict_time_s"],
+            "model_size_bytes": summary["model_size_bytes"],
+        })
+        mlflow.set_tag("model", summary["name"])
+
+
+def rfe_curve(name: str, factory: str | type, params: dict,
+              X_train, y_train) -> dict:
+    """RFECV over the pipeline; returns (transformed n_features, cv MAE)."""
+    model = _make_model(factory, params)
+    pre = make_pipeline(model).named_steps["pre"]
+    X_num = pre.fit_transform(X_train)
+    selector = RFECV(model, step=1, cv=3,
+                     scoring="neg_mean_absolute_error",
+                     min_features_to_select=1)
+    selector.fit(X_num, y_train)
+    return {
+        "name": name,
+        "n_features": [int(v) for v in selector.cv_results_["n_features"]],
+        "cv_mae": list(-selector.cv_results_["mean_test_score"]),
+    }
+
+
+def plot_metrics(summaries: list[dict], out: Path) -> None:
+    fig, ax = plt.subplots(figsize=(9, 5))
+    names = [s["name"] for s in summaries]
+    x = range(len(names))
+    width = 0.35
+    ax.bar([i - width / 2 for i in x], [s["metrics"]["mae"] for s in summaries],
+           width, label="MAE", color="#4C72B0")
+    ax.bar([i + width / 2 for i in x], [s["metrics"]["rmse"] for s in summaries],
+           width, label="RMSE", color="#DD8452")
+    ax.set_xticks(list(x))
+    ax.set_xticklabels(names)
+    ax.set_ylabel("$ (holdout)")
+    ax.set_title("Model battle — MAE / RMSE (1000-row sample, 80/20 holdout)")
+    ax.legend()
+    fig.tight_layout()
+    fig.savefig(out, dpi=150)
+    plt.close(fig)
+
+
+def plot_rfe(curves: list[dict], out: Path) -> None:
+    fig, ax = plt.subplots(figsize=(9, 5))
+    for c in curves:
+        ax.plot(c["n_features"], c["cv_mae"], marker="o", label=c["name"])
+    ax.set_xlabel("number of transformed features (RFECV)")
+    ax.set_ylabel("CV MAE ($)")
+    ax.set_title("Recursive feature elimination — holdout MAE vs features")
+    ax.legend()
+    ax.grid(True, alpha=0.3)
+    fig.tight_layout()
+    fig.savefig(out, dpi=150)
+    plt.close(fig)
+
+
+def make_objective(X_train, X_test, y_train, y_test):
+    """Optuna objective: model + tree hyperparams; returns holdout MAE."""
+    def objective(trial: optuna.Trial) -> float:
+        name = trial.suggest_categorical("model", list(MODELS))
+        factory, base = MODELS[name]
+        params = dict(base)
+        if name in ("lgbm", "xgb"):
+            params["n_estimators"] = trial.suggest_int("n_estimators", 50, 200)
+            params["max_depth"] = trial.suggest_int("max_depth", 3, 8)
+            params["learning_rate"] = trial.suggest_float(
+                "learning_rate", 0.05, 0.3, log=True)
+            params["random_state"] = SEED
+        model = _make_model(factory, params)
+        pipe = make_pipeline(model)
+        pipe.fit(X_train, y_train)
+        preds = pipe.predict(X_test)
+        return float(mean_absolute_error(y_test, preds))
+    return objective
+
+
+def main() -> None:
+    setup_mlflow(str(MLRUNS), EXPERIMENT)
+    RESULTS.mkdir(parents=True, exist_ok=True)
+
+    df = load_sample()
+    X_train, X_test, y_train, y_test = split_data(df)
+    threshold = binary_threshold(y_train.to_numpy())
+    print(f"sample: {len(df)} rows | train {len(X_train)} / test {len(X_test)}")
+
+    summaries = [
+        fit_and_evaluate(name, factory, params, X_train, X_test,
+                         y_train, y_test, threshold)
+        for name, (factory, params) in MODELS.items()
+    ]
+    for s in summaries:
+        log_run(s, len(X_train), len(X_test))
+    print("\n=== MLflow runs (OLS / LGBM / XGB) ===")
+    for s in summaries:
+        m = s["metrics"]
+        print(f"{s['name']:<6} MAE={m['mae']:.3f} RMSE={m['rmse']:.3f} "
+              f"R2={m['r2']:.4f} ROC={m['roc_auc']:.3f} PR={m['pr_auc']:.3f} "
+              f"train={s['train_time_s']}s pred={s['predict_time_s']}s "
+              f"size={s['model_size_bytes']}B")
+
+    # Bonus models computed in parallel (joblib), logged sequentially
+    bonus = Parallel(n_jobs=-1)(
+        delayed(fit_and_evaluate)(name, factory, params, X_train, X_test,
+                                  y_train, y_test, threshold)
+        for name, (factory, params) in BONUS_MODELS.items()
+    )
+    for s in bonus:
+        log_run(s, len(X_train), len(X_test))
+        print(f"{s['name']:<6} MAE={s['metrics']['mae']:.3f} "
+              f"RMSE={s['metrics']['rmse']:.3f} (parallel bonus)")
+    summaries += bonus
+
+    metrics_csv = RESULTS / "01_model_battle_metrics.csv"
+    rows = []
+    for s in summaries:
+        rows.append({
+            "model": s["name"],
+            **{k: round(v, 6) for k, v in s["metrics"].items()},
+            "train_time_s": s["train_time_s"],
+            "predict_time_s": s["predict_time_s"],
+            "model_size_bytes": s["model_size_bytes"],
+        })
+    pd.DataFrame(rows).to_csv(metrics_csv, index=False)
+    print(f"wrote {metrics_csv}")
+
+    plot_metrics(summaries, RESULTS / "01_model_battle_metrics.png")
+
+    curves = [
+        rfe_curve(name, factory, params, X_train, y_train)
+        for name, (factory, params) in MODELS.items()
+    ]
+    rfe_csv = RESULTS / "01_model_battle_rfe.csv"
+    pd.DataFrame([
+        {"model": c["name"], "n_features": n, "cv_mae": mae}
+        for c in curves for n, mae in zip(c["n_features"], c["cv_mae"])
+    ]).to_csv(rfe_csv, index=False)
+    plot_rfe(curves, RESULTS / "01_model_battle_rfe.png")
+    print(f"wrote {rfe_csv}")
+
+    print("\n=== Optuna single trial (mlflow-optuna end to end) ===")
+    study = optuna.create_study(direction="minimize",
+                                study_name="ratecode1_optuna_battle")
+    study.optimize(make_objective(X_train, X_test, y_train, y_test),
+                   n_trials=1,
+                   callbacks=[MLflowCallback(metric_name="mae",
+                                             create_experiment=False)])
+    best = study.best_trial
+    print(f"best MAE: {best.value:.4f} | params: {best.params}")
+    pd.DataFrame([{"trial": 0, "value": best.value, **best.params}]
+                 ).to_csv(RESULTS / "01_model_battle_optuna.csv", index=False)
+
+
+if __name__ == "__main__":
+    main()

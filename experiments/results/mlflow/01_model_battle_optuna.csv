@@ -1,0 +1,2 @@
+trial,value,model,n_estimators,max_depth,learning_rate
+0,1.0523661854840523,lgbm,65,7,0.2966509748415759
