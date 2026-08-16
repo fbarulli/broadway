@@ -19,7 +19,7 @@ jobs:
           version: "0.5.x"
 
       - name: Install
-        run: uv sync --extra dev --all-extras
+        run: uv sync --all-extras
 
       - name: Lint (ruff)
         run: uv run ruff check src tests
