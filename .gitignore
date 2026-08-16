@@ -18,3 +18,5 @@ experiments/results/
 !reports/figures/*.png
 graphify-out/
 .mplconfig/
+diagnostics_experiment/
+legend_experiment/

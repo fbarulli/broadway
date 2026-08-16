@@ -12,9 +12,31 @@ import statsmodels.api as sm
 from scipy import stats
 
 from broadway.stats.regression import bp_jb, fit_ols
+from matplotlib.lines import Line2D
 from statsmodels.regression.linear_model import RegressionResultsWrapper
 
 ALPHA = 0.05
+
+
+def _fmt_p(p: float) -> str:
+    return "p<0.001" if p < 0.001 else f"p={p:.3f}"
+
+
+def attach_stats_legend(ax, result: dict) -> None:
+    """Framed legend box with BP/JB/skew/kurtosis results (platform legend style)."""
+    handles = [
+        Line2D([0], [0], color="none", label=f"Breusch-Pagan: stat={result['bp_stat']:.2f}, {_fmt_p(result['bp_pval'])}"),
+        Line2D([0], [0], color="none", label=f"Jarque-Bera: stat={result['jb_stat']:.2f}, {_fmt_p(result['jb_pval'])}"),
+        Line2D([0], [0], color="none", label=f"skew={result['skew']:.2f}, kurtosis={result['kurtosis']:.2f}"),
+    ]
+    ax.legend(
+        handles=handles,
+        loc="upper left",
+        frameon=True,
+        framealpha=0.85,
+        fontsize=9,
+        title="Residual diagnostics",
+    )
 
 
 def fit_log_hc3(df: pd.DataFrame) -> RegressionResultsWrapper:
@@ -39,6 +61,7 @@ def plot_log_resid_qq(
     sm.qqplot(model.resid, line="s", ax=ax_qq)
     ax_qq.set_title("Q-Q plot (residuals)")
     ax_qq.grid(True, alpha=0.3)
+    attach_stats_legend(ax_qq, bp_jb(model))
     n = int(model.nobs)
     fig.suptitle(f"{suptitle} (N={n})" if suptitle else f"N={n}")
     fig.tight_layout()

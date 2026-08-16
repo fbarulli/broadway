@@ -11,6 +11,7 @@ import statsmodels.api as sm
 from statsmodels.stats.outliers_influence import variance_inflation_factor
 
 from _common import WORKING_DATASET, load_metered
+from _ols_bp import fit_log_hc3
 from _tests import write_tests_json
 from broadway.stats.regression import bp_jb, fit_ols, fit_robust
 
@@ -68,6 +69,16 @@ def main() -> None:
         ),
         "vif": compute_vif(metered),
     }
+
+    log_model = fit_log_hc3(metered)
+    results["ols_log_hc3_fare_trip_distance_duration"] = {
+        "n": int(log_model.nobs),
+        "rsquared": float(log_model.rsquared),
+        "params": _model_named(log_model, "params"),
+        "bse": _model_named(log_model, "bse"),
+        "pvalues": _model_named(log_model, "pvalues"),
+    }
+    results["bp_jb_log_fare_trip_distance_duration"] = bp_jb(log_model)
 
     out = write_tests_json(
         WORKING_DATASET, results, "17_ratecode1_metrics.py", n_rows=len(dist_df)
