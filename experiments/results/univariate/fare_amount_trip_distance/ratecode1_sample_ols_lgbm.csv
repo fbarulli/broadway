@@ -1,0 +1,3 @@
+model,mae,rmse,tail_mae
+OLS,0.659,1.1763,1.8438
+LGBM,0.5225,1.1035,1.826
