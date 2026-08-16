@@ -21,7 +21,7 @@ from _tests import write_tests_json
 
 OUT = RESULTS / f"{Path(__file__).stem}.png"
 
-THRESHOLD = 3.5
+THRESHOLD = 10.0
 MARGINALS = {
     "histograms": "hist",
     "box plots": "box",
@@ -98,7 +98,17 @@ def main() -> None:
             "n_trip_distance": int(out_dist.sum()),
             "n_fare_amount": int(out_fare.sum()),
             "n_union": int(outlier_mask.sum()),
-            "flagged_trips": outliers[["trip_distance", "fare_amount"]].to_dict("records"),
+            "top_flagged_trips": (
+                df.loc[outlier_mask, ["trip_distance", "fare_amount"]]
+                .assign(
+                    z_dist=z_dist[outlier_mask].abs(),
+                    z_fare=z_fare[outlier_mask].abs(),
+                )
+                .assign(max_abs_z=lambda d: d[["z_dist", "z_fare"]].max(axis=1))
+                .sort_values("max_abs_z", ascending=False)
+                .head(50)
+                .to_dict("records")
+            ),
         }
     }
     out = write_tests_json(
