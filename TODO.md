@@ -7,17 +7,16 @@ Update freely; remove entries when done (git history is the record).
 
 - **Project-style refactor** — waves 1-3 merged (k8s/optuna/mlflow finalized,
   auto-teardown + `verify_experiments.py` in). What remains from that stream:
-  - `project/` dataset binding — partial: `project/data.py` (reads
-    `configs/project/taxi.yaml`) owns `read_training_sample`,
-    `load_stratified_sample`, zone lookup; multivariate `_setup.py` already
-    imports zone constants from it. Still to move: univariate `_common.py` +
-    mlflow `_common.py` loaders, and the multivariate importlib-load of
-    univariate modules — one project-level binding.
-  - Experiment knobs single source — partial: platform side done
-    (`configs/{experiment,step,flow,dataset,environment,project}/` consumed by
-    `broadway.config.loader.load_config` / `ProjectConfig`). Tutorial
-    experiments still use module constants (univariate `_common.py`) or
-    per-experiment `config.yaml` (multivariate).
+  - `project/` dataset binding — DONE (2026-08-16): `project/working.py` is
+    the single working-dataset binding (path, filters, loaders, `time_bucket`,
+    all from `configs/experiments/working.yaml`). Univariate `_common.py` +
+    `_ols_bp.py` are thin re-exports; multivariate `_setup.py` imports it
+    directly (importlib hack deleted); mlflow `_common.py` uses it too.
+  - Experiment knobs single source — DONE: `configs/experiments/` now holds
+    `working.yaml` (dataset), `multivariate.yaml` (moved from
+    `experiments/multivariate/config.yaml`), `mlflow.yaml` (sample/split/seed/
+    features). mlflow model recipes stay in code (they reference the platform
+    model registry / sklearn classes).
   - Coding style (mandatory for every refactor commit — AGENT_WORKER_CONTRACT
     + HANDOFF + user rules):
     - No hardcoded values; YAML single source of truth (no `get(key, default)`);
@@ -43,13 +42,20 @@ Update freely; remove entries when done (git history is the record).
 
 ## Next
 
-- **Step 23 standardization** — Cook's index plot is single-panel; decide:
-  add the bottom stats legend (BP/JB/skew/kurtosis) like 04/13/14/15/19, or
-  keep as-is.
-- **Merge steps 11 + 12** into one file (reuse directive).
 - **Q-Q doc pass (remaining)** — README/dataflow already document
   `qq_zones`/`qq_markers`; only `src/broadway/stats/API.md` drift vs the
   zones/markers/raw-log work is left to check.
+
+## Done (2026-08-16)
+
+- **Step 23 standardization** — bottom stats legend (BP/JB/skew/kurtosis)
+  added via the shared `attach_stats_legend`, matching 04/13/14/15/19.
+- **Merge steps 11 + 12** — `11_ratecode1_dataset.py` now builds the dataset
+  and renders the density scatter (former step 12 deleted; plot output is
+  `11_ratecode1_scatter.png`).
+- **Pin sample/evidence** — `ratecode1_sample.parquet` + `ratecode1_sample.json`
+  are committed (gitignore exceptions added) so the 42,806-row working dataset
+  and its metrics JSON are reproducible without raw data.
 
 ## Deferred
 
@@ -65,9 +71,9 @@ Update freely; remove entries when done (git history is the record).
   (`configs/step/causal.yaml`, `configs/flow/stats_sequence.yaml`); the
   headlines/rationale in `src/broadway/timeline/suggest.py` are still
   hardcoded Python.
-- **Pin sample/evidence, then refresh reports** — sample parquet is still
-  gitignored/regenerable; `project/data.py` has seeded sampling but no pinned
-  evidence commit.
+- **Refresh reports from pinned evidence** — sample + evidence JSON are pinned
+  (see Done); reports that embed their numbers can now be refreshed
+  reproducibly.
 - W1-flagged: Q-Q style constants Python-vs-YAML decision; hardcoded
   `figures/` path prefix in `src/broadway/discover/qq.py` (still
   `f"figures/{basename}"` despite `reports/paths.py::FIGURES_DIR`).
@@ -75,11 +81,13 @@ Update freely; remove entries when done (git history is the record).
 ## Experiment notes (univariate/fare_amount_trip_distance)
 
 - Working dataset: `ratecode1_sample` (42,806 metered trips after
-  fare > 2.50, trip_duration > 0, duration < 240 min) — `WORKING_DATASET`,
-  `load_working`, `load_metered` in `_common.py`.
-- All metrics persist to `ratecode1_sample.json` (gitignored; regenerable via
-  `17_ratecode1_metrics.py` + the step scripts).
-- Series state: steps 24-29 + 31-34 committed (30 merged into 29). Step 29 =
+  fare > 2.50, trip_duration > 0, duration < 240 min) — binding owned by
+  `project/working.py` (`configs/experiments/working.yaml`); `_common.py`
+  re-exports it.
+- All metrics persist to `ratecode1_sample.json` (PINNED — committed; also
+  regenerable via `17_ratecode1_metrics.py` + the step scripts).
+- Series state: steps 24-29 + 31-34 committed (30 merged into 29; 12 merged
+  into 11). Step 29 =
   estimate size + 2x2 plots; 31/32 = NYC-style time buckets; 33 = metered-cost
   + forensics (official 2024 TLC `extra` is dirty — clean rows show a $1.00
   overnight surcharge, no peak); 34 = OLS vs LightGBM (OLS wins on 2 features).
