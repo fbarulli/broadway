@@ -35,6 +35,14 @@ Update freely; remove entries when done (git history is the record).
   - Hard rules from user: config files only (no env vars, 100% of the time),
     single source of truth, data-agnostic, no drift-type additions without
     asking first.
+  - Infra requirements (user, 2026-08-16): create a shared **base image**;
+    **pin mlflow to 3.15 wherever applicable** (incl. `docker/mlflow/Dockerfile`,
+    currently 2.22.1); **separate images** (base / mlflow-server / optuna-worker
+    — no monolithic image); **never allow pods to restart indefinitely**
+    (completion semantics / Job-style, no infinite CrashLoopBackOff); **proper
+    logging always** — inside containers and pods, log the hostname/IP/URL/DB
+    endpoint actually in use at startup so it is verifiable which endpoint the
+    process connected to.
 
 ## Next
 
