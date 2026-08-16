@@ -11,6 +11,7 @@ import seaborn as sns
 import statsmodels.api as sm
 from scipy import stats
 
+from broadway.stats import robust as _robust
 from broadway.stats.regression import bp_jb, fit_ols
 from matplotlib.lines import Line2D
 from statsmodels.regression.linear_model import RegressionResultsWrapper
@@ -22,11 +23,7 @@ ALPHA = 0.05
 
 def modified_zscore(series: pd.Series) -> pd.Series:
     """Robust standardized score from median and MAD: 0.6745 * (x - median) / MAD."""
-    med = series.median()
-    mad = (series - med).abs().median()
-    if mad == 0:
-        return pd.Series(0.0, index=series.index)
-    return 0.6745 * (series - med) / mad
+    return _robust.modified_zscore(series)
 
 
 def _fmt_p(p: float) -> str:
@@ -88,12 +85,10 @@ CAPPED_COLUMNS = ("fare_amount", "trip_distance")
 
 def winsorize(df: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
     """Cap the capped columns at their 99.5th percentiles; return df + caps."""
-    caps = {col: float(df[col].quantile(CAP_QUANTILE)) for col in CAPPED_COLUMNS}
-    out = df.copy()
-    for col, cap in caps.items():
-        out[col] = out[col].clip(upper=cap)
-    n_capped = {col: int((df[col] > cap).sum()) for col, cap in caps.items()}
-    return out, {"caps": caps, "n_capped": n_capped}
+    clipped = _robust.winsorize(df, list(CAPPED_COLUMNS), CAP_QUANTILE)
+    caps = {c: float(df[c].quantile(CAP_QUANTILE)) for c in CAPPED_COLUMNS}
+    n_capped = {c: int((df[c] > caps[c]).sum()) for c in CAPPED_COLUMNS}
+    return clipped, {"caps": caps, "n_capped": n_capped}
 
 
 OUTLIER_Z_THRESHOLD = 10.0  # step-22 modified-z |M| threshold (union over fare/distance)
@@ -101,10 +96,7 @@ OUTLIER_Z_THRESHOLD = 10.0  # step-22 modified-z |M| threshold (union over fare/
 
 def outlier_mask() -> pd.Series:
     """Step-22 mask: |modified z| > 10 on trip_distance or fare_amount."""
-    working = load_working()
-    z_dist = modified_zscore(working["trip_distance"]).abs()
-    z_fare = modified_zscore(working["fare_amount"]).abs()
-    return (z_dist > OUTLIER_Z_THRESHOLD) | (z_fare > OUTLIER_Z_THRESHOLD)
+    return _robust.outlier_mask(load_working(), list(CAPPED_COLUMNS), OUTLIER_Z_THRESHOLD)
 
 
 def fit_raw_hc3(df: pd.DataFrame, use_hour: bool) -> RegressionResultsWrapper:
@@ -125,43 +117,22 @@ SCENARIOS: tuple[tuple[str, str, float], ...] = (
 def estimation_table(model: RegressionResultsWrapper,
                      alpha: float = ALPHA) -> pd.DataFrame:
     """coef / HC3 SE / 95% CI table (p-values deliberately absent)."""
-    ci = model.conf_int(alpha=alpha)
-    return pd.DataFrame({
-        "coef": model.params,
-        "HC3_SE": model.bse,
-        "CI_low": ci[0],
-        "CI_high": ci[1],
-    })
+    return _robust.estimation_table(model, alpha)
 
 
 def scenario_dollars(model: RegressionResultsWrapper, df: pd.DataFrame,
                      scenarios: tuple[tuple[str, str, float], ...] = SCENARIOS
                      ) -> list[dict]:
     """Dollar effect of each realistic scenario, from the fitted coefs."""
-    rows = []
-    for label, term, change in scenarios:
-        coef = float(model.params[term])
-        rows.append({
-            "label": label,
-            "term": term,
-            "change": change,
-            "dollars": change * coef,
-        })
-    return rows
+    # `df` is retained for backward compatibility with earlier callers.
+    return _robust.scenario_dollars(model, scenarios)
 
 
 def standardized_coefs(model: RegressionResultsWrapper, df: pd.DataFrame) -> dict:
     """beta_std = coef * sd_x / sd_y for each predictor."""
-    sd_y = float(df["fare_amount"].std())
-    return {
-        col: {
-            "coef": float(model.params[col]),
-            "sd_x": float(df[col].std()),
-            "sd_y": sd_y,
-            "beta_std": float(model.params[col]) * float(df[col].std()) / sd_y,
-        }
-        for col in ("trip_distance", "duration_minutes")
-    }
+    return _robust.standardized_coefs(
+        model, df, ["trip_distance", "duration_minutes"], "fare_amount"
+    )
 
 
 def time_bucket(hour: int) -> str:
