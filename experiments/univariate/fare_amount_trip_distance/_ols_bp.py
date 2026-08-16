@@ -22,23 +22,42 @@ def _fmt_p(p: float) -> str:
     return "p<0.001" if p < 0.001 else f"p={p:.3f}"
 
 
-def attach_stats_legend(fig, result: dict) -> None:
+def attach_stats_legend(
+    fig,
+    result: dict,
+    raw_result: dict | None = None,
+    target: dict | None = None,
+) -> None:
     """Bottom legend with BP/JB/skew/kurtosis, outside the axes.
 
     Mirrors src/broadway/discover/qq.py::attach_qq_legend (figure-level,
     horizontal columns, framed), but anchored in the bottom band reserved by
     subplots_adjust(bottom=...) — the legend never overlaps the graphs.
+
+    When raw_result (bp_jb of the non-log model) and target (raw/log target
+    distribution stats) are given, the legend shows the raw → log comparison,
+    like the platform's raw-vs-log Q-Q figure.
     """
-    handles = [
-        Line2D([0], [0], color="none", label=f"Breusch-Pagan: stat={result['bp_stat']:.2f}, {_fmt_p(result['bp_pval'])}"),
-        Line2D([0], [0], color="none", label=f"Jarque-Bera: stat={result['jb_stat']:.2f}, {_fmt_p(result['jb_pval'])}"),
-        Line2D([0], [0], color="none", label=f"skew={result['skew']:.2f}, kurtosis={result['kurtosis']:.2f}"),
-    ]
+    if raw_result is None or target is None:
+        handles = [
+            Line2D([0], [0], color="none", label=f"Breusch-Pagan: stat={result['bp_stat']:.2f}, {_fmt_p(result['bp_pval'])}"),
+            Line2D([0], [0], color="none", label=f"Jarque-Bera: stat={result['jb_stat']:.2f}, {_fmt_p(result['jb_pval'])}"),
+            Line2D([0], [0], color="none", label=f"skew={result['skew']:.2f}, kurtosis={result['kurtosis']:.2f}"),
+        ]
+        ncol = len(handles)
+    else:
+        handles = [
+            Line2D([0], [0], color="none", label=f"BP stat: {raw_result['bp_stat']:.2f} → {result['bp_stat']:.2f} ({_fmt_p(result['bp_pval'])})"),
+            Line2D([0], [0], color="none", label=f"JB stat: {raw_result['jb_stat']:.2e} → {result['jb_stat']:.2e} ({_fmt_p(result['jb_pval'])})"),
+            Line2D([0], [0], color="none", label=f"resid skew/kurt: {raw_result['skew']:.2f}/{raw_result['kurtosis']:.1f} → {result['skew']:.2f}/{result['kurtosis']:.1f}"),
+            Line2D([0], [0], color="none", label=f"target skew/kurt: {target['skew_raw']:.2f}/{target['kurt_raw']:.1f} → {target['skew_log']:.2f}/{target['kurt_log']:.1f}"),
+        ]
+        ncol = 2
     fig.legend(
         handles=handles,
         loc="lower center",
         bbox_to_anchor=(0.5, 0.07),
-        ncol=len(handles),
+        ncol=ncol,
         fontsize=9,
         frameon=True,
         framealpha=0.85,
@@ -56,6 +75,8 @@ def plot_log_resid_qq(
     model: RegressionResultsWrapper,
     out_path: Path,
     suptitle: str | None = None,
+    raw_result: dict | None = None,
+    target: dict | None = None,
 ) -> None:
     """Log-fare model: seaborn residuals-vs-fitted + residual Q-Q, side by side.
 
@@ -72,7 +93,7 @@ def plot_log_resid_qq(
     sm.qqplot(model.resid, line="s", ax=ax_qq)
     ax_qq.set_title("Q-Q plot (residuals)")
     ax_qq.grid(True, alpha=0.3)
-    attach_stats_legend(fig, bp_jb(model))
+    attach_stats_legend(fig, bp_jb(model), raw_result=raw_result, target=target)
     n = int(model.nobs)
     fig.suptitle(f"{suptitle} (N={n})" if suptitle else f"N={n}")
     fig.savefig(out_path, dpi=150)
