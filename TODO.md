@@ -7,11 +7,17 @@ Update freely; remove entries when done (git history is the record).
 
 - **Project-style refactor** — waves 1-3 merged (k8s/optuna/mlflow finalized,
   auto-teardown + `verify_experiments.py` in). What remains from that stream:
-  - `project/` single-loader dataset binding: one loader for all experiments
-    (univariate `_common.py`, multivariate `_setup.py`, mlflow `_common.py`
-    still each carry loader logic — move to one project-level binding).
-  - `configs/experiments/*.yaml` as single source for experiment knobs
-    (currently module constants / per-experiment `config.yaml`).
+  - `project/` dataset binding — partial: `project/data.py` (reads
+    `configs/project/taxi.yaml`) owns `read_training_sample`,
+    `load_stratified_sample`, zone lookup; multivariate `_setup.py` already
+    imports zone constants from it. Still to move: univariate `_common.py` +
+    mlflow `_common.py` loaders, and the multivariate importlib-load of
+    univariate modules — one project-level binding.
+  - Experiment knobs single source — partial: platform side done
+    (`configs/{experiment,step,flow,dataset,environment,project}/` consumed by
+    `broadway.config.loader.load_config` / `ProjectConfig`). Tutorial
+    experiments still use module constants (univariate `_common.py`) or
+    per-experiment `config.yaml` (multivariate).
   - Coding style (mandatory for every refactor commit — AGENT_WORKER_CONTRACT
     + HANDOFF + user rules):
     - No hardcoded values; YAML single source of truth (no `get(key, default)`);
@@ -41,23 +47,30 @@ Update freely; remove entries when done (git history is the record).
   add the bottom stats legend (BP/JB/skew/kurtosis) like 04/13/14/15/19, or
   keep as-is.
 - **Merge steps 11 + 12** into one file (reuse directive).
-- **7 pre-existing CLI test failures** (`tests/test_cli.py`, e.g.
-  `test_train_without_dataset_still_dispatches` exits 2) — do NOT reproduce in
-  this env (suite is 516 passed / 0 failed); investigate only if they appear
-  elsewhere.
-- **Q-Q doc pass** — `README.md`/`dataflow.md` Q-Q sections predate the
-  zones/markers/raw-log work; `stats/API.md` drift; raw/log comparison +
-  marker legend not yet documented.
+- **Q-Q doc pass (remaining)** — README/dataflow already document
+  `qq_zones`/`qq_markers`; only `src/broadway/stats/API.md` drift vs the
+  zones/markers/raw-log work is left to check.
 
 ## Deferred
 
-- **W2 main-sync** — taxi-free `main`; convert/exclude taxi-referencing tests (`test_contracts.py` real-parquet load, hardcoded taxi stats in `test_walkthrough.py`/`test_results.py`).
-- **Cleanup/polish slice** — orphaned legacy results-index (`render_index`/`load_stats_sequence`/`RESULT_RENDERERS`), doc drift, taxi strings in `audit.py`, dead code, silent posthoc skip, unlabeled Q-Q truncation.
-- **LoadAudit / ParsingPolicy**.
-- **Lineage-viz** (`graph_todo.md`).
-- Move suggestion templates + effect-size wording into config; delete legacy `report` wrapper.
-- Pin sample/evidence, then refresh reports.
-- W1-flagged: Q-Q style constants Python-vs-YAML decision; hardcoded `figures/` path prefix.
+- **Cleanup/polish slice** — doc drift, dead code, silent posthoc skip,
+  unlabeled Q-Q truncation. (Legacy results-index is NOT orphaned anymore:
+  `reports/index.py`/`sequence.py`/`registry.py` are live + tested;
+  `reports/audit.py` is taxi-free.)
+- **Lineage-viz** (`graph_todo.md`) — `src/broadway/lineage/` exists
+  (graph/mermaid/records/state/sample), but the learnGitBranching-style
+  commit-tree renderer is still not built (`mermaid.py` emits plain
+  `flowchart LR`).
+- **Suggestion templates into config** — effect-size wording already moved
+  (`configs/step/causal.yaml`, `configs/flow/stats_sequence.yaml`); the
+  headlines/rationale in `src/broadway/timeline/suggest.py` are still
+  hardcoded Python.
+- **Pin sample/evidence, then refresh reports** — sample parquet is still
+  gitignored/regenerable; `project/data.py` has seeded sampling but no pinned
+  evidence commit.
+- W1-flagged: Q-Q style constants Python-vs-YAML decision; hardcoded
+  `figures/` path prefix in `src/broadway/discover/qq.py` (still
+  `f"figures/{basename}"` despite `reports/paths.py::FIGURES_DIR`).
 
 ## Experiment notes (univariate/fare_amount_trip_distance)
 
