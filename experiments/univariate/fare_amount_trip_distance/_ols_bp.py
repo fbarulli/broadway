@@ -164,6 +164,26 @@ def standardized_coefs(model: RegressionResultsWrapper, df: pd.DataFrame) -> dic
     }
 
 
+def time_bucket(hour: int) -> str:
+    """NYC-style surcharge bucket: day (6-15, ref), peak (16-19, +$1.00), overnight (else, +$0.50)."""
+    if 6 <= hour < 16:
+        return "day"
+    if 16 <= hour < 20:
+        return "peak"
+    return "overnight"
+
+
+def fit_time_bucket(df: pd.DataFrame) -> RegressionResultsWrapper:
+    """HC3 raw fare ~ distance + duration + peak/overnight dummies (day reference)."""
+    buckets = df["pickup_hour"].map(time_bucket)
+    X = df[["trip_distance", "duration_minutes"]].copy()
+    dummies = pd.get_dummies(buckets, prefix="time")
+    # get_dummies yields bool columns in pandas 2.x; statsmodels needs numeric
+    X = pd.concat([X, dummies[["time_peak", "time_overnight"]]], axis=1).astype(float)
+    X = sm.add_constant(X)
+    return sm.OLS(df["fare_amount"], X).fit(cov_type="HC3")
+
+
 def add_log_predictions(df: pd.DataFrame) -> pd.DataFrame:
     """Return a copy of df with predicted_log_fare and log_residuals columns."""
     model = fit_log_hc3(df)

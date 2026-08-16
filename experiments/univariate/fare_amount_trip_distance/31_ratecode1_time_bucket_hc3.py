@@ -9,38 +9,20 @@ confidence intervals so the estimated surcharges can be compared against
 the NYC rule values.
 """
 
-from pathlib import Path
-
 import pandas as pd
-import statsmodels.api as sm
-from statsmodels.regression.linear_model import RegressionResultsWrapper
 
 from _common import RESULTS, WORKING_DATASET, load_metered
-from _ols_bp import OUTLIER_Z_THRESHOLD, estimation_table, outlier_mask
+from _ols_bp import (
+    OUTLIER_Z_THRESHOLD,
+    estimation_table,
+    fit_time_bucket,
+    outlier_mask,
+    time_bucket,
+)
 from _tests import write_tests_json
 from broadway.stats.regression import bp_jb
 
 ESTIMATES_CSV = RESULTS / "ratecode1_sample_time_bucket_estimates.csv"
-
-
-def time_bucket(hour: int) -> str:
-    """NYC-style surcharge bucket: day (6-15, ref), peak (16-19, +$1.00), overnight (else, +$0.50)."""
-    if 6 <= hour < 16:
-        return "day"
-    if 16 <= hour < 20:
-        return "peak"
-    return "overnight"
-
-
-def fit_time_bucket(df: pd.DataFrame) -> RegressionResultsWrapper:
-    """HC3 raw fare ~ distance + duration + peak/overnight dummies (day reference)."""
-    buckets = df["pickup_hour"].map(time_bucket)
-    X = df[["trip_distance", "duration_minutes"]].copy()
-    dummies = pd.get_dummies(buckets, prefix="time")
-    # get_dummies yields bool columns in pandas 2.x; statsmodels needs numeric
-    X = pd.concat([X, dummies[["time_peak", "time_overnight"]]], axis=1).astype(float)
-    X = sm.add_constant(X)
-    return sm.OLS(df["fare_amount"], X).fit(cov_type="HC3")
 
 
 def main() -> None:
