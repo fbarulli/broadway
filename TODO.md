@@ -42,8 +42,15 @@ Update freely; remove entries when done (git history is the record).
       config files only, zero env vars (kill the `RATECODE1_PARQUET` override).
     - Data-agnostic `src/` (no column names / taxi terms — HANDOFF tiebreaker);
       dataset binding lives in `project/`.
-    - `src/broadway/stats` stays PURE: reads no config, no I/O, no env —
-      thresholds are function parameters, callers pass values from config.
+    - Config remains the single source of truth EVERYWHERE — only
+      `src/broadway/stats` functions take thresholds as parameters (no
+      config/env/I/O reads *inside* stats); callers pass config values in.
+    - Dispatch mechanics (AGENT_CONTRACT §3a): each Wave-1 task = ONE module;
+      orchestrator re-reads the 1-3 target files immediately before dispatch;
+      the contract enumerates the exact edit list (current content →
+      replacement) + regenerated artifacts; short numbered steps; references
+      AGENT_WORKER_CONTRACT.md; worker commits + pushes its own disjoint
+      files; suite green per commit.
     - Type hints on all public functions; ~25-line single-responsibility
       functions; no dead/noise code.
     - Strategic logging only; catch only recoverable exceptions (fail loud).
