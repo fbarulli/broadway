@@ -2,6 +2,40 @@
 
 Ephemeral task tracker. `HANDOFF.md` is timeless; this file holds "what's next."
 Update freely; remove entries when done (git history is the record).
+
+## Current
+
+- **Statistical testing** — next work stream (user-directed, 2026-08-16).
+  Scope to be set by the user: platform `src/broadway/stats` testing vs.
+  hypothesis tests on the taxi data vs. tutorial continuation. Do not start
+  until the specific direction is given.
+
+## Parked (paused by user, 2026-08-16)
+
+- **K8s + Optuna + MLflow finalization** — kind cluster `broadway` still
+  running; postgres + mlflow healthy (migration ordering matters: mlflow must
+  migrate first in isolation, then workers). Optuna workers hit the concurrent
+  schema-creation race (torn `version_table`). Remaining gaps:
+  - Deterministic race fix: `optuna-init` Job creates the studies once;
+    workers only `load_if_exists`.
+  - Verify worker → mlflow logging end to end; fix Deployment restart
+    semantics (finished workers must not re-run); bake migration ordering into
+    the manifests.
+  - Config-files-only refactor: ConfigMaps/Secret mounted as FILES, zero env
+    vars (also removes the `RATECODE1_PARQUET` env override).
+  - Promote battle machinery to `src/` (data-agnostic): extend
+    `evaluate/metrics.py`, `training/mlflow_utils.py` (metadata logging, no
+    artifact), `training/optuna.py` (RDB support); new `optuna_worker.py`,
+    `evaluate/explain.py`, `evaluate/feature_selection.py`, pipeline factory.
+  - `configs/experiments/ratecode1_battle.yaml` as single source
+    (seed/sample/split/features/models/experiment/tracking).
+  - Durable postgres (PVC), mlflow artifact volume, non-demo Secret,
+    mlflow 3.15.1 vs platform pin 2.22.1 (`docker/mlflow/Dockerfile`),
+    commit `k8s/optuna/` manifests (currently uncommitted).
+  - Hard rules from user: config files only (no env vars, 100% of the time),
+    single source of truth, data-agnostic, no drift-type additions without
+    asking first.
+
 ## Next
 
 - **Step 23 standardization** — Cook's index plot is single-panel; decide:
@@ -32,6 +66,14 @@ Update freely; remove entries when done (git history is the record).
   `load_working`, `load_metered` in `_common.py`.
 - All metrics persist to `ratecode1_sample.json` (gitignored; regenerable via
   `17_ratecode1_metrics.py` + the step scripts).
+- Series state: steps 24-29 + 31-34 committed (30 merged into 29). Step 29 =
+  estimate size + 2x2 plots; 31/32 = NYC-style time buckets; 33 = metered-cost
+  + forensics (official 2024 TLC `extra` is dirty — clean rows show a $1.00
+  overnight surcharge, no peak); 34 = OLS vs LightGBM (OLS wins on 2 features).
+- `experiments/mlflow/` — MLflow model battle (`01`), explainability (`02`),
+  k8s optuna worker (`03`). Runs in `mlruns/` (gitignored); metrics CSVs
+  tracked. `pyproject.toml` gained shap, lime, optuna-integration, psycopg2.
+- CSVs are named after the producing step (28-34 + mlflow battle).
 - Scripts committed; PNGs/JSONs in gitignored `experiments/results/`;
   `diagnostics_experiment/` + `legend_experiment/` are gitignored references.
 - Test gate: full `pytest` only when `src/`/`configs/`/`project/`/`tests/`
