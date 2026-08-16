@@ -36,6 +36,22 @@ Update freely; remove entries when done (git history is the record).
     optuna_worker + mlflow_utils from src; config-as-files, no env).
   - Sequential gates: Wave 2 requires Wave 1 merged; Wave 3 requires the
     optuna/mlflow work; suite green on every commit.
+  - **Coding style (mandatory for every refactor commit — AGENT_WORKER_CONTRACT
+    + HANDOFF + user rules):**
+    - No hardcoded values; YAML single source of truth (no `get(key, default)`);
+      config files only, zero env vars (kill the `RATECODE1_PARQUET` override).
+    - Data-agnostic `src/` (no column names / taxi terms — HANDOFF tiebreaker);
+      dataset binding lives in `project/`.
+    - `src/broadway/stats` stays PURE: reads no config, no I/O, no env —
+      thresholds are function parameters, callers pass values from config.
+    - Type hints on all public functions; ~25-line single-responsibility
+      functions; no dead/noise code.
+    - Strategic logging only; catch only recoverable exceptions (fail loud).
+    - Typed evidence + dumb renderers (renderers never compute); single-owner
+      surfaces.
+    - Tests with every src change (synthetic data, no taxi coupling in
+      platform tests); suite green per commit; one logical change per commit;
+      docs updated in the same commit.
 
 - **Statistical testing** — next work stream (user-directed, 2026-08-16).
   Scope to be set by the user: platform `src/broadway/stats` testing vs.
