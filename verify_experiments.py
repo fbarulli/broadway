@@ -11,8 +11,10 @@ verified; non-zero = something is broken (fail loud).
 import ast
 import importlib.util
 import sys
+import tempfile
 from pathlib import Path
 
+import pandas as pd
 import yaml
 
 from broadway.evaluate.metrics import binary_metrics, compute_metrics
@@ -90,19 +92,39 @@ def check_univariate() -> list[str]:
 
 
 def check_multivariate() -> list[str]:
-    """Load the multivariate setup + config; check the sample + dummies."""
+    """Load the multivariate setup + config; check the sample + dummies.
+
+    The borough join needs a zones lookup. Rather than require the real
+    taxi data file (absent in CI), generate a minimal zones CSV from the
+    sample's own location IDs and point the setup at it.
+    """
     problems = []
     setup = load_module("_mv_verify_setup", MULTIVARIATE / "_setup.py")
     cfg = setup.load_config()
-    sample = setup.load_manhattan_sample(cfg)
+    sample = setup.load_metered()
+    zones_dir = Path(tempfile.mkdtemp(prefix="broadway_verify_"))
+    location_ids = sorted(sample[cfg["borough"]["pickup"]["join_on"]].unique())
+    keep = cfg["sample"]["pickup_borough"]
+    # Label half the locations as the config's keep borough so the
+    # Manhattan filter selects a substantial subset; rest are "Other".
+    half = max(1, len(location_ids) // 2)
+    zones = pd.DataFrame({
+        setup.ZONE_ID_COL: location_ids,
+        setup.ZONE_BOROUGH_COL: [keep] * half + ["Other"] * (len(location_ids) - half),
+    })
+    zones_path = zones_dir / "zones.csv"
+    zones.to_csv(zones_path, index=False)
+    setup.LOOKUP_PATH = zones_path
+
+    manhattan = setup.load_manhattan_sample(cfg)
     pickup_col = cfg["borough"]["pickup"]["column"]
     keep = cfg["sample"]["pickup_borough"]
-    if sample.empty:
+    if manhattan.empty:
         problems.append("multivariate: manhattan sample empty")
-    if not (sample[pickup_col] == keep).all():
+    if not (manhattan[pickup_col] == keep).all():
         problems.append("multivariate: pickup filter not honored")
-    dummies = setup.build_borough_dummies(sample.head(50), cfg)
-    if dummies.shape[0] != 50:
+    dummies = setup.build_borough_dummies(manhattan.head(50), cfg)
+    if dummies.shape[0] != min(50, len(manhattan)):
         problems.append("multivariate: borough dummies row mismatch")
     return problems
 
