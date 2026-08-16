@@ -26,7 +26,7 @@ UNIVARIATE = HERE.parents[0] / "univariate" / "fare_amount_trip_distance"
 
 CONFIG_KEYS = ["target", "value_counts_head", "sample_role", "categorical",
                "borough", "sample", "borough_dummies", "labels", "baseline",
-               "geography_premium"]
+               "geography_premium", "model_verdicts"]
 
 
 def require_keys(config: dict, keys: list[str], context: str) -> None:

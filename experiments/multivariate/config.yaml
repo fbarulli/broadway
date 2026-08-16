@@ -48,6 +48,16 @@ baseline:
     n_estimators: 100
     learning_rate: 0.1
     max_depth: 5
+model_verdicts:
+  A:
+    role: Revenue Engine
+    verdict: "Reliable for the Manhattan-grid volume: safe for upfront app pricing, driver payouts, and revenue forecasting."
+  B:
+    role: Risk Simulator
+    verdict: "Outer-borough and airport trips are structurally harder to predict — use for risk and uncertainty, not point estimates."
+  C:
+    role: Cheat Code (failed)
+    verdict: "Penalizing outer-borough errors does not fix the underlying fare physics — no meaningful gain over A."
 labels:
   VendorID: {1: creative_mobile, 2: verifone}
   store_and_fwd_flag: {Y: stored, N: not_stored}
