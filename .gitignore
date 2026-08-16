@@ -17,3 +17,4 @@ experiments/results/
 *.png
 !reports/figures/*.png
 graphify-out/
+.mplconfig/
