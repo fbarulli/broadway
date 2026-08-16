@@ -135,7 +135,8 @@ def test_contract_driven_lifecycle(
     )
 
     assert set(result.model_dump()) >= {"metrics", "promote", "reason"}
-    assert set(result.metrics) == {"mae", "rmse", "r2"}
+    assert set(result.metrics) == {
+        "mae", "rmse", "r2", "mape", "max_error", "median_ae", "explained_var"}
     assert result.promote is True
     assert result.reason
     assert result.cv_metrics is not None
