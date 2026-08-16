@@ -33,13 +33,12 @@ from _common import (
     MLRUNS,
     RESULTS,
     SEED,
-    binary_metrics,
     binary_threshold,
     load_sample,
     make_pipeline,
-    regression_metrics,
     split_data,
 )
+from broadway.evaluate.metrics import binary_metrics, compute_metrics
 from broadway.training.mlflow_utils import (
     log_metrics,
     log_params,
@@ -48,6 +47,9 @@ from broadway.training.mlflow_utils import (
 from broadway.training.models.registry import get_model
 
 EXPERIMENT = "ratecode1_model_battle"
+# Platform metrics default to 4 decimals, but the battle CSV writer rounds to
+# 6 — keep full precision so this refactor produces identical numbers.
+METRIC_DECIMALS = 6
 
 
 def _make_model(factory: str | type, params: dict) -> object:
@@ -67,8 +69,9 @@ def fit_and_evaluate(name: str, factory: str | type, params: dict,
     t1 = time.perf_counter()
     preds = pipe.predict(X_test)
     t2 = time.perf_counter()
-    metrics = regression_metrics(y_test, preds)
-    metrics.update(binary_metrics(y_test, preds, threshold))
+    metrics = compute_metrics(y_test, preds, decimals=METRIC_DECIMALS)
+    metrics.update(binary_metrics(y_test, preds, threshold,
+                                  decimals=METRIC_DECIMALS))
     return {
         "name": name,
         "params": pipe.named_steps["model"].get_params(),

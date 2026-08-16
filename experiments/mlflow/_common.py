@@ -15,30 +15,20 @@ import pandas as pd
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import LinearRegression, Ridge
-from sklearn.metrics import (
-    average_precision_score,
-    explained_variance_score,
-    max_error,
-    mean_absolute_error,
-    mean_absolute_percentage_error,
-    mean_squared_error,
-    median_absolute_error,
-    r2_score,
-    roc_auc_score,
-)
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder
+
+from broadway.evaluate.metrics import binary_metrics, compute_metrics
 
 HERE = Path(__file__).resolve().parent
 RESULTS = HERE.parents[0] / "results" / "mlflow"   # experiments/results/mlflow
 REPO = HERE.parents[1]
 MLRUNS = REPO / "mlruns"
 
-WORKING_PARQUET = (
-    HERE.parents[0] / "results" / "univariate" / "fare_amount_trip_distance"
-    / "ratecode1_sample.parquet"
-)
+# Working dataset, shared with the univariate experiment (config-files-only:
+# no env override — k8s pods mount the same baked-in copy).
+WORKING_PARQUET = HERE.parents[0] / "results" / "univariate" / "fare_amount_trip_distance" / "ratecode1_sample.parquet"
 
 MIN_FARE = 2.50
 MAX_DURATION_MINUTES = 240
@@ -111,29 +101,6 @@ def make_pipeline(model: object) -> Pipeline:
         ("cat", OneHotEncoder(handle_unknown="ignore"), CATEGORICAL_FEATURES),
     ])
     return Pipeline([("pre", pre), ("model", model)])
-
-
-def regression_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict:
-    """Full regression metric suite (holdout)."""
-    return {
-        "mae": float(mean_absolute_error(y_true, y_pred)),
-        "rmse": float(np.sqrt(mean_squared_error(y_true, y_pred))),
-        "r2": float(r2_score(y_true, y_pred)),
-        "mape": float(mean_absolute_percentage_error(y_true, y_pred)),
-        "max_error": float(max_error(y_true, y_pred)),
-        "median_ae": float(median_absolute_error(y_true, y_pred)),
-        "explained_var": float(explained_variance_score(y_true, y_pred)),
-    }
-
-
-def binary_metrics(y_true: np.ndarray, y_pred: np.ndarray,
-                   threshold: float) -> dict:
-    """ROC / PR AUC on a binarized target (y >= threshold) — 'ROC variations'."""
-    y_bin = (y_true >= threshold).astype(int)
-    return {
-        "roc_auc": float(roc_auc_score(y_bin, y_pred)),
-        "pr_auc": float(average_precision_score(y_bin, y_pred)),
-    }
 
 
 def binary_threshold(y_train: np.ndarray) -> float:
