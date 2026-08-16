@@ -21,6 +21,19 @@ borough_dummies:
   reference: Manhattan
 geography_premium:
   missing_label: Unmapped          # distinct from the real 'Unknown' zone value
+baseline:
+  target: total_amount
+  datetime_column: tpep_pickup_datetime
+  test_fraction: 0.2
+  seed: 42
+  population: A                    # A = manhattan_sample | B = borough-stratified
+  features: [trip_distance, duration_minutes, passenger_count, pickup_hour,
+             pickup_weekday, pickup_borough, dropoff_borough, payment_type]
+  stratified:
+    per_borough: 2500
+  weighting:                       # option C: penalty for outer-borough trips
+    enabled: false
+    outer_weight: 5.0
 labels:
   VendorID: {1: creative_mobile, 2: verifone}
   store_and_fwd_flag: {Y: stored, N: not_stored}
