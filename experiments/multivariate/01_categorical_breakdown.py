@@ -18,7 +18,13 @@ import matplotlib
 matplotlib.use("Agg")
 import pandas as pd
 
-from _setup import RESULTS, WORKING_DATASET, load_config, load_manhattan_sample
+from _setup import (
+    RESULTS,
+    WORKING_DATASET,
+    load_config,
+    load_manhattan_sample,
+    require_keys,
+)
 from broadway.stats.describe import describe, plot_describe_figures
 
 CSV_STEM = Path(__file__).stem
@@ -40,8 +46,12 @@ def detect_categoricals(df: pd.DataFrame, cfg: dict) -> list[str]:
         if is_cat and n_unique > 1:
             detected.append(col)
     for col in cfg["categorical"]["extra_categories"]:
-        if col in df.columns and col not in detected and df[col].nunique() > 1:
+        if col not in df.columns:
+            raise ValueError(f"extra category '{col}' configured but not in data")
+        if col not in detected and df[col].nunique() > 1:
             detected.append(col)
+    if not detected:
+        raise ValueError("no categorical columns detected — check config thresholds")
     return detected
 
 
@@ -58,6 +68,8 @@ def category_stats(df: pd.DataFrame, col: str, cfg: dict) -> dict:
     top_n = cfg["value_counts_head"]
     target = cfg["target"]
     counts = df[col].value_counts().head(top_n)
+    if counts.empty:
+        raise ValueError(f"category '{col}' produced no groups (all missing?)")
     groups = {g: df[df[col] == g][target].dropna() for g in counts.index}
     return {
         "column": col,
@@ -120,6 +132,7 @@ def process_category(df: pd.DataFrame, col: str, cfg: dict,
 
 def main() -> None:
     cfg = load_config()
+    require_keys(cfg, ["target", "sample", "sample_role"], "01 config")
     df = load_manhattan_sample(cfg)
     RESULTS.mkdir(parents=True, exist_ok=True)
 

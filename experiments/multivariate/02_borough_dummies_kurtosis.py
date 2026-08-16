@@ -14,7 +14,13 @@ from pathlib import Path
 import pandas as pd
 import statsmodels.api as sm
 
-from _setup import RESULTS, WORKING_DATASET, load_config, load_manhattan_sample
+from _setup import (
+    RESULTS,
+    WORKING_DATASET,
+    load_config,
+    load_manhattan_sample,
+    require_finite,
+)
 from broadway.stats.regression import bp_jb
 
 CSV_STEM = Path(__file__).stem
@@ -22,10 +28,17 @@ METRICS = ("kurtosis", "jb_stat", "bp_stat", "rsquared")
 
 
 def fit_with_dummies(df: pd.DataFrame, cfg: dict, use_borough: bool):
-    """OLS on the target; optional borough one-hot dummies (config reference)."""
+    """OLS on the target; optional borough one-hot dummies (config reference).
+
+    Fails loudly on NaN/Inf or row-count mismatch instead of fitting silently
+    on misaligned input (the two bugs this experiment actually hit).
+    """
     spec = cfg["borough_dummies"]
     if use_borough:
         col = spec["column"]
+        if spec["reference"] not in set(df[col].dropna().unique()):
+            raise ValueError(f"reference borough '{spec['reference']}' "
+                             f"not present in '{col}'")
         df = df[df[col].notna()]  # drop rows with an unmapped zone (no dummy)
     X = df[spec["features"]].copy()
     if use_borough:
@@ -40,6 +53,9 @@ def fit_with_dummies(df: pd.DataFrame, cfg: dict, use_borough: bool):
                                  drop_first=True, dtype=float)
         X = pd.concat([X, dummies], axis=1)
     X = sm.add_constant(X)
+    if len(X) != len(df):
+        raise ValueError(f"exog/endog row mismatch ({len(X)} vs {len(df)})")
+    require_finite(X, f"fit use_borough={use_borough}")
     return sm.OLS(df[cfg["target"]], X).fit()
 
 

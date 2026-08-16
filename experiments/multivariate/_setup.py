@@ -13,6 +13,7 @@ import sys
 import types
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import yaml
 
@@ -22,6 +23,27 @@ HERE = Path(__file__).resolve().parent
 RESULTS = HERE.parents[0] / "results" / "multivariate"
 
 UNIVARIATE = HERE.parents[0] / "univariate" / "fare_amount_trip_distance"
+
+CONFIG_KEYS = ["target", "value_counts_head", "sample_role", "categorical",
+               "borough", "sample", "borough_dummies", "labels"]
+
+
+def require_keys(config: dict, keys: list[str], context: str) -> None:
+    """Fail loudly when config is missing keys (no silent defaults)."""
+    missing = [k for k in keys if k not in config]
+    if missing:
+        raise ValueError(f"{context}: config missing required key(s): {missing}")
+
+
+def require_finite(frame: pd.DataFrame, context: str) -> None:
+    """Fail loudly on NaN/Inf — a silent fit on dirty input is worse than an error."""
+    if frame.isna().any().any():
+        raise ValueError(f"{context}: contains NaN — aborting instead of "
+                         "fitting on misaligned/dirty input")
+    numeric = frame.select_dtypes(include="number")
+    if np.isinf(numeric.to_numpy()).any():
+        raise ValueError(f"{context}: contains Inf — aborting instead of "
+                         "fitting on misaligned/dirty input")
 
 
 def _load_univariate_module(module_name: str, filename: str) -> types.ModuleType:
@@ -46,7 +68,9 @@ time_bucket = _uni_ols_bp.time_bucket
 def load_config() -> dict:
     """Analysis policy from config.yaml (never hardcoded in code)."""
     with open(HERE / "config.yaml", encoding="utf-8") as fh:
-        return yaml.safe_load(fh)
+        config = yaml.safe_load(fh)
+    require_keys(config, CONFIG_KEYS, "config.yaml")
+    return config
 
 
 def load_zones() -> pd.DataFrame:
@@ -55,14 +79,25 @@ def load_zones() -> pd.DataFrame:
 
 
 def add_boroughs(df: pd.DataFrame, cfg: dict) -> pd.DataFrame:
-    """Join pickup + dropoff boroughs (join_on/column per config)."""
+    """Join pickup + dropoff boroughs; fail loudly on broken joins."""
     zones = load_zones()
     out = df
     for key in ("pickup", "dropoff"):
         spec = cfg["borough"][key]
+        if spec["join_on"] not in out.columns:
+            raise ValueError(f"borough join: column '{spec['join_on']}' not in data")
+        before = len(out)
         out = out.merge(zones, left_on=spec["join_on"], right_on=ZONE_ID_COL,
                         how="left").rename(
                             columns={ZONE_BOROUGH_COL: spec["column"]})
+        if len(out) != before:
+            raise ValueError(
+                f"borough join on '{spec['join_on']}' changed row count "
+                f"({before} -> {len(out)}) — duplicate LocationIDs in lookup?")
+        unmapped = int(out[spec["column"]].isna().sum())
+        if unmapped:
+            print(f"borough join '{spec['column']}': {unmapped} rows unmapped "
+                  f"(kept as NaN — callers must handle or drop them)")
     return out
 
 
@@ -74,4 +109,11 @@ def load_manhattan_sample(cfg: dict) -> pd.DataFrame:
     df = add_boroughs(df, cfg)
     pickup_col = cfg["borough"]["pickup"]["column"]
     keep = cfg["sample"]["pickup_borough"]
-    return df[df[pickup_col] == keep]
+    total = len(df)
+    sample = df[df[pickup_col] == keep]
+    print(f"sample filter '{pickup_col}' == '{keep}': {len(sample)} of {total} "
+          f"({len(sample) / total:.1%})")
+    if sample.empty:
+        raise ValueError(f"sample filter yielded 0 rows "
+                         f"(pickup borough '{keep}' absent from data)")
+    return sample
