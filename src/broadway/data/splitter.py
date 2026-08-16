@@ -1,4 +1,4 @@
-"""Time-based or stratified random train/test/val split."""
+"""Time-based or stratified random train/test/val split, plus chronological and stratified sampling helpers."""
 
 from __future__ import annotations
 
@@ -38,3 +38,24 @@ def split(
             raise ValueError("stratified split requires a classification task")
         return _stratified_split(df, dataset.target, split_cfg.validation_size, random_state)
     return _random_split(df, split_cfg.validation_size, random_state)
+
+
+def chronological_split(
+    df: pd.DataFrame, datetime_column: str, test_fraction: float
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Split df chronologically so the last test_fraction of rows form the test set."""
+    df = df.sort_values(datetime_column)
+    cutoff = int(len(df) * (1 - test_fraction))
+    return df.iloc[:cutoff], df.iloc[cutoff:]
+
+
+def stratified_sample(
+    df: pd.DataFrame, group_column: str, per_group: int, random_state: int
+) -> pd.DataFrame:
+    """Sample up to per_group rows from each group value, then shuffle the pooled sample."""
+    pieces = [
+        group.sample(n=min(per_group, len(group)), random_state=random_state)
+        for _, group in df.groupby(group_column)
+    ]
+    pooled = pd.concat(pieces)
+    return pooled.sample(frac=1.0, random_state=random_state).reset_index(drop=True)
