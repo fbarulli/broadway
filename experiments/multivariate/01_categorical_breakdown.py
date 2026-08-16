@@ -109,9 +109,10 @@ def process_category(df: pd.DataFrame, col: str, cfg: dict,
                      for g, v in stats["median_fare"].items()})
           .rename("median fare").to_string())
 
-    summary = render_describe_figure(df, col, cfg, RESULTS / f"{col}_describe.png")
+    summary = render_describe_figure(df, col, cfg,
+                                     RESULTS / f"{CSV_STEM}_{col}.png")
     print(f"imbalance ratio: {summary['imbalance_ratio']} | "
-          f"groups: {len(summary['groups'])} | wrote {col}_describe.png")
+          f"groups: {len(summary['groups'])} | wrote {CSV_STEM}_{col}.png")
 
     stats["proportions"] = {g: summary["proportions"][str(g)]
                             for g in stats["counts"]}
