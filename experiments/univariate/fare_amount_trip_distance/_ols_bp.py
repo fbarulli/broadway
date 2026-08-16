@@ -71,6 +71,15 @@ def fit_log_hc3(df: pd.DataFrame) -> RegressionResultsWrapper:
     return sm.OLS(y, X).fit(cov_type="HC3")
 
 
+def add_log_predictions(df: pd.DataFrame) -> pd.DataFrame:
+    """Return a copy of df with predicted_log_fare and log_residuals columns."""
+    model = fit_log_hc3(df)
+    out = df.copy()
+    out["predicted_log_fare"] = model.fittedvalues
+    out["log_residuals"] = model.resid
+    return out
+
+
 def plot_log_resid_qq(
     model: RegressionResultsWrapper,
     out_path: Path,

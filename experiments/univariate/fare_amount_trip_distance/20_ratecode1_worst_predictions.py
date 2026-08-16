@@ -9,19 +9,14 @@ persisted to the working dataset's results JSON.
 import pandas as pd
 
 from _common import WORKING_DATASET, load_metered
-from _ols_bp import fit_log_hc3
+from _ols_bp import add_log_predictions
 from _tests import write_tests_json
 
 THRESHOLD = -2.0
 
 
 def main() -> None:
-    df = load_metered()
-    model = fit_log_hc3(df)
-
-    df["predicted_log_fare"] = model.fittedvalues
-    df["log_residuals"] = model.resid
-
+    df = add_log_predictions(load_metered())
     worst = df[df["log_residuals"] < THRESHOLD].sort_values("log_residuals")
     print(f"trips with log_residuals < {THRESHOLD}: {len(worst)} of {len(df)}")
     print(
