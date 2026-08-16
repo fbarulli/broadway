@@ -4,14 +4,20 @@ Step 14 fit fare ~ trip_distance alone with HC3. This step adds trip
 duration (derived from pickup/dropoff datetimes, non-positive durations
 dropped) as a second predictor, and fits BOTH plain OLS and HC3 so the
 robust standard errors can be compared directly. HC3 changes only
-SEs/p-values/CIs — never coefficients or R^2.
+SEs/p-values/CIs — never coefficients or R^2. Also renders the
+residuals-vs-fitted scatter for the HC3 fit.
 """
+
+from pathlib import Path
 
 import pandas as pd
 import statsmodels.api as sm
 from statsmodels.regression.linear_model import RegressionResultsWrapper
 
-from _common import RATECODE1_PARQUET
+from _common import RATECODE1_PARQUET, RESULTS
+from _ols_bp import plot_resid_vs_fitted
+
+OUT = RESULTS / f"{Path(__file__).stem}.png"
 
 
 def load_metered() -> pd.DataFrame:
@@ -59,6 +65,9 @@ def main() -> None:
         "only widens the standard errors (and shifts p-values/CIs) to stay "
         "valid under the heteroskedasticity Breusch-Pagan rejects."
     )
+
+    plot_resid_vs_fitted(hc3, OUT, suptitle="RatecodeID == 1, distance + duration (HC3)")
+    print(f"wrote {OUT}")
 
 
 if __name__ == "__main__":
