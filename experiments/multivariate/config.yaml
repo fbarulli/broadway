@@ -8,12 +8,16 @@ sample_role: diagnostic
 categorical:
   max_unique_for_int: 50        # int columns with <= this many unique values count as categorical
   exclude: [RatecodeID, payment_type, passenger_count]
-  extra_categories: [time_bucket, pickup_borough]  # derived categoricals added by the loader
+  extra_categories: [time_bucket, dropoff_borough]  # derived categoricals added by the loader
 borough:
-  join_on: PULocationID         # our parquet's pickup-zone column
-  column: pickup_borough        # derived column name
+  pickup: {join_on: PULocationID, column: pickup_borough}
+  dropoff: {join_on: DOLocationID, column: dropoff_borough}
+sample:
+  name: manhattan_sample
+  pickup_borough: Manhattan      # Population A: Manhattan pickups only
 borough_dummies:
   features: [trip_distance, duration_minutes]
+  column: dropoff_borough
   reference: Manhattan
 labels:
   VendorID: {1: creative_mobile, 2: verifone}

@@ -14,7 +14,7 @@ from pathlib import Path
 import pandas as pd
 import statsmodels.api as sm
 
-from _setup import RESULTS, WORKING_DATASET, load_config, load_metered_categorical
+from _setup import RESULTS, WORKING_DATASET, load_config, load_manhattan_sample
 from broadway.stats.regression import bp_jb
 
 CSV_STEM = Path(__file__).stem
@@ -24,13 +24,20 @@ METRICS = ("kurtosis", "jb_stat", "bp_stat", "rsquared")
 def fit_with_dummies(df: pd.DataFrame, cfg: dict, use_borough: bool):
     """OLS on the target; optional borough one-hot dummies (config reference)."""
     spec = cfg["borough_dummies"]
+    if use_borough:
+        col = spec["column"]
+        df = df[df[col].notna()]  # drop rows with an unmapped zone (no dummy)
     X = df[spec["features"]].copy()
     if use_borough:
-        col = cfg["borough"]["column"]
+        col = spec["column"]
         categories = [spec["reference"]] + sorted(
-            v for v in df[col].dropna().unique() if v != spec["reference"])
-        dummies = pd.get_dummies(pd.Categorical(df[col], categories=categories),
-                                 prefix="borough", drop_first=True, dtype=float)
+            v for v in df[col].unique() if v != spec["reference"])
+        # wrap the Categorical in a Series to keep df's index (a bare
+        # Categorical would make get_dummies emit a RangeIndex and misalign)
+        coded = pd.Series(pd.Categorical(df[col], categories=categories),
+                          index=df.index)
+        dummies = pd.get_dummies(coded, prefix="borough",
+                                 drop_first=True, dtype=float)
         X = pd.concat([X, dummies], axis=1)
     X = sm.add_constant(X)
     return sm.OLS(df[cfg["target"]], X).fit()
@@ -50,14 +57,16 @@ def summarize(model) -> dict:
 
 def main() -> None:
     cfg = load_config()
-    df = load_metered_categorical(cfg)
+    df = load_manhattan_sample(cfg)
     RESULTS.mkdir(parents=True, exist_ok=True)
 
     before = summarize(fit_with_dummies(df, cfg, use_borough=False))
     after = summarize(fit_with_dummies(df, cfg, use_borough=True))
 
-    print(f"borough dummies: reference = {cfg['borough_dummies']['reference']} "
-          f"| n = {len(df)}")
+    spec = cfg["borough_dummies"]
+    print(f"sample: {cfg['sample']['name']} (pickup = "
+          f"{cfg['sample']['pickup_borough']}, n = {len(df)})")
+    print(f"{spec['column']} dummies: reference = {spec['reference']}")
     print(f"\n{'metric':<10}{'without':>12}{'with':>12}{'delta':>12}")
     for m in METRICS:
         print(f"{m:<10}{before[m]:>12.4g}{after[m]:>12.4g}"
@@ -65,16 +74,17 @@ def main() -> None:
 
     deltas = {m: round(float(after[m] - before[m]), 4) for m in METRICS}
     payload = {
-        "method": ("raw fare ~ distance + duration with/without pickup_borough "
-                   "one-hot dummies (plain OLS); residual heavy-tail test"),
+        "method": (f"raw fare ~ distance + duration with/without "
+                   f"{spec['column']} one-hot dummies (plain OLS); "
+                   f"residual heavy-tail test on {cfg['sample']['name']}"),
         "n": int(len(df)),
-        "reference_borough": cfg["borough_dummies"]["reference"],
+        "reference_borough": spec["reference"],
         "without_borough": before,
         "with_borough": after,
         "deltas": deltas,
     }
 
-    out = RESULTS / f"{WORKING_DATASET.stem}.json"
+    out = RESULTS / f"{cfg['sample']['name']}.json"
     data = json.loads(out.read_text()) if out.exists() else {}
     data["dataset"] = WORKING_DATASET.name
     data["source_script"] = Path(__file__).name

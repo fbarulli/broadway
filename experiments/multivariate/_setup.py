@@ -54,17 +54,24 @@ def load_zones() -> pd.DataFrame:
     return pd.read_csv(LOOKUP_PATH, usecols=[ZONE_ID_COL, ZONE_BOROUGH_COL])
 
 
-def add_borough(df: pd.DataFrame, cfg: dict) -> pd.DataFrame:
-    """Join pickup borough onto the metered rows (join_on/column from config)."""
-    spec = cfg["borough"]
-    return df.merge(load_zones(), left_on=spec["join_on"],
-                    right_on=ZONE_ID_COL, how="left").rename(
-                        columns={ZONE_BOROUGH_COL: spec["column"]})
+def add_boroughs(df: pd.DataFrame, cfg: dict) -> pd.DataFrame:
+    """Join pickup + dropoff boroughs (join_on/column per config)."""
+    zones = load_zones()
+    out = df
+    for key in ("pickup", "dropoff"):
+        spec = cfg["borough"][key]
+        out = out.merge(zones, left_on=spec["join_on"], right_on=ZONE_ID_COL,
+                        how="left").rename(
+                            columns={ZONE_BOROUGH_COL: spec["column"]})
+    return out
 
 
-def load_metered_categorical(cfg: dict) -> pd.DataFrame:
-    """Metered rows + derived categoricals (pickup_hour, time_bucket, borough)."""
+def load_manhattan_sample(cfg: dict) -> pd.DataFrame:
+    """Metered rows restricted to the config pickup borough (the 'manhattan_sample')."""
     df = load_metered()
     df["pickup_hour"] = df["tpep_pickup_datetime"].dt.hour
     df["time_bucket"] = df["pickup_hour"].map(time_bucket)
-    return add_borough(df, cfg)
+    df = add_boroughs(df, cfg)
+    pickup_col = cfg["borough"]["pickup"]["column"]
+    keep = cfg["sample"]["pickup_borough"]
+    return df[df[pickup_col] == keep]

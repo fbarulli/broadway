@@ -18,10 +18,9 @@ import matplotlib
 matplotlib.use("Agg")
 import pandas as pd
 
-from _setup import RESULTS, WORKING_DATASET, load_config, load_metered_categorical
+from _setup import RESULTS, WORKING_DATASET, load_config, load_manhattan_sample
 from broadway.stats.describe import describe, plot_describe_figures
 
-SAMPLE_NAME = WORKING_DATASET.stem
 CSV_STEM = Path(__file__).stem
 
 
@@ -80,7 +79,8 @@ def render_describe_figure(df: pd.DataFrame, col: str, cfg: dict,
     plot_df[col] = plot_df[col].astype(str)
     group_values = [str(g) for g in df[col].value_counts().head(top_n).index]
     summary = describe(plot_df, col, col, group_values, target,
-                       str(WORKING_DATASET), SAMPLE_NAME, cfg["sample_role"])
+                       str(WORKING_DATASET), cfg["sample"]["name"],
+                       cfg["sample_role"])
     plot_describe_figures(plot_df, col, col, group_values, target,
                           summary, out_path)
     return summary.model_dump()
@@ -120,7 +120,7 @@ def process_category(df: pd.DataFrame, col: str, cfg: dict,
 
 def main() -> None:
     cfg = load_config()
-    df = load_metered_categorical(cfg)
+    df = load_manhattan_sample(cfg)
     RESULTS.mkdir(parents=True, exist_ok=True)
 
     columns = detect_categoricals(df, cfg)
@@ -137,7 +137,7 @@ def main() -> None:
         "target": cfg["target"],
         "categories": evidence,
     }
-    out = RESULTS / f"{SAMPLE_NAME}.json"
+    out = RESULTS / f"{cfg['sample']['name']}.json"
     out.write_text(json.dumps(payload, indent=2))
     print(f"\nwrote {out}")
     print(f"wrote CSVs: {sorted(p.name for p in RESULTS.glob(f'{CSV_STEM}_*.csv'))}")
