@@ -94,12 +94,13 @@ def plot_resid_vs_fitted(
     out_path: Path,
     suptitle: str | None = None,
 ) -> None:
-    """Standalone residuals-vs-fitted scatter for a fitted model."""
-    fig, ax = plt.subplots(figsize=(7, 6))
+    """Standalone residuals-vs-fitted scatter with bottom stats legend."""
+    fig, ax = plt.subplots(figsize=(10, 7.5))
+    fig.subplots_adjust(bottom=0.30, top=0.90)
     draw_resid_vs_fitted(ax, model)
+    attach_stats_legend(fig, bp_jb(model))
     n = int(model.nobs)
     fig.suptitle(f"{suptitle} (N={n})" if suptitle else f"N={n}")
-    fig.tight_layout()
     fig.savefig(out_path, dpi=150)
     plt.close(fig)
 
@@ -109,15 +110,16 @@ def plot_resid_vs_fitted_qq(
     out_path: Path,
     suptitle: str | None = None,
 ) -> None:
-    """Residuals-vs-fitted and residual Q-Q plot, side by side."""
-    fig, (ax_resid, ax_qq) = plt.subplots(1, 2, figsize=(14, 6))
+    """Residuals-vs-fitted and residual Q-Q, side by side, with bottom stats legend."""
+    fig, (ax_resid, ax_qq) = plt.subplots(1, 2, figsize=(14, 7.5))
+    fig.subplots_adjust(bottom=0.30, top=0.90)
     draw_resid_vs_fitted(ax_resid, model)
     stats.probplot(model.resid, dist="norm", plot=ax_qq)
     ax_qq.set_title("Q-Q plot (residuals)")
     ax_qq.grid(True, alpha=0.3)
+    attach_stats_legend(fig, bp_jb(model))
     n = int(model.nobs)
     fig.suptitle(f"{suptitle} (N={n})" if suptitle else f"N={n}")
-    fig.tight_layout()
     fig.savefig(out_path, dpi=150)
     plt.close(fig)
 
@@ -139,7 +141,8 @@ def fit_and_plot_ols_bp(
     p_value = result["bp_pval"]
     reject = p_value < ALPHA
 
-    fig, (ax_resid, ax_bp) = plt.subplots(1, 2, figsize=(14, 6))
+    fig, (ax_resid, ax_bp) = plt.subplots(1, 2, figsize=(14, 7.5))
+    fig.subplots_adjust(bottom=0.30, top=0.90)
 
     draw_resid_vs_fitted(ax_resid, model)
 
@@ -166,12 +169,13 @@ def fit_and_plot_ols_bp(
     ax_bp.set_title(f"p = {p_value:.4f} → {verdict}")
     ax_bp.grid(True, alpha=0.3)
 
+    attach_stats_legend(fig, result)
+
     if suptitle is not None:
         fig.suptitle(f"{suptitle} (N={len(df)})")
     else:
         fig.suptitle(f"N={len(df)}")
 
-    fig.tight_layout()
     fig.savefig(out_path, dpi=150)
     plt.close(fig)
     return result
