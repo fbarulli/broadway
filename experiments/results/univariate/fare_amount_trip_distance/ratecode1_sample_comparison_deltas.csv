@@ -1,0 +1,4 @@
+pair,delta_rsquared,delta_kurtosis,delta_jb_stat,delta_bp_stat,comparable,reason
+new 28 vs previous 27,0.0002,-70.86,-54736952.3,-1091.8,False,rows differ (kept vs all) and target differs (raw vs capped)
+new 28 vs baseline 15,-0.0029,43.17,23159926.1,-108.6,False,rows differ (kept vs all) and pickup_hour added
+new 28 vs new 28 (no hour),0.0,1.09,677205.8,54.3,True,identical rows and target; only pickup_hour differs
