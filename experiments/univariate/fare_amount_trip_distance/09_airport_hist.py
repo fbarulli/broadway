@@ -37,7 +37,7 @@ def main() -> None:
     ax.set_xlim(float(values.min()), float(values.max()))
     ax.set_xlabel("fare_amount ($)")
     ax.set_ylabel("count")
-    ax.set_title("fare_amount histogram (airport pickups/dropoffs)")
+    ax.set_title(f"fare_amount histogram (airport pickups/dropoffs, N={len(airport_trips)})")
     ax.grid(True, alpha=0.3)
     fig.tight_layout()
     fig.savefig(OUT, dpi=150)

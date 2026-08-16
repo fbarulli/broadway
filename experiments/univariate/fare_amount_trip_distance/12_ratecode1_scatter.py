@@ -31,7 +31,7 @@ def main() -> None:
     ax.set_ylim(y_min, y_max)
     ax.set_xlabel("trip_distance (miles)")
     ax.set_ylabel("fare_amount ($)")
-    ax.set_title("fare_amount vs trip_distance (RatecodeID == 1)")
+    ax.set_title(f"fare_amount vs trip_distance (RatecodeID == 1, N={len(df)})")
     ax.grid(True, alpha=0.3)
     fig.tight_layout()
     fig.savefig(OUT, dpi=150)

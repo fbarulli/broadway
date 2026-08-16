@@ -41,7 +41,7 @@ def main() -> None:
     ax.set_xlim(float(values.min()), float(values.max()))
     ax.set_xlabel("fare_amount ($)")
     ax.set_ylabel("count")
-    ax.set_title(f"fare_amount histogram (RatecodeID == {RATE_CODE})")
+    ax.set_title(f"fare_amount histogram (RatecodeID == {RATE_CODE}, N={len(filtered)})")
     ax.grid(True, alpha=0.3)
     fig.tight_layout()
     fig.savefig(OUT, dpi=150)

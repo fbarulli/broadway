@@ -33,8 +33,8 @@ def plot_resid_vs_fitted(
     """Standalone residuals-vs-fitted scatter for a fitted model."""
     fig, ax = plt.subplots(figsize=(7, 6))
     draw_resid_vs_fitted(ax, model)
-    if suptitle is not None:
-        fig.suptitle(suptitle)
+    n = int(model.nobs)
+    fig.suptitle(f"{suptitle} (N={n})" if suptitle else f"N={n}")
     fig.tight_layout()
     fig.savefig(out_path, dpi=150)
     plt.close(fig)
@@ -51,8 +51,8 @@ def plot_resid_vs_fitted_qq(
     stats.probplot(model.resid, dist="norm", plot=ax_qq)
     ax_qq.set_title("Q-Q plot (residuals)")
     ax_qq.grid(True, alpha=0.3)
-    if suptitle is not None:
-        fig.suptitle(suptitle)
+    n = int(model.nobs)
+    fig.suptitle(f"{suptitle} (N={n})" if suptitle else f"N={n}")
     fig.tight_layout()
     fig.savefig(out_path, dpi=150)
     plt.close(fig)
@@ -103,7 +103,9 @@ def fit_and_plot_ols_bp(
     ax_bp.grid(True, alpha=0.3)
 
     if suptitle is not None:
-        fig.suptitle(suptitle)
+        fig.suptitle(f"{suptitle} (N={len(df)})")
+    else:
+        fig.suptitle(f"N={len(df)}")
 
     fig.tight_layout()
     fig.savefig(out_path, dpi=150)

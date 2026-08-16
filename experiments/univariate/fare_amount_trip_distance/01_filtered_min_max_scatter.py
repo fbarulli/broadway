@@ -42,7 +42,7 @@ def scatter(df: pd.DataFrame, out_path: Path) -> None:
     ax.set_ylim(y_min, y_max)
     ax.set_xlabel("trip_distance (miles)")
     ax.set_ylabel("fare_amount ($)")
-    ax.set_title("fare_amount vs trip_distance (raw)")
+    ax.set_title(f"fare_amount vs trip_distance (raw, N={len(df)})")
     ax.grid(True, alpha=0.3)
     fig.tight_layout()
     fig.savefig(out_path, dpi=150)
