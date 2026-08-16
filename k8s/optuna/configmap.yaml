@@ -1,0 +1,33 @@
+# Single source of truth for the k8s optuna stack — mounted as a FILE
+# (/etc/broadway/config.yaml), never injected as env vars. Optuna and mlflow
+# MUST use separate databases: both use Alembic's `alembic_version` table,
+# which would otherwise clash in a shared DB.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: optuna-config
+data:
+  config.yaml: |
+    dataset:
+      name: ratecode1_sample
+      parquet: /app/data/ratecode1_sample.parquet
+      target: total_amount
+      min_fare: 2.5
+      max_duration_minutes: 240
+      pickup_datetime: tpep_pickup_datetime
+      dropoff_datetime: tpep_dropoff_datetime
+      features: [trip_distance, duration_minutes, pickup_hour, pickup_weekday]
+    databases:
+      optuna: {driver: postgresql+psycopg2, host: postgres, port: "5432", name: optuna}
+      mlflow: {driver: postgresql+psycopg2, host: postgres, port: "5432", name: mlflow}
+    optuna:
+      seed: 42
+      test_fraction: 0.2
+      studies:
+        ols: {n_trials: 10}
+        lgbm: {n_trials: 10}
+        xgb: {n_trials: 10}
+    mlflow:
+      tracking_uri: http://mlflow:5000
+      experiment: ratecode1_model_battle
+      allowed_hosts: "*"   # local kind cluster; tighten for real deployments

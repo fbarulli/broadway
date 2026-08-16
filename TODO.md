@@ -65,39 +65,21 @@ Update freely; remove entries when done (git history is the record).
   hypothesis tests on the taxi data vs. tutorial continuation. Do not start
   until the specific direction is given.
 
-## Parked (paused by user, 2026-08-16)
+## Completed (Wave 3, 2026-08-16)
 
-- **K8s + Optuna + MLflow finalization** — kind cluster `broadway` still
-  running; postgres + mlflow healthy (migration ordering matters: mlflow must
-  migrate first in isolation, then workers). Optuna workers hit the concurrent
-  schema-creation race (torn `version_table`). Remaining gaps:
-  - Deterministic race fix: `optuna-init` Job creates the studies once;
-    workers only `load_if_exists`.
-  - Verify worker → mlflow logging end to end; fix Deployment restart
-    semantics (finished workers must not re-run); bake migration ordering into
-    the manifests.
-  - Config-files-only refactor: ConfigMaps/Secret mounted as FILES, zero env
-    vars (also removes the `RATECODE1_PARQUET` env override).
-  - Promote battle machinery to `src/` (data-agnostic): extend
-    `evaluate/metrics.py`, `training/mlflow_utils.py` (metadata logging, no
-    artifact), `training/optuna.py` (RDB support); new `optuna_worker.py`,
-    `evaluate/explain.py`, `evaluate/feature_selection.py`, pipeline factory.
-  - `configs/experiments/ratecode1_battle.yaml` as single source
-    (seed/sample/split/features/models/experiment/tracking).
-  - Durable postgres (PVC), mlflow artifact volume, non-demo Secret,
-    mlflow 3.15.1 vs platform pin 2.22.1 (`docker/mlflow/Dockerfile`),
-    commit `k8s/optuna/` manifests (currently uncommitted).
-  - Hard rules from user: config files only (no env vars, 100% of the time),
-    single source of truth, data-agnostic, no drift-type additions without
-    asking first.
-  - Infra requirements (user, 2026-08-16): create a shared **base image**;
-    **pin mlflow to 3.15 wherever applicable** (incl. `docker/mlflow/Dockerfile`,
-    currently 2.22.1); **separate images** (base / mlflow-server / optuna-worker
-    — no monolithic image); **never allow pods to restart indefinitely**
-    (completion semantics / Job-style, no infinite CrashLoopBackOff); **proper
-    logging always** — inside containers and pods, log the hostname/IP/URL/DB
-    endpoint actually in use at startup so it is verifiable which endpoint the
-    process connected to.
+- **K8s + Optuna + MLflow finalization** — 3 optuna worker Jobs (one per model)
+  completed on the kind cluster; studies + trials in the optuna DB, mlflow runs
+  (params/metrics/dataset lineage) in the mlflow DB; endpoint logging on every
+  pod. Root cause of the original saga: **optuna and mlflow shared one postgres
+  database and clashed over Alembic's `alembic_version` table** — fixed by
+  separate `optuna`/`mlflow` databases (init script creates the second). Other
+  fixes: `optuna-init` Job creates studies once; config/secret mounted as
+  FILES (zero env vars); workers use `broadway.training.optuna_worker` +
+  `mlflow_utils` (Wave-1 src); base image + separate mlflow/worker images;
+  mlflow 3.15 everywhere; Job completion semantics (no infinite restarts);
+  postgres + mlflow PVCs (durable); `k8s/optuna/` manifests committed.
+  Standing rules still apply: config files only (no env), single source of
+  truth, data-agnostic, fail-loud, no drift-type additions without asking.
 
 ## Next
 

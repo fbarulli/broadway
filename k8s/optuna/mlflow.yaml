@@ -1,0 +1,45 @@
+# MLflow tracking server — backend URI composed by the image entrypoint from
+# the mounted ConfigMap/Secret FILES. Artifacts go to a durable PVC.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mlflow-artifacts
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests: {storage: 2Gi}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mlflow
+  labels: {app: mlflow}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: mlflow}}
+  template:
+    metadata: {labels: {app: mlflow}}
+    spec:
+      containers:
+        - name: mlflow
+          image: mlflow-server:latest
+          imagePullPolicy: IfNotPresent
+          ports: [{containerPort: 5000}]
+          volumeMounts:
+            - {name: config, mountPath: /etc/broadway/config.yaml, subPath: config.yaml, readOnly: true}
+            - {name: optuna-db, mountPath: /etc/broadway/secret, readOnly: true}
+            - {name: artifacts, mountPath: /mlflow}
+      volumes:
+        - name: config
+          configMap: {name: optuna-config}
+        - name: optuna-db
+          secret: {secretName: optuna-db}
+        - name: artifacts
+          persistentVolumeClaim: {claimName: mlflow-artifacts}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: mlflow}
+spec:
+  selector: {app: mlflow}
+  ports: [{port: 5000, targetPort: 5000}]
