@@ -10,7 +10,7 @@ import pandas as pd
 import statsmodels.api as sm
 from statsmodels.stats.outliers_influence import variance_inflation_factor
 
-from _common import WORKING_DATASET, load_metered
+from _common import WORKING_DATASET, load_metered, load_working
 from _ols_bp import fit_log_hc3
 from _tests import write_tests_json
 from broadway.stats.regression import bp_jb, fit_ols, fit_robust
@@ -45,7 +45,7 @@ def compute_vif(df: pd.DataFrame) -> dict:
 
 
 def main() -> None:
-    dist_df = pd.read_parquet(WORKING_DATASET)
+    dist_df = load_working()
     metered = load_metered()
 
     results = {
@@ -81,7 +81,10 @@ def main() -> None:
     results["bp_jb_log_fare_trip_distance_duration"] = bp_jb(log_model)
 
     out = write_tests_json(
-        WORKING_DATASET, results, "17_ratecode1_metrics.py", n_rows=len(dist_df)
+        WORKING_DATASET,
+        results,
+        "17_ratecode1_metrics.py",
+        n_rows=len(pd.read_parquet(WORKING_DATASET)),
     )
     print(f"wrote {out}")
 

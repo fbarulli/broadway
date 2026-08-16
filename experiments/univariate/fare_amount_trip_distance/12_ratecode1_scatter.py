@@ -1,8 +1,7 @@
-"""12: density scatter of fare_amount vs trip_distance on the ratecode1 dataset.
+"""12: density scatter of fare_amount vs trip_distance on the working dataset.
 
-Reads the RatecodeID == 1 dataset built by 11_ratecode1_dataset.py and
-renders the same fare-vs-distance scatter as 01, but on the clean
-standard-metered-trip subset (no airport flat fares).
+Reads the working dataset (RatecodeID == 1, filtered) and renders the same
+fare-vs-distance scatter as 01, on the standard-metered-trip subset.
 """
 
 from pathlib import Path
@@ -10,16 +9,15 @@ from pathlib import Path
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-import polars as pl
 
-from _common import RATECODE1_PARQUET, RESULTS
+from _common import RESULTS, load_working
 
 OUT = RESULTS / f"{Path(__file__).stem}.png"
 
 
 def main() -> None:
     RESULTS.mkdir(parents=True, exist_ok=True)
-    df = pl.read_parquet(RATECODE1_PARQUET)
+    df = load_working()
     x = df["trip_distance"].to_numpy()
     y = df["fare_amount"].to_numpy()
     x_min, x_max = float(x.min()), float(x.max())
@@ -37,7 +35,7 @@ def main() -> None:
     fig.savefig(OUT, dpi=150)
     plt.close(fig)
 
-    print(f"ratecode1 rows: {len(df)}")
+    print(f"working rows: {len(df)}")
     print(f"axis limits: trip_distance [{x_min:.2f}, {x_max:.2f}], fare_amount [{y_min:.2f}, {y_max:.2f}]")
     print(f"wrote {OUT}")
 

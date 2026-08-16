@@ -15,6 +15,10 @@ RATECODE1_PARQUET = RESULTS / "ratecode1_sample.parquet"
 # sample50k / full_sample are retired (steps 01-10 kept as history).
 WORKING_DATASET = RATECODE1_PARQUET
 
+# Dataset-level filter knobs (no hardcoded values in loaders).
+MIN_FARE = 2.50  # base fare; below this = voided rides
+MAX_DURATION_MINUTES = 240  # 4h cap for realistic NYC trips
+
 # Per-dataset provenance: how the dataset was built (transformations) and the
 # X/Y it is analyzed with. Keyed by parquet stem; used by _tests.py to make
 # every <dataset>.json self-describing.
@@ -68,20 +72,27 @@ DATASET_META = {
             },
             "filters": [
                 "RatecodeID == 1",
-                "fare_amount >= 0.0",
+                "fare_amount > 2.50 (voided rides)",
                 "trip_distance >= 0.0",
                 "trip_duration > 0",
+                "duration_minutes < 240",
             ],
         },
     },
 }
 
 
+def load_working() -> pd.DataFrame:
+    """Working dataset (ratecode1) with dataset-level filters applied."""
+    df = pd.read_parquet(WORKING_DATASET)
+    return df[df["fare_amount"] > MIN_FARE]
+
+
 def load_metered() -> pd.DataFrame:
-    """Ratecode1 trips with duration_minutes derived; non-positive durations dropped."""
-    df = pd.read_parquet(RATECODE1_PARQUET)
+    """Working dataset + duration derived; duration filters applied."""
+    df = load_working()
     df["trip_duration"] = (
         df["tpep_dropoff_datetime"] - df["tpep_pickup_datetime"]
     ).dt.total_seconds()
     df["duration_minutes"] = df["trip_duration"] / 60
-    return df[df["trip_duration"] > 0]
+    return df[(df["trip_duration"] > 0) & (df["duration_minutes"] < MAX_DURATION_MINUTES)]
