@@ -47,7 +47,7 @@ def log_dataset(dataset_id: str, source_path: str, context: str = "train") -> No
     if not path.exists():
         logger.warning("dataset source not found, skipping lineage: %s", source_path)
         return
-    dataset = mlflow.data.from_pandas(pd.read_parquet(path), source=str(path))
+    dataset = mlflow.data.from_pandas(pd.read_parquet(path), source=str(path))  # type: ignore[attr-defined]
     mlflow.log_input(dataset, context=context)
 
 

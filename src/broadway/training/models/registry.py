@@ -17,7 +17,7 @@ _REGISTRY = {
 }
 
 
-def get_model(name: str, **params: float | int | str) -> Any:
+def get_model(name: str, **params: float | str) -> Any:
     if name not in _REGISTRY:
         raise ValueError(f"unknown model: {name}. valid: {list(_REGISTRY)}")
     return _REGISTRY[name](**params)

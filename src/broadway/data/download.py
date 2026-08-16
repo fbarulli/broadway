@@ -22,6 +22,5 @@ def download(url: str, env: EnvironmentConfig) -> Path:
     response = requests.get(url, stream=True)
     response.raise_for_status()
     with open(dest, "wb") as f:
-        for chunk in response.iter_content(chunk_size=env.download_chunk_size):
-            f.write(chunk)
+        f.writelines(response.iter_content(chunk_size=env.download_chunk_size))
     return dest

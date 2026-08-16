@@ -6,8 +6,6 @@ import shutil
 import subprocess
 from pathlib import Path
 
-import pytest
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -16,6 +14,7 @@ def _run(*args: str, **kwargs: object) -> subprocess.CompletedProcess[str]:
         ["uv", "run", "ds-pipeline", *args],
         capture_output=True,
         text=True,
+        check=False,
         **kwargs,
     )
 

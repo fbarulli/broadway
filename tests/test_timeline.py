@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import broadway.timeline.module as module
 from broadway.reports.timeline import render_timeline
+from broadway.timeline import module
 from broadway.timeline.models import (
     Alternative,
     AnalysisDecision,

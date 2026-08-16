@@ -45,12 +45,12 @@ class GroupSummary(BaseModel):
 
 
 def describe(df: pd.DataFrame, group_column: str, source_group_column: str, group_values: list[str], target: str, source_path: str, sample_name: str, sample_role: SampleRole) -> GroupSummary:
-    total_n = int(len(df))
+    total_n = len(df)
     groups: dict[str, GroupStat] = {}
     absent: list[str] = []
     for g in group_values:
         vals = df[df[source_group_column] == g][target].dropna()
-        n = int(len(vals))
+        n = len(vals)
         if n == 0:
             absent.append(g)
             groups[g] = GroupStat(n=0, mean=None, std=None)

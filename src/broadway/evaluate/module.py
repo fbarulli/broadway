@@ -38,6 +38,7 @@ def _processed_dir(cfg: PipelineConfig) -> Path:
 
 
 def _load_val_features(cfg: PipelineConfig) -> tuple[pd.DataFrame, pd.Series]:
+    assert cfg.etl is not None and cfg.dataset is not None
     out_dir = _processed_dir(cfg)
     val_path = out_dir / cfg.etl.val_features_file
     if not val_path.exists():
@@ -50,6 +51,7 @@ def _load_val_features(cfg: PipelineConfig) -> tuple[pd.DataFrame, pd.Series]:
 
 
 def _load_train_features(cfg: PipelineConfig) -> tuple[pd.DataFrame, pd.Series]:
+    assert cfg.etl is not None and cfg.dataset is not None
     out_dir = _processed_dir(cfg)
     train_df = pd.read_parquet(out_dir / cfg.etl.train_features_file)
     target = cfg.dataset.target
@@ -57,6 +59,7 @@ def _load_train_features(cfg: PipelineConfig) -> tuple[pd.DataFrame, pd.Series]:
 
 
 def _load_training_result(cfg: PipelineConfig) -> TrainingResult:
+    assert cfg.train is not None
     path = Path(cfg.train.output_dir) / cfg.train.output_file
     if not path.exists():
         raise FileNotFoundError(f"training result not found: {path} — run the train step first")
@@ -121,8 +124,11 @@ def run(cfg: PipelineConfig) -> None:
     if champion_uri is None:
         warnings.append("no champion model found — candidate compared against none")
     if promote:
+        dataset_name = cfg.dataset.name
+        artifact_path = result.artifact_path
         try:
-            promote_candidate(cfg.dataset.name, result.artifact_path)
+            assert dataset_name is not None and artifact_path is not None
+            promote_candidate(dataset_name, artifact_path)
         except mlflow.exceptions.MlflowException as exc:
             warnings.append(f"promotion skipped — model registry unavailable: {exc}")
 

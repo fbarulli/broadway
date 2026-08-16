@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import logging
 import traceback
-from dataclasses import dataclass, field
+from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable
 
 import numpy as np
 import pandas as pd
@@ -19,7 +19,12 @@ from broadway.reports.results import write_results
 from broadway.reports.timeline import render_timeline
 from broadway.timeline import module as timeline_module
 from broadway.timeline import runners, suggest
-from broadway.timeline.models import AnalysisDecision, AnalysisStep, StepStatus, Suggestion
+from broadway.timeline.models import (
+    AnalysisDecision,
+    AnalysisStep,
+    StepStatus,
+    Suggestion,
+)
 from broadway.timeline.sequence import (
     WalkthroughConfig,
     WalkthroughSequence,
@@ -143,7 +148,7 @@ def _print_decision_required(
         rs = describe.result_summary
         lines.append(
             f"  - describe_groups: n_total={rs.get('n_total')}, "
-            f"imbalance_ratio={humanize_float(rs.get('imbalance_ratio'))}, "
+            f"imbalance_ratio={humanize_float(float(rs.get('imbalance_ratio') or 0.0))}, "
             f"absent_groups={rs.get('absent_groups')}"
         )
     normality = by_id.get("normality")
@@ -153,8 +158,8 @@ def _print_decision_required(
     if variance is not None:
         rs = variance.result_summary
         lines.append(
-            f"  - variance: Levene statistic={humanize_float(rs.get('statistic'))}, "
-            f"p_value={humanize_pvalue(rs.get('p_value'))}"
+            f"  - variance: Levene statistic={humanize_float(float(rs.get('statistic') or 0.0))}, "
+            f"p_value={humanize_pvalue(float(rs.get('p_value') or 0.0))}"
         )
     lines.append("")
     lines.append("Eligible methods:")

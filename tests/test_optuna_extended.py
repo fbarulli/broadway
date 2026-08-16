@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-import pytest
-
 import optuna
+import pytest
 
 from broadway.training.optuna import run_study_rdb
 from broadway.training.optuna_worker import compose_db_url, run_worker

@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import pandas as pd
 import pytest
 
 from broadway.analysis.contracts import AnalysisMode
-from broadway.baseline import causal, hypothesis, prediction, module
+from broadway.baseline import causal, hypothesis, module, prediction
 from broadway.baseline.contracts import BaselineResult, load_result, save_result
 from broadway.baseline.improvement import improvement_vs_baseline
 from broadway.config.loader import load_config

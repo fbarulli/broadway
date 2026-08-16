@@ -41,7 +41,7 @@ def run_study_rdb(
     """Run an Optuna study persisted to an RDB storage URL and return the study."""
     study = _create_study_with_retry(study_name, storage_url, direction)
     if random_state is not None:
-        study.sampler.seed = random_state
+        study.sampler.seed = random_state  # type: ignore[union-attr]
     study.optimize(objective, n_trials=n_trials)
     return study
 
@@ -55,7 +55,7 @@ def run_study(
 ) -> dict[str, float | int]:
     study = optuna.create_study(direction=direction)
     if random_state is not None:
-        study.sampler.seed = random_state
+        study.sampler.seed = random_state  # type: ignore[union-attr]
 
     def _objective(trial: optuna.Trial) -> float:
         params: dict[str, float | int] = {}

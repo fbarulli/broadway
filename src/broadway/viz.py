@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-from matplotlib.axes import Axes
 import seaborn as sns
+from matplotlib.axes import Axes
 
 from broadway.config.viz import load_viz_config
 

@@ -25,9 +25,7 @@ def _datetime_candidate(series: pd.Series) -> bool:
 def _is_categorical(series: pd.Series) -> bool:
     if pd.api.types.is_bool_dtype(series) or pd.api.types.is_object_dtype(series) or pd.api.types.is_string_dtype(series):
         return True
-    if pd.api.types.is_integer_dtype(series) and series.nunique(dropna=True) <= 30:
-        return True
-    return False
+    return pd.api.types.is_integer_dtype(series) and series.nunique(dropna=True) <= 30
 
 
 def infer(name: str, df: pd.DataFrame) -> InferenceReport:

@@ -53,9 +53,9 @@ def render_timeline(
             for row in posthoc_pair_rows(persisted.result_summary):
                 lines.append(
                     f"    - {row.get('a')} vs {row.get('b')}: "
-                    f"p {humanize_pvalue(float(row.get('p_value')))}, "
-                    f"Cohen's d {humanize_float(float(row.get('cohens_d')))}, "
-                    f"Hedges' g {humanize_float(float(row.get('hedges_g')))}"
+                    f"p {humanize_pvalue(float(row['p_value']))}, "
+                    f"Cohen's d {humanize_float(float(row['cohens_d']))}, "
+                    f"Hedges' g {humanize_float(float(row['hedges_g']))}"
                 )
         for fig in persisted.figures:
             lines.append(f"![{fig.caption}]({fig.path})")

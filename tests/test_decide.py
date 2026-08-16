@@ -6,7 +6,10 @@ import pytest
 
 from broadway.config.loader import load_config
 from broadway.timeline import decide, module
-from broadway.timeline.sequence import load_walkthrough_config, load_walkthrough_sequence
+from broadway.timeline.sequence import (
+    load_walkthrough_config,
+    load_walkthrough_sequence,
+)
 
 
 def _analysis():

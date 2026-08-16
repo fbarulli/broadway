@@ -20,7 +20,7 @@ def run(df: pd.DataFrame, target: str, task: TaskType) -> BaselineResult:
             strategy="majority_class",
             metric="accuracy",
             value=value,
-            details={"majority_class": str(majority), "support": int(len(y))},
+            details={"majority_class": str(majority), "support": len(y)},
             notes=[f"majority-class baseline: predict '{majority}' for every row"],
         )
     mean = float(y.mean())

@@ -17,18 +17,24 @@ import os
 from pathlib import Path
 
 import matplotlib
+
 matplotlib.use("Agg")  # headless; set before pyplot import
 import matplotlib.colors
 import matplotlib.pyplot as plt
-from matplotlib.lines import Line2D
-from matplotlib.patches import Patch
 import numpy as np
 import pandas as pd
+from matplotlib.lines import Line2D
+from matplotlib.patches import Patch
 from pydantic import BaseModel, ConfigDict
 from scipy import stats
 
 from broadway import viz
-from broadway.config.viz import DiagnosticsConfig, QqMarkersConfig, QqZonesConfig, load_viz_config
+from broadway.config.viz import (
+    DiagnosticsConfig,
+    QqMarkersConfig,
+    QqZonesConfig,
+    load_viz_config,
+)
 from broadway.timeline.sequence import load_walkthrough_config
 
 logger = logging.getLogger(__name__)
@@ -183,15 +189,15 @@ def _draw_qq_markers(ax, osm: np.ndarray, osr: np.ndarray, markers: QqMarkersCon
         )
 
 
-def build_qq_legend_handles(zones: QqZonesConfig, any_shelf: bool, markers: QqMarkersConfig | None = None) -> list:
+def build_qq_legend_handles(zones: QqZonesConfig, any_shelf: bool, markers: QqMarkersConfig | None = None) -> list[Line2D]:
     mid = int((zones.central_quantiles[1] - zones.central_quantiles[0]) * 100)
     handles = [
         Line2D([0], [0], color=viz.QQ_REF_LINE_COLOR, linestyle=viz.QQ_REF_LINE_STYLE,
                linewidth=viz.QQ_REF_LINE_WIDTH, label="fitted reference line"),
     ]
     if zones.enabled:
-        handles.append(Patch(facecolor=zones.zone_color, alpha=zones.central_alpha, label=f"middle {mid}%"))
-        handles.append(Patch(facecolor=zones.zone_color, alpha=zones.tail_alpha, label=f"±{zones.tail_threshold}σ tails"))
+        handles.append(Patch(facecolor=zones.zone_color, alpha=zones.central_alpha, label=f"middle {mid}%"))  # type: ignore[arg-type]
+        handles.append(Patch(facecolor=zones.zone_color, alpha=zones.tail_alpha, label=f"±{zones.tail_threshold}σ tails"))  # type: ignore[arg-type]
         if any_shelf:
             handles.append(Line2D([0], [0], color=zones.shelf_color, linestyle="--", linewidth=1, label="zero-mass shelf"))
     if markers is not None and markers.enabled:
@@ -383,12 +389,12 @@ def _plot_qq_joint(
     names = list(groups)[:max_groups]
     n = len(names)
     if show_log:
-        pairs, skipped, total = _qq_log_pairs(groups, names, viz_cfg.max_points_per_trace)
-        if skipped:
+        pairs, skipped_log, total = _qq_log_pairs(groups, names, viz_cfg.max_points_per_trace)
+        if skipped_log:
             logger.warning(
                 "Q-Q plot skipped %d zero-variance group(s): %s",
-                len(skipped),
-                ", ".join(skipped),
+                len(skipped_log),
+                ", ".join(skipped_log),
             )
         _plot_raw_log_pairs(
             pairs, out_path, 1, 1, viz_cfg.fig_size_per_subplot, viz_cfg.dpi,
@@ -603,7 +609,7 @@ def plot_numeric_qq(
 
     if len(df) > sample_size:
         df = df.sample(n=sample_size, random_state=random_state)
-    n_rows = int(len(df))
+    n_rows = len(df)
 
     numeric_cols = _numeric_cols(df, cols)
     non_numeric_columns = [c for c in df.columns if c not in numeric_cols]
@@ -688,7 +694,7 @@ def plot_numeric_qq(
                 (osm, osr, slope, intercept),
                 (log_osm, log_osr, log_slope, log_intercept),
                 skew_val,
-                log_skew_val,
+                log_skew_val if log_skew_val is not None else 0.0,
             )
         counts, edges = np.histogram(finite, bins="auto")
         hists[name] = (counts, edges)

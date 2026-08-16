@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 import mlflow
 import pandas as pd
@@ -17,8 +17,12 @@ from broadway.data.splitter import split
 from broadway.evaluate.metrics import compute_metrics
 from broadway.lineage.ids import node_id
 from broadway.lineage.records import write_record
-from broadway.training.contracts import TrainingResult
-from broadway.training.mlflow_utils import log_metrics, log_model, log_params, setup_mlflow
+from broadway.training.mlflow_utils import (
+    log_metrics,
+    log_model,
+    log_params,
+    setup_mlflow,
+)
 from broadway.training.optuna import run_study
 from broadway.training.trainer import train
 from broadway.utils import feature_columns
@@ -31,6 +35,7 @@ def _processed_dir(cfg: PipelineConfig) -> Path:
 
 
 def _load_features(cfg: PipelineConfig) -> tuple[pd.DataFrame, pd.DataFrame | None]:
+    assert cfg.etl is not None
     out_dir = _processed_dir(cfg)
     train_df = pd.read_parquet(out_dir / cfg.etl.train_features_file)
     val_path = out_dir / cfg.etl.val_features_file
@@ -65,6 +70,7 @@ def _resolve_params(
     X_val: pd.DataFrame,
     y_val: pd.Series,
 ) -> dict[str, float | int | str]:
+    assert cfg.experiment is not None
     if cfg.experiment.hpo is None:
         return cfg.experiment.model.params
     objective = _hpo_objective(
@@ -81,13 +87,14 @@ def _resolve_params(
         n_trials=cfg.experiment.hpo.trials,
         direction="minimize",
         random_state=cfg.experiment.random_state,
-    )
+    )  # type: ignore[return-value]
 
 
 def run(cfg: PipelineConfig) -> None:
     if not cfg.dataset or not cfg.experiment or not cfg.train or not cfg.etl:
         raise ValueError("training step requires dataset, experiment, train, and etl config")
     require_mode(cfg.analysis, AnalysisMode.PREDICTION)
+    assert cfg.analysis is not None and cfg.analysis.name is not None
 
     train_df, val_df = _load_features(cfg)
     target = cfg.dataset.target

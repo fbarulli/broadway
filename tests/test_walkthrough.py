@@ -454,7 +454,7 @@ def test_walkthrough_posthoc_gated_on_insignificant_omnibus(
     module.save_decision(omnibus)
 
     walkthrough.run(cfg, None, force=False)
-    capsys.readouterr().out
+    capsys.readouterr()
 
     by_id = {s.step_id: s for s in module.load_steps("test_hypothesis")}
     assert "omnibus" in by_id

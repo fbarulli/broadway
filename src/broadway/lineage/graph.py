@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import yaml
 
@@ -106,7 +106,9 @@ def build_graph(configs_dir: Path, lineage_dir: Path) -> LineageGraph:
     if records_path.is_dir():
         for path in sorted(records_path.glob("*.json")):
             rec = LineageRecord.model_validate_json(path.read_text(encoding="utf-8"))
-            status = "produced" if Path(rec.artifact).exists() else "ran_but_output_missing"
+            status: Literal["produced", "ran_but_output_missing"] = (
+                "produced" if Path(rec.artifact).exists() else "ran_but_output_missing"
+            )
             node = LineageNode(
                 id=rec.node_id,
                 kind=rec.kind,
@@ -191,6 +193,7 @@ def scope_graph(
             if edge.relation == "raises" and edge.source in selected:
                 selected.add(edge.target)
     else:
+        assert dataset is not None, "scope_graph with no analysis requires a dataset"
         dataset_id = node_id("dataset", dataset)
         if dataset_id not in nodes:
             raise LineageScopeError(f"dataset {dataset!r} not found")
@@ -214,10 +217,9 @@ def scope_graph(
             if edge.relation == "raises" and edge.source in selected:
                 selected.add(edge.target)
 
-    if dataset is not None:
-        if node_id("dataset", dataset) not in selected:
-            raise LineageScopeError(
-                f"analysis {analysis!r} is not derived from dataset {dataset!r}"
+    if dataset is not None and node_id("dataset", dataset) not in selected:
+        raise LineageScopeError(
+            f"analysis {analysis!r} is not derived from dataset {dataset!r}"
             )
 
     return LineageGraph(

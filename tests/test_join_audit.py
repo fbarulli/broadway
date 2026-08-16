@@ -5,7 +5,13 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from broadway.config.schema import ColumnRole, ColumnSchema, DatasetContract, LookupSpec, TaskType
+from broadway.config.schema import (
+    ColumnRole,
+    ColumnSchema,
+    DatasetContract,
+    LookupSpec,
+    TaskType,
+)
 from broadway.data.join_audit import JoinAuditReport, audit_join
 from broadway.data.loader import load, load_with_audit
 

@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from broadway.cleaning.models import ParseFailure, StructuralCleanResult
+from broadway.cleaning.models import StructuralCleanResult
 from broadway.data.join_audit import JoinAudit, JoinAuditReport
 from broadway.data.lookup_value_audit import (
     LookupColumnValueAudit,

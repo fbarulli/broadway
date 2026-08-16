@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import subprocess
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from broadway.analysis.contracts import AnalysisMode
@@ -29,7 +29,7 @@ def _git_commit() -> str:
 
 def _build_trace(cfg: PipelineConfig) -> ArtifactTrace:
     return ArtifactTrace(
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
         commit=_git_commit(),
         dataset=cfg.dataset.name if cfg.dataset else None,
         analysis_goal=cfg.analysis.goal if cfg.analysis else None,
@@ -46,6 +46,7 @@ def load_persisted(cfg: PipelineConfig) -> BaselineResult | None:
 
 
 def _compute_baseline(cfg: PipelineConfig) -> BaselineResult:
+    assert cfg.analysis is not None
     mode = cfg.analysis.mode
     if mode == AnalysisMode.PREDICTION:
         if not cfg.dataset:
