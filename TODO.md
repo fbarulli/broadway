@@ -2,22 +2,6 @@
 
 Ephemeral task tracker. `HANDOFF.md` is timeless; this file holds "what's next."
 Update freely; remove entries when done (git history is the record).
-
-## Current
-
-- **Step 24 — influence plot (Cook's circular bubbles)** — script written
-  (`experiments/univariate/fare_amount_trip_distance/24_ratecode1_influence_plot.py`),
-  **not run, not committed** (run was aborted, cache was full). Finish:
-  ```bash
-  MPLCONFIGDIR=/home/opc/ONE/broad-way/.mplconfig .venv/bin/python experiments/univariate/fare_amount_trip_distance/24_ratecode1_influence_plot.py
-  git add experiments/univariate/fare_amount_trip_distance/24_ratecode1_influence_plot.py
-  git commit -m "feat(experiments): influence plot with Cook's distance bubbles (24)"
-  git push origin taxi
-  ```
-  Plots leverage (x) × externally studentized residuals (y), bubble area ∝
-  Cook's distance, 2p/n & 3p/n leverage lines, ±t residual cutoff, D > 4/n
-  influential in red, top-5 trips annotated. Log-fare model, 42,806 trips.
-
 ## Next
 
 - **Step 23 standardization** — Cook's index plot is single-panel; decide:
