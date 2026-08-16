@@ -27,8 +27,8 @@ from _tests import tests_path_for, write_tests_json
 from broadway.stats.regression import bp_jb
 
 OUT = RESULTS / f"{Path(__file__).stem}.png"
-COMPARISON_CSV = RESULTS / "ratecode1_sample_comparison.csv"
-DELTAS_CSV = RESULTS / "ratecode1_sample_comparison_deltas.csv"
+COMPARISON_CSV = RESULTS / f"{Path(__file__).stem}_comparison.csv"
+DELTAS_CSV = RESULTS / f"{Path(__file__).stem}_deltas.csv"
 
 MODEL_METRICS = ("rsquared", "kurtosis", "jb_stat", "bp_stat")
 

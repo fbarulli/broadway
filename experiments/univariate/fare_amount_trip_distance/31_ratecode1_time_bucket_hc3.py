@@ -9,6 +9,8 @@ confidence intervals so the estimated surcharges can be compared against
 the NYC rule values.
 """
 
+from pathlib import Path
+
 import pandas as pd
 
 from _common import RESULTS, WORKING_DATASET, load_metered
@@ -22,7 +24,7 @@ from _ols_bp import (
 from _tests import write_tests_json
 from broadway.stats.regression import bp_jb
 
-ESTIMATES_CSV = RESULTS / "ratecode1_sample_time_bucket_estimates.csv"
+ESTIMATES_CSV = RESULTS / f"{Path(__file__).stem}.csv"
 
 
 def main() -> None:

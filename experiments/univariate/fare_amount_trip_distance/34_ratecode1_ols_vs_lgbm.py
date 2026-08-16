@@ -25,7 +25,7 @@ from _tests import write_tests_json
 from broadway.stats.baseline import train_lgbm
 
 OUT = RESULTS / f"{Path(__file__).stem}.png"
-METRICS_CSV = RESULTS / "ratecode1_sample_ols_lgbm.csv"
+METRICS_CSV = RESULTS / f"{Path(__file__).stem}.csv"
 
 LGBM_PARAMS = {
     "n_estimators": 100,

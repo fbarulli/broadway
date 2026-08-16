@@ -8,7 +8,7 @@ estimation-first part — the 95% confidence intervals from the HC3
 covariance instead of p-values.
 
 Persists the estimation table to ratecode1_sample.json and a tracked CSV
-(ratecode1_sample_estimates.csv), and renders one 2x2 figure with all plot
+(29_ratecode1_estimate_size.csv), and renders one 2x2 figure with all plot
 variants: (1) coefficient forest plot in dollars, (2) realistic-trip effect
 bars with CI whiskers, (3) standardized-coefficient forest plot, (4) the
 classic minimal single-panel forest plot. All numbers come from the fitted
@@ -34,7 +34,7 @@ from _ols_bp import (
 from _tests import write_tests_json
 
 OUT = RESULTS / f"{Path(__file__).stem}.png"
-ESTIMATES_CSV = RESULTS / "ratecode1_sample_estimates.csv"
+ESTIMATES_CSV = RESULTS / f"{Path(__file__).stem}.csv"
 
 TERM_LABELS = {
     "const": "intercept ($)",

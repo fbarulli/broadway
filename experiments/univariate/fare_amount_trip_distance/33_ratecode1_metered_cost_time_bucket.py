@@ -25,7 +25,7 @@ from _tests import write_tests_json
 from broadway.stats.regression import bp_jb
 
 OUT = RESULTS / f"{Path(__file__).stem}.png"
-ESTIMATES_CSV = RESULTS / "ratecode1_sample_metered_cost_estimates.csv"
+ESTIMATES_CSV = RESULTS / f"{Path(__file__).stem}.csv"
 
 TARGET = "metered_cost"
 METERED_COST_DEF = "fare_amount + extra + mta_tax + tolls_amount"
