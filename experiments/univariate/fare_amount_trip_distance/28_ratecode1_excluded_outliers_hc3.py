@@ -23,6 +23,7 @@ from _tests import tests_path_for, write_tests_json
 from broadway.stats.regression import bp_jb
 
 OUT = RESULTS / f"{Path(__file__).stem}.png"
+COMPARISON_CSV = RESULTS / "ratecode1_sample_comparison.csv"
 
 MASK_THRESHOLD = 10.0  # step-22 modified-z |M| threshold (union over fare/distance)
 
@@ -85,6 +86,8 @@ def build_deltas(models: list[dict]) -> list[dict]:
             "pair": label,
             "delta_rsquared": round(float(nw["rsquared"]) - float(ol["rsquared"]), 4),
             "delta_kurtosis": round(float(nw["kurtosis"]) - float(ol["kurtosis"]), 2),
+            "delta_jb_stat": round(float(nw["jb_stat"]) - float(ol["jb_stat"]), 1),
+            "delta_bp_stat": round(float(nw["bp_stat"]) - float(ol["bp_stat"]), 1),
             "comparable": comparable,
             "reason": reason,
         })
@@ -99,6 +102,36 @@ def print_deltas(deltas: list[dict]) -> None:
               f"Δkurt={d['delta_kurtosis']:+.2f} [{tag}] — {d['reason']}")
 
 
+def write_comparison_csv(models: list[dict], deltas: list[dict], out_path: Path) -> None:
+    """Tidy long-format CSV: one row per (model|delta, metric) — Excel-friendly."""
+    rows = []
+    for m in models:
+        for metric, value in (
+            ("rsquared", m["rsquared"]),
+            ("kurtosis", m["kurtosis"]),
+            ("jb_stat", m["jb_stat"]),
+            ("bp_stat", m["bp_stat"]),
+        ):
+            rows.append({
+                "kind": "model", "label": m["name"], "n": m["n"], "mask": m["mask"],
+                "target": m["target"], "features": m["features"],
+                "metric": metric, "value": value, "note": "",
+            })
+    for d in deltas:
+        for metric, value in (
+            ("delta_rsquared", d["delta_rsquared"]),
+            ("delta_kurtosis", d["delta_kurtosis"]),
+            ("delta_jb_stat", d["delta_jb_stat"]),
+            ("delta_bp_stat", d["delta_bp_stat"]),
+        ):
+            rows.append({
+                "kind": "delta", "label": d["pair"], "n": "", "mask": "",
+                "target": "", "features": "", "metric": metric, "value": value,
+                "note": ("DIRECT — " if d["comparable"] else "qualified — ") + d["reason"],
+            })
+    pd.DataFrame(rows).to_csv(out_path, index=False)
+
+
 def main() -> None:
     mask = outlier_mask()
     df = load_metered()
@@ -109,6 +142,7 @@ def main() -> None:
     model = fit_excluded(kept, use_hour=True)
     model_no_hour = fit_excluded(kept, use_hour=False)
     diag = bp_jb(model)
+    diag_no_hour = bp_jb(model_no_hour)
 
     print(f"metered rows: {len(df)} | removed (|M|>{MASK_THRESHOLD} union): "
           f"{int(excluded.sum())} | kept: {len(kept)}")
@@ -131,21 +165,28 @@ def main() -> None:
     models = [
         {"name": "baseline 15", "n": base.get("n"), "mask": "none", "target": "raw",
          "features": "dist + dur", "rsquared": base.get("rsquared"),
-         "kurtosis": base_bp.get("kurtosis")},
+         "kurtosis": base_bp.get("kurtosis"), "jb_stat": base_bp.get("jb_stat"),
+         "bp_stat": base_bp.get("bp_stat")},
         {"name": "previous 27", "n": prev.get("n"), "mask": "none", "target": "capped",
          "features": "dist + dur + hour", "rsquared": prev.get("rsquared"),
-         "kurtosis": prev.get("bp_jb", {}).get("kurtosis")},
+         "kurtosis": prev.get("bp_jb", {}).get("kurtosis"),
+         "jb_stat": prev.get("bp_jb", {}).get("jb_stat"),
+         "bp_stat": prev.get("bp_jb", {}).get("bp_stat")},
         {"name": "new 28", "n": int(model.nobs), "mask": mask_label, "target": "raw",
          "features": "dist + dur + hour", "rsquared": float(model.rsquared),
-         "kurtosis": diag["kurtosis"]},
+         "kurtosis": diag["kurtosis"], "jb_stat": diag["jb_stat"],
+         "bp_stat": diag["bp_stat"]},
         {"name": "new 28 (no hour)", "n": int(model_no_hour.nobs), "mask": mask_label,
          "target": "raw", "features": "dist + dur",
          "rsquared": float(model_no_hour.rsquared),
-         "kurtosis": float(bp_jb(model_no_hour)["kurtosis"])},
+         "kurtosis": diag_no_hour["kurtosis"], "jb_stat": diag_no_hour["jb_stat"],
+         "bp_stat": diag_no_hour["bp_stat"]},
     ]
     deltas = build_deltas(models)
     print_models(models)
     print_deltas(deltas)
+    write_comparison_csv(models, deltas, COMPARISON_CSV)
+    print(f"wrote {COMPARISON_CSV}")
 
     out = write_tests_json(
         WORKING_DATASET,
