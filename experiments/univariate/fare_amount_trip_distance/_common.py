@@ -11,6 +11,10 @@ CLEAN_PARQUET = RESULTS / "sample50k.parquet"
 FULL_PARQUET = RESULTS / "full_sample.parquet"
 RATECODE1_PARQUET = RESULTS / "ratecode1_sample.parquet"
 
+# The single working dataset all analysis steps operate on from now on.
+# sample50k / full_sample are retired (steps 01-10 kept as history).
+WORKING_DATASET = RATECODE1_PARQUET
+
 # Per-dataset provenance: how the dataset was built (transformations) and the
 # X/Y it is analyzed with. Keyed by parquet stem; used by _tests.py to make
 # every <dataset>.json self-describing.
@@ -50,7 +54,7 @@ DATASET_META = {
         },
     },
     "ratecode1_sample": {
-        "x_columns": ["trip_distance"],
+        "x_columns": ["trip_distance", "duration_minutes"],
         "y_column": "fare_amount",
         "transformations": {
             "sample": {
@@ -59,10 +63,14 @@ DATASET_META = {
                 "seed": 42,
                 "source": "raw yellow_tripdata_2024-01..03 parquets",
             },
+            "derived": {
+                "duration_minutes": "(tpep_dropoff_datetime - tpep_pickup_datetime).total_seconds() / 60"
+            },
             "filters": [
                 "RatecodeID == 1",
                 "fare_amount >= 0.0",
                 "trip_distance >= 0.0",
+                "trip_duration > 0",
             ],
         },
     },
