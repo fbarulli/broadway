@@ -5,6 +5,38 @@ Update freely; remove entries when done (git history is the record).
 
 ## Current
 
+- **Project-style refactor (DataScience paused 2026-08-16)** — audit of runs
+  1+2: promote generic machinery from experiments to `src/`, thin experiments
+  to config+src calls, single project-level dataset binding. Dependency
+  breakdown (waves):
+  - **Wave 1 — PARALLEL** (disjoint files; one commit each; test gate green
+    per commit; pushes sequenced to avoid git races):
+    - extend `evaluate/metrics.py`: full regression suite + binarized ROC/PR
+      AUC (+ tests)
+    - extend `data/splitter.py`: chronological split + stratified sampler
+      (+ tests)
+    - extend `training/mlflow_utils.py`: metadata logging (train/predict time,
+      model size, no-artifact), `dataset_id` + `log_input` linking
+    - extend `training/optuna.py` (RDBStorage); new `training/optuna_worker.py`
+      (URL-from-config, retry, smoke test)
+    - extend `stats/`: winsorize, modified_zscore, outlier_mask,
+      estimation_table/standardized_coefs/scenario_dollars, residual-diagnostic
+      + coefficient-forest plots (viz)
+    - new `evaluate/explain.py`: SHAP / LIME / permutation / PDP-ICE /
+      residuals
+    - new `evaluate/feature_selection.py`: RFE curve
+    - new `utils.py`: `require_keys` / `require_finite` validators
+    - `project/` dataset binding: ONE loader for all experiments (kills the
+      mlflow env override + multivariate importlib hack; three loaders -> one)
+  - **Wave 2 — PARALLEL (after Wave 1 merged):** thin each experiment to
+    config+src calls (univariate steps, multivariate 01-06, mlflow 01-03);
+    `configs/experiments/*.yaml` as single source
+    (seed/sample/split/features/models).
+  - **Wave 3 — SEQUENTIAL:** parked k8s/optuna/mlflow thread (uses
+    optuna_worker + mlflow_utils from src; config-as-files, no env).
+  - Sequential gates: Wave 2 requires Wave 1 merged; Wave 3 requires the
+    optuna/mlflow work; suite green on every commit.
+
 - **Statistical testing** — next work stream (user-directed, 2026-08-16).
   Scope to be set by the user: platform `src/broadway/stats` testing vs.
   hypothesis tests on the taxi data vs. tutorial continuation. Do not start
