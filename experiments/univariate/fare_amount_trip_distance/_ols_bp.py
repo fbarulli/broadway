@@ -114,6 +114,56 @@ def fit_raw_hc3(df: pd.DataFrame, use_hour: bool) -> RegressionResultsWrapper:
     return sm.OLS(df["fare_amount"], X).fit(cov_type="HC3")
 
 
+# (label, predictor, realistic change in predictor units) — estimate-size steps 29/30
+SCENARIOS: tuple[tuple[str, str, float], ...] = (
+    ("5-mile trip", "trip_distance", 5.0),
+    ("10 min waiting", "duration_minutes", 10.0),
+    ("typical 1.6mi trip", "trip_distance", 1.6),
+)
+
+
+def estimation_table(model: RegressionResultsWrapper,
+                     alpha: float = ALPHA) -> pd.DataFrame:
+    """coef / HC3 SE / 95% CI table (p-values deliberately absent)."""
+    ci = model.conf_int(alpha=alpha)
+    return pd.DataFrame({
+        "coef": model.params,
+        "HC3_SE": model.bse,
+        "CI_low": ci[0],
+        "CI_high": ci[1],
+    })
+
+
+def scenario_dollars(model: RegressionResultsWrapper, df: pd.DataFrame,
+                     scenarios: tuple[tuple[str, str, float], ...] = SCENARIOS
+                     ) -> list[dict]:
+    """Dollar effect of each realistic scenario, from the fitted coefs."""
+    rows = []
+    for label, term, change in scenarios:
+        coef = float(model.params[term])
+        rows.append({
+            "label": label,
+            "term": term,
+            "change": change,
+            "dollars": change * coef,
+        })
+    return rows
+
+
+def standardized_coefs(model: RegressionResultsWrapper, df: pd.DataFrame) -> dict:
+    """beta_std = coef * sd_x / sd_y for each predictor."""
+    sd_y = float(df["fare_amount"].std())
+    return {
+        col: {
+            "coef": float(model.params[col]),
+            "sd_x": float(df[col].std()),
+            "sd_y": sd_y,
+            "beta_std": float(model.params[col]) * float(df[col].std()) / sd_y,
+        }
+        for col in ("trip_distance", "duration_minutes")
+    }
+
+
 def add_log_predictions(df: pd.DataFrame) -> pd.DataFrame:
     """Return a copy of df with predicted_log_fare and log_residuals columns."""
     model = fit_log_hc3(df)
