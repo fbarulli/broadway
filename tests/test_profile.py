@@ -4,7 +4,7 @@ import pandas as pd
 import pytest
 import yaml
 
-import broadway.discover.module as module
+from broadway.discover import module
 from broadway.discover.profile import DatasetProfile, build_profile
 from broadway.lineage import records
 

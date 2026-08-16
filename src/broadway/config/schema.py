@@ -257,7 +257,7 @@ class FullStep(BaseModel):
     flows: dict[str, str]
 
     @model_validator(mode="after")
-    def _validate_flow_modes(self) -> "FullStep":
+    def _validate_flow_modes(self) -> FullStep:
         valid = {mode.value for mode in AnalysisMode}
         invalid = sorted(set(self.flows) - valid)
         if invalid:

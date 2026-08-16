@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 def _load_split(cfg: PipelineConfig) -> tuple[pd.DataFrame, pd.DataFrame | None]:
+    assert cfg.etl is not None
     out_dir = Path(cfg.environment.data_dir) / cfg.environment.processed_subdir
     train = pd.read_parquet(out_dir / cfg.etl.train_file)
     val_path = out_dir / cfg.etl.val_file

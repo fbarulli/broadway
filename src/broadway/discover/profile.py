@@ -31,7 +31,7 @@ def _stringify(value: object) -> str | None:
 
 
 def build_profile(name: str, path: str, df: pd.DataFrame) -> DatasetProfile:
-    row_count = int(len(df))
+    row_count = len(df)
     columns: dict[str, ColumnProfile] = {}
     for col in df.columns:
         series = df[col]

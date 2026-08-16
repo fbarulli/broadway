@@ -1,19 +1,18 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import matplotlib
 
 matplotlib.use("Agg")
 
-import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt  # noqa: F401 — test seam: test_qq monkeypatches runners.plt.close
 import numpy as np
 import pandas as pd
 from scipy import stats
 
-from broadway import viz
 from broadway.analysis.contracts import AnalysisContract
 from broadway.config.schema import PipelineConfig
 from broadway.config.viz import load_viz_config
@@ -55,13 +54,13 @@ def _thresholds() -> WalkthroughConfig:
 
 
 def now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _attrition(
     df: pd.DataFrame, source_group_column: str, group_values: list[str], target: str
 ) -> dict[str, int | str]:
-    total = int(len(df))
+    total = len(df)
     group_col = df[source_group_column]
     listed = group_col.isin(group_values)
     null_group = int(group_col.isna().sum())

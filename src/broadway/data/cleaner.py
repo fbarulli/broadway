@@ -9,7 +9,11 @@ from __future__ import annotations
 import pandas as pd
 
 from broadway.cleaning.models import ParseFailure
-from broadway.cleaning.structural import parse_datetime, parse_numeric, standardize_missing
+from broadway.cleaning.structural import (
+    parse_datetime,
+    parse_numeric,
+    standardize_missing,
+)
 from broadway.config.schema import DatasetContract
 
 

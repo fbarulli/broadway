@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import inspect
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -10,8 +9,8 @@ import yaml
 from pydantic import ValidationError
 from scipy import stats
 
-from broadway import viz
 import broadway.discover.module as discover_module
+from broadway import viz
 from broadway.config.loader import load_config
 from broadway.config.viz import QqZonesConfig, load_viz_config
 from broadway.discover.profile import ColumnProfile, DatasetProfile
@@ -169,7 +168,7 @@ def test_qq_points_thins_large_input() -> None:
     rng = np.random.default_rng(0)
     vals = rng.normal(0.0, 1.0, 5_000)
 
-    osm, osr, slope, intercept = _qq_points(vals, 2000)
+    osm, osr, _, _ = _qq_points(vals, 2000)
 
     assert osm.size == 2_000
     assert osr.size == 2_000
@@ -187,7 +186,7 @@ def test_midpoint_bin_edges_integer_values() -> None:
 
 def test_midpoint_bin_edges_counts_land_in_correct_slots() -> None:
     values = np.array([-1.75, 0, 0, 1.75])
-    counts, edges = np.histogram(values, bins=midpoint_bin_edges(values))
+    counts, _ = np.histogram(values, bins=midpoint_bin_edges(values))
     assert counts.tolist() == [1, 2, 1]
 
 

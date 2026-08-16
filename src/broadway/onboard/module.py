@@ -9,7 +9,7 @@ from pathlib import Path
 import pandas as pd
 import yaml
 
-from broadway.analysis.contracts import AnalysisContract
+from broadway.analysis.contracts import AnalysisContract, AnalysisMode
 from broadway.config.loader import CONFIGS_DIR
 from broadway.config.schema import (
     ColumnRole,
@@ -94,7 +94,7 @@ def build_dataset_contract(
 
 def build_analysis_contract(
     name: str,
-    mode: str,
+    mode: AnalysisMode,
     goal: str,
     row_definition: str,
     decision_moment: str,
@@ -285,7 +285,7 @@ def init(
         name, csv, target, task, datetime_columns, ignore_columns, split_column, report, report.row_count
     )
     analysis_contract = build_analysis_contract(
-        name, mode, goal, row_definition, decision_moment, available_info, leakage_notes, success_criterion
+        name, AnalysisMode(mode), goal, row_definition, decision_moment, available_info, leakage_notes, success_criterion
     )
     experiment_config = build_experiment_config(
         report, target, datetime_columns, ignore_columns, split_column

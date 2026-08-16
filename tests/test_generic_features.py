@@ -5,7 +5,6 @@ import types
 import pandas as pd
 import pytest
 
-import broadway.features.builders as builders
 from broadway.config.schema import (
     ColumnRole,
     ColumnSchema,
@@ -15,6 +14,7 @@ from broadway.config.schema import (
     FeatureConfig,
     TaskType,
 )
+from broadway.features import builders
 from broadway.features.builders import build_derived, load_custom_builders
 from broadway.features.generic import build_generic_feature_specs
 from broadway.features.pipeline import FeaturePipeline

@@ -9,14 +9,14 @@ import mlflow.pyfunc
 import pandas as pd
 
 
-class ModelPyFunc(mlflow.pyfunc.PythonModel):
-    def load_context(self, context: mlflow.pyfunc.PythonModelContext) -> None:
+class ModelPyFunc(mlflow.pyfunc.PythonModel):  # type: ignore[name-defined]
+    def load_context(self, context: mlflow.pyfunc.PythonModelContext) -> None:  # type: ignore[name-defined]
         with open(context.artifacts["model"], "rb") as f:
             self._model = pickle.load(f)
 
     def predict(
         self,
-        context: mlflow.pyfunc.PythonModelContext,
+        context: mlflow.pyfunc.PythonModelContext,  # type: ignore[name-defined]
         model_input: pd.DataFrame,
         params: dict[str, float | int | str] | None = None,
     ) -> Any:

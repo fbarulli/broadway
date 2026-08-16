@@ -19,7 +19,7 @@ from broadway.reports.results import (
     write_results,
 )
 from broadway.reports.timeline import render_timeline
-from broadway.timeline.models import AnalysisDecision, AnalysisStep, StepStatus
+from broadway.timeline.models import AnalysisStep, StepStatus
 from broadway.timeline.sequence import load_walkthrough_sequence
 
 

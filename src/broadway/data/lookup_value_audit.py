@@ -45,7 +45,8 @@ def audit_lookup_values(
             continue
         merged = merged_names[c]
         null_count = int((matched_mask & df_merged[merged].isna()).sum())
-        sentinels = lookup.value_policies.get(c).sentinel_values if c in lookup.value_policies else []
+        policy = lookup.value_policies.get(c)
+        sentinels = policy.sentinel_values if policy is not None else []
         sentinel_counts = {
             s: int((matched_mask & (df_merged[merged] == s)).sum()) for s in sentinels
         }

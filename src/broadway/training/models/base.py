@@ -27,5 +27,5 @@ class BaseModel(ABC):
     def get_params(self) -> dict[str, float | int | str]:
         return dict(self._params)
 
-    def set_params(self, **params: float | int | str) -> None:
+    def set_params(self, **params: float | str) -> None:
         self._params.update(params)

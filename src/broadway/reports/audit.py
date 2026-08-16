@@ -638,14 +638,12 @@ def render_index(
 
     consider_body = "\n".join(f"- {c}" for c in _considerations(result, join_report, lookup_report, profile))
 
-    details = "\n".join(
-        [
-            "- [profile](profile.md)",
-            "- [transform](transform.md)",
-            "- [join](join.md)",
-            "- [lookup_values](lookup_values.md)",
-            "- [lineage graph](../lineage/graph.md)",
-        ]
+    details = (
+        "- [profile](profile.md)\n"
+        "- [transform](transform.md)\n"
+        "- [join](join.md)\n"
+        "- [lookup_values](lookup_values.md)\n"
+        "- [lineage graph](../lineage/graph.md)"
     )
 
     lines = [
@@ -690,7 +688,7 @@ def _evidence_paths(cfg: Any) -> dict[str, Path]:
 
 def _load(path: Path, model: type) -> Any:
     try:
-        return model.model_validate_json(path.read_text(encoding="utf-8"))
+        return model.model_validate_json(path.read_text(encoding="utf-8"))  # type: ignore[attr-defined]
     except Exception:
         return None
 
@@ -725,7 +723,7 @@ def run(dataset: str, analysis: str | None, environment: str) -> None:
     if join_report is None:
         print("join unmatched rate: no join audit")
     else:
-        rows_evaluated, n_joins, matched_events, unmatched_events = _join_counts(join_report)
+        _, _, matched_events, unmatched_events = _join_counts(join_report)
         total_events = matched_events + unmatched_events
         rate = round(unmatched_events / total_events * 100, 4) if total_events else 0.0
         print(f"join unmatched rate: {rate}% across {total_events} key events")

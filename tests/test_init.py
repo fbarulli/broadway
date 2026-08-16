@@ -4,8 +4,8 @@ import pandas as pd
 import pytest
 import yaml
 
-import broadway.onboard.module as module
 from broadway.lineage import records
+from broadway.onboard import module
 
 
 def _write_csv(path) -> str:

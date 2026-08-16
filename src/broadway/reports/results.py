@@ -5,9 +5,9 @@ import re
 from broadway.formatting import humanize_float, humanize_pvalue
 from broadway.reports import paths
 from broadway.timeline.models import (
+    RENDERED_STATUS,
     AnalysisDecision,
     AnalysisStep,
-    RENDERED_STATUS,
     StepStatus,
 )
 from broadway.timeline.sequence import WalkthroughSequence
@@ -19,8 +19,7 @@ def _is_pvalue_key(key: str) -> bool:
     lowered = key.lower()
     return (
         key == "p"
-        or lowered.endswith("_p")
-        or lowered.endswith("p_value")
+        or lowered.endswith(("_p", "p_value"))
         or "pval" in lowered
     )
 
@@ -102,8 +101,8 @@ def effect_size_lines(summary: dict) -> list[str]:
         eta = humanize_float(float(summary["eta_squared"]))
         omega = humanize_float(float(summary["omega_squared"]))
         return [
-            f"eta² = {eta}: proportion of outcome variance explained by group membership "
-            "(can be inflated under extreme imbalance)",
+            (f"eta² = {eta}: proportion of outcome variance explained by group membership "
+             "(can be inflated under extreme imbalance)"),
             f"omega² = {omega}: corrects for small-sample bias; the more conservative estimate",
         ]
     return []
@@ -213,9 +212,9 @@ def _render_step_page(seq_step, step: AnalysisStep) -> str:
             for row in rows:
                 lines.append(
                     f"| {row.get('a')} vs {row.get('b')} | "
-                    f"{humanize_pvalue(float(row.get('p_value')))} | "
-                    f"{humanize_float(float(row.get('cohens_d')))} | "
-                    f"{humanize_float(float(row.get('hedges_g')))} | "
+                    f"{humanize_pvalue(float(row['p_value']))} | "
+                    f"{humanize_float(float(row['cohens_d']))} | "
+                    f"{humanize_float(float(row['hedges_g']))} | "
                     f"{row.get('effect_size_note')} |"
                 )
         else:

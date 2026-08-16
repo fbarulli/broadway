@@ -25,7 +25,7 @@ def test_run_levene_returns_statistic_and_p_value() -> None:
 def test_check_normality_returns_per_group_stats() -> None:
     result = check_normality(_groups())
     assert set(result.keys()) == {"A", "B", "C"}
-    for name, stats in result.items():
+    for stats in result.values():
         assert set(stats.keys()) == {"skew", "kurtosis", "shapiro_p"}
         assert isinstance(stats["skew"], float)
         assert isinstance(stats["kurtosis"], float)

@@ -15,7 +15,7 @@ def run(
         if vals.empty:
             continue
         group_means[g] = {
-            "count": int(len(vals)),
+            "count": len(vals),
             "mean": float(vals.mean()),
             "std": float(vals.std()),
         }

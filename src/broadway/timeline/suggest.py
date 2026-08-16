@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Callable
+from collections.abc import Callable
+from typing import Literal
 
 from broadway.formatting import humanize_float
 from broadway.timeline.models import (
@@ -13,7 +14,7 @@ from broadway.timeline.models import (
 from broadway.timeline.sequence import WalkthroughConfig, WalkthroughSequence
 
 
-def _alternative(label: str, intent: str, rationale: str, command: str = "") -> Alternative:
+def _alternative(label: str, intent: Literal["support", "challenge", "alternative"], rationale: str, command: str = "") -> Alternative:
     return Alternative(label=label, command=command, intent=intent, rationale=rationale)
 
 

@@ -1,10 +1,14 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Literal
 
 from broadway.analysis.contracts import AnalysisContract
 from broadway.timeline.models import AnalysisDecision
-from broadway.timeline.sequence import load_walkthrough_config, load_walkthrough_sequence
+from broadway.timeline.sequence import (
+    load_walkthrough_config,
+    load_walkthrough_sequence,
+)
 
 
 def _question_for(kind: str) -> str:
@@ -16,7 +20,7 @@ def _question_for(kind: str) -> str:
 
 def record(
     analysis: AnalysisContract,
-    kind: str,
+    kind: Literal["omnibus", "posthoc"],
     method: str,
     reason: str,
 ) -> AnalysisDecision:
@@ -37,5 +41,5 @@ def record(
         reason=[reason],
         status="resolved",
         parents=list(spec.parents),
-        decided_at=datetime.now(timezone.utc).isoformat(),
+        decided_at=datetime.now(UTC).isoformat(),
     )

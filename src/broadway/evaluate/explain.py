@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Protocol
 
 import matplotlib
 
@@ -16,8 +17,12 @@ from lime.lime_tabular import LimeTabularExplainer
 from sklearn.inspection import PartialDependenceDisplay, permutation_importance
 
 
+class Predictable(Protocol):
+    def predict(self, X: object) -> object: ...
+
+
 def shap_summary(
-    model: object,
+    model: Predictable,
     X: pd.DataFrame,
     out_path: Path,
     kind: str,
@@ -42,7 +47,7 @@ def shap_summary(
 
 
 def permutation_importance_table(
-    model: object,
+    model: Predictable,
     X: pd.DataFrame,
     y: np.ndarray,
     n_repeats: int,
@@ -60,14 +65,14 @@ def permutation_importance_table(
     )
 
 
-def pdp_ice(model: object, X: pd.DataFrame, features: list[str], out_path: Path) -> None:
+def pdp_ice(model: Predictable, X: pd.DataFrame, features: list[str], out_path: Path) -> None:
     display = PartialDependenceDisplay.from_estimator(model, X, features, kind="both")
     display.figure_.savefig(out_path, dpi=150, bbox_inches="tight")
     plt.close(display.figure_)
 
 
 def lime_explanation(
-    model: object,
+    model: Predictable,
     X_train: pd.DataFrame,
     row: pd.Series,
     feature_names: list[str],

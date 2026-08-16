@@ -5,7 +5,12 @@ from __future__ import annotations
 import numpy as np
 from scipy import stats
 
-from broadway.stats.effect_size import epsilon_squared, eta_squared, group_imbalance, omega_squared
+from broadway.stats.effect_size import (
+    epsilon_squared,
+    eta_squared,
+    group_imbalance,
+    omega_squared,
+)
 from broadway.stats.guards import validate_groups
 from broadway.stats.plan import AnalysisPlan
 

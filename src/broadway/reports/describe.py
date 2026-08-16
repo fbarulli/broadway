@@ -45,11 +45,7 @@ def render(summary: GroupSummary) -> str:
         else "none"
     )
 
-    figures = "\n".join(
-        [
-            "[describe.png](figures/describe.png)",
-        ]
-    )
+    figures = "[describe.png](figures/describe.png)"
 
     sections = [
         ("Question", "whether trip duration differs across pickup boroughs"),

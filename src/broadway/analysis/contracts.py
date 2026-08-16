@@ -30,7 +30,7 @@ class AnalysisContract(BaseModel):
     hypothesis: HypothesisConfig | None = None
 
     @model_validator(mode="after")
-    def _reject_empty_strings(self) -> "AnalysisContract":
+    def _reject_empty_strings(self) -> AnalysisContract:
         for field in ("name", "goal", "row_definition", "decision_moment", "success_criterion"):
             if not getattr(self, field).strip():
                 raise ValueError(f"'{field}' must be non-empty")
@@ -39,7 +39,7 @@ class AnalysisContract(BaseModel):
         return self
 
     @model_validator(mode="after")
-    def _require_hypothesis_group(self) -> "AnalysisContract":
+    def _require_hypothesis_group(self) -> AnalysisContract:
         if self.mode == AnalysisMode.HYPOTHESIS and self.hypothesis is None:
             raise ValueError("hypothesis mode requires a 'hypothesis' block (group_column, group_values)")
         return self

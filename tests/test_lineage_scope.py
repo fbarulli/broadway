@@ -50,7 +50,7 @@ def test_scope_graph_by_analysis_and_dataset() -> None:
     scoped = scope_graph(_graph(), analysis="test_hypothesis", dataset="test")
     node_ids = {n.id for n in scoped.nodes}
 
-    for expected in {
+    for expected in (
         "dataset:test",
         "etl:test",
         "describe:test_hypothesis",
@@ -58,7 +58,7 @@ def test_scope_graph_by_analysis_and_dataset() -> None:
         "analysis:test_hypothesis",
         "slice:airport",
         "decision:keep",
-    }:
+    ):
         assert expected in node_ids
 
     assert "training:test" not in node_ids
@@ -69,16 +69,16 @@ def test_scope_graph_by_dataset_only() -> None:
     scoped = scope_graph(_graph(), dataset="test")
     node_ids = {n.id for n in scoped.nodes}
 
-    for expected in {"dataset:test", "ingest:test", "etl:test", "slice:airport", "decision:keep"}:
+    for expected in ("dataset:test", "ingest:test", "etl:test", "slice:airport", "decision:keep"):
         assert expected in node_ids
 
-    for absent in {
+    for absent in (
         "analysis:test",
         "analysis:test_hypothesis",
         "describe:test_hypothesis",
         "stats:test_hypothesis",
         "training:test",
-    }:
+    ):
         assert absent not in node_ids
 
 

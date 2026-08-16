@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import pandas as pd
-import pytest
 
 from broadway.onboard.infer import infer
 from broadway.onboard.models import InferenceReport

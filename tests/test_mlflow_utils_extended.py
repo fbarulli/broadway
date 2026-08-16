@@ -43,9 +43,8 @@ def test_log_dataset_missing_source_warns_and_continues(
 ) -> None:
     setup_mlflow(str(tmp_path / "mlruns"), "test_experiment")
     missing = tmp_path / "missing.parquet"
-    with mlflow.start_run() as run:
-        with caplog.at_level(logging.WARNING, logger=_LOGGER_NAME):
-            log_dataset("test-train", str(missing), context="train")
+    with mlflow.start_run() as run, caplog.at_level(logging.WARNING, logger=_LOGGER_NAME):
+        log_dataset("test-train", str(missing), context="train")
     assert "missing.parquet" in caplog.text
     run_obj = mlflow.tracking.MlflowClient().get_run(run.info.run_id)
     assert run_obj.data.params["dataset_id"] == "test-train"

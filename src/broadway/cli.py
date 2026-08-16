@@ -5,7 +5,12 @@ from __future__ import annotations
 import argparse
 import logging
 
-from broadway.config.loader import DEFAULT_ENVIRONMENT, STEP_MODELS, load_config, resolve_full_steps
+from broadway.config.loader import (
+    DEFAULT_ENVIRONMENT,
+    STEP_MODELS,
+    load_config,
+    resolve_full_steps,
+)
 from broadway.lineage.sample import load_sample
 
 STEPS = list(STEP_MODELS.keys())
@@ -103,17 +108,17 @@ def main() -> None:
     args = _build_parser().parse_args()
 
     if args.step == "discover":
-        from broadway.discover.module import run
+        from broadway.discover.module import run as discover_run
 
-        run(args.csv, args.target, args.task, args.datetime_column, args.ignore_columns)
+        discover_run(args.csv, args.target, args.task, args.datetime_column, args.ignore_columns)
     elif args.step == "columns":
-        from broadway.discover.columns import run
+        from broadway.discover.columns import run as columns_run
 
-        run(args.csv)
+        columns_run(args.csv)
     elif args.step == "lineage":
-        from broadway.lineage.module import run
+        from broadway.lineage.module import run as lineage_run
 
-        run(args.analysis, args.dataset)
+        lineage_run(args.analysis, args.dataset)
     elif args.step == "report":
         from broadway.reports.results import write_results
         from broadway.timeline import module as timeline_module
@@ -170,7 +175,7 @@ def main() -> None:
         cfg = load_config(
             "stats", dataset=args.dataset, analysis=args.analysis, environment=args.environment,
         )
-        sample = load_sample(args.sample) if args.sample else None
+        sample = load_sample(args.sample) if args.sample else None  # type: ignore[assignment]
         walkthrough_run(cfg, sample, args.force)
     elif args.step == "decide":
         from broadway.analysis.contracts import AnalysisMode, require_mode
@@ -189,7 +194,7 @@ def main() -> None:
         )
         print(f"next: ds-pipeline walkthrough --analysis {analysis.name}")
     else:
-        from broadway.pipeline import run
+        from broadway.pipeline import run as pipeline_run
 
         cfg = load_config(
             step=args.step,
@@ -198,5 +203,5 @@ def main() -> None:
             analysis=args.analysis,
             environment=args.environment,
         )
-        steps = resolve_full_steps(cfg) if cfg.full else [args.step]
-        run(cfg, steps)
+        steps = resolve_full_steps(cfg) if cfg.full else [args.step]  # type: ignore[assignment]
+        pipeline_run(cfg, steps)  # type: ignore[arg-type]

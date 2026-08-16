@@ -6,7 +6,11 @@ import pandas as pd
 
 import broadway.etl.module as etl_module
 from broadway.cleaning.models import StructuralCleanResult
-from broadway.cleaning.structural import parse_datetime, parse_numeric, standardize_missing
+from broadway.cleaning.structural import (
+    parse_datetime,
+    parse_numeric,
+    standardize_missing,
+)
 from broadway.config.loader import load_config
 from broadway.config.schema import ColumnRole, ColumnSchema, LookupSpec
 from broadway.contracts.pandera import is_numeric_dtype
