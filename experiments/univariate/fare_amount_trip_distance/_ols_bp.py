@@ -173,15 +173,15 @@ def time_bucket(hour: int) -> str:
     return "overnight"
 
 
-def fit_time_bucket(df: pd.DataFrame) -> RegressionResultsWrapper:
-    """HC3 raw fare ~ distance + duration + peak/overnight dummies (day reference)."""
+def fit_time_bucket(df: pd.DataFrame, target: str = "fare_amount") -> RegressionResultsWrapper:
+    """HC3 fit of `target` ~ distance + duration + peak/overnight dummies (day ref)."""
     buckets = df["pickup_hour"].map(time_bucket)
     X = df[["trip_distance", "duration_minutes"]].copy()
     dummies = pd.get_dummies(buckets, prefix="time")
     # get_dummies yields bool columns in pandas 2.x; statsmodels needs numeric
     X = pd.concat([X, dummies[["time_peak", "time_overnight"]]], axis=1).astype(float)
     X = sm.add_constant(X)
-    return sm.OLS(df["fare_amount"], X).fit(cov_type="HC3")
+    return sm.OLS(df[target], X).fit(cov_type="HC3")
 
 
 def add_log_predictions(df: pd.DataFrame) -> pd.DataFrame:
