@@ -13,7 +13,9 @@ data/raw/
 data/processed/
 artifacts/
 /results/
-experiments/results/
+experiments/results/**
+!experiments/results/**/
+!experiments/results/**/*.csv
 *.png
 !reports/figures/*.png
 graphify-out/

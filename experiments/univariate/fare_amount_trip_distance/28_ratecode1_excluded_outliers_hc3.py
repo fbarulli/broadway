@@ -24,6 +24,9 @@ from broadway.stats.regression import bp_jb
 
 OUT = RESULTS / f"{Path(__file__).stem}.png"
 COMPARISON_CSV = RESULTS / "ratecode1_sample_comparison.csv"
+DELTAS_CSV = RESULTS / "ratecode1_sample_comparison_deltas.csv"
+
+MODEL_METRICS = ("rsquared", "kurtosis", "jb_stat", "bp_stat")
 
 MASK_THRESHOLD = 10.0  # step-22 modified-z |M| threshold (union over fare/distance)
 
@@ -102,34 +105,17 @@ def print_deltas(deltas: list[dict]) -> None:
               f"Δkurt={d['delta_kurtosis']:+.2f} [{tag}] — {d['reason']}")
 
 
-def write_comparison_csv(models: list[dict], deltas: list[dict], out_path: Path) -> None:
-    """Tidy long-format CSV: one row per (model|delta, metric) — Excel-friendly."""
-    rows = []
-    for m in models:
-        for metric, value in (
-            ("rsquared", m["rsquared"]),
-            ("kurtosis", m["kurtosis"]),
-            ("jb_stat", m["jb_stat"]),
-            ("bp_stat", m["bp_stat"]),
-        ):
-            rows.append({
-                "kind": "model", "label": m["name"], "n": m["n"], "mask": m["mask"],
-                "target": m["target"], "features": m["features"],
-                "metric": metric, "value": value, "note": "",
-            })
-    for d in deltas:
-        for metric, value in (
-            ("delta_rsquared", d["delta_rsquared"]),
-            ("delta_kurtosis", d["delta_kurtosis"]),
-            ("delta_jb_stat", d["delta_jb_stat"]),
-            ("delta_bp_stat", d["delta_bp_stat"]),
-        ):
-            rows.append({
-                "kind": "delta", "label": d["pair"], "n": "", "mask": "",
-                "target": "", "features": "", "metric": metric, "value": value,
-                "note": ("DIRECT — " if d["comparable"] else "qualified — ") + d["reason"],
-            })
-    pd.DataFrame(rows).to_csv(out_path, index=False)
+def write_comparison_csv(models: list[dict], out_path: Path) -> None:
+    """Wide CSV: one row per model, one column per headline metric."""
+    cols = ["name", "n", "mask", "target", "features"] + list(MODEL_METRICS)
+    pd.DataFrame([{c: m[c] for c in cols} for m in models]).to_csv(out_path, index=False)
+
+
+def write_deltas_csv(deltas: list[dict], out_path: Path) -> None:
+    """Wide CSV: one row per delta pair, comparable flag + reason included."""
+    cols = ["pair", "delta_rsquared", "delta_kurtosis", "delta_jb_stat",
+            "delta_bp_stat", "comparable", "reason"]
+    pd.DataFrame([{c: d[c] for c in cols} for d in deltas]).to_csv(out_path, index=False)
 
 
 def main() -> None:
@@ -185,8 +171,10 @@ def main() -> None:
     deltas = build_deltas(models)
     print_models(models)
     print_deltas(deltas)
-    write_comparison_csv(models, deltas, COMPARISON_CSV)
+    write_comparison_csv(models, COMPARISON_CSV)
+    write_deltas_csv(deltas, DELTAS_CSV)
     print(f"wrote {COMPARISON_CSV}")
+    print(f"wrote {DELTAS_CSV}")
 
     out = write_tests_json(
         WORKING_DATASET,
