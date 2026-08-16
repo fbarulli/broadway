@@ -23,9 +23,9 @@ from _setup import (
     WORKING_DATASET,
     load_config,
     load_manhattan_sample,
-    require_keys,
 )
 from broadway.stats.describe import describe, plot_describe_figures
+from broadway.utils import require_keys
 
 CSV_STEM = Path(__file__).stem
 

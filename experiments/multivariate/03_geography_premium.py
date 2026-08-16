@@ -25,9 +25,9 @@ from _setup import (
     build_borough_dummies,
     load_config,
     load_manhattan_sample,
-    require_finite,
 )
 from broadway.stats.regression import bp_jb
+from broadway.utils import require_finite
 
 CSV_STEM = Path(__file__).stem
 BOROUGH_PREFIX = "borough_"
