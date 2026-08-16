@@ -1,4 +1,9 @@
-"""Column presence, dtype, and null-rate checks against the contract."""
+"""Column presence and null-rate checks against the raw contract.
+
+Dtype conformance is intentionally not checked here: source representation may
+differ from the canonical dtype (e.g. dates stored as strings). Strict dtype
+validation happens at the canonical boundary in the ``etl`` step.
+"""
 
 from __future__ import annotations
 
@@ -32,18 +37,6 @@ def check_nulls(df: pd.DataFrame, contract: DatasetContract, threshold: float) -
         null_rate = df[col].isna().mean()
         if null_rate > threshold:
             msg = f"{col}: null rate {null_rate:.1%} exceeds threshold {threshold:.1%}"
-            issues.append(msg)
-            logger.warning(msg)
-    return issues
-
-
-def check_dtypes(df: pd.DataFrame, contract: DatasetContract) -> list[str]:
-    issues = []
-    for col in set(df.columns) & set(contract.columns):
-        expected = contract.columns[col].dtype
-        actual = str(df[col].dtype)
-        if expected != actual:
-            msg = f"{col}: dtype mismatch — expected {expected}, got {actual}"
             issues.append(msg)
             logger.warning(msg)
     return issues

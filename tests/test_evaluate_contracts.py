@@ -149,7 +149,8 @@ def test_cross_validate_returns_finite_metrics() -> None:
     coef = np.array([1.5, -2.0, 0.5])
     y = X @ coef + rng.normal(scale=0.1, size=60)
     metrics = cross_validate(LinearRegression(), X, y, cv_folds=5, random_state=0)
-    assert set(metrics) == {"mae", "rmse", "r2"}
+    assert set(metrics) == {
+        "mae", "rmse", "r2", "mape", "max_error", "median_ae", "explained_var"}
     assert all(np.isfinite(value) for value in metrics.values())
 
 
@@ -196,7 +197,6 @@ def _make_config(tmp_path: Path) -> PipelineConfig:
             "price": ColumnSchema(dtype="float64", null_count=0, role=ColumnRole.TARGET),
         },
         lookup_tables={},
-        row_count=40,
     )
     experiment = ExperimentConfig(
         features=FeatureConfig(include=["rooms", "area"], exclude=[], derived=[], encodings=[]),
@@ -215,6 +215,7 @@ def _make_config(tmp_path: Path) -> PipelineConfig:
         training_data_file="training_data.parquet",
         train_features_file="train_features.parquet",
         val_features_file="val_features.parquet",
+        missing_encodings=["", "NA", "null"],
     )
     train_step = TrainStep(
         random_state=42,
@@ -282,9 +283,11 @@ def test_module_run_writes_evaluation_result(tmp_path: Path, monkeypatch: pytest
     result_path = Path(cfg.evaluate.output_dir) / cfg.evaluate.output_file
     assert result_path.exists()
     evaluation = EvaluationResult.model_validate_json(result_path.read_text(encoding="utf-8"))
-    assert set(evaluation.metrics) == {"mae", "rmse", "r2"}
+    assert set(evaluation.metrics) == {
+        "mae", "rmse", "r2", "mape", "max_error", "median_ae", "explained_var"}
     assert evaluation.cv_metrics is not None
-    assert set(evaluation.cv_metrics) == {"mae", "rmse", "r2"}
+    assert set(evaluation.cv_metrics) == {
+        "mae", "rmse", "r2", "mape", "max_error", "median_ae", "explained_var"}
     assert evaluation.residuals is not None
     assert isinstance(evaluation.promote, bool)
 

@@ -1,0 +1,49 @@
+steps:
+  - id: describe_groups
+    label: Describe groups
+    order: 1
+    question: Do the groups contain enough observations?
+    kind: evidence
+    action: describing the groups
+  - id: normality
+    label: Normality diagnostics
+    order: 2
+    question: Is the distributional shape problematic?
+    kind: evidence
+    action: running normality diagnostics
+  - id: variance
+    label: Variance homogeneity
+    order: 3
+    question: Is error/group variance homogeneous?
+    kind: evidence
+    action: checking variance homogeneity
+  - id: decide_omnibus
+    label: Choose principal method
+    order: 4
+    question: Which principal method should answer the question?
+    kind: decision
+    action: choosing the principal method
+  - id: omnibus
+    label: Principal analysis
+    order: 5
+    question: Do the group means differ?
+    kind: analysis
+    action: running the principal analysis
+  - id: decide_posthoc
+    label: Choose post-hoc method
+    order: 6
+    question: Which post-hoc comparison is appropriate?
+    kind: decision
+    action: choosing the post-hoc method
+  - id: posthoc
+    label: Post-hoc comparisons
+    order: 7
+    question: Which specific group pairs differ?
+    kind: analysis
+    action: running post-hoc comparisons
+  - id: conclusion
+    label: Conclusion
+    order: 8
+    question: What is the conclusion?
+    kind: analysis
+    action: drawing the conclusion

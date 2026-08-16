@@ -7,6 +7,8 @@ import numpy as np
 from statsmodels.graphics.tsaplots import plot_acf as _plot_acf
 from statsmodels.stats.stattools import durbin_watson
 
+from broadway import viz
+
 
 def durbin_watson_test(resid: np.ndarray) -> float:
     return float(durbin_watson(np.asarray(resid, dtype=float)))
@@ -14,5 +16,7 @@ def durbin_watson_test(resid: np.ndarray) -> float:
 
 def plot_acf(resid: np.ndarray, lags: int, out_path: str) -> None:
     fig = _plot_acf(np.asarray(resid, dtype=float), lags=lags)
+    for ax in fig.axes:
+        viz.despine(ax)
     fig.savefig(out_path)
     plt.close(fig)

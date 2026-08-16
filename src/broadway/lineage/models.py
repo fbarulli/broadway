@@ -4,6 +4,17 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
+SampleRole = Literal["diagnostic", "estimation"]
+
+
+class SampleSpec(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: str
+    role: SampleRole
+    path: str
+    description: str | None = None
+    column_mapping: dict[str, str] = {}
+
 
 class DatasetRef(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -50,6 +61,8 @@ class LineageRecord(BaseModel):
     artifact: str
     parents: list[str]
     audit: TransformAudit | None = None
+    sample_name: str | None = None
+    sample_role: SampleRole | None = None
 
 
 class LineageNode(BaseModel):
@@ -58,7 +71,11 @@ class LineageNode(BaseModel):
     kind: str
     label: str
     artifact: str | None = None
-    status: Literal["produced", "not_yet_produced", "ran_but_output_missing"]
+    status: Literal[
+        "produced", "not_yet_produced", "ran_but_output_missing", "referenced_not_found"
+    ]
+    sample_name: str | None = None
+    sample_role: SampleRole | None = None
 
 
 class LineageEdge(BaseModel):

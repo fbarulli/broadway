@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import csv as csv_module
 import os
+import shutil
 import subprocess
 from pathlib import Path
 
 import pytest
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 def _run(*args: str, **kwargs: object) -> subprocess.CompletedProcess[str]:
@@ -24,6 +27,11 @@ def _write_csv(path: Path, rows: list[dict[str, object]]) -> None:
         w.writerows(rows)
 
 
+def _copy_viz_config(configs_dir: Path) -> None:
+    (configs_dir / "step").mkdir(parents=True, exist_ok=True)
+    shutil.copy(REPO_ROOT / "configs" / "step" / "viz.yaml", configs_dir / "step" / "viz.yaml")
+
+
 class TestDiscoverCLI:
     def test_discover_parses_and_generates_yaml(self, tmp_path: Path) -> None:
         csv_path = tmp_path / "test_data.csv"
@@ -38,10 +46,14 @@ class TestDiscoverCLI:
 
         configs_dir = tmp_path / "configs"
         dataset_dir = configs_dir / "dataset"
+        _copy_viz_config(configs_dir)
         env = {
             **os.environ,
             "BROADWAY_CONFIGS_DIR": str(configs_dir),
             "BROADWAY_DATASET_DIR": "dataset",
+            "BROADWAY_ARTIFACTS_DIR": str(tmp_path / "artifacts"),
+            "BROADWAY_REPORTS_DIR": str(tmp_path / "reports"),
+            "BROADWAY_LINEAGE_DIR": str(tmp_path / "lineage"),
         }
 
         result = _run(
@@ -55,6 +67,7 @@ class TestDiscoverCLI:
         assert result.returncode == 0, f"stderr: {result.stderr}"
         yaml_path = dataset_dir / f"{csv_path.stem}.yaml"
         assert yaml_path.exists()
+        assert (tmp_path / "artifacts" / "discover" / "profile.json").exists()
 
     def test_discover_missing_csv_raises(self, tmp_path: Path) -> None:
         result = _run(
@@ -78,11 +91,18 @@ class TestDiscoverCLI:
 
         configs_dir = tmp_path / "configs"
         dataset_dir = configs_dir / "dataset"
+        _copy_viz_config(configs_dir)
         env = {
             **os.environ,
             "BROADWAY_CONFIGS_DIR": str(configs_dir),
             "BROADWAY_DATASET_DIR": "dataset",
+            "BROADWAY_ARTIFACTS_DIR": str(tmp_path / "artifacts"),
+            "BROADWAY_REPORTS_DIR": str(tmp_path / "reports"),
+            "BROADWAY_LINEAGE_DIR": str(tmp_path / "lineage"),
         }
+
+        real = Path("artifacts/discover/profile.json")
+        before = real.read_bytes() if real.exists() else None
 
         result = _run(
             "discover",
@@ -95,6 +115,9 @@ class TestDiscoverCLI:
         )
         assert result.returncode == 0, f"stderr: {result.stderr}"
         assert dataset_dir.joinpath(f"{csv_path.stem}.yaml").exists()
+        assert (tmp_path / "artifacts" / "discover" / "profile.json").exists()
+        if before is not None:
+            assert real.read_bytes() == before
 
 
 class TestTrainCLI:
@@ -109,6 +132,13 @@ class TestTrainCLI:
         assert result.returncode not in (2,), (
             f"argparse error (exit 2), should have dispatched: {result.stderr}"
         )
+
+
+class TestWalkthroughCLI:
+    def test_walkthrough_requires_dataset(self) -> None:
+        result = _run("walkthrough", "--analysis", "test_hypothesis")
+        assert result.returncode == 2
+        assert "required" in result.stderr.lower()
 
 
 class TestMissingSubcommand:

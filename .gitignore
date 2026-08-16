@@ -5,12 +5,23 @@ __pycache__/
 .mypy_cache/
 .pytest_cache/
 mlruns/
+notebooks/
 *.egg-info/
 dist/
 build/
 data/raw/
 data/processed/
 artifacts/
-results/
+/results/
+experiments/results/**
+!experiments/results/**/
+!experiments/results/**/*.csv
+# Pinned sample + evidence (single source of truth — committed on purpose)
+!experiments/results/univariate/fare_amount_trip_distance/ratecode1_sample.parquet
+!experiments/results/univariate/fare_amount_trip_distance/ratecode1_sample.json
 *.png
+!reports/figures/*.png
 graphify-out/
+.mplconfig/
+diagnostics_experiment/
+legend_experiment/

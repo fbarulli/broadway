@@ -1,0 +1,13 @@
+skew_threshold: 2.0
+kurtosis_threshold: 7.0
+shapiro_alpha: 0.05
+imbalance_ratio_threshold: 1.5
+significance_alpha: 0.05
+max_qq_groups: 12
+decisions:
+  omnibus:
+    methods: [welch, anova, kruskal]
+    parents: [describe_groups, normality, variance]
+  posthoc:
+    methods: [games_howell]
+    parents: [omnibus]

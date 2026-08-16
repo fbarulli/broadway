@@ -113,10 +113,9 @@ def test_init_and_run_non_taxi_dataset(
                 ),
             )
 
-    # 5. Run the full flow (skip the optional eda report; discover is skipped
-    #    inside pipeline.run anyway).
+    # 5. Run the full flow (discover is skipped inside pipeline.run anyway).
     steps = resolve_full_steps(cfg)
-    run_pipeline(cfg, [s for s in steps if s != "eda"])
+    run_pipeline(cfg, [s for s in steps])
 
     # 6. Assert every step produced its artifact and lineage sidecar.
     assert (tmp_path / "artifacts" / "baseline" / "baseline.json").exists()

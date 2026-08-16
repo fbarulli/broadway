@@ -1,0 +1,393 @@
+from __future__ import annotations
+
+import logging
+import traceback
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Callable
+
+import numpy as np
+import pandas as pd
+
+from broadway.analysis.contracts import AnalysisContract, AnalysisMode, require_mode
+from broadway.config.schema import PipelineConfig
+from broadway.formatting import humanize_float, humanize_pvalue
+from broadway.lineage.models import SampleSpec
+from broadway.reports import paths
+from broadway.reports.index import render_dashboard
+from broadway.reports.results import write_results
+from broadway.reports.timeline import render_timeline
+from broadway.timeline import module as timeline_module
+from broadway.timeline import runners, suggest
+from broadway.timeline.models import AnalysisDecision, AnalysisStep, StepStatus, Suggestion
+from broadway.timeline.sequence import (
+    WalkthroughConfig,
+    WalkthroughSequence,
+    WalkthroughStepConfig,
+    load_walkthrough_config,
+    load_walkthrough_sequence,
+)
+
+logger = logging.getLogger(__name__)
+
+TIMELINE_DIR = timeline_module.TIMELINE_DIR
+
+
+@dataclass
+class StepContext:
+    analysis: AnalysisContract
+    df: pd.DataFrame
+    groups: dict[str, np.ndarray]
+    group_column: str
+    source_group_column: str
+    group_values: list[str]
+    target: str
+    source_path: str
+    sample_name: str | None
+    source: str
+    out_dir: Path
+    figures_dir: Path
+    attrition: dict
+    sequence: WalkthroughSequence
+    thresholds: WalkthroughConfig
+
+
+class _StopWalkthrough(Exception):
+    pass
+
+
+def _resolved_decision(analysis: str, kind: str) -> AnalysisDecision | None:
+    for decision in timeline_module.load_decisions(analysis):
+        if decision.kind == kind and decision.status == "resolved":
+            return decision
+    return None
+
+
+def _write_timeline(
+    analysis: AnalysisContract, sequence: WalkthroughSequence, thresholds: WalkthroughConfig
+) -> None:
+    steps = timeline_module.load_steps(analysis.name)
+    decisions = timeline_module.load_decisions(analysis.name)
+    suggestion = suggest.suggest_next(sequence, steps, decisions, thresholds, analysis.name)
+    timeline_md = render_timeline(analysis.name, sequence, steps, decisions)
+    if suggestion is not None:
+        timeline_md += (
+            "\n## Suggested next action\n\n"
+            f"- {suggestion.headline}\n"
+            f"- command: {suggestion.command}\n"
+        )
+    paths.TIMELINE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    paths.TIMELINE_PATH.write_text(timeline_md, encoding="utf-8")
+    paths.INDEX_PATH.parent.mkdir(parents=True, exist_ok=True)
+    paths.INDEX_PATH.write_text(
+        render_dashboard(analysis.name, analysis.goal, sequence, steps, decisions, suggestion),
+        encoding="utf-8",
+    )
+    write_results(analysis.name, sequence, steps, decisions)
+
+
+def _handle_failure(
+    analysis: AnalysisContract,
+    step,
+    exc: Exception,
+    source: str,
+    sample_name: str | None,
+) -> None:
+    failures_dir = TIMELINE_DIR / analysis.name / "failures"
+    failures_dir.mkdir(parents=True, exist_ok=True)
+    (failures_dir / f"{step.id}.log").write_text(traceback.format_exc(), encoding="utf-8")
+    what = getattr(step, "action", step.id)
+    message = f"step '{step.label}' failed while attempting {what}"
+    failed = AnalysisStep(
+        analysis=analysis.name,
+        step_id=step.id,
+        order=step.order,
+        question=step.question,
+        status=StepStatus.FAILED,
+        method=None,
+        source=source,
+        sample_name=sample_name,
+        evidence_refs=[],
+        result_summary={},
+        ramification=message,
+        decision_required=False,
+        performed_at=runners.now_iso(),
+    )
+    timeline_module.save_step(failed)
+    print(message)
+    print(f"fix and rerun: ds-pipeline walkthrough --analysis {analysis.name} --force")
+
+
+def _print_suggestion(suggestion: Suggestion, include_rationale: bool = False) -> None:
+    lines = ["── Suggestion ──", suggestion.headline]
+    if include_rationale:
+        lines.extend(suggestion.rationale)
+    lines.append(f"Next: {suggestion.command}")
+    if suggestion.alternatives:
+        lines.append("Alternatives:")
+        for alt in suggestion.alternatives:
+            lines.append(f"  [{alt.intent}] {alt.label} — {alt.rationale}")
+    print("\n".join(lines))
+
+
+def _print_decision_required(
+    analysis: AnalysisContract, steps: list[AnalysisStep], thresholds: WalkthroughConfig
+) -> None:
+    by_id = {s.step_id: s for s in steps}
+    lines = ["=" * 60, "DECISION REQUIRED — decide_omnibus", "=" * 60, ""]
+    lines.append(f"Goal: {analysis.goal}")
+    lines.append("")
+    lines.append("Evidence gathered:")
+    describe = by_id.get("describe_groups")
+    if describe is not None:
+        rs = describe.result_summary
+        lines.append(
+            f"  - describe_groups: n_total={rs.get('n_total')}, "
+            f"imbalance_ratio={humanize_float(rs.get('imbalance_ratio'))}, "
+            f"absent_groups={rs.get('absent_groups')}"
+        )
+    normality = by_id.get("normality")
+    if normality is not None:
+        lines.append(f"  - normality: {normality.status.value}")
+    variance = by_id.get("variance")
+    if variance is not None:
+        rs = variance.result_summary
+        lines.append(
+            f"  - variance: Levene statistic={humanize_float(rs.get('statistic'))}, "
+            f"p_value={humanize_pvalue(rs.get('p_value'))}"
+        )
+    lines.append("")
+    lines.append("Eligible methods:")
+    for method in thresholds.decisions["omnibus"].methods:
+        lines.append(f"  - {method}")
+    lines.append("")
+    lines.append(
+        f'Next: ds-pipeline decide --analysis {analysis.name} --method <method> --reason "..."'
+    )
+    print("\n".join(lines))
+
+
+def _print_posthoc_decision_required(
+    analysis: AnalysisContract, thresholds: WalkthroughConfig
+) -> None:
+    lines = ["=" * 60, "DECISION REQUIRED — decide_posthoc", "=" * 60, ""]
+    lines.append(f"Goal: {analysis.goal}")
+    lines.append("")
+    lines.append("Eligible post-hoc methods:")
+    for method in thresholds.decisions["posthoc"].methods:
+        lines.append(f"  - {method}")
+    lines.append("")
+    lines.append(
+        f'Next: ds-pipeline decide --analysis {analysis.name} '
+        f'--kind posthoc --method <method> --reason "..."'
+    )
+    print("\n".join(lines))
+
+
+def _warn_stale_decisions(analysis: str) -> None:
+    by_id = {s.step_id: s for s in timeline_module.load_steps(analysis)}
+    for decision in timeline_module.load_decisions(analysis):
+        for parent in decision.parents:
+            step = by_id.get(parent)
+            if step is not None and step.performed_at > decision.decided_at:
+                print(
+                    f"WARNING: decision '{decision.id}' was made against earlier evidence"
+                )
+                break
+
+
+def _run_describe(
+    analysis: AnalysisContract, step: WalkthroughStepConfig, ctx: StepContext
+) -> AnalysisStep:
+    return runners.run_describe(
+        analysis, step.order, step.question, ctx.df, ctx.group_column,
+        ctx.source_group_column, ctx.group_values, ctx.target, ctx.source_path,
+        ctx.sample_name, ctx.source, ctx.out_dir, ctx.figures_dir, ctx.attrition,
+    )
+
+
+def _run_normality(
+    analysis: AnalysisContract, step: WalkthroughStepConfig, ctx: StepContext
+) -> AnalysisStep:
+    return runners.run_normality(
+        analysis, step.order, step.question, ctx.groups, ctx.out_dir,
+        ctx.figures_dir, ctx.source, ctx.sample_name,
+    )
+
+
+def _run_variance(
+    analysis: AnalysisContract, step: WalkthroughStepConfig, ctx: StepContext
+) -> AnalysisStep:
+    return runners.run_variance(
+        analysis, step.order, step.question, ctx.groups, ctx.out_dir, ctx.source, ctx.sample_name,
+    )
+
+
+def _run_omnibus(
+    analysis: AnalysisContract, step: WalkthroughStepConfig, ctx: StepContext
+) -> AnalysisStep:
+    decision = _resolved_decision(analysis.name, "omnibus")
+    if decision is None:
+        print("no omnibus decision recorded")
+        _write_timeline(analysis, ctx.sequence, ctx.thresholds)
+        raise _StopWalkthrough()
+    return runners.run_omnibus(
+        analysis, step.order, step.question, ctx.groups, decision.method,
+        ctx.out_dir, ctx.source, ctx.sample_name,
+    )
+
+
+def _run_posthoc(
+    analysis: AnalysisContract, step: WalkthroughStepConfig, ctx: StepContext
+) -> AnalysisStep | None:
+    omnibus_step = timeline_module.load_step(analysis.name, "omnibus")
+    if (
+        omnibus_step is not None
+        and omnibus_step.result_summary.get("passed") is False
+    ):
+        logger.info("post-hoc not warranted: omnibus not significant")
+        return None
+    decision = _resolved_decision(analysis.name, "posthoc")
+    if decision is None:
+        print("no posthoc decision recorded")
+        _write_timeline(analysis, ctx.sequence, ctx.thresholds)
+        raise _StopWalkthrough()
+    return runners.run_posthoc(
+        analysis, step.order, step.question, ctx.df, ctx.source_group_column, ctx.target,
+        decision.method, ctx.out_dir, ctx.source, ctx.sample_name,
+    )
+
+
+def _run_conclusion(
+    analysis: AnalysisContract, step: WalkthroughStepConfig, ctx: StepContext
+) -> AnalysisStep:
+    omnibus_step = timeline_module.load_step(analysis.name, "omnibus")
+    if omnibus_step is None:
+        print("no omnibus evidence recorded")
+        _write_timeline(analysis, ctx.sequence, ctx.thresholds)
+        raise _StopWalkthrough()
+    posthoc_step = timeline_module.load_step(analysis.name, "posthoc")
+    return runners.run_conclusion(
+        analysis, step.order, step.question, omnibus_step, posthoc_step,
+        ctx.out_dir, ctx.source, ctx.sample_name,
+    )
+
+
+_STEP_RUNNERS: dict[str, Callable] = {
+    "describe_groups": _run_describe,
+    "normality": _run_normality,
+    "variance": _run_variance,
+    "omnibus": _run_omnibus,
+    "posthoc": _run_posthoc,
+    "conclusion": _run_conclusion,
+}
+
+
+def run(cfg: PipelineConfig, sample: SampleSpec | None, force: bool) -> None:
+    analysis = require_mode(cfg.analysis, AnalysisMode.HYPOTHESIS)
+    if analysis.hypothesis is None:
+        raise ValueError("hypothesis mode requires a 'hypothesis' block (group_column, group_values)")
+    if cfg.dataset is None:
+        raise ValueError("walkthrough requires a dataset config")
+    thresholds = load_walkthrough_config()
+    sequence = load_walkthrough_sequence()
+    df, group_column, source_group_column, groups, attrition = runners.load_frame_and_groups(cfg, sample)
+    out_dir = TIMELINE_DIR / analysis.name
+    figures_dir = paths.FIGURES_DIR
+    source = "sample" if sample else "canonical"
+    sample_name = sample.name if sample else None
+    source_path = sample.path if sample else str(runners.canonical_path(cfg.dataset, cfg.environment))
+    group_values = analysis.hypothesis.group_values
+    target = cfg.dataset.target
+    ctx = StepContext(
+        analysis=analysis,
+        df=df,
+        groups=groups,
+        group_column=group_column,
+        source_group_column=source_group_column,
+        group_values=group_values,
+        target=target,
+        source_path=source_path,
+        sample_name=sample_name,
+        source=source,
+        out_dir=out_dir,
+        figures_dir=figures_dir,
+        attrition=attrition,
+        sequence=sequence,
+        thresholds=thresholds,
+    )
+
+    completed = 0
+    for step in sorted(sequence.steps, key=lambda s: s.order):
+        if step.kind == "decision":
+            kind = step.id.removeprefix("decide_")
+            if kind == "posthoc":
+                omnibus_step = timeline_module.load_step(analysis.name, "omnibus")
+                if (
+                    omnibus_step is not None
+                    and omnibus_step.result_summary.get("passed") is False
+                ):
+                    logger.info("post-hoc not warranted: omnibus not significant")
+                    continue
+            decision = _resolved_decision(analysis.name, kind)
+            if decision is not None:
+                logger.info("gate passed (method=%s)", decision.method)
+                continue
+            _write_timeline(analysis, sequence, thresholds)
+            if kind == "omnibus":
+                _print_decision_required(
+                    analysis, timeline_module.load_steps(analysis.name), thresholds
+                )
+            elif kind == "posthoc":
+                _print_posthoc_decision_required(analysis, thresholds)
+            else:
+                print("=" * 60)
+                print(f"DECISION REQUIRED — {step.id}")
+                print("=" * 60)
+                print(f"Goal: {analysis.goal}")
+                print(
+                    f'Next: ds-pipeline decide --analysis {analysis.name} '
+                    f'--kind {kind} --method <method> --reason "..."'
+                )
+            decision_suggestion = suggest.suggest_after(
+                step.id,
+                timeline_module.load_steps(analysis.name),
+                timeline_module.load_decisions(analysis.name),
+                thresholds,
+                analysis.name,
+            )
+            if decision_suggestion is not None:
+                _print_suggestion(decision_suggestion)
+            return
+        if step.id not in _STEP_RUNNERS:
+            _write_timeline(analysis, sequence, thresholds)
+            print(f"step '{step.id}' not yet implemented; stopping.")
+            return
+        if not force and timeline_module.load_step(analysis.name, step.id) is not None:
+            logger.info("skipped %s (already exists)", step.id)
+            continue
+        executor = _STEP_RUNNERS[step.id]
+        try:
+            step_result = executor(analysis, step, ctx)
+        except _StopWalkthrough:
+            return
+        except Exception as exc:
+            _handle_failure(analysis, step, exc, source, sample_name)
+            return
+        if step_result is None:
+            continue
+        timeline_module.save_step(step_result)
+        completed += 1
+        step_suggestion = suggest.suggest_after(
+            step_result.step_id,
+            timeline_module.load_steps(analysis.name),
+            timeline_module.load_decisions(analysis.name),
+            thresholds,
+            analysis.name,
+        )
+        if step_suggestion is not None:
+            _print_suggestion(step_suggestion, include_rationale=(step.id == "omnibus"))
+
+    _warn_stale_decisions(analysis.name)
+    _write_timeline(analysis, sequence, thresholds)
+    print(f"walkthrough: completed {completed} step(s)")

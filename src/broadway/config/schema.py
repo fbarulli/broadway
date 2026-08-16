@@ -3,7 +3,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from broadway.analysis.contracts import AnalysisContract, AnalysisMode
 
@@ -20,15 +20,31 @@ class ColumnRole(str, Enum):
     IGNORE = "ignore"
 
 
+def normalize_dtype(dtype: str) -> str:
+    return "datetime64" if dtype.startswith("datetime64") else dtype
+
+
 class ColumnSchema(BaseModel):
     dtype: str
     null_count: int
     role: ColumnRole
 
+    @field_validator("dtype", mode="before")
+    @classmethod
+    def _normalize_dtype(cls, v: object) -> object:
+        return normalize_dtype(v) if isinstance(v, str) else v
+
+
+class LookupValuePolicy(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    sentinel_values: list[str] = []
+
 
 class LookupSpec(BaseModel):
     path: str
     key: str
+    value_policies: dict[str, LookupValuePolicy] = {}
+    na_values: list[str] = []
 
 
 class DatasetContract(BaseModel):
@@ -39,7 +55,7 @@ class DatasetContract(BaseModel):
     datetime_column: str | None
     columns: dict[str, ColumnSchema]
     lookup_tables: dict[str, LookupSpec]
-    row_count: int
+    exclude_from_profiling: list[str] = []
 
 
 class EnvironmentConfig(BaseModel):
@@ -145,18 +161,34 @@ class EtlStep(BaseModel):
     train_features_file: str
     val_features_file: str
     max_drop_fraction: float = Field(ge=0.0, le=1.0)
+    missing_encodings: list[str]
+
+
+class ProjectConfig(BaseModel):
+    raw_dir: str
+    processed_dir: str
+    processed_file: str
+    min_trip_distance: float
+    max_trip_distance: float
+    min_trip_duration_minutes: float
+    max_trip_duration_minutes: float
+    min_pickup_datetime: str
+    min_passenger_count: int
+    max_passenger_count: int
+    rename_map: dict[str, str]
+    borough_column: str
+    borough_lookup_column: str
+    lookup_path: str
+    rush_hour_morning_start: int
+    rush_hour_morning_end: int
+    rush_hour_evening_start: int
+    rush_hour_evening_end: int
+    night_start: int
+    night_end: int
 
 
 class ContractsStep(BaseModel):
     null_threshold: float
-
-
-class EdaStep(BaseModel):
-    output_dir: str
-    max_columns: int
-    output_file: str
-    mcar_alpha: float
-    outlier_iqr_multiplier: float
 
 
 class FeaturesStep(BaseModel):
@@ -248,7 +280,6 @@ class PipelineConfig(BaseModel):
     discover: DiscoverStep | None = None
     etl: EtlStep | None = None
     contracts: ContractsStep | None = None
-    eda: EdaStep | None = None
     features: FeaturesStep | None = None
     stats: StatsStep | None = None
     causal: CausalStep | None = None

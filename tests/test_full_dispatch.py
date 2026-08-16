@@ -11,9 +11,9 @@ from broadway.config.schema import FullStep
 
 def test_flows_dispatch_per_mode() -> None:
     expected = {
-        "test": ["discover", "etl", "contracts", "eda", "baseline", "features", "train", "evaluate"],
-        "test_hypothesis": ["discover", "etl", "contracts", "eda", "baseline", "stats"],
-        "test_causal": ["discover", "etl", "contracts", "eda", "baseline", "causal"],
+        "test": ["discover", "etl", "contracts", "baseline", "features", "train", "evaluate"],
+        "test_hypothesis": ["discover", "etl", "contracts", "baseline", "stats"],
+        "test_causal": ["discover", "etl", "contracts", "baseline", "causal"],
     }
     for analysis_name, steps in expected.items():
         cfg = load_config("full", analysis=analysis_name)

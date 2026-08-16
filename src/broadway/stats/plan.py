@@ -7,6 +7,8 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict
 
+from broadway.lineage.models import SampleRole
+
 
 class AnalysisPlan(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -22,6 +24,8 @@ class AnalysisPlan(BaseModel):
     passed: bool
     next_step: str | None
     analysis_goal: str | None = None
+    sample_name: str | None = None
+    sample_role: SampleRole | None = None
 
 
 def save_plan(plan: AnalysisPlan, path: Path) -> None:

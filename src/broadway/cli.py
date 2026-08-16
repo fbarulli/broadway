@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import argparse
+import logging
 
 from broadway.config.loader import DEFAULT_ENVIRONMENT, STEP_MODELS, load_config, resolve_full_steps
+from broadway.lineage.sample import load_sample
 
 STEPS = list(STEP_MODELS.keys())
 
@@ -27,12 +29,27 @@ def _build_parser() -> argparse.ArgumentParser:
     discover.add_argument("--datetime-column", type=str, default=None)
     discover.add_argument("--ignore-columns", nargs="*", default=[])
 
+    columns = sub.add_parser("columns")
+    columns.add_argument("--csv", type=str, required=True)
+
     lineage = sub.add_parser("lineage")
     lineage.add_argument("--analysis", type=str, required=True)
     lineage.add_argument("--dataset", type=str, required=True)
 
+    report = sub.add_parser("report")
+    report.add_argument("--analysis", required=True)
+    report.add_argument("--dataset", required=True)
+
     profile = sub.add_parser("profile")
     profile.add_argument("--dataset", type=str, required=True)
+
+    audit = sub.add_parser("audit")
+    audit.add_argument("--dataset", type=str, required=True)
+    audit.add_argument("--analysis", type=str, default=None)
+    audit.add_argument("--environment", type=str, default=DEFAULT_ENVIRONMENT)
+
+    ingest = sub.add_parser("ingest")
+    ingest.add_argument("--dataset", type=str, required=True)
 
     init = sub.add_parser("init")
     init.add_argument("csv")
@@ -51,32 +68,126 @@ def _build_parser() -> argparse.ArgumentParser:
     init.add_argument("--success-criterion")
 
     for step in STEPS:
-        if step == "discover":
+        if step in ("discover", "stats"):
             continue
         _add_step_args(sub.add_parser(step))
+
+    stats = sub.add_parser("stats")
+    stats_sub = stats.add_subparsers(dest="stats_subcommand", required=True)
+    for sc in ("run", "describe"):
+        p = stats_sub.add_parser(sc)
+        _add_step_args(p)
+        p.add_argument("--sample", required=True)
+
+    walkthrough = sub.add_parser("walkthrough")
+    walkthrough.add_argument("--analysis", type=str, required=True)
+    walkthrough.add_argument("--dataset", type=str, required=True)
+    walkthrough.add_argument("--sample", type=str, default=None)
+    walkthrough.add_argument("--force", action="store_true")
+    walkthrough.add_argument("--environment", type=str, default=DEFAULT_ENVIRONMENT)
+
+    decide = sub.add_parser("decide")
+    decide.add_argument("--analysis", type=str, required=True)
+    decide.add_argument("--method", type=str, required=True)
+    decide.add_argument("--reason", type=str, required=True)
+    decide.add_argument("--kind", type=str, default="omnibus", choices=["omnibus", "posthoc"])
+    decide.add_argument("--dataset", type=str, default=None)
+    decide.add_argument("--environment", type=str, default=DEFAULT_ENVIRONMENT)
 
     return parser
 
 
 def main() -> None:
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+
     args = _build_parser().parse_args()
 
     if args.step == "discover":
         from broadway.discover.module import run
 
         run(args.csv, args.target, args.task, args.datetime_column, args.ignore_columns)
+    elif args.step == "columns":
+        from broadway.discover.columns import run
+
+        run(args.csv)
     elif args.step == "lineage":
         from broadway.lineage.module import run
 
         run(args.analysis, args.dataset)
+    elif args.step == "report":
+        from broadway.reports.results import write_results
+        from broadway.timeline import module as timeline_module
+        from broadway.timeline.sequence import load_walkthrough_sequence
+
+        steps = timeline_module.load_steps(args.analysis)
+        decisions = timeline_module.load_decisions(args.analysis)
+        if not steps and not decisions:
+            print("run the walkthrough first")
+            return
+        sequence = load_walkthrough_sequence()
+        write_results(args.analysis, sequence, steps, decisions)
+        print("wrote reports/results/")
     elif args.step == "profile":
         from broadway.discover.module import profile
 
         profile(args.dataset)
+    elif args.step == "audit":
+        from broadway.reports.audit import run as audit_run
+
+        audit_run(args.dataset, args.analysis, args.environment)
+    elif args.step == "ingest":
+        try:
+            from project.etl.process import process_data
+        except ImportError as exc:
+            raise SystemExit(
+                "ingest is a dataset-demo command (needs the project/ layer) "
+                "and is not available on this build"
+            ) from exc
+
+        process_data(args.dataset)
     elif args.step == "init":
         from broadway.onboard.module import init
 
         init(args.csv, args.name, args.target, args.task, args.datetime_columns, args.ignore_columns, args.split_column, args.mode, args.goal, args.row_definition, args.decision_moment, args.available_info, args.leakage_notes, args.success_criterion)
+    elif args.step == "stats":
+        cfg = load_config(
+            step="stats", dataset=args.dataset, experiment=args.experiment,
+            analysis=args.analysis, environment=args.environment,
+        )
+        if args.stats_subcommand == "describe":
+            from broadway.stats.describe import run as describe_run
+
+            sample = load_sample(args.sample)
+            describe_run(cfg, sample)
+        else:  # "run"
+            from broadway.stats.module import run as module_run
+
+            sample = load_sample(args.sample)
+            module_run(cfg, sample)
+    elif args.step == "walkthrough":
+        from broadway.timeline.walkthrough import run as walkthrough_run
+
+        cfg = load_config(
+            "stats", dataset=args.dataset, analysis=args.analysis, environment=args.environment,
+        )
+        sample = load_sample(args.sample) if args.sample else None
+        walkthrough_run(cfg, sample, args.force)
+    elif args.step == "decide":
+        from broadway.analysis.contracts import AnalysisMode, require_mode
+        from broadway.timeline import decide as decide_module
+        from broadway.timeline import module as timeline_module
+
+        cfg = load_config(
+            "stats", dataset=args.dataset, analysis=args.analysis, environment=args.environment,
+        )
+        analysis = require_mode(cfg.analysis, AnalysisMode.HYPOTHESIS)
+        decision = decide_module.record(analysis, args.kind, args.method, args.reason)
+        timeline_module.save_decision(decision)
+        print(
+            f"recorded decision '{decision.kind}' (method={decision.method}) "
+            f"for analysis '{analysis.name}'"
+        )
+        print(f"next: ds-pipeline walkthrough --analysis {analysis.name}")
     else:
         from broadway.pipeline import run
 

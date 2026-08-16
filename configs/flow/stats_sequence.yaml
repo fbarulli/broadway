@@ -1,0 +1,9 @@
+steps:
+  - describe
+  - normality
+  - levene
+  - anova
+  - welch
+  - kruskal
+  - effect_size
+  - games_howell

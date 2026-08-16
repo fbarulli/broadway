@@ -126,7 +126,6 @@ def _make_config(tmp_path: Path) -> PipelineConfig:
             "price": ColumnSchema(dtype="float64", null_count=0, role=ColumnRole.TARGET),
         },
         lookup_tables={},
-        row_count=40,
     )
     experiment = ExperimentConfig(
         features=FeatureConfig(include=["rooms", "area"], exclude=[], derived=[], encodings=[]),
@@ -145,6 +144,7 @@ def _make_config(tmp_path: Path) -> PipelineConfig:
         training_data_file="training_data.parquet",
         train_features_file="train_features.parquet",
         val_features_file="val_features.parquet",
+        missing_encodings=["", "NA", "null"],
     )
     train_step = TrainStep(
         random_state=42,

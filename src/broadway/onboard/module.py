@@ -77,7 +77,7 @@ def build_dataset_contract(
         else:
             role = ColumnRole.FEATURE
         columns[col] = ColumnSchema(
-            dtype=hint.dtype,
+            dtype="datetime64" if role == ColumnRole.DATETIME else hint.dtype,
             null_count=round(hint.null_rate * row_count),
             role=role,
         )
@@ -89,7 +89,6 @@ def build_dataset_contract(
         datetime_column=split_column,
         columns=columns,
         lookup_tables={},
-        row_count=row_count,
     )
 
 

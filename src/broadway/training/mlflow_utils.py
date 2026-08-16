@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import logging
 import os
+from pathlib import Path
 from typing import Any
 
 import mlflow
+import pandas as pd
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +28,27 @@ def log_params(params: dict[str, float | int | str]) -> None:
 
 def log_metrics(metrics: dict[str, float]) -> None:
     mlflow.log_metrics(metrics)
+
+
+def log_metadata(metadata: dict[str, float]) -> None:
+    """Log run metadata (e.g. train/predict time, model-size bytes) as metrics."""
+    mlflow.log_metrics(metadata)
+
+
+def log_dataset(dataset_id: str, source_path: str, context: str = "train") -> None:
+    """Log a dataset id and, when the parquet source exists, its lineage.
+
+    MLflow 3.x removed ``mlflow.data.from_parquet``; the parquet lineage is
+    recorded via ``from_pandas`` with the file path as the dataset source.
+    A missing source is recoverable: a warning is logged and logging continues.
+    """
+    mlflow.log_params({"dataset_id": dataset_id})
+    path = Path(source_path)
+    if not path.exists():
+        logger.warning("dataset source not found, skipping lineage: %s", source_path)
+        return
+    dataset = mlflow.data.from_pandas(pd.read_parquet(path), source=str(path))
+    mlflow.log_input(dataset, context=context)
 
 
 def log_model(model: Any, artifact_path: str) -> str:

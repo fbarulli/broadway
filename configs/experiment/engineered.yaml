@@ -4,7 +4,10 @@ features:
     - area
     - neighborhood
   exclude: []
-  derived: []
+  derived:
+    - name: price_per_area
+      func: price / area
+      source: area
   encodings:
     - type: target
       columns:

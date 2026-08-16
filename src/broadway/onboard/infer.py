@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import os
+
 import pandas as pd
 
 from broadway.discover.profile import build_profile
 from broadway.onboard.models import ColumnHint, InferenceReport
 
-_IDENTIFIER_THRESHOLD = 0.95
+_IDENTIFIER_THRESHOLD = float(os.getenv("BROADWAY_IDENTIFIER_THRESHOLD", "0.95"))
 
 
 def _datetime_candidate(series: pd.Series) -> bool:
