@@ -5,52 +5,22 @@ Update freely; remove entries when done (git history is the record).
 
 ## Current
 
-- **Project-style refactor (DataScience paused 2026-08-16)** — audit of runs
-  1+2: promote generic machinery from experiments to `src/`, thin experiments
-  to config+src calls, single project-level dataset binding. Dependency
-  breakdown (waves):
-  - **Wave 1 — PARALLEL** (disjoint files; one commit each; test gate green
-    per commit; pushes sequenced to avoid git races):
-    - extend `evaluate/metrics.py`: full regression suite + binarized ROC/PR
-      AUC (+ tests)
-    - extend `data/splitter.py`: chronological split + stratified sampler
-      (+ tests)
-    - extend `training/mlflow_utils.py`: metadata logging (train/predict time,
-      model size, no-artifact), `dataset_id` + `log_input` linking
-    - extend `training/optuna.py` (RDBStorage); new `training/optuna_worker.py`
-      (URL-from-config, retry, smoke test)
-    - extend `stats/`: winsorize, modified_zscore, outlier_mask,
-      estimation_table/standardized_coefs/scenario_dollars, residual-diagnostic
-      + coefficient-forest plots (viz)
-    - new `evaluate/explain.py`: SHAP / LIME / permutation / PDP-ICE /
-      residuals
-    - new `evaluate/feature_selection.py`: RFE curve
-    - new `utils.py`: `require_keys` / `require_finite` validators
-    - `project/` dataset binding: ONE loader for all experiments (kills the
-      mlflow env override + multivariate importlib hack; three loaders -> one)
-  - **Wave 2 — PARALLEL (after Wave 1 merged):** thin each experiment to
-    config+src calls (univariate steps, multivariate 01-06, mlflow 01-03);
-    `configs/experiments/*.yaml` as single source
-    (seed/sample/split/features/models).
-  - **Wave 3 — SEQUENTIAL:** parked k8s/optuna/mlflow thread (uses
-    optuna_worker + mlflow_utils from src; config-as-files, no env).
-  - Sequential gates: Wave 2 requires Wave 1 merged; Wave 3 requires the
-    optuna/mlflow work; suite green on every commit.
-  - **Coding style (mandatory for every refactor commit — AGENT_WORKER_CONTRACT
-    + HANDOFF + user rules):**
+- **Project-style refactor — DONE** (waves 1-3 all merged, pushed to `taxi`;
+  see Completed below). What remains from that stream is parked here:
+  - `project/` single-loader dataset binding: one loader for all experiments
+    (univariate `_common.py`, multivariate `_setup.py`, mlflow `_common.py`
+    still each carry loader logic — move to one project-level binding).
+  - `configs/experiments/*.yaml` as single source for experiment knobs
+    (currently module constants / per-experiment `config.yaml`).
+  - Coding style (mandatory for every refactor commit — AGENT_WORKER_CONTRACT
+    + HANDOFF + user rules):
     - No hardcoded values; YAML single source of truth (no `get(key, default)`);
-      config files only, zero env vars (kill the `RATECODE1_PARQUET` override).
+      config files only, zero env vars.
     - Data-agnostic `src/` (no column names / taxi terms — HANDOFF tiebreaker);
       dataset binding lives in `project/`.
-    - Config remains the single source of truth EVERYWHERE — only
+    - Config is the single source of truth EVERYWHERE — only
       `src/broadway/stats` functions take thresholds as parameters (no
       config/env/I/O reads *inside* stats); callers pass config values in.
-    - Dispatch mechanics (AGENT_CONTRACT §3a): each Wave-1 task = ONE module;
-      orchestrator re-reads the 1-3 target files immediately before dispatch;
-      the contract enumerates the exact edit list (current content →
-      replacement) + regenerated artifacts; short numbered steps; references
-      AGENT_WORKER_CONTRACT.md; worker commits + pushes its own disjoint
-      files; suite green per commit.
     - Type hints on all public functions; ~25-line single-responsibility
       functions; no dead/noise code.
     - Strategic logging only; catch only recoverable exceptions (fail loud).
@@ -98,8 +68,9 @@ Update freely; remove entries when done (git history is the record).
   keep as-is.
 - **Merge steps 11 + 12** into one file (reuse directive).
 - **7 pre-existing CLI test failures** (`tests/test_cli.py`, e.g.
-  `test_train_without_dataset_still_dispatches` exits 2) — verified
-  pre-existing on clean `ca4e7ff`; investigate when time allows.
+  `test_train_without_dataset_still_dispatches` exits 2) — do NOT reproduce in
+  this env (suite is 516 passed / 0 failed); investigate only if they appear
+  elsewhere.
 - **Q-Q doc pass** — `README.md`/`dataflow.md` Q-Q sections predate the
   zones/markers/raw-log work; `stats/API.md` drift; raw/log comparison +
   marker legend not yet documented.
@@ -132,6 +103,6 @@ Update freely; remove entries when done (git history is the record).
 - Scripts committed; PNGs/JSONs in gitignored `experiments/results/`;
   `diagnostics_experiment/` + `legend_experiment/` are gitignored references.
 - Test gate: full `pytest` only when `src/`/`configs/`/`project/`/`tests/`
-  change (suite currently has the 7 pre-existing CLI failures above).
+  change (currently 516 passed, 0 failed).
 - `uv` needs `UV_CACHE_DIR` inside the workspace (sandbox); matplotlib needs
   `MPLCONFIGDIR` (`.mplconfig/`).
