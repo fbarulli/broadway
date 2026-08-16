@@ -19,6 +19,8 @@ borough_dummies:
   features: [trip_distance, duration_minutes]
   column: dropoff_borough
   reference: Manhattan
+geography_premium:
+  missing_label: Unmapped          # distinct from the real 'Unknown' zone value
 labels:
   VendorID: {1: creative_mobile, 2: verifone}
   store_and_fwd_flag: {Y: stored, N: not_stored}

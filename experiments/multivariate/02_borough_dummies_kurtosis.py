@@ -17,6 +17,7 @@ import statsmodels.api as sm
 from _setup import (
     RESULTS,
     WORKING_DATASET,
+    build_borough_dummies,
     load_config,
     load_manhattan_sample,
     require_finite,
@@ -42,16 +43,7 @@ def fit_with_dummies(df: pd.DataFrame, cfg: dict, use_borough: bool):
         df = df[df[col].notna()]  # drop rows with an unmapped zone (no dummy)
     X = df[spec["features"]].copy()
     if use_borough:
-        col = spec["column"]
-        categories = [spec["reference"]] + sorted(
-            v for v in df[col].unique() if v != spec["reference"])
-        # wrap the Categorical in a Series to keep df's index (a bare
-        # Categorical would make get_dummies emit a RangeIndex and misalign)
-        coded = pd.Series(pd.Categorical(df[col], categories=categories),
-                          index=df.index)
-        dummies = pd.get_dummies(coded, prefix="borough",
-                                 drop_first=True, dtype=float)
-        X = pd.concat([X, dummies], axis=1)
+        X = pd.concat([X, build_borough_dummies(df, cfg)], axis=1)
     X = sm.add_constant(X)
     if len(X) != len(df):
         raise ValueError(f"exog/endog row mismatch ({len(X)} vs {len(df)})")

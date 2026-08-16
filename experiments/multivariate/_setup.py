@@ -117,3 +117,20 @@ def load_manhattan_sample(cfg: dict) -> pd.DataFrame:
         raise ValueError(f"sample filter yielded 0 rows "
                          f"(pickup borough '{keep}' absent from data)")
     return sample
+
+
+def build_borough_dummies(df: pd.DataFrame, cfg: dict) -> pd.DataFrame:
+    """One-hot dummies for the config borough column (config reference dropped).
+
+    Wraps the Categorical in a Series so get_dummies keeps df's index — a
+    bare Categorical would emit a RangeIndex and silently misalign a concat.
+    Callers decide missing-value handling (drop or fill) before calling.
+    """
+    spec = cfg["borough_dummies"]
+    col = spec["column"]
+    categories = [spec["reference"]] + sorted(
+        v for v in df[col].dropna().unique() if v != spec["reference"])
+    coded = pd.Series(pd.Categorical(df[col], categories=categories),
+                      index=df.index)
+    return pd.get_dummies(coded, prefix="borough",
+                          drop_first=True, dtype=float)
