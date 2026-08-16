@@ -14,11 +14,15 @@ import json
 from pathlib import Path
 
 import pandas as pd
-import statsmodels.api as sm
 from statsmodels.regression.linear_model import RegressionResultsWrapper
 
-from _common import RESULTS, WORKING_DATASET, load_metered, load_working
-from _ols_bp import modified_zscore, plot_resid_vs_fitted_qq
+from _common import RESULTS, WORKING_DATASET, load_metered
+from _ols_bp import (
+    OUTLIER_Z_THRESHOLD,
+    fit_raw_hc3,
+    outlier_mask,
+    plot_resid_vs_fitted_qq,
+)
 from _tests import tests_path_for, write_tests_json
 from broadway.stats.regression import bp_jb
 
@@ -27,8 +31,6 @@ COMPARISON_CSV = RESULTS / "ratecode1_sample_comparison.csv"
 DELTAS_CSV = RESULTS / "ratecode1_sample_comparison_deltas.csv"
 
 MODEL_METRICS = ("rsquared", "kurtosis", "jb_stat", "bp_stat")
-
-MASK_THRESHOLD = 10.0  # step-22 modified-z |M| threshold (union over fare/distance)
 
 # (pair label, new model, old model, comparable, reason)
 DELTA_PAIRS = [
@@ -39,21 +41,6 @@ DELTA_PAIRS = [
     ("new 28 vs new 28 (no hour)", "new 28", "new 28 (no hour)", True,
      "identical rows and target; only pickup_hour differs"),
 ]
-
-
-def outlier_mask() -> pd.Series:
-    """Step-22 mask: |modified z| > 10 on trip_distance or fare_amount."""
-    working = load_working()
-    z_dist = modified_zscore(working["trip_distance"]).abs()
-    z_fare = modified_zscore(working["fare_amount"]).abs()
-    return (z_dist > MASK_THRESHOLD) | (z_fare > MASK_THRESHOLD)
-
-
-def fit_excluded(df: pd.DataFrame, use_hour: bool) -> RegressionResultsWrapper:
-    """HC3 fit of raw fare on kept rows; optional pickup_hour feature."""
-    cols = ["trip_distance", "duration_minutes"] + (["pickup_hour"] if use_hour else [])
-    X = sm.add_constant(df[cols])
-    return sm.OLS(df["fare_amount"], X).fit(cov_type="HC3")
 
 
 def model_entry(model: RegressionResultsWrapper, **extra: object) -> dict:
@@ -125,12 +112,12 @@ def main() -> None:
     excluded = mask.reindex(df.index).fillna(False)
     kept = df[~excluded]
 
-    model = fit_excluded(kept, use_hour=True)
-    model_no_hour = fit_excluded(kept, use_hour=False)
+    model = fit_raw_hc3(kept, use_hour=True)
+    model_no_hour = fit_raw_hc3(kept, use_hour=False)
     diag = bp_jb(model)
     diag_no_hour = bp_jb(model_no_hour)
 
-    print(f"metered rows: {len(df)} | removed (|M|>{MASK_THRESHOLD} union): "
+    print(f"metered rows: {len(df)} | removed (|M|>{OUTLIER_Z_THRESHOLD} union): "
           f"{int(excluded.sum())} | kept: {len(kept)}")
     print(model.summary())
     print(f"R^2={model.rsquared:.4f} | resid kurtosis={diag['kurtosis']:.2f} | "
@@ -147,7 +134,7 @@ def main() -> None:
     base = results.get("hc3_fare_trip_distance_duration", {})
     base_bp = results.get("bp_jb_fare_trip_distance_duration", {})
     prev = results.get("hc3_fare_capped_trip_distance_duration_pickup_hour", {})
-    mask_label = f"|M|>{MASK_THRESHOLD} union"
+    mask_label = f"|M|>{OUTLIER_Z_THRESHOLD} union"
     models = [
         {"name": "baseline 15", "n": base.get("n"), "mask": "none", "target": "raw",
          "features": "dist + dur", "rsquared": base.get("rsquared"),
@@ -184,14 +171,14 @@ def main() -> None:
                 method=("raw fare ~ dist + duration + pickup_hour, HC3, "
                         "modified-z |M|>10 outliers removed"),
                 n_removed=int(excluded.sum()),
-                mask_threshold=MASK_THRESHOLD,
+                mask_threshold=OUTLIER_Z_THRESHOLD,
             ),
             "hc3_fare_trip_distance_duration_excluded": model_entry(
                 model_no_hour,
                 method=("raw fare ~ dist + duration, HC3, "
                         "modified-z |M|>10 outliers removed (no hour)"),
                 n_removed=int(excluded.sum()),
-                mask_threshold=MASK_THRESHOLD,
+                mask_threshold=OUTLIER_Z_THRESHOLD,
             ),
             "model_comparison": {
                 "source_script": "28_ratecode1_excluded_outliers_hc3.py",

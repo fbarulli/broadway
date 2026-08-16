@@ -15,6 +15,8 @@ from broadway.stats.regression import bp_jb, fit_ols
 from matplotlib.lines import Line2D
 from statsmodels.regression.linear_model import RegressionResultsWrapper
 
+from _common import load_working
+
 ALPHA = 0.05
 
 
@@ -92,6 +94,24 @@ def winsorize(df: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
         out[col] = out[col].clip(upper=cap)
     n_capped = {col: int((df[col] > cap).sum()) for col, cap in caps.items()}
     return out, {"caps": caps, "n_capped": n_capped}
+
+
+OUTLIER_Z_THRESHOLD = 10.0  # step-22 modified-z |M| threshold (union over fare/distance)
+
+
+def outlier_mask() -> pd.Series:
+    """Step-22 mask: |modified z| > 10 on trip_distance or fare_amount."""
+    working = load_working()
+    z_dist = modified_zscore(working["trip_distance"]).abs()
+    z_fare = modified_zscore(working["fare_amount"]).abs()
+    return (z_dist > OUTLIER_Z_THRESHOLD) | (z_fare > OUTLIER_Z_THRESHOLD)
+
+
+def fit_raw_hc3(df: pd.DataFrame, use_hour: bool) -> RegressionResultsWrapper:
+    """HC3 fit of raw fare; optional pickup_hour feature (steps 28/29)."""
+    cols = ["trip_distance", "duration_minutes"] + (["pickup_hour"] if use_hour else [])
+    X = sm.add_constant(df[cols])
+    return sm.OLS(df["fare_amount"], X).fit(cov_type="HC3")
 
 
 def add_log_predictions(df: pd.DataFrame) -> pd.DataFrame:
