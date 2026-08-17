@@ -32,8 +32,8 @@ jobs:
           MPLCONFIGDIR: ${{ runner.temp }}/mplconfig
         run: uv run pytest tests/ --cov=src/broadway --cov-report=term-missing --cov-fail-under=85
 
-      - name: Experiment smoke (taxi branch only — verify_experiments.py)
+      - name: Experiment smoke (taxi branch only — experiments.py)
         if: github.ref == 'refs/heads/taxi' || (github.event_name == 'pull_request' && github.base_ref == 'taxi')
         env:
           MPLCONFIGDIR: ${{ runner.temp }}/mplconfig
-        run: uv run python verify_experiments.py
+        run: uv run python experiments.py verify
