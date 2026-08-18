@@ -5,6 +5,7 @@ from pathlib import Path
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 
 from _common import CLEAN_PARQUET, RESULTS
@@ -17,20 +18,41 @@ CSV_OUT = RESULTS / "02_filtered_profile_describe.csv"
 PNG_OUT = RESULTS / "02_filtered_profile.png"
 
 
+# Per-percentile annotation placement: p -> (vertical anchor, horizontal
+# anchor, offset in points). The 0.95-1.0 lines sit within 0.05 of each other,
+# so the top-cluster labels are anchored above/below their lines and staggered
+# to avoid overlapping one another and the curve.
+LABEL_PLACEMENT = {
+    0.01: ("center", "left", (3, 0)),
+    0.05: ("center", "left", (3, 0)),
+    0.50: ("center", "left", (3, 0)),
+    0.95: ("top", "left", (3, -8)),
+    0.99: ("top", "left", (3, -7)),
+    0.999: ("bottom", "left", (3, 2)),
+    1.0: ("top", "right", (-3, 0)),
+}
+
+
 def plot_profiles(df: pd.DataFrame, out_path: Path) -> None:
-    """One figure, 3 histograms with dashed lines at the PERCENTILES quantiles."""
-    fig, axes = plt.subplots(1, 3, figsize=(15, 4))
+    """One figure, 3 ECDF subplots with dashed percentile gridlines."""
+    fig, axes = plt.subplots(1, 3, figsize=(15, 4), constrained_layout=True)
     for ax, col in zip(axes, COLS):
-        values = df[col]
-        ax.hist(values, bins=60, edgecolor="white", linewidth=0.5)
+        values = df[col].sort_values()
+        n = len(values)
+        ax.plot(values, np.arange(1, n + 1) / n, linewidth=1.0)
         for p in PERCENTILES:
-            ax.axvline(values.quantile(p), color="red", linestyle="--",
-                       linewidth=0.8)
-        ax.set_xlabel(col)
-        ax.set_ylabel("count")
-        ax.set_title(f"{col} (N={len(values)})")
+            ax.axhline(p, color="red", linestyle="--", linewidth=0.8)
+        for p in PERCENTILES:
+            va, ha, offset = LABEL_PLACEMENT[p]
+            x = values.quantile(p)
+            ax.annotate(f"{p * 100:g}% x={x:.1f}", xy=(x, p), xytext=offset,
+                        textcoords="offset points", ha=ha, va=va,
+                        fontsize=6, color="red")
+        ax.set_xscale("log")
+        ax.set_xlabel("value")
+        ax.set_ylabel("cumulative share")
+        ax.set_title(f"{col} (N={n})")
         ax.grid(True, alpha=0.3)
-    fig.tight_layout()
     fig.savefig(out_path, dpi=150)
     plt.close(fig)
 
