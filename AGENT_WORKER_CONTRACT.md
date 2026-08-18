@@ -9,3 +9,6 @@ These rules never change. Apply them to every change, every time.
 - Catch exceptions only when recoverable; let everything else bubble up.
 - YAML = single source of truth: no `get(key, default)`, no hardcoded values.
 - ~25-line functions; single responsibility; no dead/noise code.
+- Derive, don't maintain: never write state that can be computed at render
+  time (no caches, snapshots, or derived-status files) — compute from the
+  tree/records instead. The platform derives; it does not store derived state.
