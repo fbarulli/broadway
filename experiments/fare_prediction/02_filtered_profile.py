@@ -14,6 +14,11 @@ from project.working import MIN_FARE
 
 COLS = ["fare_amount", "trip_distance", "trip_duration_minutes"]
 PERCENTILES = [0.01, 0.05, 0.50, 0.95, 0.99, 0.999, 1.0]
+UNIT_FMT = {
+    "fare_amount": "${:g}",
+    "trip_distance": "{:g} mi",
+    "trip_duration_minutes": "{:g} min",
+}
 
 CSV_OUT = RESULTS / "02_filtered_profile_describe.csv"
 PNG_OUT = RESULTS / "02_filtered_profile.png"
@@ -29,20 +34,24 @@ def plot_profiles(df: pd.DataFrame, out_path: Path) -> None:
     fig, axes = plt.subplots(1, 3, figsize=(15, 4.5), constrained_layout=True)
     for ax, col in zip(axes, COLS):
         values = df[col]
+        fmt = UNIT_FMT[col]
         sns.boxplot(
             y=values, log_scale=True, color="#4c72b0", whis=[0, 100],
             width=0.35, ax=ax, showmeans=True,
             meanprops={"marker": "o", "markerfacecolor": "#d62728",
                        "markeredgecolor": "#d62728", "markersize": 5},
         )
+        ax.yaxis.set_major_formatter(
+            matplotlib.ticker.FuncFormatter(lambda v, _p, fmt=fmt: fmt.format(v))
+        )
         ax.axhspan(float(values.quantile(0.99)), float(values.max()),
                    alpha=0.08, color="#d62728")
         for p in mark_percentiles:
             y = float(values.quantile(p))
             ax.axhline(y, color="#d62728", linestyle="--", linewidth=0.8)
-            ax.text(0.03, y, f"{p * 100:g}% = {y:.3g}",
+            ax.text(0.03, y, f"{p * 100:g}% = {fmt.format(y)}",
                     transform=ax.get_yaxis_transform(), fontsize=7,
-                    color="#d62728", va="center")
+                    color="#d62728", va="bottom")
         ax.set_title(f"{col} (N={len(values)})")
         ax.set_ylabel("")
         ax.grid(True, alpha=0.3, axis="y")
