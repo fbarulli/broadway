@@ -1,20 +1,34 @@
 name: fare_prediction_1m
 role: estimation
-version: "v1"
-path: data/samples/fare_prediction_1m@v1.parquet
+version: "v2"
+path: data/samples/fare_prediction_1m@v2.parquet
 description: 1M random sample of the taxi training data, policy-filtered for fare prediction
 source:
   name: training_data
   path: data/processed/training_data.parquet
 seed: 42
 size: 1000000
-columns: [fare_amount, trip_distance, trip_duration_minutes]
+columns: [pickup_datetime, fare_amount, trip_distance, trip_duration_minutes]
+derived:
+  - {name: speed_mph, formula: speed_mph}
+# Plausibility exclusions from the 04 percentile-extremes audit (recorded
+# decision: drop implausible low/high-fare trips — 189 rows on v1). Each
+# inner group is AND; a row is dropped when ANY group fully matches.
+exclude_any:
+  - [{column: fare_amount, op: "<=", value: 4.40}, {column: trip_distance, op: ">", value: 5.0}]
+  - [{column: fare_amount, op: "<=", value: 4.40}, {column: trip_duration_minutes, op: ">", value: 30.0}]
+  - [{column: fare_amount, op: "<=", value: 4.40}, {column: speed_mph, op: ">", value: 60.0}]
+  - [{column: fare_amount, op: ">=", value: 71.60}, {column: trip_distance, op: "<", value: 3.0}]
+  - [{column: fare_amount, op: ">=", value: 71.60}, {column: trip_duration_minutes, op: "<", value: 5.0}]
+  - [{column: fare_amount, op: ">=", value: 71.60}, {column: speed_mph, op: ">", value: 100.0}]
 # Policy mirrors configs/experiments/working.yaml (min_fare: 2.50) — declared once here
 filters:
   - {column: fare_amount, op: ">", value: 2.50}
   - {column: trip_distance, op: ">", value: 0.0}
   - {column: trip_duration_minutes, op: ">", value: 0.0}
 schema:
+  pickup_datetime: {dtype: "datetime64[ns]", nullable: false}
   fare_amount: {dtype: float64, nullable: false, checks: [{op: ">", value: 0.0}]}
   trip_distance: {dtype: float64, nullable: false, checks: [{op: ">", value: 0.0}]}
   trip_duration_minutes: {dtype: float64, nullable: false, checks: [{op: ">", value: 0.0}]}
+  speed_mph: {dtype: float64, nullable: false, checks: [{op: ">", value: 0.0}]}

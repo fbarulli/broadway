@@ -21,6 +21,12 @@ class FilterSpec(BaseModel):
     value: float
 
 
+class DerivedSpec(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: str
+    formula: Literal["speed_mph"]
+
+
 class SampleSpec(BaseModel):
     model_config = ConfigDict(extra="forbid")
     name: str
@@ -33,7 +39,9 @@ class SampleSpec(BaseModel):
     size: int | None = None
     source: DatasetRef | None = None
     columns: list[str] | None = None
+    derived: list[DerivedSpec] | None = None
     filters: list[FilterSpec] | None = None
+    exclude_any: list[list[FilterSpec]] | None = None
     schema: dict | None = None  # type: ignore[assignment]
 
 

@@ -14,7 +14,9 @@ import pandas as pd
 import pytest
 import yaml
 from pandera.errors import SchemaErrors
+from pydantic import ValidationError
 
+import broadway.samples.generate as generate_module
 from broadway.config import loader
 from broadway.lineage.sample import load_sample
 from broadway.samples import generate_sample, read_named_sample
@@ -26,7 +28,8 @@ SCHEMA = {
 }
 PROVENANCE_KEYS = {
     "name", "version", "source", "seed", "size", "row_count", "columns",
-    "dtypes", "filters", "definition_sha256", "artifact_sha256", "created_at",
+    "dtypes", "filters", "derived", "exclude_any",
+    "definition_sha256", "artifact_sha256", "created_at",
 }
 
 
@@ -193,6 +196,149 @@ def test_schema_violation_raises(
 
     with pytest.raises(SchemaErrors):
         read_named_sample("schema_bad", samples_dir=samples_dir)
+
+
+def _exclude_source(tmp_path: Path) -> Path:
+    """12-row source with fares/distances/durations spanning the rule groups."""
+    src = tmp_path / "src.parquet"
+    pd.DataFrame({
+        "id": list(range(12)),
+        "fare_amount": [2.5, 2.5, 3.0, 4.0, 5.0, 6.0, 6.5, 7.0, 7.5, 8.0, 3.5, 8.0],
+        "trip_distance": [0.5, 3.5, 4.0, 2.0, 0.5, 1.0, 3.5, 2.0, 3.5, 0.5, 3.5, 0.5],
+        "trip_duration_minutes": [
+            1.0, 1.0, 10.0, 2.0, 1.0, 4.0, 12.0, 4.0, 2.0, 15.0, 4.0, 5.0,
+        ],
+    }).to_parquet(src, index=False)
+    return src
+
+
+LOW_GROUP = [
+    {"column": "fare_amount", "op": "<=", "value": 4.0},
+    {"column": "trip_distance", "op": ">", "value": 3.0},
+]
+HIGH_GROUP = [
+    {"column": "fare_amount", "op": ">=", "value": 6.0},
+    {"column": "trip_duration_minutes", "op": "<", "value": 5.0},
+]
+EXCLUDE_COLS = ["id", "fare_amount", "trip_distance", "trip_duration_minutes"]
+
+
+def test_derived_column_computed_and_recorded(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    src = tmp_path / "src.parquet"
+    pd.DataFrame({
+        "trip_distance": [6.0, 30.0, 10.0],
+        "trip_duration_minutes": [60.0, 120.0, 60.0],
+    }).to_parquet(src, index=False)
+    _write_config(
+        tmp_path, "derived", src,
+        size=3,
+        columns=["trip_distance", "trip_duration_minutes"],
+        derived=[{"name": "speed_mph", "formula": "speed_mph"}],
+        filters=None,
+        schema=None,
+    )
+    samples_dir = _generated(tmp_path, monkeypatch, "derived", src)
+
+    df = pd.read_parquet(samples_dir / "derived@v1.parquet")
+    assert list(df.columns) == ["trip_distance", "trip_duration_minutes", "speed_mph"]
+    # 6 mi in 1 h → 6 mph; 30 mi in 2 h → 15 mph; 10 mi in 1 h → 10 mph.
+    assert sorted(df["speed_mph"]) == [6.0, 10.0, 15.0]
+
+    provenance = json.loads(
+        (samples_dir / "derived@v1.json").read_text(encoding="utf-8")
+    )
+    assert provenance["derived"] == ["speed_mph"]
+    assert provenance["columns"] == [
+        "trip_distance", "trip_duration_minutes", "speed_mph",
+    ]
+
+
+def test_exclude_any_drops_exactly_matching_rows(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    src = _exclude_source(tmp_path)
+    base = {"size": 12, "columns": EXCLUDE_COLS, "filters": None, "schema": None}
+    # Row ids matching each group: LOW → {1, 2, 10}, HIGH → {5, 7, 8}.
+    expected = {
+        "low": {1, 2, 10},
+        "high": {5, 7, 8},
+        "both": {1, 2, 5, 7, 8, 10},
+    }
+    configs = {
+        "low": [LOW_GROUP],
+        "high": [HIGH_GROUP],
+        "both": [LOW_GROUP, HIGH_GROUP],
+    }
+    for tag, groups in configs.items():
+        _write_config(tmp_path, f"excl_{tag}", src, exclude_any=groups, **base)
+        samples_dir = _generated(tmp_path, monkeypatch, f"excl_{tag}", src)
+        sample = read_named_sample(f"excl_{tag}", samples_dir=samples_dir)
+        assert set(sample.df["id"]) == set(range(12)) - expected[tag]
+        assert sample.provenance["exclude_any"] == groups
+
+
+def test_v2_immutable_and_v1_preserved(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    src = _exclude_source(tmp_path)
+    base = {"size": 12, "columns": EXCLUDE_COLS, "filters": None, "schema": None}
+    _write_config(tmp_path, "multiver", src, **base)
+    samples_dir = _generated(tmp_path, monkeypatch, "multiver", src)
+    v1_path = samples_dir / "multiver@v1.parquet"
+    assert v1_path.exists()
+
+    _write_config(
+        tmp_path, "multiver", src,
+        version="v2", path="data/samples/multiver@v2.parquet",
+        derived=[{"name": "speed_mph", "formula": "speed_mph"}],
+        **base,
+    )
+    _generated(tmp_path, monkeypatch, "multiver", src)
+    v2_path = samples_dir / "multiver@v2.parquet"
+    assert v2_path.exists()
+    assert v1_path.exists()  # v1 artifact untouched
+
+    with pytest.raises(FileExistsError, match="bump `version`"):
+        generate_sample("multiver", samples_dir=samples_dir)
+    assert v1_path.exists() and v2_path.exists()
+
+
+def test_unknown_derived_formula_rejected(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    src = _exclude_source(tmp_path)
+    _write_config(
+        tmp_path, "badformula", src,
+        size=12,
+        columns=EXCLUDE_COLS,
+        derived=[{"name": "speed_mph", "formula": "teleport_mph"}],
+        filters=None,
+        schema=None,
+    )
+    monkeypatch.setattr(loader, "CONFIGS_DIR", tmp_path / "configs")
+    with pytest.raises(ValidationError):
+        generate_sample("badformula", samples_dir=tmp_path / "samples")
+
+
+def test_derived_formula_not_in_whitelist_raises(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The generate-time guard fires when the whitelist lacks a declared formula."""
+    src = _exclude_source(tmp_path)
+    _write_config(
+        tmp_path, "noguard", src,
+        size=12,
+        columns=EXCLUDE_COLS,
+        derived=[{"name": "speed_mph", "formula": "speed_mph"}],
+        filters=None,
+        schema=None,
+    )
+    monkeypatch.setattr(loader, "CONFIGS_DIR", tmp_path / "configs")
+    monkeypatch.setattr(generate_module, "_DERIVED_FUNCS", {})
+    with pytest.raises(ValueError, match="unknown derived formula"):
+        generate_sample("noguard", samples_dir=tmp_path / "samples")
 
 
 def test_existing_config_still_parses() -> None:
