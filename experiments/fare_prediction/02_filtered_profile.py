@@ -7,42 +7,37 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import seaborn as sns
 
 from _common import CLEAN_PARQUET, RESULTS
 from project.working import MIN_FARE
 
 COLS = ["fare_amount", "trip_distance", "trip_duration_minutes"]
 PERCENTILES = [0.01, 0.05, 0.50, 0.95, 0.99, 0.999, 1.0]
+TAIL_PERCENTILES = [0.99, 0.999]
 
 CSV_OUT = RESULTS / "02_filtered_profile_describe.csv"
 PNG_OUT = RESULTS / "02_filtered_profile.png"
 
 
 def plot_profiles(df: pd.DataFrame, out_path: Path) -> None:
-    """One figure, 3 quantile-function subplots: percentile vs value (log-y).
+    """One figure, 3 seaborn boxen (letter-value) plots on log-y.
 
-    The percentile is the x-axis, so each percentile's value is read directly
-    at its marker — no crossing-reading as with the ECDF.
+    Boxen tiers show many quantiles of the heavy-tailed distribution at a
+    glance; the 99% / 99.9% percentiles are marked with dashed lines.
     """
-    q_grid = np.linspace(0.001, 1.0, 200)
     fig, axes = plt.subplots(1, 3, figsize=(15, 4), constrained_layout=True)
     for ax, col in zip(axes, COLS):
         values = df[col]
-        ax.plot(q_grid * 100, np.quantile(values, q_grid), linewidth=1.0)
-        for i, p in enumerate(PERCENTILES):
+        sns.boxenplot(y=values, log_scale=True, color="#4c72b0", ax=ax)
+        for p in TAIL_PERCENTILES:
             y = float(values.quantile(p))
-            ax.plot(p * 100, y, "o", color="red", markersize=3)
-            above = i % 2 == 0
-            ax.annotate(
-                f"{y:.3g}", xy=(p * 100, y), xytext=(0, 4 if above else -4),
-                textcoords="offset points", ha="center",
-                va="bottom" if above else "top", fontsize=6, color="red",
-            )
-        ax.set_yscale("log")
-        ax.set_xlabel("percentile (%)")
-        ax.set_ylabel("value")
+            ax.axhline(y, color="red", linestyle="--", linewidth=0.8)
+            ax.text(0.03, y, f"{p * 100:g}% = {y:.3g}",
+                    transform=ax.get_yaxis_transform(), fontsize=7,
+                    color="red", va="center")
         ax.set_title(f"{col} (N={len(values)})")
-        ax.grid(True, alpha=0.3)
+        ax.grid(True, alpha=0.3, axis="y")
     fig.savefig(out_path, dpi=150)
     plt.close(fig)
 
