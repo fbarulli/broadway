@@ -1,4 +1,4 @@
-"""07: specification diagnostics — Ramsey RESET, Pearson-vs-Spearman discrepancies, MI-vs-R² audit; now covers the duration×temporal interactions, validating the temporal-compounding claim (individual hour flags ≈ 0 MI, duration×flag interactions show real MI)."""
+"""07: specification diagnostics — Ramsey RESET, Pearson-vs-Spearman discrepancies, MI-vs-R² audit; now audits the SAFE (pre-trip) feature set — post-trip columns (distance/duration/speed) are leakage and are excluded."""
 
 from pathlib import Path
 
@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import statsmodels.api as sm
-from _common import RESULTS
+from _common import RESULTS, SAFE_NUMERIC_FEATURES
 from scipy.stats import pearsonr, spearmanr
 from sklearn.feature_selection import mutual_info_regression
 from statsmodels.regression.linear_model import RegressionResultsWrapper
@@ -19,33 +19,14 @@ from statsmodels.stats.diagnostic import linear_reset
 
 PREPARED_TRAIN = RESULTS / "prepared" / "train.parquet"
 TARGET = "fare_amount"
-RESET_X_COLS = ["trip_distance", "trip_duration_minutes", "pickup_hour"]
-# The non-linear monotonic trap: trip_duration_minutes is monotonic but curved
-# (Pearson 0.84 vs Spearman 0.97). The RESET variants test whether a log or
-# quadratic term captures the curve — the baseline's specification error
-# should collapse once the curvature is modelled.
+RESET_X_COLS = ["pickup_hour", "route_id_encoded", "pu_rush_interaction"]
+# The safe-feature nonlinearity check: route_id_encoded is the strongest safe
+# association; a quadratic term tests whether its curve needs capturing.
 RESET_VARIANTS = (
-    ("linear (baseline)", RESET_X_COLS),
-    ("log duration", ["trip_distance", "log_duration", "pickup_hour"]),
-    ("quadratic duration", ["trip_distance", "trip_duration_minutes", "duration_sq", "pickup_hour"]),
+    ("linear (safe)", RESET_X_COLS),
+    ("quadratic route_id", ["pickup_hour", "route_id_encoded", "route_id_sq", "pu_rush_interaction"]),
 )
-AUDIT_COLS = [
-    "trip_distance",
-    "trip_duration_minutes",
-    "pickup_hour",
-    "pickup_day_of_week",
-    "pickup_month",
-    "is_weekend",
-    "is_rush_hour",
-    "is_night",
-    "hour_sin",
-    "hour_cos",
-    "dayofweek_sin",
-    "dayofweek_cos",
-    "duration_rush",
-    "duration_weekend",
-    "duration_night",
-]
+AUDIT_COLS = list(SAFE_NUMERIC_FEATURES)
 MI_NEIGHBORS = 5
 MI_RANDOM_STATE = 42
 DELTA_THRESHOLD = 0.05
@@ -86,22 +67,20 @@ def run_reset(model: RegressionResultsWrapper) -> dict[int, tuple[float, float]]
 
 
 def _variant_frame(df: pd.DataFrame, x_cols: list[str]) -> pd.DataFrame:
-    """X frame with the duration transforms a RESET variant needs."""
-    base_cols = [c for c in x_cols if c not in ("log_duration", "duration_sq")]
+    """X frame with the transforms a RESET variant needs."""
+    base_cols = [c for c in x_cols if c not in ("route_id_sq",)]
     out = df[base_cols].copy()
-    if "log_duration" in x_cols:
-        out["log_duration"] = np.log1p(df["trip_duration_minutes"])
-    if "duration_sq" in x_cols:
-        out["duration_sq"] = df["trip_duration_minutes"] ** 2
+    if "route_id_sq" in x_cols:
+        out["route_id_sq"] = df["route_id_encoded"] ** 2
     return out
 
 
 def run_reset_variants(df: pd.DataFrame) -> pd.DataFrame:
-    """RESET (power=2) across the linear / log-duration / quadratic specs.
+    """RESET (power=2) across the linear and quadratic-route_id specs.
 
-    The non-linear monotonic trap: duration is curved, so the linear baseline
-    shows a large RESET F; a log or quadratic term should shrink it sharply
-    once the curve is captured.
+    route_id_encoded is the strongest safe association; the quadratic term
+    tests whether its curve needs capturing (the safe-set analogue of the
+    earlier monotonic-trap check on duration).
     """
     rows = []
     for label, x_cols in RESET_VARIANTS:
@@ -115,7 +94,7 @@ def run_reset_variants(df: pd.DataFrame) -> pd.DataFrame:
             "reset_p": float(test.pvalue),
         })
     variants = pd.DataFrame(rows).set_index("model")
-    print("\nRESET variants (non-linear monotonic trap — duration curvature):")
+    print("\nRESET variants (safe features — route_id_encoded curvature):")
     print(variants.round(4).to_string())
     return variants
 
@@ -247,26 +226,22 @@ def _residuals_fitted(
     ax.grid(True, alpha=0.3)
 
 
-def _duration_curve(ax: plt.Axes, df: pd.DataFrame) -> None:
-    """Fare vs duration: linear / log / quadratic fits over the same curve.
-
-    The monotonic-trap visual — the linear fit visibly misses the curve that
-    log and quadratic terms capture.
-    """
+def _route_curve(ax: plt.Axes, df: pd.DataFrame) -> None:
+    """Fare vs route_id_encoded: linear / log / quadratic fits over the same curve."""
     sample = df.sample(n=min(SCATTER_SAMPLE, len(df)), random_state=MI_RANDOM_STATE)
-    d = sample["trip_duration_minutes"]
+    d = sample["route_id_encoded"]
     y = sample[TARGET]
     ax.scatter(d, y, s=3, alpha=0.12, color="#4c72b0")
     grid = np.linspace(d.quantile(0.01), d.quantile(0.99), 100)
     ax.plot(grid, np.polyval(np.polyfit(d, y, 1), grid), "-",
             color="#dd8452", lw=1.6, label="linear")
     ax.plot(grid, np.polyval(np.polyfit(np.log1p(d), y, 1), np.log1p(grid)), "--",
-            color="#2ca02c", lw=1.6, label="log(duration)")
+            color="#2ca02c", lw=1.6, label="log(route_id_encoded)")
     ax.plot(grid, np.polyval(np.polyfit(d, y, 2), grid), ":",
             color="#d62728", lw=1.6, label="quadratic")
-    ax.set_xlabel("trip_duration_minutes")
+    ax.set_xlabel("route_id_encoded")
     ax.set_ylabel("fare_amount")
-    ax.set_title("fare vs duration — linear vs log vs quadratic (monotonic trap)")
+    ax.set_title("fare vs route_id_encoded — linear vs log vs quadratic")
     ax.legend(fontsize=8)
     ax.grid(True, alpha=0.3)
 
@@ -277,11 +252,11 @@ def plot_reset(
     df: pd.DataFrame,
     out_path: Path,
 ) -> None:
-    """3 panels: residual-variance-by-bin bars, residuals-vs-fitted, duration curve."""
+    """3 panels: residual-variance-by-bin bars, residuals-vs-fitted, route curve."""
     fig, axes = plt.subplots(1, 3, figsize=(14, 4.5), constrained_layout=True)
     _variance_by_bin(axes[0], model)
     _residuals_fitted(axes[1], model, reset)
-    _duration_curve(axes[2], df)
+    _route_curve(axes[2], df)
     fig.savefig(out_path, dpi=150)
     plt.close(fig)
 

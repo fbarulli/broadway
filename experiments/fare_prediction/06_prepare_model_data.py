@@ -1,9 +1,15 @@
-"""06: chronological train/val/test split, temporal features, duration×temporal interactions, raw location ids as categorical for LightGBM, log1p target."""
+"""06: chronological train/val/test split, temporal features, duration×temporal interactions, safe pre-trip features (route target encoding, pu×time interactions), raw location ids as categorical, log1p target.
+
+The model feature set is SAFE_FEATURES (pre-trip only — no distance/duration/
+speed, which are post-trip leakage). The target encodings are fitted on the
+TRAIN slice only; unseen ids fall back to the train global mean.
+"""
 
 import numpy as np
 import pandas as pd
 from _common import DATETIME_SRC, RESULTS, SAMPLE_NAME, build_temporal_features
 
+from broadway.features.encodings import fit_target_encoding, transform_target_encoding
 from broadway.samples import read_named_sample
 
 TRAIN_VAL_TEST = (0.8, 0.1, 0.1)
@@ -11,6 +17,7 @@ TARGET = "fare_amount"
 TARGET_LOG = "fare_amount_log"
 PU_COL = "pickup_location_id"
 DO_COL = "dropoff_location_id"
+SMOOTHING = 10
 PREPARED_DIR = RESULTS / "prepared"
 SPLIT_CSV = RESULTS / "06_prepare_model_data_split.csv"
 
@@ -22,6 +29,14 @@ INTERACTION_SPECS: tuple[tuple[str, str, str], ...] = (
     ("duration_rush", "trip_duration_minutes", "is_rush_hour"),
     ("duration_weekend", "trip_duration_minutes", "is_weekend"),
     ("duration_night", "trip_duration_minutes", "is_night"),
+)
+
+# Pickup-zone × temporal-flag interactions (pre-trip: zone + time known in
+# advance). Built on the train-only pickup target encoding.
+PU_INTERACTION_SPECS: tuple[tuple[str, str], ...] = (
+    ("pu_rush_interaction", "is_rush_hour"),
+    ("pu_night_interaction", "is_night"),
+    ("pu_weekend_interaction", "is_weekend"),
 )
 
 
@@ -49,13 +64,40 @@ def _interactions(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def _prepare_split(df: pd.DataFrame) -> pd.DataFrame:
-    """Temporal features, duration×temporal interactions, categorical ids, log1p target."""
+    """Temporal features, route id, duration×temporal interactions, categorical ids, log1p target."""
     df = build_temporal_features(df)
     df = _interactions(df)
+    df["route_id"] = df[PU_COL].astype(str) + "_" + df[DO_COL].astype(str)
     for col in LOCATION_COLS:
         df[col] = df[col].astype("category")
     df[TARGET_LOG] = np.log1p(df[TARGET])
     return df
+
+
+def _apply_encodings(splits: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
+    """Train-only target encodings (route + pickup) + pu×time interactions.
+
+    Fitted on the TRAIN slice; unseen ids fall back to the train global mean
+    (the platform's ``__unknown__`` fallback). The pu interactions multiply
+    the pickup encoding by each temporal flag.
+    """
+    train = splits["train"]
+    encodings = {
+        "route_id": fit_target_encoding(train, "route_id", TARGET, SMOOTHING),
+        PU_COL: fit_target_encoding(train, PU_COL, TARGET, SMOOTHING),
+    }
+    out = {}
+    for name, df in splits.items():
+        df = transform_target_encoding(df, "route_id", encodings["route_id"]).rename(
+            columns={"route_id_target_enc": "route_id_encoded"}
+        )
+        df = transform_target_encoding(df, PU_COL, encodings[PU_COL]).rename(
+            columns={f"{PU_COL}_target_enc": "pickup_location_id_encoded"}
+        )
+        for feat, flag in PU_INTERACTION_SPECS:
+            df[feat] = df["pickup_location_id_encoded"] * df[flag]
+        out[name] = df
+    return out
 
 
 def _evidence_rows(splits: dict[str, pd.DataFrame]) -> list[dict[str, object]]:
@@ -82,6 +124,7 @@ def main() -> None:
         "val": _prepare_split(val),
         "test": _prepare_split(test),
     }
+    splits = _apply_encodings(splits)
     for name, df in splits.items():
         out = PREPARED_DIR / f"{name}.parquet"
         df.to_parquet(out, index=False)
