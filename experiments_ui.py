@@ -657,7 +657,9 @@ def _render_series_page(
 {cards}
 <div class="drop-zone"></div>
 </div>
+<script>
 {_SERIES_REORDER_JS}
+</script>
 </body>
 </html>
 """
