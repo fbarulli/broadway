@@ -17,7 +17,7 @@ PERCENTILES = [0.01, 0.05, 0.50, 0.95, 0.99, 0.999, 1.0]
 UNIT_FMT = {
     "fare_amount": "${:g}",
     "trip_distance": "{:g} mi",
-    "trip_duration_minutes": "{:g} min",
+    "trip_duration_minutes": "{:.0f} min",
 }
 
 CSV_OUT = RESULTS / "02_filtered_profile_describe.csv"
@@ -46,6 +46,13 @@ def plot_profiles(df: pd.DataFrame, out_path: Path) -> None:
         ax.yaxis.set_major_formatter(
             matplotlib.ticker.FuncFormatter(lambda v, _p, fmt=fmt: fmt.format(v))
         )
+        ax.yaxis.set_minor_locator(
+            matplotlib.ticker.LogLocator(base=10, subs=(2.0, 5.0))
+        )
+        ax.yaxis.set_minor_formatter(
+            matplotlib.ticker.FuncFormatter(lambda v, _p, fmt=fmt: fmt.format(v))
+        )
+        ax.tick_params(axis="y", which="minor", labelsize=6)
         thresholds: list[tuple[float, str]] = []
         for label, p in mark_labels:
             y = float(values.min() if p == 0.0 else
