@@ -80,6 +80,20 @@ Development happens on `taxi`; the `main` split already happened, don't redo it.
   the census/narrative from the tree + records and reports drift. It never
   commits.
 
+## 3c. Proportional process (task tiers)
+
+The ceremony matches the task; overhead must not exceed the work.
+
+- **Micro** (one-file tweaks: plot/label/format iterations, tiny bug fixes):
+  the main agent does them **directly** — cheap checks (run the touched
+  script, git diff/status) + ruff; no worker round-trip, no full contract.
+- **Medium** (a step script, a UI slice, small migrations): one worker with a
+  **trimmed** contract (task, complete edit list, acceptance checks — no
+  essay), then the main agent re-verifies the cheap checks.
+- **Large** (platform/`src` changes, new subsystems, cross-cutting refactors):
+  full ceremony — `CONTRACT_TEMPLATE.md`, all gates, read-only review agent
+  after.
+
 ## 4. Decisions
 
 - **ALWAYS present decisions to the user; NEVER decide unilaterally.**
@@ -144,15 +158,22 @@ no surface.
 ```
 cd /home/opc/ONE/broad-way && uv run pytest -q
 ```
-Must be green after every change.
-No broken intermediate state — every commit must leave the suite green.
+
+- **Full suite required when `src/` or `tests/` changes** (platform code).
+- **Experiments/scripts/UI-only changes:** the suite cannot be affected
+  (pytest does not collect `experiments/` or root scripts) — instead run ruff
+  plus the touched scripts/targeted checks.
+- Exit codes are captured **directly, never through a pipe** (a piped pytest
+  masks its exit code — that caused a broken commit once; it must not recur).
+- No broken intermediate state — every commit leaves the applicable gate
+  green.
 
 ## 11. Quick reference
 
 - `uv sync` — install deps.
-- `uv run pytest -q` — full suite (must be green).
+- `uv run pytest -q` — full suite (required when `src/`/`tests/` change; see §10).
 - `uv run ds-pipeline <command> ...` — the CLI (`ingest`, `etl`, `stats {run,describe}`,
   `report`, `lineage`, `profile`, `discover`, `init`, ...).
 - `uv run python -m project.scripts.NN_name` — taxi analysis scripts.
-- Agents: Task tool, `subagent_type="general"`, precise contract; require
-  full-suite green + commit + push.
+- Agents: Task tool, `subagent_type="general"`, contract per tier (§3c);
+  commit + push to `taxi`.
