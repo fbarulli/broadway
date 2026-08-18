@@ -1,7 +1,7 @@
 """Bare-bones FastAPI census dashboard for Broadway experiments.
 
 Serves a single read-only HTML table listing every experiment script under
-``experiments/*/*/*.py`` with its category, docstring question, run status and
+``experiments/**/*.py`` with its category, docstring question, run status and
 artifact count. No templates, no JS, no external assets — a skeleton to be
 extended later.
 """
@@ -52,13 +52,13 @@ def _numeric_sort_key(name: str) -> tuple[bool, int, str]:
 
 
 def census_rows() -> list[dict[str, str | int]]:
-    """Walk ``experiments/*/*/*.py`` and build one row per experiment."""
+    """Recursively walk ``experiments/**/*.py`` and build one row per experiment."""
     rows: list[dict[str, str | int]] = []
-    for script in sorted(EXPERIMENTS_ROOT.glob("*/*/*.py")):
+    for script in sorted(EXPERIMENTS_ROOT.rglob("*.py")):
         if script.name.startswith("_"):
             continue
         stem = script.stem
-        category = f"{script.parent.parent.name}/{script.parent.name}"
+        category = script.parent.relative_to(EXPERIMENTS_ROOT).as_posix()
         results = _result_files(category, stem)
         rows.append(
             {
