@@ -2,9 +2,9 @@
 
 import json
 
-from broadway.samples import generate_sample
-
 from _common import SAMPLE_NAME
+
+from broadway.samples import generate_sample
 
 
 def main() -> None:

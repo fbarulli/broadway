@@ -8,7 +8,7 @@ snapshot in `HANDOFF.md`.
 ## Install
 
 ```bash
-uv sync                    # install deps (add --extra spark only for genuinely large datasets)
+uv sync --extra dev        # install deps incl. dev toolchain (ruff/mypy/pytest-cov); add --extra spark only for genuinely large datasets
 docker compose up -d       # mlflow + postgres (optional; training logs runs + artifacts here)
 ```
 
