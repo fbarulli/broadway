@@ -1,0 +1,20 @@
+name: fare_prediction_1m
+role: estimation
+version: "v1"
+path: data/samples/fare_prediction_1m@v1.parquet
+description: 1M random sample of the taxi training data, policy-filtered for fare prediction
+source:
+  name: training_data
+  path: data/processed/training_data.parquet
+seed: 42
+size: 1000000
+columns: [fare_amount, trip_distance, trip_duration_minutes]
+# Policy mirrors configs/experiments/working.yaml (min_fare: 2.50) — declared once here
+filters:
+  - {column: fare_amount, op: ">", value: 2.50}
+  - {column: trip_distance, op: ">", value: 0.0}
+  - {column: trip_duration_minutes, op: ">", value: 0.0}
+schema:
+  fare_amount: {dtype: float64, nullable: false, checks: [{op: ">", value: 0.0}]}
+  trip_distance: {dtype: float64, nullable: false, checks: [{op: ">", value: 0.0}]}
+  trip_duration_minutes: {dtype: float64, nullable: false, checks: [{op: ">", value: 0.0}]}

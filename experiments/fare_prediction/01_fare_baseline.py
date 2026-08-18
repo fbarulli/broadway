@@ -1,18 +1,17 @@
-"""01: fare prediction baseline"""
+"""01: generate the named fare_prediction_1m sample (sampling + policy applied once)."""
 
-from _common import CLEAN_PARQUET, RESULTS, SAMPLE_SIZE, SEED
-from project.data import read_training_sample
+import json
+
+from broadway.samples import generate_sample
+
+from _common import SAMPLE_NAME
 
 
 def main() -> None:
-    RESULTS.mkdir(parents=True, exist_ok=True)
-    df = read_training_sample(
-        sample=SAMPLE_SIZE, seed=SEED,
-        columns=["fare_amount", "trip_distance", "trip_duration_minutes"],
-    )
-    df.to_parquet(CLEAN_PARQUET)
-    print(f"rows: {len(df)}")
-    print(f"wrote {CLEAN_PARQUET}")
+    artifact = generate_sample(SAMPLE_NAME)
+    provenance = json.loads(artifact.with_suffix(".json").read_text(encoding="utf-8"))
+    print(f"artifact: {artifact}")
+    print(f"rows: {provenance['row_count']}")
 
 
 if __name__ == "__main__":

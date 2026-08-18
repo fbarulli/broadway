@@ -239,6 +239,10 @@ broadway/
       mermaid.py            # to_mermaid(graph) -> mermaid source
       state.py              # current_state(graph, mode, goal, decisions) -> RunState
       module.py             # ds-pipeline lineage command
+    samples/                # named-sample registry: definition → immutable artifact → validated consumption
+      generate.py           # generate_sample(name): spec → data/samples/<name>@v<N>.parquet + provenance sidecar
+      loader.py             # read_named_sample(name): integrity/digest/row-count/schema validation → Sample
+      models.py             # Sample (df + spec + provenance)
     timeline/               # hypothesis walkthrough: step sequence + decision gates (the "analysis timeline")
       models.py             # StepStatus / AnalysisStep / AnalysisDecision / Suggestion / Alternative (Pydantic)
       sequence.py           # WalkthroughSequence / DecisionSpec / WalkthroughConfig.decisions / WalkthroughStepConfig.action + loaders (configs/flow/hypothesis_walkthrough.yaml, configs/step/walkthrough.yaml)
@@ -271,7 +275,7 @@ broadway/
     features.yaml           # feature-engineer params SSOT
   configs/flow/<mode>.yaml  # mode-specific step lists (prediction/hypothesis/causal)
   configs/flow/stats_sequence.yaml  # ordered stats-step list for reports/index.md (StatsSequence)
-  configs/sample/<name>.yaml  # SampleSpec (role/path/column_mapping) for `stats --sample`
+  configs/sample/<name>.yaml  # SampleSpec for `stats --sample`; named samples declare version/source/seed/size/columns/filters/schema
   configs/analysis/<name>.yaml  # authored analytical intent (AnalysisContract)
   tests/                    # test_base.py, test_anova.py, ... (pytest)
 ```
@@ -291,6 +295,8 @@ broadway/
 | `join_audit.audit_join(df, ...)` | `audit_join` | `src/broadway/data/join_audit.py` |
 | `lookup_value_audit.audit_lookup_values(...)` | `audit_lookup_values` | `src/broadway/data/lookup_value_audit.py` |
 | `sample.load_sample(name)` | `load_sample` | `src/broadway/lineage/sample.py` |
+| `samples.generate_sample(name)` | `generate_sample` | `src/broadway/samples/generate.py` |
+| `samples.read_named_sample(name)` | `read_named_sample` | `src/broadway/samples/loader.py` |
 | `anova.run_anova(groups)` | `run_anova` | `src/broadway/stats/anova.py` |
 | `anova.run_welch(groups)` | `run_welch` | `src/broadway/stats/anova.py` |
 | `anova.run_kruskal(groups)` | `run_kruskal` | `src/broadway/stats/anova.py` |
@@ -380,6 +386,28 @@ Analysis intent is authored separately via `configs/analysis/<name>.yaml` → `A
 |---|---|---|---|
 | Stratified random | `load_stratified_sample` | per-borough proportions preserved; deterministic (`RANDOM_STATE`) | 08, 09, 11, 07 (games-howell), 04–06 (ANOVA groups via `load_borough_durations`) |
 | Contiguous time slice | `load_time_slice` | rows sorted by `pickup_datetime`, no random sampling (filter pushdown) | 10 (Durbin-Watson / ACF) |
+
+## Named sample registry
+
+Steps never own sample paths, filtering, or sampling logic — they declare a
+sample name, and the registry resolves it to an immutable versioned artifact:
+
+```
+configs/sample/<name>.yaml  (SampleSpec: version/source/seed/size/columns/filters/schema)
+        ▼  generate_sample (broadway/samples/generate.py)  — fails if the version exists
+data/samples/<name>@v<N>.parquet  +  <name>@v<N>.json  (provenance sidecar)
+        ▼  read_named_sample (broadway/samples/loader.py)
+validates: artifact sha256 == provenance.artifact_sha256  (integrity)
+           definition sha256 == provenance.definition_sha256  (definition immutability)
+           row count == provenance.row_count
+           pandera schema built from spec.schema (dtype + nullable + op checks)
+        ▼
+Sample(df, spec, provenance)  →  steps consume by name (e.g. experiments/fare_prediction)
+```
+
+Regenerating a changed definition requires bumping `version` in the config —
+the artifact is immutable; the loader rejects any drift between definition,
+artifact, and provenance.
 
 ## Contracts
 

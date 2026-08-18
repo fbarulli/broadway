@@ -7,6 +7,20 @@ from pydantic import BaseModel, ConfigDict
 SampleRole = Literal["diagnostic", "estimation"]
 
 
+class DatasetRef(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: str
+    path: str
+    row_count: int | None = None
+
+
+class FilterSpec(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    column: str
+    op: Literal[">", "<", ">=", "<=", "==", "!="]
+    value: float
+
+
 class SampleSpec(BaseModel):
     model_config = ConfigDict(extra="forbid")
     name: str
@@ -14,13 +28,13 @@ class SampleSpec(BaseModel):
     path: str
     description: str | None = None
     column_mapping: dict[str, str] = {}
-
-
-class DatasetRef(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    name: str
-    path: str
-    row_count: int | None = None
+    version: str = "v1"
+    seed: int | None = None
+    size: int | None = None
+    source: DatasetRef | None = None
+    columns: list[str] | None = None
+    filters: list[FilterSpec] | None = None
+    schema: dict | None = None  # type: ignore[assignment]
 
 
 class DatasetSlice(BaseModel):

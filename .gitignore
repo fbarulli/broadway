@@ -11,6 +11,7 @@ dist/
 build/
 data/raw/
 data/processed/
+data/samples/
 artifacts/
 /results/
 experiments/results/**

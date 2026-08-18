@@ -326,6 +326,11 @@ configs/
 `configs/analysis/` holds one YAML per analytical use case (e.g. `taxi.yaml`,
 `taxi_hypothesis.yaml`, `taxi_causal.yaml`).
 
+`configs/sample/<name>.yaml` now declares versioned named samples too —
+seed/size/columns/filters/schema generate immutable artifacts under
+`data/samples/` (`<name>@v<N>.parquet` + provenance), validated by
+`read_named_sample` before steps consume them by name.
+
 YAML → Pydantic (`src/broadway/config/schema.py`) → `load_config()`. No
 defaults, no `get(key, default)`, no hardcoded values anywhere.
 

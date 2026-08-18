@@ -1,7 +1,8 @@
-"""02: filter the 1M sample with the project's existing data policy and profile it.
+"""02: profile the named fare_prediction_1m sample.
 
-Data flow: 01 = raw 1M sample → 02 = policy-filtered sample persisted to
-FILTERED_PARQUET → later steps (e.g. 03) consume FILTERED_PARQUET.
+The fare/distance/duration policy lives in the sample definition
+(configs/sample/fare_prediction_1m.yaml), applied once at generation; this
+step only consumes the validated sample by name.
 """
 
 from pathlib import Path
@@ -9,12 +10,12 @@ from pathlib import Path
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
 import seaborn as sns
 
-from _common import CLEAN_PARQUET, FILTERED_PARQUET, RESULTS
-from project.working import MIN_FARE
+from broadway.samples import read_named_sample
+
+from _common import RESULTS, SAMPLE_NAME
 
 COLS = ["fare_amount", "trip_distance", "trip_duration_minutes"]
 PERCENTILES = [0.01, 0.05, 0.50, 0.95, 0.99, 0.999, 1.0]
@@ -82,22 +83,12 @@ def plot_profiles(df: pd.DataFrame, out_path: Path) -> None:
 
 def main() -> None:
     RESULTS.mkdir(parents=True, exist_ok=True)
-    df = pd.read_parquet(CLEAN_PARQUET)
-    n_before = len(df)
+    sample = read_named_sample(SAMPLE_NAME)
+    print(f"sample: {SAMPLE_NAME}@{sample.provenance['version']}")
+    print(f"rows: {sample.provenance['row_count']}")
+    print(f"artifact_sha256: {sample.provenance['artifact_sha256']}")
 
-    # MIN_FARE comes from working.yaml (config-driven, not a new constant);
-    # the other two guards are consistent with upstream cleaning.
-    df = df[(df["fare_amount"] > MIN_FARE) & (df["trip_distance"] > 0)
-            & (df["trip_duration_minutes"] > 0)]
-
-    n_after = len(df)
-    print(f"rows before: {n_before}")
-    print(f"rows after: {n_after}")
-    print(f"rows removed: {n_before - n_after}")
-
-    df.to_parquet(FILTERED_PARQUET)
-    print(f"wrote {FILTERED_PARQUET}")
-
+    df = sample.df
     desc = df[COLS].describe(percentiles=PERCENTILES)
     print(desc)
     desc.to_csv(CSV_OUT)

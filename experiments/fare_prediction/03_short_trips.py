@@ -1,13 +1,15 @@
-"""03: profile the short trips (< 0.31 mi) subset.
+"""03: profile the short trips (< 0.31 mi) subset of the named fare_prediction_1m sample.
 
-Short trips are drawn from the policy-filtered 1M sample (FILTERED_PARQUET,
-written by 02); the fare/duration policy is already applied there, so only
-the distance filter is applied here.
+Short trips are a slice of the validated named sample (only the distance
+subset is applied here); the fare/duration policy lives in the sample
+definition and was applied once at generation.
 """
 
 import pandas as pd
 
-from _common import FILTERED_PARQUET, RESULTS
+from broadway.samples import read_named_sample
+
+from _common import RESULTS, SAMPLE_NAME
 
 SHORT_DISTANCE = 0.31
 SHORT_COLS = ["fare_amount", "trip_duration_minutes"]
@@ -50,7 +52,8 @@ def describe_to_markdown(title: str, desc: pd.DataFrame, n: int) -> str:
 
 def main() -> None:
     RESULTS.mkdir(parents=True, exist_ok=True)
-    df = pd.read_parquet(FILTERED_PARQUET)
+    sample = read_named_sample(SAMPLE_NAME)
+    df = sample.df
     short = df[(df["trip_distance"] > 0) & (df["trip_distance"] < SHORT_DISTANCE)]
     print(f"Total short trips: {len(short):,}")
 
