@@ -72,6 +72,13 @@ Development happens on `taxi`; the `main` split already happened, don't redo it.
   never silently improvise.
 - After substantial or risky work, dispatch a read-only review agent
   (`subagent_type="explore"`) to audit the change and report findings.
+- Every contract follows `CONTRACT_TEMPLATE.md` — the skeleton is mandatory
+  (task, complete edit list, constraints, acceptance checks with evidence
+  format, commit/push). A contract the worker has to interpret is incomplete.
+- Periodically — after substantial work, or whenever direction is unclear —
+  dispatch a read-only **landscape audit**: a fresh-context agent re-derives
+  the census/narrative from the tree + records and reports drift. It never
+  commits.
 
 ## 4. Decisions
 
