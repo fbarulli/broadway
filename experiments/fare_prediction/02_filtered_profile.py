@@ -27,12 +27,12 @@ PNG_OUT = RESULTS / "02_filtered_profile.png"
 def plot_profiles(df: pd.DataFrame, out_path: Path) -> None:
     """One figure, 3 box-whisker plots on log-y with measurement marks.
 
-    Whiskers span min→max; the mean is marked; min/50/95/99/99.9%/max are
-    drawn as labeled dashed lines; the region above 99% is shaded as the tail;
-    each band between marks shows how many values it contains.
+    Whiskers span min→max; the mean is marked; min/1/5/50/95/99/99.9%/max are
+    drawn as labeled dashed lines (labels left); each band's value count is
+    shown on the right; the region above 99% is shaded as the tail.
     """
-    mark_labels = (("min", 0.0), ("50%", 0.50), ("95%", 0.95),
-                   ("99%", 0.99), ("99.9%", 0.999), ("max", 1.0))
+    mark_labels = (("min", 0.0), ("1%", 0.01), ("5%", 0.05), ("50%", 0.50),
+                   ("95%", 0.95), ("99%", 0.99), ("99.9%", 0.999), ("max", 1.0))
     fig, axes = plt.subplots(1, 3, figsize=(15, 4.5), constrained_layout=True)
     for ax, col in zip(axes, COLS):
         values = df[col]
@@ -59,9 +59,9 @@ def plot_profiles(df: pd.DataFrame, out_path: Path) -> None:
                    alpha=0.08, color="#d62728")
         for (lo, _), (hi, _) in zip(thresholds[:-1], thresholds[1:]):
             n = int(((values > lo) & (values <= hi)).sum())
-            ax.text(0.03, (lo * hi) ** 0.5, f"n = {n:,}",
+            ax.text(0.97, (lo * hi) ** 0.5, f"n = {n:,}",
                     transform=ax.get_yaxis_transform(), fontsize=6,
-                    color="#555555", va="center")
+                    color="#555555", va="center", ha="right")
         ax.set_title(f"{col} (N={len(values)})")
         ax.set_ylabel("")
         ax.grid(True, alpha=0.3, axis="y")
