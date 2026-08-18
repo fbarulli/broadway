@@ -25,12 +25,14 @@ PNG_OUT = RESULTS / "02_filtered_profile.png"
 
 
 def plot_profiles(df: pd.DataFrame, out_path: Path) -> None:
-    """One figure, 3 box-whisker plots on log-y with percentile marks.
+    """One figure, 3 box-whisker plots on log-y with measurement marks.
 
-    Whiskers span min→max; the mean is marked; 50/95/99/99.9% percentiles are
-    drawn as labeled dashed lines; the region above 99% is shaded as the tail.
+    Whiskers span min→max; the mean is marked; min/50/95/99/99.9%/max are
+    drawn as labeled dashed lines; the region above 99% is shaded as the tail;
+    each band between marks shows how many values it contains.
     """
-    mark_percentiles = (0.50, 0.95, 0.99, 0.999)
+    mark_labels = (("min", 0.0), ("50%", 0.50), ("95%", 0.95),
+                   ("99%", 0.99), ("99.9%", 0.999), ("max", 1.0))
     fig, axes = plt.subplots(1, 3, figsize=(15, 4.5), constrained_layout=True)
     for ax, col in zip(axes, COLS):
         values = df[col]
@@ -44,19 +46,22 @@ def plot_profiles(df: pd.DataFrame, out_path: Path) -> None:
         ax.yaxis.set_major_formatter(
             matplotlib.ticker.FuncFormatter(lambda v, _p, fmt=fmt: fmt.format(v))
         )
-        ax.axhspan(float(values.quantile(0.99)), float(values.max()),
-                   alpha=0.08, color="#d62728")
-        for p in mark_percentiles:
-            y = float(values.quantile(p))
+        thresholds: list[tuple[float, str]] = []
+        for label, p in mark_labels:
+            y = float(values.min() if p == 0.0 else
+                      values.max() if p == 1.0 else values.quantile(p))
+            thresholds.append((y, label))
             ax.axhline(y, color="#d62728", linestyle="--", linewidth=0.8)
-            ax.text(0.03, y, f"{p * 100:g}% = {fmt.format(y)}",
+            ax.text(0.03, y, f"{label} = {fmt.format(y)}",
                     transform=ax.get_yaxis_transform(), fontsize=7,
                     color="#d62728", va="bottom")
-        y_max = float(values.max())
-        ax.axhline(y_max, color="#d62728", linestyle="--", linewidth=0.8)
-        ax.text(0.03, y_max, f"max = {fmt.format(y_max)}",
-                transform=ax.get_yaxis_transform(), fontsize=7,
-                color="#d62728", va="bottom")
+        ax.axhspan(float(values.quantile(0.99)), float(values.max()),
+                   alpha=0.08, color="#d62728")
+        for (lo, _), (hi, _) in zip(thresholds[:-1], thresholds[1:]):
+            n = int(((values > lo) & (values <= hi)).sum())
+            ax.text(0.03, (lo * hi) ** 0.5, f"n = {n:,}",
+                    transform=ax.get_yaxis_transform(), fontsize=6,
+                    color="#555555", va="center")
         ax.set_title(f"{col} (N={len(values)})")
         ax.set_ylabel("")
         ax.grid(True, alpha=0.3, axis="y")
