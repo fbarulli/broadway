@@ -18,40 +18,30 @@ CSV_OUT = RESULTS / "02_filtered_profile_describe.csv"
 PNG_OUT = RESULTS / "02_filtered_profile.png"
 
 
-# Per-percentile annotation placement: p -> (vertical anchor, horizontal
-# anchor, offset in points). The 0.95-1.0 lines sit within 0.05 of each other,
-# so the top-cluster labels are anchored above/below their lines and staggered
-# to avoid overlapping one another and the curve.
-LABEL_PLACEMENT = {
-    0.01: ("center", "left", (3, 0)),
-    0.05: ("center", "left", (3, 0)),
-    0.50: ("center", "left", (3, 0)),
-    0.95: ("top", "left", (3, -8)),
-    0.99: ("top", "left", (3, -7)),
-    0.999: ("bottom", "left", (3, 2)),
-    1.0: ("top", "right", (-3, 0)),
-}
-
-
 def plot_profiles(df: pd.DataFrame, out_path: Path) -> None:
-    """One figure, 3 ECDF subplots with dashed percentile gridlines."""
+    """One figure, 3 quantile-function subplots: percentile vs value (log-y).
+
+    The percentile is the x-axis, so each percentile's value is read directly
+    at its marker — no crossing-reading as with the ECDF.
+    """
+    q_grid = np.linspace(0.001, 1.0, 200)
     fig, axes = plt.subplots(1, 3, figsize=(15, 4), constrained_layout=True)
     for ax, col in zip(axes, COLS):
-        values = df[col].sort_values()
-        n = len(values)
-        ax.plot(values, np.arange(1, n + 1) / n, linewidth=1.0)
-        for p in PERCENTILES:
-            ax.axhline(p, color="red", linestyle="--", linewidth=0.8)
-        for p in PERCENTILES:
-            va, ha, offset = LABEL_PLACEMENT[p]
-            x = values.quantile(p)
-            ax.annotate(f"{p * 100:g}% x={x:.1f}", xy=(x, p), xytext=offset,
-                        textcoords="offset points", ha=ha, va=va,
-                        fontsize=6, color="red")
-        ax.set_xscale("log")
-        ax.set_xlabel("value")
-        ax.set_ylabel("cumulative share")
-        ax.set_title(f"{col} (N={n})")
+        values = df[col]
+        ax.plot(q_grid * 100, np.quantile(values, q_grid), linewidth=1.0)
+        for i, p in enumerate(PERCENTILES):
+            y = float(values.quantile(p))
+            ax.plot(p * 100, y, "o", color="red", markersize=3)
+            above = i % 2 == 0
+            ax.annotate(
+                f"{y:.3g}", xy=(p * 100, y), xytext=(0, 4 if above else -4),
+                textcoords="offset points", ha="center",
+                va="bottom" if above else "top", fontsize=6, color="red",
+            )
+        ax.set_yscale("log")
+        ax.set_xlabel("percentile (%)")
+        ax.set_ylabel("value")
+        ax.set_title(f"{col} (N={len(values)})")
         ax.grid(True, alpha=0.3)
     fig.savefig(out_path, dpi=150)
     plt.close(fig)
