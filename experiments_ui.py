@@ -27,7 +27,7 @@ import logging
 import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import parse_qs, quote
 
@@ -257,7 +257,7 @@ def _render_evidence(stem: str, focus: str) -> str:
     if not results_dir.is_dir():
         return ""
     tables = []
-    for csv_path in sorted(results_dir.glob(f"{stem}_describe.csv")):
+    for csv_path in sorted(results_dir.glob(f"{stem}*_describe.csv")):
         try:
             desc = pd.read_csv(csv_path, index_col=0)
         except (ValueError, OSError):
@@ -872,7 +872,7 @@ async def save_observations(
         "experiment": name,
         "verdict": verdict,
         "observations": fields.get("observations", [""])[0],
-        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(UTC).isoformat(),
     }
     OBSERVATIONS_DIR.mkdir(parents=True, exist_ok=True)
     (OBSERVATIONS_DIR / f"{name}.json").write_text(json.dumps(record, indent=2), encoding="utf-8")
