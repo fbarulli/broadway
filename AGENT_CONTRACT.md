@@ -108,18 +108,10 @@ code). Every agent instruction references it.
 - **Project docs** — keep current in the SAME commit as any change: `README.md`,
   `dataflow.md`, `src/broadway/stats/API.md`, `tests/README.md`.
   `README.md` must be current at ALL times (test counts, commands, paths).
-- **Data rules (agent-applied)** — `DATA_VALIDATION.md`: do reversible
-  structural cleaning first (names/types, dates, missing-value encodings,
-  accidental duplicates, required columns, parse-failure records, raw values
-  preserved); hold off on analytical judgments (outliers, imputation,
-  winsorizing, scaling, encoding, feature engineering, row filters) until
-  profiling/EDA has described the data; cleaning before analysis corrects
-  representation errors, never makes analytical judgments — those are recorded
-  decisions with evidence; use named slices for reproducibility.
 
 - **Scratch (NEVER touch)** — `01.md`, `TODO_*.md`, `GOALS.md`, `LEARN.md`,
   `trust.md`, `synth.md`, `SENIOR.md`, `project.md`, `FEEDBACK.md`,
-  `GENERAL_TODO.md`, `project/STATS.md`.
+  `DATA_VALIDATION.md`, `GENERAL_TODO.md`, `project/STATS.md`.
 - `HANDOFF.md` is maintained on explicit user request (it is not scratch anymore).
 
 ## 8. Git policy
