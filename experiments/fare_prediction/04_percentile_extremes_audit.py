@@ -197,11 +197,9 @@ def plot_extremes(
     df: pd.DataFrame,
     bottom: pd.DataFrame,
     top: pd.DataFrame,
-    bottom_flagged: pd.DataFrame,
-    top_flagged: pd.DataFrame,
     out_path: Path,
 ) -> None:
-    """Two-panel figure: bottom-vs-top fare boxplot plus flagged-extremes scatter."""
+    """Two-panel figure: bottom-vs-top fare boxplot plus fare-density comparison."""
     fig, axes = plt.subplots(1, 2, figsize=(12, 4.5), constrained_layout=True)
     extremes = pd.concat([
         bottom.assign(group="bottom 1%"),
@@ -218,20 +216,15 @@ def plot_extremes(
     )
     axes[0].set_title("bottom vs top 1% fares")
     axes[0].grid(True, alpha=0.3, axis="y")
-    sns.scatterplot(
-        x="trip_distance", y="fare_amount", hue="group", data=extremes,
-        palette={"bottom 1%": "#4c72b0", "top 1%": "#d62728"},
-        s=8, alpha=0.5, ax=axes[1],
-    )
+    sns.kdeplot(df["fare_amount"], label="all trips", color="#7f7f7f", ax=axes[1])
+    sns.kdeplot(bottom["fare_amount"], label="bottom 1%", color="#4c72b0", ax=axes[1])
+    sns.kdeplot(top["fare_amount"], label="top 1%", color="#d62728", ax=axes[1])
     axes[1].set_xscale("log")
-    axes[1].set_yscale("log")
-    flagged = pd.concat([bottom_flagged, top_flagged])
-    axes[1].scatter(
-        x=flagged["trip_distance"], y=flagged["fare_amount"],
-        marker="x", s=40, color="black", label="flagged",
-    )
-    axes[1].legend(title=None)
-    axes[1].set_title("extremes: fare vs distance (flagged = x)")
+    axes[1].set_xlabel("fare_amount")
+    axes[1].set_ylabel("density")
+    axes[1].legend(fontsize=7)
+    axes[1].set_title("fare density: all vs bottom/top 1%")
+    axes[1].grid(True, alpha=0.3, axis="y")
     fig.savefig(out_path, dpi=150)
     plt.close(fig)
 
@@ -274,7 +267,7 @@ def main() -> None:
     combined.to_csv(EVIDENCE_CSV)
     print(f"wrote {EVIDENCE_CSV} ({len(combined)} rows)")
 
-    plot_extremes(df, bottom, top, bottom_flagged, top_flagged, PNG_OUT)
+    plot_extremes(df, bottom, top, PNG_OUT)
     print(f"wrote {PNG_OUT}")
 
     SUMMARY_MD.write_text(

@@ -13,7 +13,8 @@ matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
 import pandas as pd
-from _common import RESULTS, SAMPLE_NAME, UNIT_FMT, box_with_marks
+import seaborn as sns
+from _common import RESULTS, SAMPLE_NAME
 
 from broadway.samples import read_named_sample
 
@@ -57,14 +58,22 @@ def describe_to_markdown(title: str, desc: pd.DataFrame, n: int) -> str:
     return f"# {title}\n\nTotal rows: {n:,}\n\n{body}\n"
 
 
-def plot_short_trips(df: pd.DataFrame, out_path: Path) -> None:
-    """Two box-with-marks panels: short-trip fare and duration profiles."""
+def plot_short_trips(df: pd.DataFrame, short: pd.DataFrame, out_path: Path) -> None:
+    """Two KDE panels: all trips vs short trips (fare, duration) on log-x.
+
+    Shows where the short-trip slice sits inside the full sample's
+    distribution.
+    """
     fig, axes = plt.subplots(1, 2, figsize=(10, 4.5), constrained_layout=True)
-    box_with_marks(axes[0], df["fare_amount"], UNIT_FMT["fare_amount"],
-                   f"fare_amount (N={len(df)})")
-    box_with_marks(axes[1], df["trip_duration_minutes"],
-                   UNIT_FMT["trip_duration_minutes"],
-                   f"trip_duration_minutes (N={len(df)})")
+    for ax, col in zip(axes, SHORT_COLS):
+        sns.kdeplot(df[col], label="all trips", color="#4c72b0", ax=ax)
+        sns.kdeplot(short[col], label="short trips (<0.31 mi)", color="#d62728", ax=ax)
+        ax.set_xscale("log")
+        ax.set_xlabel(col)
+        ax.set_ylabel("density")
+        ax.set_title(f"{col}: all vs short trips")
+        ax.legend(fontsize=7)
+        ax.grid(True, alpha=0.3, axis="y")
     fig.savefig(out_path, dpi=150)
     plt.close(fig)
 
@@ -84,7 +93,7 @@ def main() -> None:
     SUMMARY_MD.write_text(describe_to_markdown("Short trips (< 0.31 mi)", desc, len(short)))
     print(f"wrote {SUMMARY_MD}")
 
-    plot_short_trips(short, PNG_OUT)
+    plot_short_trips(df, short, PNG_OUT)
     print(f"wrote {PNG_OUT}")
 
 
