@@ -20,6 +20,15 @@ from statsmodels.stats.diagnostic import linear_reset
 PREPARED_TRAIN = RESULTS / "prepared" / "train.parquet"
 TARGET = "fare_amount"
 RESET_X_COLS = ["trip_distance", "trip_duration_minutes", "pickup_hour"]
+# The non-linear monotonic trap: trip_duration_minutes is monotonic but curved
+# (Pearson 0.84 vs Spearman 0.97). The RESET variants test whether a log or
+# quadratic term captures the curve — the baseline's specification error
+# should collapse once the curvature is modelled.
+RESET_VARIANTS = (
+    ("linear (baseline)", RESET_X_COLS),
+    ("log duration", ["trip_distance", "log_duration", "pickup_hour"]),
+    ("quadratic duration", ["trip_distance", "trip_duration_minutes", "duration_sq", "pickup_hour"]),
+)
 AUDIT_COLS = [
     "trip_distance",
     "trip_duration_minutes",
@@ -74,6 +83,41 @@ def run_reset(model: RegressionResultsWrapper) -> dict[int, tuple[float, float]]
         )
         print(f"RESET power={power}: F={f_value:,.1f}, p={p_value:.3e} -> {verdict}")
     return results
+
+
+def _variant_frame(df: pd.DataFrame, x_cols: list[str]) -> pd.DataFrame:
+    """X frame with the duration transforms a RESET variant needs."""
+    base_cols = [c for c in x_cols if c not in ("log_duration", "duration_sq")]
+    out = df[base_cols].copy()
+    if "log_duration" in x_cols:
+        out["log_duration"] = np.log1p(df["trip_duration_minutes"])
+    if "duration_sq" in x_cols:
+        out["duration_sq"] = df["trip_duration_minutes"] ** 2
+    return out
+
+
+def run_reset_variants(df: pd.DataFrame) -> pd.DataFrame:
+    """RESET (power=2) across the linear / log-duration / quadratic specs.
+
+    The non-linear monotonic trap: duration is curved, so the linear baseline
+    shows a large RESET F; a log or quadratic term should shrink it sharply
+    once the curve is captured.
+    """
+    rows = []
+    for label, x_cols in RESET_VARIANTS:
+        X = _variant_frame(df, x_cols)
+        model = sm.OLS(df[TARGET], sm.add_constant(X)).fit()
+        test = linear_reset(model, power=2, use_f=True)
+        rows.append({
+            "model": label,
+            "r2": float(model.rsquared),
+            "reset_f": float(test.statistic),
+            "reset_p": float(test.pvalue),
+        })
+    variants = pd.DataFrame(rows).set_index("model")
+    print("\nRESET variants (non-linear monotonic trap — duration curvature):")
+    print(variants.round(4).to_string())
+    return variants
 
 
 def correlation_evidence(df: pd.DataFrame) -> pd.DataFrame:
@@ -203,15 +247,41 @@ def _residuals_fitted(
     ax.grid(True, alpha=0.3)
 
 
+def _duration_curve(ax: plt.Axes, df: pd.DataFrame) -> None:
+    """Fare vs duration: linear / log / quadratic fits over the same curve.
+
+    The monotonic-trap visual — the linear fit visibly misses the curve that
+    log and quadratic terms capture.
+    """
+    sample = df.sample(n=min(SCATTER_SAMPLE, len(df)), random_state=MI_RANDOM_STATE)
+    d = sample["trip_duration_minutes"]
+    y = sample[TARGET]
+    ax.scatter(d, y, s=3, alpha=0.12, color="#4c72b0")
+    grid = np.linspace(d.quantile(0.01), d.quantile(0.99), 100)
+    ax.plot(grid, np.polyval(np.polyfit(d, y, 1), grid), "-",
+            color="#dd8452", lw=1.6, label="linear")
+    ax.plot(grid, np.polyval(np.polyfit(np.log1p(d), y, 1), np.log1p(grid)), "--",
+            color="#2ca02c", lw=1.6, label="log(duration)")
+    ax.plot(grid, np.polyval(np.polyfit(d, y, 2), grid), ":",
+            color="#d62728", lw=1.6, label="quadratic")
+    ax.set_xlabel("trip_duration_minutes")
+    ax.set_ylabel("fare_amount")
+    ax.set_title("fare vs duration — linear vs log vs quadratic (monotonic trap)")
+    ax.legend(fontsize=8)
+    ax.grid(True, alpha=0.3)
+
+
 def plot_reset(
     model: RegressionResultsWrapper,
     reset: dict[int, tuple[float, float]],
+    df: pd.DataFrame,
     out_path: Path,
 ) -> None:
-    """2 panels: residual-variance-by-fitted-bin bars and the residuals-vs-fitted audit."""
-    fig, axes = plt.subplots(1, 2, figsize=(10, 4.5), constrained_layout=True)
+    """3 panels: residual-variance-by-bin bars, residuals-vs-fitted, duration curve."""
+    fig, axes = plt.subplots(1, 3, figsize=(14, 4.5), constrained_layout=True)
     _variance_by_bin(axes[0], model)
     _residuals_fitted(axes[1], model, reset)
+    _duration_curve(axes[2], df)
     fig.savefig(out_path, dpi=150)
     plt.close(fig)
 
@@ -237,7 +307,10 @@ def _markdown_table(frame: pd.DataFrame) -> str:
 
 
 def _summary_md(
-    n_rows: int, evidence: pd.DataFrame, reset: dict[int, tuple[float, float]]
+    n_rows: int,
+    evidence: pd.DataFrame,
+    reset: dict[int, tuple[float, float]],
+    variants: pd.DataFrame,
 ) -> str:
     """Render the specification-diagnostics Markdown summary."""
     f2, p2 = reset[2]
@@ -256,6 +329,13 @@ def _summary_md(
         f"- RESET baseline: {TARGET} ~ {' + '.join(RESET_X_COLS)} (plain OLS).",
         f"- RESET power=2 (yhat²): F={f2:,.1f}, p={p2:.3e} → {verdict2}.",
         f"- RESET power=3 (yhat²+yhat³): F={f3:,.1f}, p={p3:.3e} → {verdict3}.",
+        "",
+        "## RESET variants (non-linear monotonic trap — duration curvature)",
+        "",
+        ("trip_duration_minutes is monotonic but curved; log or quadratic terms "
+         "should collapse the specification error."),
+        "",
+        _markdown_table(variants),
         "",
         "## Evidence table",
         "",
@@ -282,6 +362,7 @@ def main() -> None:
 
     model = fit_linear_baseline(df)
     reset = run_reset(model)
+    variants = run_reset_variants(df)
 
     evidence = correlation_evidence(df).join(mi_r2_evidence(df))
     print(evidence.round(4).to_string())
@@ -291,10 +372,10 @@ def main() -> None:
     plot_main(evidence, PNG_MAIN)
     print(f"wrote {PNG_MAIN}")
 
-    plot_reset(model, reset, PNG_RESET)
+    plot_reset(model, reset, df, PNG_RESET)
     print(f"wrote {PNG_RESET}")
 
-    SUMMARY_MD.write_text(_summary_md(len(df), evidence, reset))
+    SUMMARY_MD.write_text(_summary_md(len(df), evidence, reset, variants))
     print(f"wrote {SUMMARY_MD}")
 
     top_delta = evidence.nlargest(3, "delta").index.tolist()
