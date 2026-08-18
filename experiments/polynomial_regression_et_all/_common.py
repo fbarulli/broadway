@@ -17,5 +17,5 @@ from project.working import (
 )
 
 HERE = Path(__file__).resolve().parent
-RESULTS = HERE.parents[2] / "experiments" / "results" / HERE.parents[0].name / HERE.name
+RESULTS = HERE.parents[1] / "experiments" / "results" / HERE.name
 CLEAN_PARQUET = RESULTS / "sample50k.parquet"
