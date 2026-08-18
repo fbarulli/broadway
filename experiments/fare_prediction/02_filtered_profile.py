@@ -52,6 +52,11 @@ def plot_profiles(df: pd.DataFrame, out_path: Path) -> None:
             ax.text(0.03, y, f"{p * 100:g}% = {fmt.format(y)}",
                     transform=ax.get_yaxis_transform(), fontsize=7,
                     color="#d62728", va="bottom")
+        y_max = float(values.max())
+        ax.axhline(y_max, color="#d62728", linestyle="--", linewidth=0.8)
+        ax.text(0.03, y_max, f"max = {fmt.format(y_max)}",
+                transform=ax.get_yaxis_transform(), fontsize=7,
+                color="#d62728", va="bottom")
         ax.set_title(f"{col} (N={len(values)})")
         ax.set_ylabel("")
         ax.grid(True, alpha=0.3, axis="y")
