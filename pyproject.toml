@@ -76,3 +76,6 @@ ignore = ["B017", "BLE001", "TRY004"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["PLR0913", "PLR2004"]
+
+[tool.pytest.ini_options]
+addopts = "--ignore=deepseek-harness"
