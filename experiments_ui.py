@@ -18,13 +18,14 @@ import html
 import json
 import logging
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import parse_qs
 
 import uvicorn
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Query, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -40,7 +41,9 @@ OBSERVATIONS_DIR = Path(__file__).resolve().parent / "artifacts" / "experiments"
 
 _PARQUET_CONSTANTS = ("CLEAN_PARQUET", "FULL_PARQUET", "RATECODE1_PARQUET")
 _EXTERNAL_RE = re.compile(r"read_training_sample|load_metered|load_working")
-_NUMBER_PREFIX = re.compile(r"^\d+:\s*")
+_NUMBER_PREFIX = re.compile(r"^\d+[a-z]?:\s*")
+_STEM_PREFIX = re.compile(r"^\d+")
+_SLUG_RE = re.compile(r"[a-z0-9_]+")
 _VERDICTS = ("supported", "refuted", "inconclusive", "partial")
 _UPSTREAM_LABEL = "upstream (project data / working dataset)"
 
@@ -167,9 +170,17 @@ def _graph_html(stem: str, profiles: dict[str, ScriptProfile]) -> str:
         for consumer in _consumers_of(constant, stem, profiles):
             nodes.append((consumer, _box_class(consumer)))
     boxes = " <span class=\"arrow\">→</span> ".join(
-        f'<span class="{cls}">{html.escape(label)}</span>' for label, cls in nodes
+        f'<span class="{cls}"><a href="{_node_href(label)}">{html.escape(label)}</a></span>'
+        for label, cls in nodes
     )
     return f'<div class="graph">{boxes}</div>'
+
+
+def _node_href(label: str) -> str:
+    """Href for a graph node: the dashboard for upstream, the step page otherwise."""
+    if label == _UPSTREAM_LABEL:
+        return "/"
+    return f"/experiments/{html.escape(label)}"
 
 
 def _render_table(rows: list[dict[str, str | int]]) -> str:
@@ -211,7 +222,9 @@ def _verdict_options(saved: str) -> str:
     )
 
 
-def _render_observations_form(stem: str, observations: dict[str, str]) -> str:
+def _render_observations_form(
+    stem: str, observations: dict[str, str], next_url: str = ""
+) -> str:
     """Render saved observations (if any) above the observation form."""
     saved_block = ""
     if observations:
@@ -227,15 +240,94 @@ def _render_observations_form(stem: str, observations: dict[str, str]) -> str:
         )
     selected = str(observations.get("verdict", _VERDICTS[0]))
     prefill = html.escape(str(observations.get("observations", "")))
+    hidden = (
+        f'<input type="hidden" name="next" value="{html.escape(next_url)}">' if next_url else ""
+    )
     return (
         saved_block
         + f'<form method="post" action="/experiments/{html.escape(stem)}/observations">'
+        + hidden
         + '<p><label for="verdict">verdict</label> '
         + f'<select name="verdict" id="verdict" required>{_verdict_options(selected)}</select></p>'
         + '<p><label for="observations">observations</label></p>'
         + f'<p><textarea name="observations" id="observations" rows="6" cols="60">{prefill}</textarea></p>'
         + '<p><button type="submit">save observation</button></p>'
         + "</form>"
+    )
+
+
+def _prev_next_hrefs(stems: list[str], current: str, href: str) -> tuple[str, str]:
+    """Return (prev, next) step hrefs around ``current`` in sorted ``stems``."""
+    idx = stems.index(current)
+    prev = f"{href}{stems[idx - 1]}" if idx > 0 else ""
+    nxt = f"{href}{stems[idx + 1]}" if idx < len(stems) - 1 else ""
+    return prev, nxt
+
+
+def _series_strip(
+    stems: list[str],
+    current: str,
+    href_for: Callable[[str], str],
+    prev_href: str,
+    next_href: str,
+) -> str:
+    """Render the series strip: prev/next plus one mini-link per stem (current highlighted)."""
+    items = []
+    for stem in stems:
+        cls = "strip-link" + (" current" if stem == current else "")
+        items.append(
+            f'<a class="{cls}" href="{html.escape(href_for(stem))}">{html.escape(stem)}</a>'
+        )
+    prev = (
+        f'<a class="strip-nav" href="{html.escape(prev_href)}">« prev</a>'
+        if prev_href
+        else '<span class="strip-nav strip-dim">« prev</span>'
+    )
+    nxt = (
+        f'<a class="strip-nav" href="{html.escape(next_href)}">next »</a>'
+        if next_href
+        else '<span class="strip-nav strip-dim">next »</span>'
+    )
+    return f'<nav class="strip">{prev}{"".join(items)}{nxt}</nav>'
+
+
+def _next_prefix(stem: str, stems: list[str]) -> str:
+    """Pick the filename prefix for a step inserted after ``stem``."""
+    match = _STEM_PREFIX.match(stem)
+    base = int(match.group(0)) if match else 0
+    candidate = f"{base + 1:02d}"
+    if not any(s.startswith(candidate) for s in stems):
+        return candidate
+    letter = "a"
+    while any(s.startswith(f"{base:02d}{letter}") for s in stems):
+        letter = chr(ord(letter) + 1)
+    return f"{base:02d}{letter}"
+
+
+def _scaffold_text(prefix: str, question: str) -> str:
+    """Return the scaffolded step-script text for an inserted step."""
+    safe = question.replace('"""', "'''")
+    return (
+        f'"""{prefix}: {safe}"""\n'
+        "\n"
+        "from pathlib import Path\n"
+        "\n"
+        "import pandas as pd\n"
+        "\n"
+        "from _common import RESULTS\n"
+        "from project.working import load_metered\n"
+        "\n"
+        'OUT = RESULTS / f"{Path(__file__).stem}.png"\n'
+        "\n"
+        "\n"
+        "def main() -> None:\n"
+        "    RESULTS.mkdir(parents=True, exist_ok=True)\n"
+        "    df = load_metered()\n"
+        '    print(f"rows: {len(df)}")\n'
+        "\n"
+        "\n"
+        'if __name__ == "__main__":\n'
+        "    main()\n"
     )
 
 
@@ -271,8 +363,21 @@ def _render_dashboard_page(rows: list[dict[str, str | int]]) -> str:
 """
 
 
-def _render_experiment_page(stem: str, question: str, profiles: dict[str, ScriptProfile]) -> str:
-    """Render the full per-experiment HTML page (graph, artifacts, observation form)."""
+def _render_experiment_page(
+    stem: str,
+    question: str,
+    stems: list[str],
+    profiles: dict[str, ScriptProfile],
+) -> str:
+    """Render the full per-experiment HTML page (strip, graph, artifacts, observation form)."""
+    prev_href, next_href = _prev_next_hrefs(stems, stem, "/experiments/")
+    strip = _series_strip(stems, stem, lambda s: f"/experiments/{s}", prev_href, next_href)
+    nav = (
+        "<p>"
+        f'<a href="/series?from={html.escape(stem)}">show with next</a>'
+        f' | <a href="/experiments/{html.escape(stem)}/new">＋ new step after this</a>'
+        "</p>"
+    )
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -281,8 +386,13 @@ def _render_experiment_page(stem: str, question: str, profiles: dict[str, Script
 <style>
   body {{ font-family: system-ui, sans-serif; margin: 2rem; color: #222; }}
   h1 {{ font-size: 1.4rem; }}
+  .strip {{ display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; margin: 1rem 0; font-size: 0.85rem; }}
+  .strip a, .strip span {{ padding: 0.15rem 0.4rem; border: 1px solid #ccc; border-radius: 3px; text-decoration: none; color: #222; }}
+  .strip a.current {{ background: #d9f2d9; border-color: #2a7; }}
+  .strip .strip-dim {{ color: #999; border-style: dashed; }}
   .graph {{ display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; margin: 1rem 0; }}
   .box {{ border: 1px solid #999; border-radius: 4px; padding: 0.4rem 0.8rem; font-size: 0.85rem; }}
+  .box a {{ text-decoration: none; color: inherit; }}
   .box.green {{ background: #d9f2d9; }}
   .box.gray {{ background: #ececec; }}
   .box.strong {{ font-weight: bold; border-width: 2px; }}
@@ -293,11 +403,112 @@ def _render_experiment_page(stem: str, question: str, profiles: dict[str, Script
 <body>
 <h1>{html.escape(stem)}</h1>
 <p>{html.escape(question)}</p>
+{strip}
+{nav}
 {_graph_html(stem, profiles)}
 <h2>artifacts</h2>
 {_render_artifacts(stem)}
 <h2>observations</h2>
 {_render_observations_form(stem, load_observations(stem))}
+</body>
+</html>
+"""
+
+
+def _render_series_cards(
+    stems: list[str], profiles: dict[str, ScriptProfile], back_url: str
+) -> str:
+    """Render one card per step: header link, question, figure, observation form."""
+    cards = []
+    for stem in stems:
+        script = _script_for(stem)
+        question = _question_from_docstring(script) if script else ""
+        png = next((f for f in _result_files(stem) if f.suffix == ".png"), None)
+        figure = (
+            f'<p><img src="/results/{html.escape(png.name)}" alt="{html.escape(png.name)}"></p>'
+            if png
+            else "<p>No figure yet.</p>"
+        )
+        cards.append(
+            '<section class="card">'
+            f'<h2><a href="/experiments/{html.escape(stem)}">{html.escape(stem)}</a></h2>'
+            f"<p>{html.escape(question)}</p>"
+            f"{figure}"
+            f"{_render_observations_form(stem, load_observations(stem), back_url)}"
+            "</section>"
+        )
+    return "\n".join(cards)
+
+
+def _render_series_page(
+    from_stem: str,
+    to_stem: str,
+    stems: list[str],
+    profiles: dict[str, ScriptProfile],
+) -> str:
+    """Render the multi-step series view: strip plus one card per step in range."""
+    from_idx = stems.index(from_stem)
+    to_idx = stems.index(to_stem)
+    prev_href = ""
+    if from_idx > 0:
+        prev_href = f"/series?from={stems[from_idx - 1]}&to={stems[to_idx - 1]}"
+    next_href = ""
+    if to_idx < len(stems) - 1:
+        next_href = f"/series?from={stems[from_idx + 1]}&to={stems[to_idx + 1]}"
+    strip = _series_strip(stems, from_stem, lambda s: f"/series?from={s}", prev_href, next_href)
+    back_url = f"/series?from={from_stem}&to={to_stem}"
+    cards = _render_series_cards(stems[from_idx : to_idx + 1], profiles, back_url)
+    return f"""<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>series — Broadway experiments</title>
+<style>
+  body {{ font-family: system-ui, sans-serif; margin: 2rem; color: #222; }}
+  h1 {{ font-size: 1.4rem; }}
+  .strip {{ display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; margin: 1rem 0; font-size: 0.85rem; }}
+  .strip a, .strip span {{ padding: 0.15rem 0.4rem; border: 1px solid #ccc; border-radius: 3px; text-decoration: none; color: #222; }}
+  .strip a.current {{ background: #d9f2d9; border-color: #2a7; }}
+  .strip .strip-dim {{ color: #999; border-style: dashed; }}
+  .cards {{ display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-start; }}
+  .card {{ border: 1px solid #ccc; border-radius: 6px; padding: 0.8rem 1rem; flex: 1 1 22rem; }}
+  .card img {{ max-width: 100%; }}
+</style>
+</head>
+<body>
+<h1>series</h1>
+{strip}
+<div class="cards">
+{cards}
+</div>
+</body>
+</html>
+"""
+
+
+def _render_new_step_page(stem: str) -> str:
+    """Render the insert-a-step form page."""
+    return f"""<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>new step after {html.escape(stem)} — Broadway experiments</title>
+<style>
+  body {{ font-family: system-ui, sans-serif; margin: 2rem; color: #222; }}
+  h1 {{ font-size: 1.4rem; }}
+  label {{ display: block; margin-top: 0.6rem; }}
+  input, textarea {{ margin-top: 0.2rem; }}
+</style>
+</head>
+<body>
+<h1>new step after {html.escape(stem)}</h1>
+<form method="post" action="/experiments/{html.escape(stem)}/new">
+<p><label for="name">name (slug: [a-z0-9_]+)</label>
+<input name="name" id="name" required pattern="[a-z0-9_]+" size="40"></p>
+<p><label for="question">question</label>
+<textarea name="question" id="question" rows="3" cols="60" required></textarea></p>
+<p><button type="submit">create step</button></p>
+</form>
 </body>
 </html>
 """
@@ -319,13 +530,63 @@ def index() -> HTMLResponse:
 
 @app.get("/experiments/{name}", response_model=None)
 def experiment_page(name: str) -> HTMLResponse | PlainTextResponse:
-    """Serve the per-experiment page with graph, artifacts, and observation form."""
+    """Serve the per-experiment page with strip, graph, artifacts, and observation form."""
     script = _script_for(name)
     if script is None:
         return PlainTextResponse("unknown experiment", status_code=404)
+    stems = [s.stem for s in series_scripts()]
     return HTMLResponse(
-        _render_experiment_page(name, _question_from_docstring(script), series_profiles())
+        _render_experiment_page(name, _question_from_docstring(script), stems, series_profiles())
     )
+
+
+@app.get("/series", response_model=None)
+def series_page(
+    from_: str = Query(default="", alias="from"),
+    to: str = Query(default=""),
+) -> HTMLResponse | PlainTextResponse:
+    """Serve the multi-step series view: one card per step from ``from_`` to ``to``."""
+    stems = [script.stem for script in series_scripts()]
+    if not stems:
+        return PlainTextResponse("no experiments", status_code=404)
+    from_stem = from_ or stems[0]
+    if from_stem not in stems or (to and to not in stems):
+        return PlainTextResponse("unknown experiment", status_code=404)
+    from_idx = stems.index(from_stem)
+    to_idx = stems.index(to) if to else min(from_idx + 1, len(stems) - 1)
+    if to_idx < from_idx:
+        from_idx, to_idx = to_idx, from_idx
+    return HTMLResponse(
+        _render_series_page(stems[from_idx], stems[to_idx], stems, series_profiles())
+    )
+
+
+@app.get("/experiments/{name}/new", response_model=None)
+def new_step_page(name: str) -> HTMLResponse | PlainTextResponse:
+    """Serve the form to insert a new step after ``name``."""
+    if _script_for(name) is None:
+        return PlainTextResponse("unknown experiment", status_code=404)
+    return HTMLResponse(_render_new_step_page(name))
+
+
+@app.post("/experiments/{name}/new", response_model=None)
+async def create_step(name: str, request: Request) -> RedirectResponse | PlainTextResponse:
+    """Validate and scaffold a new step script after ``name``; 303 to its page."""
+    if _script_for(name) is None:
+        return PlainTextResponse("unknown experiment", status_code=404)
+    fields = parse_qs((await request.body()).decode("utf-8"))
+    new_name = fields.get("name", [""])[0]
+    question = fields.get("question", [""])[0]
+    if not _SLUG_RE.fullmatch(new_name) or not question.strip():
+        return PlainTextResponse("invalid name or question", status_code=422)
+    stems = [script.stem for script in series_scripts()]
+    prefix = _next_prefix(name, stems)
+    stem = f"{prefix}_{new_name}"
+    (EXPERIMENT_DIR / f"{stem}.py").write_text(
+        _scaffold_text(prefix, question), encoding="utf-8"
+    )
+    logger.info("created step script %s after %s", stem, name)
+    return RedirectResponse(url=f"/experiments/{stem}", status_code=303)
 
 
 @app.post("/experiments/{name}/observations", response_model=None)
@@ -346,7 +607,10 @@ async def save_observations(name: str, request: Request) -> RedirectResponse | P
     OBSERVATIONS_DIR.mkdir(parents=True, exist_ok=True)
     (OBSERVATIONS_DIR / f"{name}.json").write_text(json.dumps(record, indent=2), encoding="utf-8")
     logger.info("saved observations for %s (verdict=%s)", name, verdict)
-    return RedirectResponse(url=f"/experiments/{name}", status_code=303)
+    next_url = fields.get("next", [""])[0]
+    if not (next_url.startswith("/") and not next_url.startswith("//")):
+        next_url = ""
+    return RedirectResponse(url=next_url or f"/experiments/{name}", status_code=303)
 
 
 if __name__ == "__main__":
