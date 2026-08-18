@@ -102,6 +102,10 @@ public functions, strategic logging only, catch only recoverable exceptions,
 YAML single source of truth, ~25-line single-responsibility functions, no dead
 code). Every agent instruction references it.
 
+**Plots use seaborn (`sns`) unless stated otherwise** — established
+convention; matplotlib stays available for low-level layout where seaborn has
+no surface.
+
 ## 7. Docs & file taxonomy
 
 - **Operating contract** — this file. Update only when the user explicitly asks.
