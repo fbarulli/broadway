@@ -163,7 +163,7 @@ def _result_files(stem: str, focus: str) -> list[Path]:
     results_dir = _results_dir(focus)
     if not results_dir.is_dir():
         return []
-    return sorted(results_dir.glob(f"{stem}.*"))
+    return sorted(results_dir.glob(f"{stem}*"))
 
 
 def _has_results(stem: str, focus: str) -> bool:
