@@ -22,3 +22,4 @@ SEED = 42
 HERE = Path(__file__).resolve().parent
 RESULTS = HERE.parents[1] / "experiments" / "results" / HERE.name
 CLEAN_PARQUET = RESULTS / "sample1m.parquet"
+FILTERED_PARQUET = RESULTS / "filtered1m.parquet"

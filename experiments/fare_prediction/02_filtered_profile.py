@@ -1,4 +1,8 @@
-"""02: filter the 1M sample with the project's existing data policy and profile it."""
+"""02: filter the 1M sample with the project's existing data policy and profile it.
+
+Data flow: 01 = raw 1M sample → 02 = policy-filtered sample persisted to
+FILTERED_PARQUET → later steps (e.g. 03) consume FILTERED_PARQUET.
+"""
 
 from pathlib import Path
 
@@ -9,7 +13,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
-from _common import CLEAN_PARQUET, RESULTS
+from _common import CLEAN_PARQUET, FILTERED_PARQUET, RESULTS
 from project.working import MIN_FARE
 
 COLS = ["fare_amount", "trip_distance", "trip_duration_minutes"]
@@ -90,6 +94,9 @@ def main() -> None:
     print(f"rows before: {n_before}")
     print(f"rows after: {n_after}")
     print(f"rows removed: {n_before - n_after}")
+
+    df.to_parquet(FILTERED_PARQUET)
+    print(f"wrote {FILTERED_PARQUET}")
 
     desc = df[COLS].describe(percentiles=PERCENTILES)
     print(desc)
