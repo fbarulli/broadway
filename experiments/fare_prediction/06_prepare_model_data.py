@@ -14,7 +14,7 @@ SMOOTHING = 10
 PU_COL = "pickup_location_id"
 DO_COL = "dropoff_location_id"
 PREPARED_DIR = RESULTS / "prepared"
-SPLIT_CSV = RESULTS / "06_prepare_split.csv"
+SPLIT_CSV = RESULTS / "06_prepare_model_data_split.csv"
 
 LOCATION_COLS = (PU_COL, DO_COL)
 

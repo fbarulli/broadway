@@ -252,12 +252,12 @@ def _render_artifacts(stem: str, focus: str) -> str:
 
 
 def _render_evidence(stem: str, focus: str) -> str:
-    """Render each matching ``<stem>_describe.csv`` as an escaped HTML table, or ""."""
+    """Render each matching ``<stem>*.csv`` evidence file as an escaped HTML table, or ""."""
     results_dir = _results_dir(focus)
     if not results_dir.is_dir():
         return ""
     tables = []
-    for csv_path in sorted(results_dir.glob(f"{stem}*_describe.csv")):
+    for csv_path in sorted(results_dir.glob(f"{stem}*.csv")):
         try:
             desc = pd.read_csv(csv_path, index_col=0)
         except (ValueError, OSError):
@@ -271,8 +271,8 @@ def _render_evidence(stem: str, focus: str) -> str:
                     cells.append(f"<td>{html.escape(value)}</td>")
                 elif pd.isna(value):
                     cells.append("<td></td>")
-                elif label == "count":
-                    cells.append(f"<td>{value:,.0f}</td>")
+                elif float(value).is_integer():
+                    cells.append(f"<td>{float(value):,.0f}</td>")
                 else:
                     cells.append(f"<td>{value:,.2f}</td>")
             body.append(f"<tr><th>{html.escape(str(label))}</th>{''.join(cells)}</tr>")

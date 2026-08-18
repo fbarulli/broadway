@@ -9,7 +9,9 @@ def fit_target_encoding(df: pd.DataFrame, col: str, target: str, smoothing: int)
     global_mean = df[target].mean()
     stats = df.groupby(col)[target].agg(["mean", "count"])
     stats["encoded"] = (stats["count"] * stats["mean"] + smoothing * global_mean) / (stats["count"] + smoothing)
-    return stats["encoded"].to_dict()
+    encoded = stats["encoded"].to_dict()
+    encoded["__unknown__"] = global_mean  # unseen categories fall back to the global mean
+    return encoded
 
 
 def transform_target_encoding(df: pd.DataFrame, col: str, mapping: dict[str, float]) -> pd.DataFrame:
