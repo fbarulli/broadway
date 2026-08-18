@@ -16,6 +16,9 @@ from project.working import (
     time_bucket,
 )
 
+SAMPLE_SIZE = 1_000_000
+SEED = 42
+
 HERE = Path(__file__).resolve().parent
 RESULTS = HERE.parents[1] / "experiments" / "results" / HERE.name
-CLEAN_PARQUET = RESULTS / "sample50k.parquet"
+CLEAN_PARQUET = RESULTS / "sample1m.parquet"
