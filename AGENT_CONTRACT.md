@@ -58,6 +58,21 @@ Development happens on `taxi`; the `main` split already happened, don't redo it.
 - When a deferred item is completed and verified, **remove** it from the queue;
   git history is the record — no inline `DONE` markers.
 
+## 3b. Verification (evidence, not claims)
+
+- Every contract lists the **acceptance checks**: exact commands, expected exit
+  codes/counts, and the **evidence format** the worker pastes back (command
+  output, git status, diffs). A report without evidence is incomplete.
+- Worker reports are **hypotheses until verified**. The main agent re-runs the
+  cheap, high-signal checks itself (git status, exit codes, targeted greps,
+  collect counts) before accepting a task as done; expensive full-suite re-runs
+  stay delegated.
+- A worker that finds a contract spec is wrong must verify the fix with
+  evidence and report the deviation — never silently comply with a broken spec,
+  never silently improvise.
+- After substantial or risky work, dispatch a read-only review agent
+  (`subagent_type="explore"`) to audit the change and report findings.
+
 ## 4. Decisions
 
 - **ALWAYS present decisions to the user; NEVER decide unilaterally.**
