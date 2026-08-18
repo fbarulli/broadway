@@ -31,6 +31,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import parse_qs, quote
 
+import pandas as pd
 import uvicorn
 from fastapi import FastAPI, Query, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
@@ -248,6 +249,36 @@ def _render_artifacts(stem: str, focus: str) -> str:
         else ""
     )
     return f"<ul>{links}</ul>{image}"
+
+
+def _render_evidence(stem: str, focus: str) -> str:
+    """Render each matching ``<stem>_describe.csv`` as an escaped HTML table, or ""."""
+    results_dir = _results_dir(focus)
+    if not results_dir.is_dir():
+        return ""
+    tables = []
+    for csv_path in sorted(results_dir.glob(f"{stem}_describe.csv")):
+        try:
+            desc = pd.read_csv(csv_path, index_col=0)
+        except (ValueError, OSError):
+            continue
+        header = "".join(f"<th>{html.escape(str(col))}</th>" for col in desc.columns)
+        body = []
+        for label, row in desc.iterrows():
+            cells = []
+            for value in row:
+                if label == "count":
+                    cells.append(f"<td>{int(value)}</td>")
+                else:
+                    cells.append(f"<td>{html.escape(f'{value:,.2f}')}</td>")
+            body.append(f"<tr><th>{html.escape(str(label))}</th>{''.join(cells)}</tr>")
+        tables.append(
+            '<table class="evidence">'
+            f"<thead><tr><th>stat</th>{header}</tr></thead>"
+            f"<tbody>{''.join(body)}</tbody>"
+            "</table>"
+        )
+    return "\n".join(tables)
 
 
 def _verdict_options(saved: str) -> str:
@@ -473,6 +504,8 @@ def _render_experiment_page(
         f' | <a href="{html.escape(_h(f"/experiments/{stem}/new", focus))}">＋ new step after this</a>'
         "</p>"
     )
+    evidence = _render_evidence(stem, focus)
+    evidence_section = f"<h2>evidence</h2>{evidence}" if evidence else ""
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -494,6 +527,9 @@ def _render_experiment_page(
   .box.strong {{ font-weight: bold; border-width: 2px; }}
   .arrow {{ color: #666; }}
   img {{ max-width: 100%; }}
+  .evidence {{ border-collapse: collapse; width: 100%; font-size: 0.9rem; }}
+  .evidence th, .evidence td {{ border: 1px solid #ccc; padding: 0.4rem 0.6rem; text-align: left; vertical-align: top; }}
+  .evidence th {{ background: #f0f0f0; }}
 </style>
 </head>
 <body>
@@ -505,6 +541,7 @@ def _render_experiment_page(
 {_graph_html(stem, profiles, focus)}
 <h2>artifacts</h2>
 {_render_artifacts(stem, focus)}
+{evidence_section}
 <h2>observations</h2>
 {_render_observations_form(stem, load_observations(stem), focus)}
 </body>
