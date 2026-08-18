@@ -3,6 +3,29 @@
 Exploring baseline models for predicting `fare_amount` on the metered
 working dataset.
 
+
+
+
+
+
+
+
+Target: fare_amount
+Allowed features: information known before the trip starts
+Evaluation: MAE and RMSE on future held-out trips
+Split: train on earlier dates, validate/test on later dates
+
+
+
+
+
+
+
+
+
+
+
+
 All analysis policy lives in `config.yaml` (no hardcoded values, no env vars).
 
 Step scripts follow the `NN_name.py` convention used by the
