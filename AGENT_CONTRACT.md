@@ -129,6 +129,11 @@ code). Every agent instruction references it.
   analytical remediation to explicit decisions.
 - **Config-driven:** edit a YAML → re-run → new result. Every step is generic
   over config (no hardcoded "Borough", thresholds, etc.).
+- **Derive, don't maintain:** never store state that can be computed from the
+  tree/records at render time (status, census, counts, graphs). Stored derived
+  state is the anti-pattern — it needs updates, and updates are death by
+  updates. The UI is a live view; refreshing IS the update. Replace scheduled
+  syncs with triggers (after structural churn, before big decisions).
 
 ## 10. Test gate
 
