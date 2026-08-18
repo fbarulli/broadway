@@ -12,9 +12,7 @@ PROFILE_COLS = ["fare_amount", "trip_distance", "trip_duration_minutes"]
 BOTTOM_SUSPECT = {"max_distance": 5.0, "max_duration": 30.0, "max_speed": 60.0}
 TOP_SUSPECT = {"min_distance": 3.0, "min_duration": 5.0, "max_speed": 100.0}
 
-DESCRIBE_BOTTOM_CSV = RESULTS / "04_percentile_extremes_audit_bottom_describe.csv"
-DESCRIBE_TOP_CSV = RESULTS / "04_percentile_extremes_audit_top_describe.csv"
-SUSPICIOUS_CSV = RESULTS / "04_percentile_extremes_suspicious.csv"
+EVIDENCE_CSV = RESULTS / "04_percentile_extremes_audit_describe.csv"
 SUMMARY_MD = RESULTS / "04_percentile_extremes.md"
 
 FLAG_COLS = ["fare_amount", "trip_distance", "trip_duration_minutes", "speed_mph"]
@@ -151,6 +149,40 @@ def _summary_md(
     ])
 
 
+def _combined_evidence(
+    bottom_desc: pd.DataFrame,
+    top_desc: pd.DataFrame,
+    bottom_flagged: pd.DataFrame,
+    top_flagged: pd.DataFrame,
+) -> pd.DataFrame:
+    """Join both describes and both flagged sets into ONE evidence table.
+
+    Index = describe stat labels / suspicious row numbers; ``group``
+    distinguishes the sections; ``speed_mph`` is NaN on describe rows.
+    """
+    rows: list[dict[str, object]] = []
+    for label, desc in (("bottom_describe", bottom_desc), ("top_describe", top_desc)):
+        for stat, row in desc.iterrows():
+            rows.append({
+                "group": label, "stat": stat,
+                "fare_amount": row["fare_amount"],
+                "trip_distance": row["trip_distance"],
+                "trip_duration_minutes": row["trip_duration_minutes"],
+                "speed_mph": np.nan,
+            })
+    for label, flagged in (("suspicious_bottom", bottom_flagged),
+                           ("suspicious_top", top_flagged)):
+        for i, (_, row) in enumerate(flagged.iterrows(), 1):
+            rows.append({
+                "group": label, "stat": i,
+                "fare_amount": row["fare_amount"],
+                "trip_distance": row["trip_distance"],
+                "trip_duration_minutes": row["trip_duration_minutes"],
+                "speed_mph": row["speed_mph"],
+            })
+    return pd.DataFrame(rows).set_index("stat")
+
+
 def main() -> None:
     RESULTS.mkdir(parents=True, exist_ok=True)
     sample = read_named_sample(SAMPLE_NAME)
@@ -185,17 +217,9 @@ def main() -> None:
     print("Top flagged rows (head):")
     print(top_flagged[FLAG_COLS].head(10))
 
-    bottom_desc.to_csv(DESCRIBE_BOTTOM_CSV)
-    print(f"wrote {DESCRIBE_BOTTOM_CSV}")
-    top_desc.to_csv(DESCRIBE_TOP_CSV)
-    print(f"wrote {DESCRIBE_TOP_CSV}")
-
-    suspicious = pd.concat(
-        [bottom_flagged.assign(group="bottom"), top_flagged.assign(group="top")],
-        ignore_index=True,
-    )[["group", *FLAG_COLS]]
-    suspicious.to_csv(SUSPICIOUS_CSV, index=False)
-    print(f"wrote {SUSPICIOUS_CSV}")
+    combined = _combined_evidence(bottom_desc, top_desc, bottom_flagged, top_flagged)
+    combined.to_csv(EVIDENCE_CSV)
+    print(f"wrote {EVIDENCE_CSV} ({len(combined)} rows)")
 
     SUMMARY_MD.write_text(
         _summary_md(

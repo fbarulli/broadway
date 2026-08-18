@@ -267,10 +267,14 @@ def _render_evidence(stem: str, focus: str) -> str:
         for label, row in desc.iterrows():
             cells = []
             for value in row:
-                if label == "count":
-                    cells.append(f"<td>{int(value)}</td>")
+                if isinstance(value, str):
+                    cells.append(f"<td>{html.escape(value)}</td>")
+                elif pd.isna(value):
+                    cells.append("<td></td>")
+                elif label == "count":
+                    cells.append(f"<td>{value:,.0f}</td>")
                 else:
-                    cells.append(f"<td>{html.escape(f'{value:,.2f}')}</td>")
+                    cells.append(f"<td>{value:,.2f}</td>")
             body.append(f"<tr><th>{html.escape(str(label))}</th>{''.join(cells)}</tr>")
         tables.append(
             '<table class="evidence">'
