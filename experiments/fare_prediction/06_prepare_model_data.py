@@ -23,14 +23,6 @@ SPLIT_CSV = RESULTS / "06_prepare_model_data_split.csv"
 
 LOCATION_COLS = (PU_COL, DO_COL)
 
-# Temporal compounding: individual hour markers carry ~0 information; they
-# matter combined with trip duration, so each flag enters as a product term.
-INTERACTION_SPECS: tuple[tuple[str, str, str], ...] = (
-    ("duration_rush", "trip_duration_minutes", "is_rush_hour"),
-    ("duration_weekend", "trip_duration_minutes", "is_weekend"),
-    ("duration_night", "trip_duration_minutes", "is_night"),
-)
-
 # Pickup-zone × temporal-flag interactions (pre-trip: zone + time known in
 # advance). Built on the train-only pickup target encoding.
 PU_INTERACTION_SPECS: tuple[tuple[str, str], ...] = (
@@ -56,17 +48,9 @@ def time_split(
     return train, val, test
 
 
-def _interactions(df: pd.DataFrame) -> pd.DataFrame:
-    """Add duration × temporal-flag product terms (float64) to ``df``."""
-    for name, base, flag in INTERACTION_SPECS:
-        df[name] = df[base] * df[flag]
-    return df
-
-
 def _prepare_split(df: pd.DataFrame) -> pd.DataFrame:
-    """Temporal features, route id, duration×temporal interactions, categorical ids, log1p target."""
+    """Temporal features, route id, categorical ids, log1p target."""
     df = build_temporal_features(df)
-    df = _interactions(df)
     df["route_id"] = df[PU_COL].astype(str) + "_" + df[DO_COL].astype(str)
     for col in LOCATION_COLS:
         df[col] = df[col].astype("category")

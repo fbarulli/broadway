@@ -30,10 +30,7 @@ SAMPLE_NAME = "fare_prediction_1m"
 # Pre-trip feature contract: fare prediction uses only information known
 # before the trip starts. Post-trip columns are LEAKAGE and are excluded from
 # the model feature set (they may still be stored in the prepared parquets).
-POST_TRIP_COLS = [
-    "trip_distance", "trip_duration_minutes",
-    "duration_rush", "duration_weekend", "duration_night", "speed_mph",
-]
+POST_TRIP_COLS = ["trip_distance", "trip_duration_minutes", "speed_mph"]
 SAFE_NUMERIC_FEATURES = [
     "pickup_hour", "pickup_day_of_week", "pickup_month",
     "is_weekend", "is_rush_hour", "is_night",
