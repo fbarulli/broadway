@@ -1,4 +1,4 @@
-"""07: specification diagnostics — Ramsey RESET, Pearson-vs-Spearman discrepancies, MI-vs-R² audit."""
+"""07: specification diagnostics — Ramsey RESET, Pearson-vs-Spearman discrepancies, MI-vs-R² audit; now covers the duration×temporal interactions, validating the temporal-compounding claim (individual hour flags ≈ 0 MI, duration×flag interactions show real MI)."""
 
 from pathlib import Path
 
@@ -33,8 +33,9 @@ AUDIT_COLS = [
     "hour_cos",
     "dayofweek_sin",
     "dayofweek_cos",
-    "pickup_location_id_encoded",
-    "dropoff_location_id_encoded",
+    "duration_rush",
+    "duration_weekend",
+    "duration_night",
 ]
 MI_NEIGHBORS = 5
 MI_RANDOM_STATE = 42
