@@ -15,7 +15,9 @@ Each step page renders a bare-bones HTML pipeline graph (upstream -> this
 step -> downstream consumers of the datasets it writes), the step's result
 artifacts, and a form for a human observation plus a required verdict,
 persisted to ``artifacts/experiments/observations/<stem>.json``. No
-templates, no JS, no external assets.
+templates, no external assets. The series view has one small inline script
+for drag-and-drop step reordering: a reorder renumbers the involved scripts
+(window-scoped) so filename order stays the source of truth.
 """
 
 import ast
@@ -45,6 +47,7 @@ _EXTERNAL_RE = re.compile(r"read_training_sample|load_metered|load_working")
 _NUMBER_PREFIX = re.compile(r"^\d+[a-z]?:\s*")
 _STEM_PREFIX = re.compile(r"^\d+")
 _NN_PREFIX = re.compile(r"^\d")
+_KEY_RE = re.compile(r"^(\d+)([a-z]*)_(.*)$")
 _SLUG_RE = re.compile(r"[a-z0-9_]+")
 _VERDICTS = ("supported", "refuted", "inconclusive", "partial")
 _UPSTREAM_LABEL = "upstream (project data / working dataset)"
@@ -364,6 +367,43 @@ def _scaffold_text(prefix: str, question: str) -> str:
     )
 
 
+def _stem_key(stem: str) -> tuple[int, str, str] | None:
+    """Split a step stem into (number, letter, name); None if it lacks a ``NN[l]_`` prefix."""
+    match = _KEY_RE.match(stem)
+    if not match:
+        return None
+    return int(match.group(1)), match.group(2), match.group(3)
+
+
+def _reorder_moves(renamed: dict[str, str], focus: str) -> list[tuple[Path, Path]]:
+    """Collect (old, new) rename pairs: reordered scripts plus their observation records."""
+    moves: list[tuple[Path, Path]] = []
+    for old, new in renamed.items():
+        if old == new:
+            continue
+        moves.append((_series_dir(focus) / f"{old}.py", _series_dir(focus) / f"{new}.py"))
+        old_obs = OBSERVATIONS_DIR / f"{old}.json"
+        if old_obs.is_file():
+            moves.append((old_obs, OBSERVATIONS_DIR / f"{new}.json"))
+    return moves
+
+
+def _renumber_stems(order: list[str], focus: str) -> list[str]:
+    """Renumber ``order``'s scripts window-scoped: sorted keys assigned in position order."""
+    parsed = [_stem_key(stem) for stem in order]
+    keys = sorted({(n, letter) for n, letter, _ in parsed})
+    renamed = {
+        stem: f"{keys[i][0]:02d}{keys[i][1]}_{parsed[i][2]}" for i, stem in enumerate(order)
+    }
+    moves = _reorder_moves(renamed, focus)
+    temps = [(src, src.with_name(f".{src.stem}.tmp")) for src, _ in moves]
+    for src, tmp in temps:
+        src.rename(tmp)
+    for (_, dst), (_, tmp) in zip(moves, temps):
+        tmp.rename(dst)
+    return [renamed[stem] for stem in order]
+
+
 def _series_selector(series: list[str], focus: str) -> str:
     """Render the top-row series selector: one dashboard link per series, current bold."""
     links = []
@@ -487,7 +527,8 @@ def _render_series_cards(
             else "<p>No figure yet.</p>"
         )
         cards.append(
-            '<section class="card">'
+            '<section class="card" draggable="true"'
+            f' data-stem="{html.escape(stem)}">'
             f'<h2><a href="{html.escape(_h(f"/experiments/{stem}", focus))}">{html.escape(stem)}</a></h2>'
             f"<p>{html.escape(question)}</p>"
             f"{figure}"
@@ -495,6 +536,72 @@ def _render_series_cards(
             "</section>"
         )
     return "\n".join(cards)
+
+
+_SERIES_REORDER_JS = """
+(() => {
+  const container = document.querySelector(".cards");
+  if (!container) return;
+  const focus = container.dataset.focus;
+  const endZone = container.querySelector(".drop-zone");
+  const stems = () =>
+    Array.from(container.querySelectorAll(".card")).map((card) => card.dataset.stem);
+  const clearOver = () => {
+    for (const el of container.querySelectorAll(".drag-over")) el.classList.remove("drag-over");
+  };
+  let dragged = null;
+
+  container.addEventListener("dragstart", (event) => {
+    const card = event.target.closest(".card");
+    if (!card) return;
+    dragged = card;
+    card.classList.add("dragging");
+    event.dataTransfer.effectAllowed = "move";
+  });
+
+  container.addEventListener("dragend", () => {
+    if (dragged) dragged.classList.remove("dragging");
+    clearOver();
+    dragged = null;
+  });
+
+  container.addEventListener("dragover", (event) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    const target = event.target.closest(".card, .drop-zone");
+    clearOver();
+    if (target && target !== dragged) target.classList.add("drag-over");
+  });
+
+  container.addEventListener("drop", async (event) => {
+    event.preventDefault();
+    const target = event.target.closest(".card, .drop-zone");
+    if (!dragged || !target || target === dragged) return;
+    if (target.classList.contains("card")) {
+      container.insertBefore(dragged, target);
+    } else {
+      container.insertBefore(dragged, endZone);
+    }
+    const order = stems();
+    if (dragged) dragged.classList.remove("dragging");
+    clearOver();
+    dragged = null;
+    const response = await fetch("/series/reorder?focus=" + encodeURIComponent(focus), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ order }),
+    });
+    if (!response.ok) {
+      alert(await response.text());
+      return;
+    }
+    const reordered = (await response.json()).reordered;
+    location.href = "/series?from=" + encodeURIComponent(reordered[0])
+      + "&to=" + encodeURIComponent(reordered[reordered.length - 1])
+      + "&focus=" + encodeURIComponent(focus);
+  });
+})();
+"""
 
 
 def _render_series_page(
@@ -535,15 +642,22 @@ def _render_series_page(
   .cards {{ display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-start; }}
   .card {{ border: 1px solid #ccc; border-radius: 6px; padding: 0.8rem 1rem; flex: 1 1 22rem; }}
   .card img {{ max-width: 100%; }}
+  .card[draggable="true"] {{ cursor: grab; }}
+  .card.dragging {{ opacity: 0.5; }}
+  .card.drag-over {{ outline: 2px dashed #2a7; }}
+  .drop-zone {{ flex: 1 1 100%; min-height: 2rem; border: 2px dashed #ccc; border-radius: 6px; }}
+  .drop-zone.drag-over {{ border-color: #2a7; background: #f0f8f0; }}
 </style>
 </head>
 <body>
 <h1>series</h1>
 {_series_selector(series, focus)}
 {strip}
-<div class="cards">
+<div class="cards" data-focus="{html.escape(focus)}">
 {cards}
+<div class="drop-zone"></div>
 </div>
+{_SERIES_REORDER_JS}
 </body>
 </html>
 """
@@ -637,6 +751,33 @@ def series_page(
             stems[from_idx], stems[to_idx], stems, series_profiles(focus), focus, list_series()
         )
     )
+
+
+@app.post("/series/reorder", response_model=None)
+async def reorder_series(
+    request: Request, focus: str = Query(default=DEFAULT_SERIES)
+) -> dict[str, list[str]] | PlainTextResponse:
+    """Renumber the given stems (window-scoped) so filename order matches the new order."""
+    if focus not in list_series():
+        return PlainTextResponse("unknown series", status_code=404)
+    try:
+        body = await request.json()
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return PlainTextResponse("invalid order", status_code=422)
+    order = body.get("order") if isinstance(body, dict) else None
+    if (
+        not isinstance(order, list)
+        or not order
+        or not all(isinstance(stem, str) for stem in order)
+        or len(order) != len(set(order))
+    ):
+        return PlainTextResponse("invalid order", status_code=422)
+    stems = [script.stem for script in series_scripts(focus)]
+    if not all(stem in stems and _stem_key(stem) is not None for stem in order):
+        return PlainTextResponse("invalid order", status_code=422)
+    reordered = _renumber_stems(order, focus)
+    logger.info("reordered %d stems in %s", len(order), focus)
+    return {"reordered": reordered}
 
 
 @app.get("/experiments/{name}/new", response_model=None)
