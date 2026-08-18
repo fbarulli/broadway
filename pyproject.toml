@@ -33,6 +33,8 @@ dependencies = [
     "lime>=0.2",
     "optuna-integration[mlflow]>=4.9.0",
     "psycopg2-binary>=2.9",
+    "fastapi>=0.141.1",
+    "uvicorn>=0.52.1",
 ]
 
 [project.optional-dependencies]
