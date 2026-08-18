@@ -14,29 +14,34 @@ from project.working import MIN_FARE
 
 COLS = ["fare_amount", "trip_distance", "trip_duration_minutes"]
 PERCENTILES = [0.01, 0.05, 0.50, 0.95, 0.99, 0.999, 1.0]
-TAIL_PERCENTILES = [0.99, 0.999]
 
 CSV_OUT = RESULTS / "02_filtered_profile_describe.csv"
 PNG_OUT = RESULTS / "02_filtered_profile.png"
 
 
 def plot_profiles(df: pd.DataFrame, out_path: Path) -> None:
-    """One figure, 3 seaborn boxen (letter-value) plots on log-y.
+    """One figure, 3 box-whisker plots on log-y with the key values annotated.
 
-    Boxen tiers show many quantiles of the heavy-tailed distribution at a
-    glance; the 99% / 99.9% percentiles are marked with dashed lines.
+    Whiskers span min→max (whis=[0, 100]); the mean is marked; the describe
+    percentiles are printed on the panel so the exact amounts are readable.
     """
-    fig, axes = plt.subplots(1, 3, figsize=(15, 4), constrained_layout=True)
+    fig, axes = plt.subplots(1, 3, figsize=(15, 4.5), constrained_layout=True)
     for ax, col in zip(axes, COLS):
         values = df[col]
-        sns.boxenplot(y=values, log_scale=True, color="#4c72b0", ax=ax)
-        for p in TAIL_PERCENTILES:
-            y = float(values.quantile(p))
-            ax.axhline(y, color="red", linestyle="--", linewidth=0.8)
-            ax.text(0.03, y, f"{p * 100:g}% = {y:.3g}",
-                    transform=ax.get_yaxis_transform(), fontsize=7,
-                    color="red", va="center")
+        sns.boxplot(
+            y=values, log_scale=True, color="#4c72b0", whis=[0, 100],
+            width=0.35, ax=ax, showmeans=True,
+            meanprops={"marker": "o", "markerfacecolor": "#d62728",
+                       "markeredgecolor": "#d62728", "markersize": 5},
+        )
+        lines = [f"mean = {float(values.mean()):.3g}"]
+        for p in (0.50, 0.95, 0.99, 0.999):
+            lines.append(f"{p * 100:g}% = {float(values.quantile(p)):.3g}")
+        lines.append(f"max = {float(values.max()):.3g}")
+        ax.text(0.02, 0.98, "\n".join(lines), transform=ax.transAxes,
+                ha="left", va="top", fontsize=7, family="monospace")
         ax.set_title(f"{col} (N={len(values)})")
+        ax.set_ylabel("")
         ax.grid(True, alpha=0.3, axis="y")
     fig.savefig(out_path, dpi=150)
     plt.close(fig)
