@@ -1,14 +1,14 @@
 name: fare_prediction_1m
 role: estimation
-version: "v2"
-path: data/samples/fare_prediction_1m@v2.parquet
+version: "v3"
+path: data/samples/fare_prediction_1m@v3.parquet
 description: 1M random sample of the taxi training data, policy-filtered for fare prediction
 source:
   name: training_data
   path: data/processed/training_data.parquet
 seed: 42
 size: 1000000
-columns: [pickup_datetime, fare_amount, trip_distance, trip_duration_minutes]
+columns: [pickup_datetime, pickup_location_id, dropoff_location_id, fare_amount, trip_distance, trip_duration_minutes]
 derived:
   - {name: speed_mph, formula: speed_mph}
 # Plausibility exclusions from the 04 percentile-extremes audit (recorded
@@ -28,6 +28,8 @@ filters:
   - {column: trip_duration_minutes, op: ">", value: 0.0}
 schema:
   pickup_datetime: {dtype: "datetime64[ns]", nullable: false}
+  pickup_location_id: {dtype: "int32", nullable: false}
+  dropoff_location_id: {dtype: "int32", nullable: false}
   fare_amount: {dtype: float64, nullable: false, checks: [{op: ">", value: 0.0}]}
   trip_distance: {dtype: float64, nullable: false, checks: [{op: ">", value: 0.0}]}
   trip_duration_minutes: {dtype: float64, nullable: false, checks: [{op: ">", value: 0.0}]}
