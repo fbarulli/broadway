@@ -1,8 +1,10 @@
-"""06: chronological train/val/test split, temporal features, duration×temporal interactions, safe pre-trip features (route target encoding, pu×time interactions), raw location ids as categorical, log1p target.
+"""06: chronological train/val/test split, temporal features, log-target smoothed encodings (route, pickup, dropoff) + pu×time interactions, raw location ids as categorical, log1p target.
 
 The model feature set is SAFE_FEATURES (pre-trip only — no distance/duration/
-speed, which are post-trip leakage). The target encodings are fitted on the
-TRAIN slice only; unseen ids fall back to the train global mean.
+speed, which are post-trip leakage). Encodings are fitted on the TRAIN slice
+only against ``fare_amount_log``: the high-cardinality route id gets stronger
+shrinkage (ROUTE_SMOOTHING=50) than single zones (LOCATION_SMOOTHING=20).
+Unseen ids fall back to the train global mean.
 """
 
 import numpy as np
@@ -17,7 +19,9 @@ TARGET = "fare_amount"
 TARGET_LOG = "fare_amount_log"
 PU_COL = "pickup_location_id"
 DO_COL = "dropoff_location_id"
-SMOOTHING = 10
+ENCODING_TARGET = TARGET_LOG
+ROUTE_SMOOTHING = 50
+LOCATION_SMOOTHING = 20
 PREPARED_DIR = RESULTS / "prepared"
 SPLIT_CSV = RESULTS / "06_prepare_model_data_split.csv"
 
@@ -58,25 +62,46 @@ def _prepare_split(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def _apply_encodings(splits: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
-    """Train-only target encodings (route + pickup) + pu×time interactions.
+def _raw_ids(df: pd.DataFrame) -> pd.DataFrame:
+    """Location ids back to their base dtype before target encoding.
 
-    Fitted on the TRAIN slice; unseen ids fall back to the train global mean
-    (the platform's ``__unknown__`` fallback). The pu interactions multiply
-    the pickup encoding by each temporal flag.
+    ``Series.map`` on a category column returns a categorical whenever every
+    mapped value is distinct (true for dropoff zones on the full train); the
+    encodings' ``__unknown__`` fillna would then reject the float fallback.
+    """
+    out = df.copy()
+    for col in LOCATION_COLS:
+        if isinstance(out[col].dtype, pd.CategoricalDtype):
+            out[col] = out[col].astype(out[col].cat.categories.dtype)
+    return out
+
+
+def _apply_encodings(splits: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
+    """Train-only log-target encodings (route + pickup + dropoff) + pu×time interactions.
+
+    Fitted on the TRAIN slice against ``fare_amount_log``; unseen ids fall back
+    to the train global mean (the platform's ``__unknown__`` fallback). The
+    route id is high-cardinality (~30k zone pairs), so it needs stronger
+    shrinkage (ROUTE_SMOOTHING=50) than single zones (LOCATION_SMOOTHING=20).
+    The pu interactions multiply the pickup encoding by each temporal flag.
     """
     train = splits["train"]
     encodings = {
-        "route_id": fit_target_encoding(train, "route_id", TARGET, SMOOTHING),
-        PU_COL: fit_target_encoding(train, PU_COL, TARGET, SMOOTHING),
+        "route_id": fit_target_encoding(train, "route_id", ENCODING_TARGET, ROUTE_SMOOTHING),
+        PU_COL: fit_target_encoding(train, PU_COL, ENCODING_TARGET, LOCATION_SMOOTHING),
+        DO_COL: fit_target_encoding(train, DO_COL, ENCODING_TARGET, LOCATION_SMOOTHING),
     }
     out = {}
     for name, df in splits.items():
+        df = _raw_ids(df)
         df = transform_target_encoding(df, "route_id", encodings["route_id"]).rename(
             columns={"route_id_target_enc": "route_id_encoded"}
         )
         df = transform_target_encoding(df, PU_COL, encodings[PU_COL]).rename(
             columns={f"{PU_COL}_target_enc": "pickup_location_id_encoded"}
+        )
+        df = transform_target_encoding(df, DO_COL, encodings[DO_COL]).rename(
+            columns={f"{DO_COL}_target_enc": "dropoff_location_id_encoded"}
         )
         for feat, flag in PU_INTERACTION_SPECS:
             df[feat] = df["pickup_location_id_encoded"] * df[flag]
