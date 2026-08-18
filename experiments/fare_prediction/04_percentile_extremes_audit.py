@@ -1,8 +1,17 @@
 """04: audit the bottom and top 1% of fares for plausibility."""
 
+from pathlib import Path
+
+import matplotlib
+
+matplotlib.use("Agg")
+
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from _common import RESULTS, SAMPLE_NAME
+import seaborn as sns
+from _common import RESULTS, SAMPLE_NAME, UNIT_FMT
+from matplotlib.ticker import FuncFormatter
 
 from broadway.samples import read_named_sample
 
@@ -14,6 +23,7 @@ TOP_SUSPECT = {"min_distance": 3.0, "min_duration": 5.0, "max_speed": 100.0}
 
 EVIDENCE_CSV = RESULTS / "04_percentile_extremes_audit_describe.csv"
 SUMMARY_MD = RESULTS / "04_percentile_extremes.md"
+PNG_OUT = RESULTS / "04_percentile_extremes_audit.png"
 
 FLAG_COLS = ["fare_amount", "trip_distance", "trip_duration_minutes", "speed_mph"]
 PERCENTILES = [0.01, 0.25, 0.5, 0.75, 0.99]
@@ -183,6 +193,49 @@ def _combined_evidence(
     return pd.DataFrame(rows).set_index("stat")
 
 
+def plot_extremes(
+    df: pd.DataFrame,
+    bottom: pd.DataFrame,
+    top: pd.DataFrame,
+    bottom_flagged: pd.DataFrame,
+    top_flagged: pd.DataFrame,
+    out_path: Path,
+) -> None:
+    """Two-panel figure: bottom-vs-top fare boxplot plus flagged-extremes scatter."""
+    fig, axes = plt.subplots(1, 2, figsize=(12, 4.5), constrained_layout=True)
+    extremes = pd.concat([
+        bottom.assign(group="bottom 1%"),
+        top.assign(group="top 1%"),
+    ])
+    sns.boxplot(
+        x="group", y="fare_amount", data=extremes, log_scale=True,
+        whis=[0, 100], showmeans=True, ax=axes[0],
+        meanprops={"marker": "o", "markerfacecolor": "#d62728",
+                   "markeredgecolor": "#d62728", "markersize": 5},
+    )
+    axes[0].yaxis.set_major_formatter(
+        FuncFormatter(lambda v, _p: UNIT_FMT["fare_amount"].format(v))
+    )
+    axes[0].set_title("bottom vs top 1% fares")
+    axes[0].grid(True, alpha=0.3, axis="y")
+    sns.scatterplot(
+        x="trip_distance", y="fare_amount", hue="group", data=extremes,
+        palette={"bottom 1%": "#4c72b0", "top 1%": "#d62728"},
+        s=8, alpha=0.5, ax=axes[1],
+    )
+    axes[1].set_xscale("log")
+    axes[1].set_yscale("log")
+    flagged = pd.concat([bottom_flagged, top_flagged])
+    axes[1].scatter(
+        x=flagged["trip_distance"], y=flagged["fare_amount"],
+        marker="x", s=40, color="black", label="flagged",
+    )
+    axes[1].legend(title=None)
+    axes[1].set_title("extremes: fare vs distance (flagged = x)")
+    fig.savefig(out_path, dpi=150)
+    plt.close(fig)
+
+
 def main() -> None:
     RESULTS.mkdir(parents=True, exist_ok=True)
     sample = read_named_sample(SAMPLE_NAME)
@@ -220,6 +273,9 @@ def main() -> None:
     combined = _combined_evidence(bottom_desc, top_desc, bottom_flagged, top_flagged)
     combined.to_csv(EVIDENCE_CSV)
     print(f"wrote {EVIDENCE_CSV} ({len(combined)} rows)")
+
+    plot_extremes(df, bottom, top, bottom_flagged, top_flagged, PNG_OUT)
+    print(f"wrote {PNG_OUT}")
 
     SUMMARY_MD.write_text(
         _summary_md(

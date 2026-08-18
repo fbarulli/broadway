@@ -5,11 +5,17 @@ subset is applied here); the fare/duration policy lives in the sample
 definition and was applied once at generation.
 """
 
+from pathlib import Path
+
+import matplotlib
+
+matplotlib.use("Agg")
+
+import matplotlib.pyplot as plt
 import pandas as pd
+from _common import RESULTS, SAMPLE_NAME, UNIT_FMT, box_with_marks
 
 from broadway.samples import read_named_sample
-
-from _common import RESULTS, SAMPLE_NAME
 
 SHORT_DISTANCE = 0.31
 SHORT_COLS = ["fare_amount", "trip_duration_minutes"]
@@ -17,6 +23,7 @@ SHORT_PERCENTILES = [0.01, 0.25, 0.5, 0.75, 0.99]
 
 DESCRIBE_CSV = RESULTS / "03_short_trips_describe.csv"
 SUMMARY_MD = RESULTS / "03_short_trips.md"
+PNG_OUT = RESULTS / "03_short_trips.png"
 
 
 def describe_to_markdown(title: str, desc: pd.DataFrame, n: int) -> str:
@@ -50,6 +57,18 @@ def describe_to_markdown(title: str, desc: pd.DataFrame, n: int) -> str:
     return f"# {title}\n\nTotal rows: {n:,}\n\n{body}\n"
 
 
+def plot_short_trips(df: pd.DataFrame, out_path: Path) -> None:
+    """Two box-with-marks panels: short-trip fare and duration profiles."""
+    fig, axes = plt.subplots(1, 2, figsize=(10, 4.5), constrained_layout=True)
+    box_with_marks(axes[0], df["fare_amount"], UNIT_FMT["fare_amount"],
+                   f"fare_amount (N={len(df)})")
+    box_with_marks(axes[1], df["trip_duration_minutes"],
+                   UNIT_FMT["trip_duration_minutes"],
+                   f"trip_duration_minutes (N={len(df)})")
+    fig.savefig(out_path, dpi=150)
+    plt.close(fig)
+
+
 def main() -> None:
     RESULTS.mkdir(parents=True, exist_ok=True)
     sample = read_named_sample(SAMPLE_NAME)
@@ -64,6 +83,9 @@ def main() -> None:
 
     SUMMARY_MD.write_text(describe_to_markdown("Short trips (< 0.31 mi)", desc, len(short)))
     print(f"wrote {SUMMARY_MD}")
+
+    plot_short_trips(short, PNG_OUT)
+    print(f"wrote {PNG_OUT}")
 
 
 if __name__ == "__main__":
