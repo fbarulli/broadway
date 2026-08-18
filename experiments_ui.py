@@ -1,10 +1,15 @@
-"""Bare-bones FastAPI dashboard + per-experiment pages for the univariate
-``fare_amount_trip_distance`` experiment series.
+"""Bare-bones FastAPI dashboard + per-experiment pages across experiment series.
 
-Scope: only the 30 step scripts under ``experiments/univariate/
-fare_amount_trip_distance/`` (``*.py`` excluding ``_*.py``) are censused,
-graphed, and observed. Other experiment series (``multivariate``,
-``mlflow``) are intentionally out of scope for now — nothing walks them.
+The UI is multi-series: any folder under ``experiments/`` that contains at
+least one numbered ``NN_*.py`` step script is a series, addressed by its id
+(the folder path relative to ``experiments/``, e.g.
+``univariate/fare_amount_trip_distance``) via the ``?focus=<series id>`` query
+parameter on every page. The default focus is the univariate
+``fare_amount_trip_distance`` series.
+
+To add a series: drop a folder with numbered ``NN_*.py`` scripts under
+``experiments/``; its results live in ``experiments/results/<series id>`` and
+its dashboard becomes reachable at ``/?focus=<series id>``.
 
 Each step page renders a bare-bones HTML pipeline graph (upstream -> this
 step -> downstream consumers of the datasets it writes), the step's result
@@ -22,7 +27,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, quote
 
 import uvicorn
 from fastapi import FastAPI, Query, Request
@@ -31,24 +36,21 @@ from fastapi.staticfiles import StaticFiles
 
 logger = logging.getLogger(__name__)
 
-EXPERIMENT_DIR = (
-    Path(__file__).resolve().parent / "experiments" / "univariate" / "fare_amount_trip_distance"
-)
-RESULTS_DIR = (
-    Path(__file__).resolve().parent / "experiments" / "results" / "univariate" / "fare_amount_trip_distance"
-)
+EXPERIMENTS_ROOT = Path(__file__).resolve().parent / "experiments"
+DEFAULT_SERIES = "univariate/fare_amount_trip_distance"
 OBSERVATIONS_DIR = Path(__file__).resolve().parent / "artifacts" / "experiments" / "observations"
 
 _PARQUET_CONSTANTS = ("CLEAN_PARQUET", "FULL_PARQUET", "RATECODE1_PARQUET")
 _EXTERNAL_RE = re.compile(r"read_training_sample|load_metered|load_working")
 _NUMBER_PREFIX = re.compile(r"^\d+[a-z]?:\s*")
 _STEM_PREFIX = re.compile(r"^\d+")
+_NN_PREFIX = re.compile(r"^\d")
 _SLUG_RE = re.compile(r"[a-z0-9_]+")
 _VERDICTS = ("supported", "refuted", "inconclusive", "partial")
 _UPSTREAM_LABEL = "upstream (project data / working dataset)"
 
 app = FastAPI()
-app.mount("/results", StaticFiles(directory=RESULTS_DIR), name="results")
+app.mount("/results", StaticFiles(directory=EXPERIMENTS_ROOT / "results"), name="results")
 
 
 @dataclass
@@ -60,9 +62,35 @@ class ScriptProfile:
     external: bool = False
 
 
-def series_scripts() -> list[Path]:
-    """Return the series' step scripts (``*.py``, excluding ``_*.py``), sorted."""
-    return sorted(p for p in EXPERIMENT_DIR.glob("*.py") if not p.name.startswith("_"))
+def _series_dir(focus: str) -> Path:
+    """Return the folder for a series id (``experiments/<focus>``)."""
+    return EXPERIMENTS_ROOT / focus
+
+
+def _results_dir(focus: str) -> Path:
+    """Return the results folder for a series id (``experiments/results/<focus>``)."""
+    return EXPERIMENTS_ROOT / "results" / focus
+
+
+def _h(path: str, focus: str) -> str:
+    """Append ``?focus=<quoted series id>`` to an internal path (``&`` if it has a query)."""
+    sep = "&" if "?" in path else "?"
+    return f"{path}{sep}focus={quote(focus, safe='')}"
+
+
+def list_series() -> list[str]:
+    """Return series ids: folders under ``experiments/`` with a numbered ``NN_*.py``, sorted."""
+    found: set[str] = set()
+    for script in EXPERIMENTS_ROOT.rglob("*.py"):
+        if script.name.startswith("_") or not _NN_PREFIX.match(script.name):
+            continue
+        found.add(script.relative_to(EXPERIMENTS_ROOT).parent.as_posix())
+    return sorted(found)
+
+
+def series_scripts(focus: str) -> list[Path]:
+    """Return the focused series' step scripts (``*.py``, excluding ``_*.py``), sorted."""
+    return sorted(p for p in _series_dir(focus).glob("*.py") if not p.name.startswith("_"))
 
 
 def script_profile(script: Path) -> ScriptProfile:
@@ -80,17 +108,17 @@ def script_profile(script: Path) -> ScriptProfile:
     )
 
 
-def series_profiles() -> dict[str, ScriptProfile]:
-    """Return ``{stem: profile}`` for every step script in the series."""
-    return {script.stem: script_profile(script) for script in series_scripts()}
+def series_profiles(focus: str) -> dict[str, ScriptProfile]:
+    """Return ``{stem: profile}`` for every step script in the focused series."""
+    return {script.stem: script_profile(script) for script in series_scripts(focus)}
 
 
-def census_rows() -> list[dict[str, str | int]]:
-    """Build one dashboard row per series script (experiment | question | status | artifacts)."""
+def census_rows(focus: str) -> list[dict[str, str | int]]:
+    """Build one dashboard row per focused-series script (experiment | question | status | artifacts)."""
     rows: list[dict[str, str | int]] = []
-    for script in series_scripts():
+    for script in series_scripts(focus):
         stem = script.stem
-        results = _result_files(stem)
+        results = _result_files(stem, focus)
         rows.append(
             {
                 "experiment": stem,
@@ -126,21 +154,22 @@ def _question_from_docstring(script: Path) -> str:
     return _NUMBER_PREFIX.sub("", first_line, count=1).strip()
 
 
-def _result_files(stem: str) -> list[Path]:
-    """Return result files for ``stem`` under RESULTS_DIR, sorted."""
-    if not RESULTS_DIR.is_dir():
+def _result_files(stem: str, focus: str) -> list[Path]:
+    """Return result files for ``stem`` in the focused series, sorted."""
+    results_dir = _results_dir(focus)
+    if not results_dir.is_dir():
         return []
-    return sorted(RESULTS_DIR.glob(f"{stem}.*"))
+    return sorted(results_dir.glob(f"{stem}.*"))
 
 
-def _has_results(stem: str) -> bool:
-    """Whether any result files exist for ``stem`` under RESULTS_DIR."""
-    return any(RESULTS_DIR.glob(f"{stem}.*"))
+def _has_results(stem: str, focus: str) -> bool:
+    """Whether any result files exist for ``stem`` in the focused series."""
+    return any(_results_dir(focus).glob(f"{stem}.*"))
 
 
-def _box_class(stem: str) -> str:
+def _box_class(stem: str, focus: str) -> str:
     """CSS class for a node box: green when the step ran, gray otherwise."""
-    return "box green" if _has_results(stem) else "box gray"
+    return "box green" if _has_results(stem, focus) else "box gray"
 
 
 def _producers_of(constant: str, profiles: dict[str, ScriptProfile]) -> list[str]:
@@ -155,7 +184,7 @@ def _consumers_of(constant: str, stem: str, profiles: dict[str, ScriptProfile]) 
     )
 
 
-def _graph_html(stem: str, profiles: dict[str, ScriptProfile]) -> str:
+def _graph_html(stem: str, profiles: dict[str, ScriptProfile], focus: str) -> str:
     """Render the bare-bones pipeline graph as escaped HTML boxes + arrows."""
     profile = profiles[stem]
     nodes: list[tuple[str, str]] = []
@@ -164,33 +193,34 @@ def _graph_html(stem: str, profiles: dict[str, ScriptProfile]) -> str:
     else:
         for constant in sorted(profile.consumed):
             for producer in _producers_of(constant, profiles):
-                nodes.append((producer, _box_class(producer)))
-    nodes.append((stem, "box strong " + _box_class(stem)))
+                nodes.append((producer, _box_class(producer, focus)))
+    nodes.append((stem, "box strong " + _box_class(stem, focus)))
     for constant in sorted(profile.produced):
         for consumer in _consumers_of(constant, stem, profiles):
-            nodes.append((consumer, _box_class(consumer)))
+            nodes.append((consumer, _box_class(consumer, focus)))
     boxes = " <span class=\"arrow\">→</span> ".join(
-        f'<span class="{cls}"><a href="{_node_href(label)}">{html.escape(label)}</a></span>'
+        f'<span class="{cls}"><a href="{html.escape(_node_href(label, focus))}">{html.escape(label)}</a></span>'
         for label, cls in nodes
     )
     return f'<div class="graph">{boxes}</div>'
 
 
-def _node_href(label: str) -> str:
-    """Href for a graph node: the dashboard for upstream, the step page otherwise."""
+def _node_href(label: str, focus: str) -> str:
+    """Href for a graph node: the focused dashboard for upstream, the step page otherwise."""
     if label == _UPSTREAM_LABEL:
-        return "/"
-    return f"/experiments/{html.escape(label)}"
+        return _h("/", focus)
+    return _h(f"/experiments/{label}", focus)
 
 
-def _render_table(rows: list[dict[str, str | int]]) -> str:
+def _render_table(rows: list[dict[str, str | int]], focus: str) -> str:
     """Render the dashboard table body: linked experiment, question, status, artifacts."""
     cells = []
     for row in rows:
         stem = html.escape(str(row["experiment"]))
+        href = html.escape(_h(f"/experiments/{stem}", focus))
         cells.append(
             "<tr>"
-            f'<td><a href="/experiments/{stem}">{stem}</a></td>'
+            f'<td><a href="{href}">{stem}</a></td>'
             f"<td>{html.escape(str(row['question']))}</td>"
             f"<td>{html.escape(str(row['status']))}</td>"
             f"<td>{row['artifacts']}</td>"
@@ -199,17 +229,20 @@ def _render_table(rows: list[dict[str, str | int]]) -> str:
     return "\n".join(cells)
 
 
-def _render_artifacts(stem: str) -> str:
+def _render_artifacts(stem: str, focus: str) -> str:
     """Render result files as links plus the embedded PNG, if present."""
-    files = _result_files(stem)
+    files = _result_files(stem, focus)
     if not files:
         return "<p>No artifacts yet.</p>"
     links = "".join(
-        f'<li><a href="/results/{html.escape(f.name)}">{html.escape(f.name)}</a></li>' for f in files
+        f'<li><a href="/results/{html.escape(focus)}/{html.escape(f.name)}">{html.escape(f.name)}</a></li>'
+        for f in files
     )
     png = next((f for f in files if f.suffix == ".png"), None)
     image = (
-        f'<p><img src="/results/{html.escape(png.name)}" alt="{html.escape(png.name)}"></p>' if png else ""
+        f'<p><img src="/results/{html.escape(focus)}/{html.escape(png.name)}" alt="{html.escape(png.name)}"></p>'
+        if png
+        else ""
     )
     return f"<ul>{links}</ul>{image}"
 
@@ -223,7 +256,7 @@ def _verdict_options(saved: str) -> str:
 
 
 def _render_observations_form(
-    stem: str, observations: dict[str, str], next_url: str = ""
+    stem: str, observations: dict[str, str], focus: str, next_url: str = ""
 ) -> str:
     """Render saved observations (if any) above the observation form."""
     saved_block = ""
@@ -245,7 +278,7 @@ def _render_observations_form(
     )
     return (
         saved_block
-        + f'<form method="post" action="/experiments/{html.escape(stem)}/observations">'
+        + f'<form method="post" action="{html.escape(_h(f"/experiments/{stem}/observations", focus))}">'
         + hidden
         + '<p><label for="verdict">verdict</label> '
         + f'<select name="verdict" id="verdict" required>{_verdict_options(selected)}</select></p>'
@@ -331,9 +364,23 @@ def _scaffold_text(prefix: str, question: str) -> str:
     )
 
 
-def _render_dashboard_page(rows: list[dict[str, str | int]]) -> str:
+def _series_selector(series: list[str], focus: str) -> str:
+    """Render the top-row series selector: one dashboard link per series, current bold."""
+    links = []
+    for sid in series:
+        label = html.escape(sid)
+        if sid == focus:
+            links.append(f"<strong>{label}</strong>")
+        else:
+            links.append(f'<a href="{html.escape(_h("/", sid))}">{label}</a>')
+    return '<nav class="selector">' + " | ".join(links) + "</nav>"
+
+
+def _render_dashboard_page(
+    rows: list[dict[str, str | int]], focus: str, series: list[str]
+) -> str:
     """Render the full dashboard HTML page with minimal inline styling."""
-    table_rows = _render_table(rows)
+    table_rows = _render_table(rows, focus)
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -342,6 +389,7 @@ def _render_dashboard_page(rows: list[dict[str, str | int]]) -> str:
 <style>
   body {{ font-family: system-ui, sans-serif; margin: 2rem; color: #222; }}
   h1 {{ font-size: 1.4rem; }}
+  .selector {{ margin: 0.75rem 0; font-size: 0.9rem; }}
   table {{ border-collapse: collapse; width: 100%; font-size: 0.9rem; }}
   th, td {{ border: 1px solid #ccc; padding: 0.4rem 0.6rem; text-align: left; vertical-align: top; }}
   th {{ background: #f0f0f0; }}
@@ -350,6 +398,7 @@ def _render_dashboard_page(rows: list[dict[str, str | int]]) -> str:
 </head>
 <body>
 <h1>Broadway experiments</h1>
+{_series_selector(series, focus)}
 <table>
 <thead>
 <tr><th>experiment</th><th>question</th><th>status</th><th>artifacts</th></tr>
@@ -368,14 +417,20 @@ def _render_experiment_page(
     question: str,
     stems: list[str],
     profiles: dict[str, ScriptProfile],
+    focus: str,
+    series: list[str],
 ) -> str:
     """Render the full per-experiment HTML page (strip, graph, artifacts, observation form)."""
     prev_href, next_href = _prev_next_hrefs(stems, stem, "/experiments/")
-    strip = _series_strip(stems, stem, lambda s: f"/experiments/{s}", prev_href, next_href)
+    prev_href = _h(prev_href, focus) if prev_href else ""
+    next_href = _h(next_href, focus) if next_href else ""
+    strip = _series_strip(
+        stems, stem, lambda s: _h(f"/experiments/{s}", focus), prev_href, next_href
+    )
     nav = (
         "<p>"
-        f'<a href="/series?from={html.escape(stem)}">show with next</a>'
-        f' | <a href="/experiments/{html.escape(stem)}/new">＋ new step after this</a>'
+        f'<a href="{html.escape(_h(f"/series?from={stem}", focus))}">show with next</a>'
+        f' | <a href="{html.escape(_h(f"/experiments/{stem}/new", focus))}">＋ new step after this</a>'
         "</p>"
     )
     return f"""<!doctype html>
@@ -386,6 +441,7 @@ def _render_experiment_page(
 <style>
   body {{ font-family: system-ui, sans-serif; margin: 2rem; color: #222; }}
   h1 {{ font-size: 1.4rem; }}
+  .selector {{ margin: 0.75rem 0; font-size: 0.9rem; }}
   .strip {{ display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; margin: 1rem 0; font-size: 0.85rem; }}
   .strip a, .strip span {{ padding: 0.15rem 0.4rem; border: 1px solid #ccc; border-radius: 3px; text-decoration: none; color: #222; }}
   .strip a.current {{ background: #d9f2d9; border-color: #2a7; }}
@@ -403,38 +459,39 @@ def _render_experiment_page(
 <body>
 <h1>{html.escape(stem)}</h1>
 <p>{html.escape(question)}</p>
+{_series_selector(series, focus)}
 {strip}
 {nav}
-{_graph_html(stem, profiles)}
+{_graph_html(stem, profiles, focus)}
 <h2>artifacts</h2>
-{_render_artifacts(stem)}
+{_render_artifacts(stem, focus)}
 <h2>observations</h2>
-{_render_observations_form(stem, load_observations(stem))}
+{_render_observations_form(stem, load_observations(stem), focus)}
 </body>
 </html>
 """
 
 
 def _render_series_cards(
-    stems: list[str], profiles: dict[str, ScriptProfile], back_url: str
+    stems: list[str], profiles: dict[str, ScriptProfile], back_url: str, focus: str
 ) -> str:
     """Render one card per step: header link, question, figure, observation form."""
     cards = []
     for stem in stems:
-        script = _script_for(stem)
+        script = _script_for(stem, focus)
         question = _question_from_docstring(script) if script else ""
-        png = next((f for f in _result_files(stem) if f.suffix == ".png"), None)
+        png = next((f for f in _result_files(stem, focus) if f.suffix == ".png"), None)
         figure = (
-            f'<p><img src="/results/{html.escape(png.name)}" alt="{html.escape(png.name)}"></p>'
+            f'<p><img src="/results/{html.escape(focus)}/{html.escape(png.name)}" alt="{html.escape(png.name)}"></p>'
             if png
             else "<p>No figure yet.</p>"
         )
         cards.append(
             '<section class="card">'
-            f'<h2><a href="/experiments/{html.escape(stem)}">{html.escape(stem)}</a></h2>'
+            f'<h2><a href="{html.escape(_h(f"/experiments/{stem}", focus))}">{html.escape(stem)}</a></h2>'
             f"<p>{html.escape(question)}</p>"
             f"{figure}"
-            f"{_render_observations_form(stem, load_observations(stem), back_url)}"
+            f"{_render_observations_form(stem, load_observations(stem), focus, back_url)}"
             "</section>"
         )
     return "\n".join(cards)
@@ -445,19 +502,23 @@ def _render_series_page(
     to_stem: str,
     stems: list[str],
     profiles: dict[str, ScriptProfile],
+    focus: str,
+    series: list[str],
 ) -> str:
     """Render the multi-step series view: strip plus one card per step in range."""
     from_idx = stems.index(from_stem)
     to_idx = stems.index(to_stem)
     prev_href = ""
     if from_idx > 0:
-        prev_href = f"/series?from={stems[from_idx - 1]}&to={stems[to_idx - 1]}"
+        prev_href = _h(f"/series?from={stems[from_idx - 1]}&to={stems[to_idx - 1]}", focus)
     next_href = ""
     if to_idx < len(stems) - 1:
-        next_href = f"/series?from={stems[from_idx + 1]}&to={stems[to_idx + 1]}"
-    strip = _series_strip(stems, from_stem, lambda s: f"/series?from={s}", prev_href, next_href)
-    back_url = f"/series?from={from_stem}&to={to_stem}"
-    cards = _render_series_cards(stems[from_idx : to_idx + 1], profiles, back_url)
+        next_href = _h(f"/series?from={stems[from_idx + 1]}&to={stems[to_idx + 1]}", focus)
+    strip = _series_strip(
+        stems, from_stem, lambda s: _h(f"/series?from={s}", focus), prev_href, next_href
+    )
+    back_url = _h(f"/series?from={from_stem}&to={to_stem}", focus)
+    cards = _render_series_cards(stems[from_idx : to_idx + 1], profiles, back_url, focus)
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -466,6 +527,7 @@ def _render_series_page(
 <style>
   body {{ font-family: system-ui, sans-serif; margin: 2rem; color: #222; }}
   h1 {{ font-size: 1.4rem; }}
+  .selector {{ margin: 0.75rem 0; font-size: 0.9rem; }}
   .strip {{ display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; margin: 1rem 0; font-size: 0.85rem; }}
   .strip a, .strip span {{ padding: 0.15rem 0.4rem; border: 1px solid #ccc; border-radius: 3px; text-decoration: none; color: #222; }}
   .strip a.current {{ background: #d9f2d9; border-color: #2a7; }}
@@ -477,6 +539,7 @@ def _render_series_page(
 </head>
 <body>
 <h1>series</h1>
+{_series_selector(series, focus)}
 {strip}
 <div class="cards">
 {cards}
@@ -486,7 +549,7 @@ def _render_series_page(
 """
 
 
-def _render_new_step_page(stem: str) -> str:
+def _render_new_step_page(stem: str, focus: str, series: list[str]) -> str:
     """Render the insert-a-step form page."""
     return f"""<!doctype html>
 <html lang="en">
@@ -496,13 +559,15 @@ def _render_new_step_page(stem: str) -> str:
 <style>
   body {{ font-family: system-ui, sans-serif; margin: 2rem; color: #222; }}
   h1 {{ font-size: 1.4rem; }}
+  .selector {{ margin: 0.75rem 0; font-size: 0.9rem; }}
   label {{ display: block; margin-top: 0.6rem; }}
   input, textarea {{ margin-top: 0.2rem; }}
 </style>
 </head>
 <body>
 <h1>new step after {html.escape(stem)}</h1>
-<form method="post" action="/experiments/{html.escape(stem)}/new">
+{_series_selector(series, focus)}
+<form method="post" action="{html.escape(_h(f"/experiments/{stem}/new", focus))}">
 <p><label for="name">name (slug: [a-z0-9_]+)</label>
 <input name="name" id="name" required pattern="[a-z0-9_]+" size="40"></p>
 <p><label for="question">question</label>
@@ -514,29 +579,37 @@ def _render_new_step_page(stem: str) -> str:
 """
 
 
-def _script_for(name: str) -> Path | None:
-    """Return the series script with stem ``name``, or None if unknown."""
+def _script_for(name: str, focus: str) -> Path | None:
+    """Return the focused-series script with stem ``name``, or None if unknown."""
     if not name or name.startswith("_"):
         return None
-    candidate = EXPERIMENT_DIR / f"{name}.py"
+    candidate = _series_dir(focus) / f"{name}.py"
     return candidate if candidate.is_file() else None
 
 
-@app.get("/")
-def index() -> HTMLResponse:
-    """Serve the dashboard for the univariate series."""
-    return HTMLResponse(_render_dashboard_page(census_rows()))
+@app.get("/", response_model=None)
+def index(focus: str = Query(default=DEFAULT_SERIES)) -> HTMLResponse | PlainTextResponse:
+    """Serve the dashboard for the focused series."""
+    if focus not in list_series():
+        return PlainTextResponse("unknown series", status_code=404)
+    return HTMLResponse(_render_dashboard_page(census_rows(focus), focus, list_series()))
 
 
 @app.get("/experiments/{name}", response_model=None)
-def experiment_page(name: str) -> HTMLResponse | PlainTextResponse:
+def experiment_page(
+    name: str, focus: str = Query(default=DEFAULT_SERIES)
+) -> HTMLResponse | PlainTextResponse:
     """Serve the per-experiment page with strip, graph, artifacts, and observation form."""
-    script = _script_for(name)
+    if focus not in list_series():
+        return PlainTextResponse("unknown series", status_code=404)
+    script = _script_for(name, focus)
     if script is None:
         return PlainTextResponse("unknown experiment", status_code=404)
-    stems = [s.stem for s in series_scripts()]
+    stems = [s.stem for s in series_scripts(focus)]
     return HTMLResponse(
-        _render_experiment_page(name, _question_from_docstring(script), stems, series_profiles())
+        _render_experiment_page(
+            name, _question_from_docstring(script), stems, series_profiles(focus), focus, list_series()
+        )
     )
 
 
@@ -544,9 +617,12 @@ def experiment_page(name: str) -> HTMLResponse | PlainTextResponse:
 def series_page(
     from_: str = Query(default="", alias="from"),
     to: str = Query(default=""),
+    focus: str = Query(default=DEFAULT_SERIES),
 ) -> HTMLResponse | PlainTextResponse:
     """Serve the multi-step series view: one card per step from ``from_`` to ``to``."""
-    stems = [script.stem for script in series_scripts()]
+    if focus not in list_series():
+        return PlainTextResponse("unknown series", status_code=404)
+    stems = [script.stem for script in series_scripts(focus)]
     if not stems:
         return PlainTextResponse("no experiments", status_code=404)
     from_stem = from_ or stems[0]
@@ -557,42 +633,56 @@ def series_page(
     if to_idx < from_idx:
         from_idx, to_idx = to_idx, from_idx
     return HTMLResponse(
-        _render_series_page(stems[from_idx], stems[to_idx], stems, series_profiles())
+        _render_series_page(
+            stems[from_idx], stems[to_idx], stems, series_profiles(focus), focus, list_series()
+        )
     )
 
 
 @app.get("/experiments/{name}/new", response_model=None)
-def new_step_page(name: str) -> HTMLResponse | PlainTextResponse:
-    """Serve the form to insert a new step after ``name``."""
-    if _script_for(name) is None:
+def new_step_page(
+    name: str, focus: str = Query(default=DEFAULT_SERIES)
+) -> HTMLResponse | PlainTextResponse:
+    """Serve the form to insert a new step after ``name`` in the focused series."""
+    if focus not in list_series():
+        return PlainTextResponse("unknown series", status_code=404)
+    if _script_for(name, focus) is None:
         return PlainTextResponse("unknown experiment", status_code=404)
-    return HTMLResponse(_render_new_step_page(name))
+    return HTMLResponse(_render_new_step_page(name, focus, list_series()))
 
 
 @app.post("/experiments/{name}/new", response_model=None)
-async def create_step(name: str, request: Request) -> RedirectResponse | PlainTextResponse:
+async def create_step(
+    name: str, request: Request, focus: str = Query(default=DEFAULT_SERIES)
+) -> RedirectResponse | PlainTextResponse:
     """Validate and scaffold a new step script after ``name``; 303 to its page."""
-    if _script_for(name) is None:
+    if focus not in list_series():
+        return PlainTextResponse("unknown series", status_code=404)
+    if _script_for(name, focus) is None:
         return PlainTextResponse("unknown experiment", status_code=404)
     fields = parse_qs((await request.body()).decode("utf-8"))
     new_name = fields.get("name", [""])[0]
     question = fields.get("question", [""])[0]
     if not _SLUG_RE.fullmatch(new_name) or not question.strip():
         return PlainTextResponse("invalid name or question", status_code=422)
-    stems = [script.stem for script in series_scripts()]
+    stems = [script.stem for script in series_scripts(focus)]
     prefix = _next_prefix(name, stems)
     stem = f"{prefix}_{new_name}"
-    (EXPERIMENT_DIR / f"{stem}.py").write_text(
+    (_series_dir(focus) / f"{stem}.py").write_text(
         _scaffold_text(prefix, question), encoding="utf-8"
     )
-    logger.info("created step script %s after %s", stem, name)
-    return RedirectResponse(url=f"/experiments/{stem}", status_code=303)
+    logger.info("created step script %s after %s in %s", stem, name, focus)
+    return RedirectResponse(url=_h(f"/experiments/{stem}", focus), status_code=303)
 
 
 @app.post("/experiments/{name}/observations", response_model=None)
-async def save_observations(name: str, request: Request) -> RedirectResponse | PlainTextResponse:
-    """Validate and persist an observation + verdict for a series script."""
-    if _script_for(name) is None:
+async def save_observations(
+    name: str, request: Request, focus: str = Query(default=DEFAULT_SERIES)
+) -> RedirectResponse | PlainTextResponse:
+    """Validate and persist an observation + verdict for a focused-series script."""
+    if focus not in list_series():
+        return PlainTextResponse("unknown series", status_code=404)
+    if _script_for(name, focus) is None:
         return PlainTextResponse("unknown experiment", status_code=404)
     fields = parse_qs((await request.body()).decode("utf-8"))
     verdict = fields.get("verdict", [""])[0]
@@ -610,7 +700,7 @@ async def save_observations(name: str, request: Request) -> RedirectResponse | P
     next_url = fields.get("next", [""])[0]
     if not (next_url.startswith("/") and not next_url.startswith("//")):
         next_url = ""
-    return RedirectResponse(url=next_url or f"/experiments/{name}", status_code=303)
+    return RedirectResponse(url=next_url or _h(f"/experiments/{name}", focus), status_code=303)
 
 
 if __name__ == "__main__":
