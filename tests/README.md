@@ -2,7 +2,7 @@
 
 Test suite organized by capability. Tests use contract-driven valid fixtures
 plus explicit malformed fixtures, so they are not tautological. The
-non-taxi onboarding E2E test (`test_onboarding_e2e.py`) is the acceptance
+synthetic-dataset onboarding E2E test (`test_onboarding_e2e.py`) is the acceptance
 proof that `src/broadway/**` needs no edits when the dataset is swapped.
 
 ## Config & contracts
@@ -23,7 +23,7 @@ Ingest, structural cleaning, joins, and the dataset loaders.
 - `test_structural_cleaning.py` — `standardize_missing`, `parse_datetime`, duplicate/target-null removal, `StructuralCleanResult`.
 - `test_join_audit.py`, `test_lookup_value_audit.py` — `JoinAudit` / `LookupValueAudit` evidence.
 
-> **Taxi-layer tests** (`project/tests/`) cover the taxi ETL (`project/etl/`)
+> **Dataset-layer tests** (`project/tests/`) cover the dataset ETL (`project/etl/`)
 > and project config consistency with generated data. Platform tests never
 > touch project-level data or configs — enforced by `test_platform_hygiene.py`.
 
@@ -60,7 +60,7 @@ Run graph, sidecar records, and sample specs.
 - `test_profile.py` — `DatasetProfile` / `ColumnProfile` observed facts.
 - `test_qq.py` — `plot_numeric_qq` small multiples + per-feature distribution grid (exclusion/chunking), `run_normality` joint per-group Q-Q cap, and profile-evidence rendering.
 - `test_onboard.py`, `test_init.py` — semantic inference hints + `ds-pipeline init` scaffolding.
-- `test_onboarding_e2e.py` — non-taxi CSV: init → etl → contracts → baseline → features → train → evaluate with a local MLflow file store.
+- `test_onboarding_e2e.py` — synthetic CSV: init → etl → contracts → baseline → features → train → evaluate with a local MLflow file store.
 
 ## Modeling / features / baseline
 
