@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable
 from pathlib import Path
 
 import mlflow
@@ -17,13 +16,13 @@ from broadway.data.splitter import split
 from broadway.evaluate.metrics import compute_metrics
 from broadway.lineage.ids import node_id
 from broadway.lineage.records import write_record
+from broadway.training.hpo import run_hpo
 from broadway.training.mlflow_utils import (
     log_metrics,
     log_model,
     log_params,
     setup_mlflow,
 )
-from broadway.training.optuna import run_study
 from broadway.training.trainer import train
 from broadway.utils import feature_columns
 
@@ -47,22 +46,6 @@ def _xy(df: pd.DataFrame, target: str) -> tuple[pd.DataFrame, pd.Series]:
     return feature_columns(df, target), df[target]
 
 
-def _hpo_objective(
-    model_type: str,
-    target_metric: str,
-    X_train: pd.DataFrame,
-    y_train: pd.Series,
-    X_val: pd.DataFrame,
-    y_val: pd.Series,
-) -> Callable[[dict[str, float | int]], float]:
-    def objective(params: dict[str, float | int]) -> float:
-        model, _ = train(model_type, X_train, y_train, **params)
-        metrics = compute_metrics(y_val.to_numpy(), model.predict(X_val))
-        return metrics[target_metric]
-
-    return objective
-
-
 def _resolve_params(
     cfg: PipelineConfig,
     X_train: pd.DataFrame,
@@ -73,21 +56,23 @@ def _resolve_params(
     assert cfg.experiment is not None
     if cfg.experiment.hpo is None:
         return cfg.experiment.model.params
-    objective = _hpo_objective(
-        cfg.experiment.model.type,
-        cfg.experiment.target_metric,
+    result = run_hpo(
+        cfg.experiment.hpo,
         X_train,
         y_train,
         X_val,
         y_val,
-    )
-    return run_study(
-        objective,
-        search_space=cfg.experiment.hpo.search_space,
-        n_trials=cfg.experiment.hpo.trials,
-        direction="minimize",
         random_state=cfg.experiment.random_state,
-    )  # type: ignore[return-value]
+    )
+    # The pipeline trains cfg.experiment.model.type: when hpo.models holds
+    # several entries, the others only feed the leaderboard and bandit
+    # allocation — the study target is the entry matching model.type.
+    best = result["models"].get(cfg.experiment.model.type)
+    if best is None:
+        raise ValueError(
+            f"hpo produced no valid trial for model '{cfg.experiment.model.type}'"
+        )
+    return dict(best["best_params"])
 
 
 def run(cfg: PipelineConfig) -> None:
