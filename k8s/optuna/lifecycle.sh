@@ -64,12 +64,18 @@ restore_state() {
 }
 
 run_hpo() {
-  log "starting worker jobs"
-  kubectl apply -f "$DIR/worker-jobs.yaml" >/dev/null
-  for m in ols lgbm xgb; do
-    log "waiting for optuna-$m"
-    kubectl wait --for=condition=complete "job/optuna-$m" --timeout=1200s >/dev/null \
-      || { log "optuna-$m FAILED"; kubectl logs "job/optuna-$m" | tail -20; return 1; }
+  log "starting worker jobs (rendered from the HPO spec — single source of truth)"
+  # The renderer is the ONLY generator of Job manifests; the image tag is
+  # injectable (CD sets OPTUNA_WORKER_IMAGE to the built registry tag).
+  uv run python "$DIR/render_worker_jobs.py" \
+    --image "${OPTUNA_WORKER_IMAGE:-broadway-optuna-worker:latest}" \
+    | kubectl apply -f - >/dev/null
+  # Wait for every job the renderer created (no hardcoded model list).
+  JOBS=$(kubectl get jobs -o name | grep '^job.batch/optuna-' || true)
+  for job in $JOBS; do
+    log "waiting for $job"
+    kubectl wait --for=condition=complete "$job" --timeout=1200s >/dev/null \
+      || { log "$job FAILED"; kubectl logs "$job" | tail -20; return 1; }
   done
   log "all workers complete"
 }

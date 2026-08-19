@@ -1,10 +1,12 @@
-"""Render the optuna worker Jobs for the HPO spec's models (dry-run / CI).
+"""Render the optuna worker Jobs for the HPO spec's models.
 
 The HPO spec (configs/experiments/mlflow.yaml -> `hpo.models`) is the single
 source for WHICH models get worker Jobs; the registry provides the display
-names the worker CLI accepts. CI runs this with a CI image tag and asserts the
-output is valid Kubernetes with the right image/env/model args — without a
-cluster. The deployed manifests (worker-jobs.yaml) mirror this structure.
+names the worker CLI accepts. `lifecycle.sh train` pipes this output into
+`kubectl apply -f -` — it is the ONLY generator of the Job manifests (the
+static worker-jobs.yaml has been removed). CI runs it with a CI image tag and
+asserts the output is valid Kubernetes with the right image/env/model args.
+The image tag is injectable (`--image`) so CD can pin the built registry tag.
 """
 
 from __future__ import annotations
