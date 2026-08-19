@@ -152,12 +152,12 @@ jobs:
 
       # Config-load simulation with the committed fixture: verifies the
       # configmap structure + the HPO spec both parse inside the pod layout.
+      # Literal block (run: |) — folded scalars collapse the newlines the
+      # python -c string needs.
       - name: Boot — config-load simulation
-        run: >
-          docker run --rm
-          -v "$PWD/.github/ci-fixtures/k8s-config.yaml:/etc/broadway/config.yaml"
-          broadway-optuna-worker:test python -c
-          "import yaml
+        run: |
+          docker run --rm -v "$PWD/.github/ci-fixtures/k8s-config.yaml:/etc/broadway/config.yaml" broadway-optuna-worker:test python -c "
+          import yaml
           from pathlib import Path
           from broadway.config.schema import HPOConfig
           cfg = yaml.safe_load(Path('/etc/broadway/config.yaml').read_text())
