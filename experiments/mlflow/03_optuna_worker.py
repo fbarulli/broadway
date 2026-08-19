@@ -13,6 +13,7 @@ trials; `--init-only` pre-creates the studies (optuna-init Job).
 """
 
 import argparse
+import os
 import socket
 from pathlib import Path
 
@@ -33,7 +34,14 @@ from broadway.training.mlflow_utils import (
 from broadway.training.optuna_worker import compose_db_url
 
 # HPO search spaces + budgets (configs/experiments/mlflow.yaml -> `hpo`).
-HPO_CONFIG_PATH = Path(__file__).resolve().parents[2] / "configs" / "experiments" / "mlflow.yaml"
+# Env-overridable: the k8s worker image sets BROADWAY_MLFLOW_CONFIG to its
+# mounted location; local default = repo path.
+HPO_CONFIG_PATH = Path(
+    os.environ.get(
+        "BROADWAY_MLFLOW_CONFIG",
+        Path(__file__).resolve().parents[2] / "configs" / "experiments" / "mlflow.yaml",
+    )
+)
 
 
 def load_secret(secret_dir: str) -> dict:

@@ -9,6 +9,7 @@ full metric suite. Run knobs (sample size, split, seed, features) come from
 reference the platform model registry / sklearn classes.
 """
 
+import os
 from pathlib import Path
 
 import numpy as np
@@ -29,8 +30,13 @@ RESULTS = HERE.parents[0] / "results" / "mlflow"   # experiments/results/mlflow
 REPO = HERE.parents[1]
 MLRUNS = REPO / "mlruns"
 
-_cfg = yaml.safe_load(
-    (REPO / "configs" / "experiments" / "mlflow.yaml").read_text())
+# Config path is env-overridable (the k8s worker image sets
+# BROADWAY_MLFLOW_CONFIG to its mounted location; local default = repo path).
+CONFIG_PATH = Path(
+    os.environ.get("BROADWAY_MLFLOW_CONFIG", REPO / "configs" / "experiments" / "mlflow.yaml")
+)
+
+_cfg = yaml.safe_load(CONFIG_PATH.read_text())
 require_keys(_cfg, ["sample_size", "test_fraction", "seed",
                     "continuous_features", "categorical_features"], "mlflow.yaml")
 

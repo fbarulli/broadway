@@ -1,7 +1,9 @@
 # Optuna worker image: shared base + the file-config worker script +
-# the baked-in working parquet.
+# its shared helpers (MODELS map + config) + the baked-in working parquet.
 FROM broadway-base:latest
 COPY experiments/mlflow/03_optuna_worker.py /app/worker.py
+COPY experiments/mlflow/_common.py /app/_common.py
+COPY configs/experiments/mlflow.yaml /app/configs/experiments/mlflow.yaml
 COPY experiments/results/univariate/fare_amount_trip_distance/ratecode1_sample.parquet \
      /app/data/ratecode1_sample.parquet
 CMD ["python", "/app/worker.py"]
