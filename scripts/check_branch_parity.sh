@@ -53,6 +53,7 @@ SHARED=(
   docker-compose.yml
   .gitignore
   .dockerignore
+  README.md
   scripts/check_branch_parity.sh
 )
 
