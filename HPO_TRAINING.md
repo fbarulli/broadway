@@ -97,9 +97,20 @@ paths); workers auto-delete ~2 min after finishing (`ttlSecondsAfterFinished`).
 ## 4a. CI boundary (what is and isn't automated)
 
 - **CI — structural determinism, no cluster, no training:** the platform gates
-  (ruff/mypy/pytest+coverage, shellcheck, kubeconform, frozen lockfile) plus the
-  **Build & Boot** job — builds the three images and boots the worker container
-  (imports, CLI, config-load simulation) to catch layout/import bugs.
+  (ruff/mypy/pytest+coverage, shellcheck, kubeconform, frozen lockfile,
+  config parse-all, orchestrator job dry-run) plus the **Build & Boot** job —
+  builds the three images (cached across runs via `docker/load`+`docker/save`)
+  and boots the worker container (imports, CLI, config-load simulation).
+  Rapid pushes cancel in-flight runs (`concurrency`).
+- **CD — push the verified images to GHCR** on push to `main`/`taxi` only
+  (never on PRs), tagged `ghcr.io/<repo>/<image>:<sha>` and `:latest`.
+  `lifecycle.sh` consumes the built tag via `OPTUNA_WORKER_IMAGE`:
+  ```bash
+  OPTUNA_WORKER_IMAGE=ghcr.io/<repo>/broadway-optuna-worker:<sha> \
+    k8s/optuna/lifecycle.sh train
+  ```
+  (For the local kind stack the default `broadway-optuna-worker:latest` is
+  loaded into the cluster; the GHCR tag is for real clusters.)
 - **Manual — runtime semantics:** `lifecycle.sh train` (kind cluster + workers +
   dump/restore) runs only on demand. **There is no scheduled retraining, by
   design** — HPO answers the question you ask, when you ask it.

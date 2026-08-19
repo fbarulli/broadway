@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [main, taxi]
 
+# Rapid pushes to the same branch/PR cancel the in-flight run — no wasted
+# compute on superseded commits.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   platform:
     name: Platform gates (src + tests + maintained surfaces)
@@ -91,12 +97,23 @@ jobs:
   # failures / parents[] resolution / eager-default traps / config structure.
   # Runtime semantics (kind cluster + workers + dump/restore) stay a manual,
   # on-demand `lifecycle.sh train` — this gate never runs training.
+  # Images are cached via docker/load + docker/save (GitHub-native): the base
+  # image's slow uv-sync layers persist across runs when pyproject/lock don't
+  # change. (buildx's container driver can't chain FROM across separate builds
+  # — verified empirically — so plain `docker build` is kept.)
   build-and-boot:
     name: Build & Boot (docker images — no cluster)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+
+      # Restore previously saved images so the chained FROM resolves instantly
+      # and unchanged base layers skip rebuilding.
+      - name: Load cached images
+        uses: docker/load@v1
+        with:
+          images: broadway-base:test, broadway-optuna-worker:test, mlflow-server:test
 
       - name: Build base image
         run: docker build -f k8s/optuna/Dockerfile.base -t broadway-base:test .
@@ -133,3 +150,47 @@ jobs:
       - name: Boot — mlflow image health
         run: docker run --rm --entrypoint python mlflow-server:test \
           -c "import mlflow; print('mlflow', mlflow.__version__)"
+
+      # Persist the built images to the Actions cache for the next run.
+      - name: Save cached images
+        uses: docker/save@v1
+        with:
+          images: broadway-base:test, broadway-optuna-worker:test, mlflow-server:test
+
+  # CD — push the verified images to GHCR on push to main/taxi ONLY (never on
+  # PRs). lifecycle.sh consumes the built tag via OPTUNA_WORKER_IMAGE.
+  cd:
+    name: CD (push images to GHCR)
+    needs: build-and-boot
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/taxi')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Chained local builds (plain docker build — the proven pattern), then
+      # tag + push each with the commit sha and :latest.
+      - name: Build images
+        run: |
+          docker build -f k8s/optuna/Dockerfile.base -t broadway-base:latest .
+          docker build -f k8s/optuna/Dockerfile.worker -t broadway-optuna-worker:latest .
+          docker build -f k8s/optuna/Dockerfile.mlflow -t mlflow-server:latest .
+
+      - name: Push to GHCR
+        run: |
+          for img in broadway-base broadway-optuna-worker mlflow-server; do
+            docker tag "$img:latest" "ghcr.io/${{ github.repository }}/$img:${{ github.sha }}"
+            docker tag "$img:latest" "ghcr.io/${{ github.repository }}/$img:latest"
+            docker push "ghcr.io/${{ github.repository }}/$img:${{ github.sha }}"
+            docker push "ghcr.io/${{ github.repository }}/$img:latest"
+          done
