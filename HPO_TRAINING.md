@@ -99,8 +99,9 @@ paths); workers auto-delete ~2 min after finishing (`ttlSecondsAfterFinished`).
 - **CI — structural determinism, no cluster, no training:** the platform gates
   (ruff/mypy/pytest+coverage, shellcheck, kubeconform, frozen lockfile,
   config parse-all, orchestrator job dry-run) plus the **Build & Boot** job —
-  builds the three images (cached across runs via `docker/load`+`docker/save`)
-  and boots the worker container (imports, CLI, config-load simulation).
+  builds the three images (cached across runs via a gzipped `docker save`
+  tarball + `actions/cache`) and boots the worker container (imports, CLI,
+  config-load simulation).
   Rapid pushes cancel in-flight runs (`concurrency`).
 - **CD — push the verified images to GHCR** on push to `main`/`taxi` only
   (never on PRs), tagged `ghcr.io/<repo>/<image>:<sha>` and `:latest`.
