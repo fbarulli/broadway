@@ -1,13 +1,16 @@
 """Unified HPO API tests — bandit allocation, objective, studies, run_hpo.
 
 Synthetic only: the run_hpo orchestration tests stub make_objective with a
-parabola objective so no real model training or taxi data is involved.
+parabola objective so no real model training or taxi data is involved. The
+mlflow tracking tests log runs to a hermetic tmp file store (no server) and
+fit a linear model on the tiny 4-row fixture.
 """
 
 from __future__ import annotations
 
 from typing import Self
 
+import mlflow
 import pandas as pd
 import pytest
 
@@ -15,13 +18,16 @@ from broadway.config.schema import HPOConfig, ModelHPOSpec
 from broadway.training import hpo as hpo_module
 from broadway.training.hpo import (
     bandit_allocate,
+    log_best_artifacts,
     make_objective,
     run_hpo,
     run_model_study,
 )
+from broadway.training.mlflow_utils import setup_mlflow
 
 
-def _parabola(params: dict[str, float | int]) -> float:
+def _parabola(params: dict[str, float | int], trial=None) -> float:
+    del trial
     return float((params["x"] - 3.0) ** 2)
 
 
@@ -193,11 +199,95 @@ def test_run_hpo_requires_models(tiny_data, monkeypatch: pytest.MonkeyPatch) -> 
 
 
 def test_run_hpo_no_valid_trial_raises(tiny_data, monkeypatch: pytest.MonkeyPatch) -> None:
-    def _nan(params: dict[str, float | int]) -> float:
-        del params
+    def _nan(params: dict[str, float | int], trial=None) -> float:
+        del params, trial
         return float("nan")
 
     monkeypatch.setattr(hpo_module, "make_objective", lambda *args, **kwargs: _nan)
     X_train, y_train, X_val, y_val = tiny_data
     with pytest.raises(ValueError, match="no valid trial"):
         run_hpo(_hpo_config(), X_train, y_train, X_val, y_val, random_state=1)
+
+
+# --- mlflow tracking (hermetic tmp file store, no server) -------------------
+
+
+def _mlflow_file_store(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Point mlflow at a per-test tmp file store."""
+    monkeypatch.setenv("MLFLOW_ALLOW_FILE_STORE", "true")
+    monkeypatch.setenv("MLFLOW_TRACKING_URI", str(tmp_path / "mlruns"))
+    setup_mlflow(str(tmp_path / "mlruns"), "test_experiment")
+
+
+def test_mlflow_tracking_logs_trials(tmp_path, tiny_data, monkeypatch: pytest.MonkeyPatch) -> None:
+    _mlflow_file_store(tmp_path, monkeypatch)
+    X_train, y_train, X_val, y_val = tiny_data
+    objective = make_objective("linear", "rmse", X_train, y_train, X_val, y_val)
+    spec = ModelHPOSpec(name="m0", search_space={"n_jobs": [1, 4]})
+    n_trials = 5
+    run_model_study(spec, objective, n_trials=n_trials, random_state=42,
+                    mlflow_tracking=True, mlflow_tags={"model": "m0"})
+    runs = mlflow.search_runs(experiment_names=["test_experiment"])
+    assert len(runs) == n_trials
+    assert (runs["status"] == "FINISHED").all()
+    for _, run in runs.iterrows():
+        assert run["tags.study"] == "hpo-m0"
+        assert run["tags.model"] == "m0"
+        assert run["tags.trial"] in {str(i) for i in range(n_trials)}
+        assert run["tags.mlflow.runName"].startswith("hpo-m0 trial ")
+        assert run["params.n_jobs"] in {"1", "2", "3", "4"}
+        assert run["metrics.rmse"] == pytest.approx(0.0, abs=0.1)
+        assert run["metrics.mae"] == pytest.approx(0.0, abs=0.1)
+        assert run["metrics.r2"] == pytest.approx(1.0, abs=0.05)
+        assert run["metrics.target_metric"] == pytest.approx(run["metrics.rmse"])
+
+
+def test_run_hpo_mlflow_tags(tmp_path, tiny_data, monkeypatch: pytest.MonkeyPatch) -> None:
+    _mlflow_file_store(tmp_path, monkeypatch)
+    _stub_objective(monkeypatch)
+    X_train, y_train, X_val, y_val = tiny_data
+    run_hpo(_hpo_config(), X_train, y_train, X_val, y_val, random_state=42,
+            mlflow_tracking=True, mlflow_tags={"exp": "x"})
+    runs = mlflow.search_runs(experiment_names=["test_experiment"])
+    assert len(runs) == 50
+    assert set(runs["tags.model"]) == {"m0", "m1"}
+    assert set(runs["tags.study"]) == {"hpo-m0", "hpo-m1"}
+    assert (runs["tags.exp"] == "x").all()
+
+
+def _run_artifacts(run_id: str) -> tuple[list[str], bool]:
+    """Run artifact paths, plus whether it carries a logged model output."""
+    client = mlflow.tracking.MlflowClient()
+    artifacts = [a.path for a in client.list_artifacts(run_id)]
+    outputs = client.get_run(run_id).outputs
+    has_model = outputs is not None and len(outputs.model_outputs) == 1
+    return artifacts, has_model
+
+
+def test_log_best_artifacts_linear_model_and_csv(tmp_path, tiny_data,
+                                                 monkeypatch: pytest.MonkeyPatch) -> None:
+    _mlflow_file_store(tmp_path, monkeypatch)
+    X_train, y_train, X_val, y_val = tiny_data
+    with mlflow.start_run():
+        log_best_artifacts("linear", {}, X_train, y_train, X_val, y_val)
+    runs = mlflow.search_runs(experiment_names=["test_experiment"])
+    assert len(runs) == 1
+    artifacts, has_model = _run_artifacts(runs.iloc[0]["run_id"])
+    assert has_model
+    assert "predictions.csv" in artifacts
+    assert "feature_importance.png" not in artifacts
+
+
+def test_log_best_artifacts_tree_importance_plot(tmp_path, tiny_data,
+                                                 monkeypatch: pytest.MonkeyPatch) -> None:
+    _mlflow_file_store(tmp_path, monkeypatch)
+    X_train, y_train, X_val, y_val = tiny_data
+    with mlflow.start_run():
+        log_best_artifacts("lgbm", {"n_estimators": 5, "max_depth": 2},
+                           X_train, y_train, X_val, y_val)
+    runs = mlflow.search_runs(experiment_names=["test_experiment"])
+    assert len(runs) == 1
+    artifacts, has_model = _run_artifacts(runs.iloc[0]["run_id"])
+    assert has_model
+    assert "predictions.csv" in artifacts
+    assert "feature_importance.png" in artifacts

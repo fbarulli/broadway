@@ -20,6 +20,7 @@ import socket
 from pathlib import Path
 
 import mlflow
+import optuna
 import pandas as pd
 import yaml
 from _common import MODEL_KEYS
@@ -84,9 +85,21 @@ def log_endpoints(model_name: str, cfg: dict, db_url: str) -> None:
     print(f"[worker] db_url={db_url}")
 
 
-def log_to_mlflow(model_name: str, best, cfg: dict, dataset_path: str,
-                  n_trials: int) -> None:
-    """Log the best trial, dataset lineage, and metadata (no model artifact)."""
+def log_to_mlflow(
+    model_name: str,
+    key: str,
+    best: optuna.trial.FrozenTrial,
+    cfg: dict,
+    dataset_path: str,
+    n_trials: int,
+    study_name: str,
+    seed: int,
+    X_train: pd.DataFrame,
+    y_train: pd.Series,
+    X_val: pd.DataFrame,
+    y_val: pd.Series,
+) -> None:
+    """Log the best trial (params, metrics, lineage, metadata) + model artifacts."""
     setup_mlflow(cfg["mlflow"]["tracking_uri"], cfg["mlflow"]["experiment"])
     with mlflow.start_run(run_name=f"optuna_{model_name}"):
         log_params(best.params)
@@ -94,6 +107,9 @@ def log_to_mlflow(model_name: str, best, cfg: dict, dataset_path: str,
         log_dataset(cfg["dataset"]["name"], dataset_path, context="train")
         log_metadata({"n_trials": float(n_trials)})
         mlflow.set_tag("model", model_name)
+        mlflow.set_tag("study", study_name)
+        mlflow.set_tag("seed", str(seed))
+        hpo.log_best_artifacts(key, best.params, X_train, y_train, X_val, y_val)
 
 
 def main() -> None:
@@ -135,12 +151,19 @@ def main() -> None:
     objective = hpo.make_objective(
         model_type=key, target_metric=hpo_cfg.target_metric,
         X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val)
+    study_name = f"hpo-{key}"
+    # Point the per-trial callback at the configmap tracking store + experiment
+    # (same setup the final best run uses) before the study runs.
+    setup_mlflow(cfg["mlflow"]["tracking_uri"], cfg["mlflow"]["experiment"])
     study = hpo.run_model_study(
         spec, objective, n_trials=hpo_cfg.initial_trials_per_model,
-        random_state=seed, storage_url=db_url, direction=hpo_cfg.direction)
+        random_state=seed, storage_url=db_url, direction=hpo_cfg.direction,
+        mlflow_tracking=True,
+        mlflow_tags={"model": args.model, "study": study_name, "seed": str(seed)})
     best = study.best_trial
-    log_to_mlflow(args.model, best, cfg, ds["parquet"],
-                  hpo_cfg.initial_trials_per_model)
+    log_to_mlflow(args.model, key, best, cfg, ds["parquet"],
+                  hpo_cfg.initial_trials_per_model, study_name, seed,
+                  X_train, y_train, X_val, y_val)
     print(f"[worker] DONE model={args.model} best_mae={best.value:.4f} "
           f"params={best.params}")
 
