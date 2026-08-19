@@ -34,10 +34,10 @@ def real_df() -> pd.DataFrame:
     n = 1000
     return pd.DataFrame(
         {
-            "rooms": rng.integers(1, 7, n),
-            "area": rng.integers(30, 200, n),
-            "neighborhood": rng.choice(["A", "B", "C", "D"], n),
-            "price": rng.integers(100, 1000, n),
+            "feature_1": rng.integers(1, 7, n),
+            "feature_2": rng.integers(30, 200, n),
+            "feature_3": rng.choice(["A", "B", "C", "D"], n),
+            "target": rng.integers(100, 1000, n),
         }
     )
 
@@ -52,10 +52,10 @@ def test_valid_dataframe_passes_all_checks(
 def test_missing_required_column_raises(
     real_df: pd.DataFrame, contract: DatasetContract, null_threshold: float
 ) -> None:
-    df = real_df.drop(columns=["area"])
+    df = real_df.drop(columns=["feature_2"])
     issues = check_columns(df, contract)
     assert len(issues) > 0
-    assert any("area" in issue for issue in issues)
+    assert any("feature_2" in issue for issue in issues)
     with pytest.raises(DataContractError):
         raise DataContractError("; ".join(issues))
 
@@ -64,7 +64,7 @@ def test_wrong_dtype_not_checked_at_raw_boundary(
     real_df: pd.DataFrame, contract: DatasetContract, null_threshold: float
 ) -> None:
     df = real_df.copy()
-    df["rooms"] = df["rooms"].astype("float64")
+    df["feature_1"] = df["feature_1"].astype("float64")
     assert check_columns(df, contract) == []
     assert check_nulls(df, contract, null_threshold) == []
 
@@ -73,9 +73,9 @@ def test_nulls_above_threshold_raises(
     real_df: pd.DataFrame, contract: DatasetContract, null_threshold: float
 ) -> None:
     df = real_df.copy()
-    df.loc[df.sample(frac=0.1, random_state=42).index, "area"] = None
+    df.loc[df.sample(frac=0.1, random_state=42).index, "feature_2"] = None
     issues = check_nulls(df, contract, null_threshold)
     assert len(issues) > 0
-    assert any("area" in issue for issue in issues)
+    assert any("feature_2" in issue for issue in issues)
     with pytest.raises(DataContractError):
         raise DataContractError("; ".join(issues))

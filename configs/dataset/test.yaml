@@ -1,23 +1,23 @@
 columns:
-  area:
+  feature_1:
     dtype: int64
     null_count: 0
     role: feature
-  neighborhood:
+  feature_2:
+    dtype: int64
+    null_count: 0
+    role: feature
+  feature_3:
     dtype: object
     null_count: 0
     role: feature
-  price:
+  target:
     dtype: int64
     null_count: 0
     role: target
-  rooms:
-    dtype: int64
-    null_count: 0
-    role: feature
 datetime_column: null
 lookup_tables: {}
 name: test
-path: /tmp/test.csv
-target: price
+path: demo/demo.csv
+target: target
 task: regression

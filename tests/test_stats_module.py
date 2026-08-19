@@ -59,7 +59,7 @@ def test_stats_run_writes_plan_file(
     assert "effect_sizes" in plan
     assert "passed" in plan
     assert "reason" in plan
-    assert plan.get("analysis_goal") == "test whether price differs across neighborhoods"
+    assert plan.get("analysis_goal") == "test whether target differs across feature groups"
 
 
 def test_stats_missing_canonical_raises(

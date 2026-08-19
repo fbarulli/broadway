@@ -1,15 +1,15 @@
 name: test_hypothesis
 mode: hypothesis
-goal: test whether price differs across neighborhoods
+goal: test whether target differs across feature groups
 row_definition: one listing
 decision_moment: post-hoc analysis
 available_info:
-  - neighborhood
-  - price
+  - feature_3
+  - target
 leakage_notes: []
 success_criterion: report effect size alongside significance
 hypothesis:
-  group_column: neighborhood
+  group_column: feature_3
   group_values:
     - A
     - B

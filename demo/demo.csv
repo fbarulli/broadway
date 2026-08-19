@@ -1,4 +1,4 @@
-rooms,area,neighborhood,price
+feature_1,feature_2,feature_3,target
 3,960,Alpha,307
 4,1420,Alpha,402
 2,610,Beta,233

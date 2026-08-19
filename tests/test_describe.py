@@ -69,15 +69,15 @@ def _setup_test_cfg(
     (configs_dir / "analysis" / "test_hypothesis.yaml").write_text(
         "name: test_hypothesis\n"
         "mode: hypothesis\n"
-        "goal: test whether price differs across neighborhoods\n"
+        "goal: test whether target differs across feature groups\n"
         "row_definition: one listing\n"
         "decision_moment: post-hoc\n"
         "available_info:\n"
-        "  - neighborhood\n"
+        "  - feature_3\n"
         "leakage_notes: []\n"
         "success_criterion: report effect size\n"
         "hypothesis:\n"
-        "  group_column: neighborhood\n"
+        "  group_column: feature_3\n"
         "  group_values:\n"
         "    - A\n"
         "    - B\n",
@@ -99,7 +99,7 @@ def test_describe_run_writes_artifacts(
 
     canonical = tmp_path / "test_canonical.parquet"
     pd.DataFrame(
-        {"neighborhood": ["A", "A", "B", "B", "B"], "price": [100, 110, 200, 210, 220]}
+        {"feature_3": ["A", "A", "B", "B", "B"], "target": [100, 110, 200, 210, 220]}
     ).to_parquet(canonical, index=False)
     sample = SampleSpec(name="test_diagnostic", role="diagnostic", path=str(canonical))
 
@@ -143,15 +143,15 @@ def test_describe_run_column_mapping(
     (configs_dir / "analysis" / "neighborhood_hypothesis.yaml").write_text(
         "name: neighborhood_hypothesis\n"
         "mode: hypothesis\n"
-        "goal: test whether price differs across neighborhoods\n"
+        "goal: test whether target differs across feature groups\n"
         "row_definition: one listing\n"
         "decision_moment: post-hoc\n"
         "available_info:\n"
-        "  - neighborhood\n"
+        "  - feature_3\n"
         "leakage_notes: []\n"
         "success_criterion: report effect size\n"
         "hypothesis:\n"
-        "  group_column: neighborhood\n"
+        "  group_column: feature_3\n"
         "  group_values:\n"
         "    - A\n"
         "    - B\n"
@@ -171,7 +171,7 @@ def test_describe_run_column_mapping(
     pd.DataFrame(
         {
             "source_neighborhood": ["A", "A", "B", "B", "B"],
-            "price": [100, 110, 200, 210, 220],
+            "target": [100, 110, 200, 210, 220],
         }
     ).to_parquet(sample_path, index=False)
 
@@ -183,13 +183,13 @@ def test_describe_run_column_mapping(
         role="diagnostic",
         path=str(sample_path),
         description="mapped sample",
-        column_mapping={"neighborhood": "source_neighborhood"},
+        column_mapping={"feature_3": "source_neighborhood"},
     )
 
     run(cfg, sample)
 
     summary = json.loads((tmp_path / "describe.json").read_text())
-    assert summary["group_column"] == "neighborhood"
+    assert summary["group_column"] == "feature_3"
     assert summary["source_group_column"] == "source_neighborhood"
     assert set(summary["groups"]) == {"A", "B", "C"}
     assert summary["groups"]["A"]["n"] == 2

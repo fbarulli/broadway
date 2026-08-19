@@ -53,7 +53,7 @@ BUILDERS = {
     "log_distance": lambda df, src, **kw: np.log1p(df[src]),
     "same_group": lambda df, src, **kw: _same_group(df, kw.get("group_col", "group"), kw.get("lookup_col", "group_lookup")),
     "rate_per_hour": lambda df, src, **kw: _rate_per_hour(df, kw.get("columns", {})),
-    "price / area": lambda df, src, **kw: df[src],
+    "source_copy": lambda df, src, **kw: df[src],
 }
 
 _BUILDER_DTYPES: dict[str, str] = {
@@ -66,7 +66,7 @@ _BUILDER_DTYPES: dict[str, str] = {
     "same_group": "int64",
     "rate_per_hour": "float64",
     "log_distance": "float64",
-    "price / area": "float64",
+    "source_copy": "float64",
 }
 
 
