@@ -1,4 +1,9 @@
-"""HPO — run an Optuna study and return the best parameters."""
+"""HPO — run an Optuna study and return the best parameters.
+
+Runs persist to RDB storage with heartbeats, so an interrupted worker's stale
+RUNNING trial is recovered on resume: run_study_rdb/run_worker pick up from the
+completed trials instead of carrying a permanent phantom.
+"""
 
 from __future__ import annotations
 
@@ -9,17 +14,25 @@ import numpy as np
 import optuna
 from sqlalchemy.exc import IntegrityError, OperationalError
 
+HEARTBEAT_INTERVAL = 60.0
+GRACE_PERIOD = 300.0
+
 _STUDY_CREATE_ATTEMPTS = 8
 _STUDY_CREATE_RETRY_SECONDS = 5.0
 
 
 def _create_study_with_retry(study_name: str, storage_url: str, direction: str) -> optuna.Study:
+    storage = optuna.storages.RDBStorage(
+        url=storage_url,
+        heartbeat_interval=int(HEARTBEAT_INTERVAL),
+        grace_period=int(GRACE_PERIOD),
+    )
     last_error: Exception | None = None
     for _ in range(_STUDY_CREATE_ATTEMPTS):
         try:
             return optuna.create_study(
                 study_name=study_name,
-                storage=storage_url,
+                storage=storage,
                 load_if_exists=True,
                 direction=direction,
             )
