@@ -9,8 +9,8 @@
 sample_size: 1000
 test_fraction: 0.2
 seed: 42
-continuous_features: [trip_distance, duration_minutes, pickup_hour]
-categorical_features: [time_bucket]
+continuous_features: [rooms, area]
+categorical_features: [neighborhood]
 hpo:
   engine: optuna
   direction: minimize

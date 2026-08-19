@@ -18,6 +18,6 @@ columns:
 datetime_column: null
 lookup_tables: {}
 name: test
-path: /tmp/test.csv
+path: demo/demo.csv
 target: price
 task: regression
