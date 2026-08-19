@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import numpy as np
 import pandas as pd
 import pytest
+from contract_fixture import feature_columns, make_contract_frame
 
 from broadway.config.loader import load_config
 from broadway.config.schema import DatasetContract, PipelineConfig
@@ -28,18 +28,9 @@ def null_threshold(cfg: PipelineConfig) -> float:
 
 
 @pytest.fixture
-def real_df() -> pd.DataFrame:
+def real_df(contract: DatasetContract) -> pd.DataFrame:
     """Generated data matching the test dataset contract (never real data)."""
-    rng = np.random.default_rng(42)
-    n = 1000
-    return pd.DataFrame(
-        {
-            "feature_1": rng.integers(1, 7, n),
-            "feature_2": rng.integers(30, 200, n),
-            "feature_3": rng.choice(["A", "B", "C", "D"], n),
-            "target": rng.integers(100, 1000, n),
-        }
-    )
+    return make_contract_frame(contract, n=1000)
 
 
 def test_valid_dataframe_passes_all_checks(
@@ -52,10 +43,11 @@ def test_valid_dataframe_passes_all_checks(
 def test_missing_required_column_raises(
     real_df: pd.DataFrame, contract: DatasetContract, null_threshold: float
 ) -> None:
-    df = real_df.drop(columns=["feature_2"])
+    dropped = feature_columns(contract)[0]
+    df = real_df.drop(columns=[dropped])
     issues = check_columns(df, contract)
     assert len(issues) > 0
-    assert any("feature_2" in issue for issue in issues)
+    assert any(dropped in issue for issue in issues)
     with pytest.raises(DataContractError):
         raise DataContractError("; ".join(issues))
 
@@ -64,7 +56,8 @@ def test_wrong_dtype_not_checked_at_raw_boundary(
     real_df: pd.DataFrame, contract: DatasetContract, null_threshold: float
 ) -> None:
     df = real_df.copy()
-    df["feature_1"] = df["feature_1"].astype("float64")
+    col = feature_columns(contract)[0]
+    df[col] = df[col].astype("float64")
     assert check_columns(df, contract) == []
     assert check_nulls(df, contract, null_threshold) == []
 
@@ -73,9 +66,10 @@ def test_nulls_above_threshold_raises(
     real_df: pd.DataFrame, contract: DatasetContract, null_threshold: float
 ) -> None:
     df = real_df.copy()
-    df.loc[df.sample(frac=0.1, random_state=42).index, "feature_2"] = None
+    col = feature_columns(contract)[0]
+    df.loc[df.sample(frac=0.1, random_state=42).index, col] = None
     issues = check_nulls(df, contract, null_threshold)
     assert len(issues) > 0
-    assert any("feature_2" in issue for issue in issues)
+    assert any(col in issue for issue in issues)
     with pytest.raises(DataContractError):
         raise DataContractError("; ".join(issues))

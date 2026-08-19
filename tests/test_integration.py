@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pandas as pd
 import pytest
+from contract_fixture import make_contract_frame, numeric_feature_columns, target_column
 
 from broadway.config.loader import load_config
 from broadway.data.cleaner import clean
@@ -14,14 +15,10 @@ from broadway.training.trainer import train
 
 @pytest.fixture
 def tmp_dataset(tmp_path: Path) -> Path:
-    rows = 100
-    df = pd.DataFrame(
-        {
-            "feature_1": [1 + i % 6 for i in range(rows)],
-            "feature_2": [30.0 + i * 1.5 for i in range(rows)],
-            "target": [100.0 + i * 8.0 for i in range(rows)],
-        }
-    )
+    cfg = load_config("full", dataset="test", experiment="baseline", analysis="test")
+    assert cfg.dataset is not None
+    cols = numeric_feature_columns(cfg.dataset) + [target_column(cfg.dataset)]
+    df = make_contract_frame(cfg.dataset, n=100)[cols]
     f = tmp_path / "training_data.parquet"
     df.to_parquet(f)
     return f

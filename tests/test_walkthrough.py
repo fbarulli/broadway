@@ -5,6 +5,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
+from contract_fixture import categorical_column, target_column
 
 from broadway.config.loader import load_config
 from broadway.reports import paths
@@ -23,7 +24,16 @@ def _setup(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setattr(paths, "FIGURES_DIR", tmp_path / "reports" / "figures")
 
 
-def _make_canonical(tmp_path: Path) -> Path:
+def _demo_columns() -> tuple[str, str]:
+    """(group column, target column) from the demo dataset contract."""
+    cfg = load_config("contracts", dataset="test", experiment="baseline")
+    assert cfg.dataset is not None
+    group = categorical_column(cfg.dataset)
+    assert group is not None
+    return group, target_column(cfg.dataset)
+
+
+def _make_canonical(tmp_path: Path, group: str, target: str) -> Path:
     rng = np.random.default_rng(0)
     specs = [
         ("A", 10.0, 1.0),
@@ -31,7 +41,7 @@ def _make_canonical(tmp_path: Path) -> Path:
     ]
     frames = [
         pd.DataFrame(
-            {"feature_3": [name] * 60, "target": rng.normal(mean, std, 60)}
+            {group: [name] * 60, target: rng.normal(mean, std, 60)}
         )
         for name, mean, std in specs
     ]
@@ -59,7 +69,7 @@ def test_walkthrough_stops_at_gate(
 ) -> None:
     _setup(monkeypatch, tmp_path)
     cfg = _load_cfg()
-    monkeypatch.setattr(runners, "canonical_path", lambda d, e: _make_canonical(tmp_path))
+    monkeypatch.setattr(runners, "canonical_path", lambda d, e: _make_canonical(tmp_path, *_demo_columns()))
 
     walkthrough.run(cfg, None, force=False)
 
@@ -141,7 +151,7 @@ def test_walkthrough_resume_idempotent(
 ) -> None:
     _setup(monkeypatch, tmp_path)
     cfg = _load_cfg()
-    monkeypatch.setattr(runners, "canonical_path", lambda d, e: _make_canonical(tmp_path))
+    monkeypatch.setattr(runners, "canonical_path", lambda d, e: _make_canonical(tmp_path, *_demo_columns()))
 
     walkthrough.run(cfg, None, force=False)
     assert len(module.load_steps("test_hypothesis")) == 3
@@ -155,7 +165,7 @@ def test_walkthrough_resume_past_gate(
 ) -> None:
     _setup(monkeypatch, tmp_path)
     cfg = _load_cfg()
-    monkeypatch.setattr(runners, "canonical_path", lambda d, e: _make_canonical(tmp_path))
+    monkeypatch.setattr(runners, "canonical_path", lambda d, e: _make_canonical(tmp_path, *_demo_columns()))
 
     walkthrough.run(cfg, None, force=False)
     assert "DECISION REQUIRED" in capsys.readouterr().out
@@ -179,7 +189,7 @@ def test_walkthrough_force_reruns_but_preserves_decision(
 ) -> None:
     _setup(monkeypatch, tmp_path)
     cfg = _load_cfg()
-    monkeypatch.setattr(runners, "canonical_path", lambda d, e: _make_canonical(tmp_path))
+    monkeypatch.setattr(runners, "canonical_path", lambda d, e: _make_canonical(tmp_path, *_demo_columns()))
     monkeypatch.setattr(runners, "now_iso", _counter_clock())
 
     walkthrough.run(cfg, None, force=False)
@@ -244,17 +254,18 @@ def test_load_frame_and_groups_from_canonical(
 ) -> None:
     _setup(monkeypatch, tmp_path)
     cfg = _load_cfg()
-    canonical = _make_canonical(tmp_path)
+    group, target = _demo_columns()
+    canonical = _make_canonical(tmp_path, group, target)
     monkeypatch.setattr(runners, "canonical_path", lambda d, e: canonical)
 
     df, group_column, source_group_column, groups, attrition = runners.load_frame_and_groups(cfg, None)
 
-    assert group_column == "feature_3"
-    assert source_group_column == "feature_3"
+    assert group_column == group
+    assert source_group_column == group
     assert set(groups) == set(cfg.analysis.hypothesis.group_values)
     assert groups["A"].shape[0] == 60
     assert groups["B"].shape[0] == 60
-    assert "feature_3" in df.columns
+    assert group in df.columns
     assert cfg.dataset.target in df.columns
     assert attrition["n_total"] == 120
     assert attrition["n_used"] == 120
@@ -391,7 +402,7 @@ def test_walkthrough_end_to_end(
 ) -> None:
     _setup(monkeypatch, tmp_path)
     cfg = _load_cfg()
-    monkeypatch.setattr(runners, "canonical_path", lambda d, e: _make_canonical(tmp_path))
+    monkeypatch.setattr(runners, "canonical_path", lambda d, e: _make_canonical(tmp_path, *_demo_columns()))
 
     walkthrough.run(cfg, None, force=False)
     assert "DECISION REQUIRED" in capsys.readouterr().out
@@ -435,10 +446,11 @@ def test_walkthrough_posthoc_gated_on_insignificant_omnibus(
 ) -> None:
     _setup(monkeypatch, tmp_path)
     cfg = _load_cfg()
+    group, target = _demo_columns()
     rng = np.random.default_rng(1)
     frames = [
         pd.DataFrame(
-            {"feature_3": [name] * 60, "target": rng.normal(10.0, 1.0, 60)}
+            {group: [name] * 60, target: rng.normal(10.0, 1.0, 60)}
         )
         for name in ("A", "B")
     ]
@@ -468,7 +480,7 @@ def test_stale_decision_warning(
 ) -> None:
     _setup(monkeypatch, tmp_path)
     cfg = _load_cfg()
-    monkeypatch.setattr(runners, "canonical_path", lambda d, e: _make_canonical(tmp_path))
+    monkeypatch.setattr(runners, "canonical_path", lambda d, e: _make_canonical(tmp_path, *_demo_columns()))
     monkeypatch.setattr(runners, "now_iso", _counter_clock())
 
     walkthrough.run(cfg, None, force=False)
@@ -528,12 +540,13 @@ def test_run_describe_attrition_none(
 ) -> None:
     _setup(monkeypatch, tmp_path)
     cfg = _load_cfg()
+    group, target = _demo_columns()
     df = pd.DataFrame(
-        {"feature_3": ["A", "B"], "target": [10.0, 20.0]}
+        {group: ["A", "B"], target: [10.0, 20.0]}
     )
     step = runners.run_describe(
-        cfg.analysis, 1, "q?", df, "feature_3", "feature_3",
-        ["A", "B"], "target", "x.parquet",
+        cfg.analysis, 1, "q?", df, group, group,
+        ["A", "B"], target, "x.parquet",
         None, "canonical", tmp_path / "timeline" / "test_hypothesis",
         tmp_path / "reports" / "figures",
     )
@@ -550,15 +563,16 @@ def test_run_describe_attrition_null_group(
 ) -> None:
     _setup(monkeypatch, tmp_path)
     cfg = _load_cfg()
+    group, target = _demo_columns()
     df = pd.DataFrame(
         {
-            "feature_3": ["A", "B", None],
-            "target": [10.0, 20.0, 30.0],
+            group: ["A", "B", None],
+            target: [10.0, 20.0, 30.0],
         }
     )
     step = runners.run_describe(
-        cfg.analysis, 1, "q?", df, "feature_3", "feature_3",
-        ["A", "B"], "target", "x.parquet",
+        cfg.analysis, 1, "q?", df, group, group,
+        ["A", "B"], target, "x.parquet",
         None, "canonical", tmp_path / "timeline" / "test_hypothesis",
         tmp_path / "reports" / "figures",
     )
@@ -572,15 +586,16 @@ def test_run_describe_attrition_unlisted_group(
 ) -> None:
     _setup(monkeypatch, tmp_path)
     cfg = _load_cfg()
+    group, target = _demo_columns()
     df = pd.DataFrame(
         {
-            "feature_3": ["A", "B", "C"],
-            "target": [10.0, 20.0, 30.0],
+            group: ["A", "B", "C"],
+            target: [10.0, 20.0, 30.0],
         }
     )
     step = runners.run_describe(
-        cfg.analysis, 1, "q?", df, "feature_3", "feature_3",
-        ["A", "B"], "target", "x.parquet",
+        cfg.analysis, 1, "q?", df, group, group,
+        ["A", "B"], target, "x.parquet",
         None, "canonical", tmp_path / "timeline" / "test_hypothesis",
         tmp_path / "reports" / "figures",
     )
@@ -594,7 +609,7 @@ def test_walkthrough_failure_capture(
 ) -> None:
     _setup(monkeypatch, tmp_path)
     cfg = _load_cfg()
-    monkeypatch.setattr(runners, "canonical_path", lambda d, e: _make_canonical(tmp_path))
+    monkeypatch.setattr(runners, "canonical_path", lambda d, e: _make_canonical(tmp_path, *_demo_columns()))
 
     original = runners.run_describe
 

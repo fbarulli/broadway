@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pandas as pd
 import pytest
+from contract_fixture import categorical_column, target_column
 
 from broadway.config import loader
 from broadway.config.loader import load_config
@@ -58,9 +59,19 @@ def test_plot_functions_write_files(tmp_path: Path) -> None:
     assert out.exists()
 
 
+def _demo_columns() -> tuple[str, str]:
+    """(group column, target column) from the demo dataset contract."""
+    cfg = load_config("contracts", dataset="test", experiment="baseline")
+    assert cfg.dataset is not None
+    group = categorical_column(cfg.dataset)
+    assert group is not None
+    return group, target_column(cfg.dataset)
+
+
 def _setup_test_cfg(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    group, _ = _demo_columns()
     configs_dir = tmp_path / "configs"
     shutil.copytree(REPO_ROOT / "configs" / "environment", configs_dir / "environment")
     shutil.copytree(REPO_ROOT / "configs" / "dataset", configs_dir / "dataset")
@@ -72,12 +83,12 @@ def _setup_test_cfg(
         "goal: test whether target differs across feature groups\n"
         "row_definition: one listing\n"
         "decision_moment: post-hoc\n"
-        "available_info:\n"
-        "  - feature_3\n"
+        f"available_info:\n"
+        f"  - {group}\n"
         "leakage_notes: []\n"
         "success_criterion: report effect size\n"
         "hypothesis:\n"
-        "  group_column: feature_3\n"
+        f"  group_column: {group}\n"
         "  group_values:\n"
         "    - A\n"
         "    - B\n",
@@ -92,6 +103,7 @@ def _setup_test_cfg(
 def test_describe_run_writes_artifacts(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    group, target = _demo_columns()
     _setup_test_cfg(tmp_path, monkeypatch)
     cfg = load_config("stats", dataset="test", analysis="test_hypothesis")
     assert cfg.dataset is not None
@@ -99,7 +111,7 @@ def test_describe_run_writes_artifacts(
 
     canonical = tmp_path / "test_canonical.parquet"
     pd.DataFrame(
-        {"feature_3": ["A", "A", "B", "B", "B"], "target": [100, 110, 200, 210, 220]}
+        {group: ["A", "A", "B", "B", "B"], target: [100, 110, 200, 210, 220]}
     ).to_parquet(canonical, index=False)
     sample = SampleSpec(name="test_diagnostic", role="diagnostic", path=str(canonical))
 
@@ -135,23 +147,25 @@ def test_describe_run_missing_sample_raises(
 def test_describe_run_column_mapping(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    group, target = _demo_columns()
+    source_name = f"source_{group}"
     configs_dir = tmp_path / "configs"
     shutil.copytree(REPO_ROOT / "configs" / "environment", configs_dir / "environment")
     shutil.copytree(REPO_ROOT / "configs" / "dataset", configs_dir / "dataset")
     shutil.copytree(REPO_ROOT / "configs" / "step", configs_dir / "step")
     (configs_dir / "analysis").mkdir(parents=True)
-    (configs_dir / "analysis" / "neighborhood_hypothesis.yaml").write_text(
-        "name: neighborhood_hypothesis\n"
+    (configs_dir / "analysis" / "group_hypothesis.yaml").write_text(
+        "name: group_hypothesis\n"
         "mode: hypothesis\n"
         "goal: test whether target differs across feature groups\n"
         "row_definition: one listing\n"
         "decision_moment: post-hoc\n"
-        "available_info:\n"
-        "  - feature_3\n"
+        f"available_info:\n"
+        f"  - {group}\n"
         "leakage_notes: []\n"
         "success_criterion: report effect size\n"
         "hypothesis:\n"
-        "  group_column: feature_3\n"
+        f"  group_column: {group}\n"
         "  group_values:\n"
         "    - A\n"
         "    - B\n"
@@ -163,15 +177,15 @@ def test_describe_run_column_mapping(
     monkeypatch.setattr(paths, "RESULTS_DIR", tmp_path / "reports" / "results")
     monkeypatch.setattr(paths, "FIGURES_DIR", tmp_path / "reports" / "figures")
 
-    cfg = load_config("stats", dataset="test", analysis="neighborhood_hypothesis")
+    cfg = load_config("stats", dataset="test", analysis="group_hypothesis")
     assert cfg.dataset is not None
     assert cfg.stats is not None
 
     sample_path = tmp_path / "mapped_sample.parquet"
     pd.DataFrame(
         {
-            "source_neighborhood": ["A", "A", "B", "B", "B"],
-            "target": [100, 110, 200, 210, 220],
+            source_name: ["A", "A", "B", "B", "B"],
+            target: [100, 110, 200, 210, 220],
         }
     ).to_parquet(sample_path, index=False)
 
@@ -183,14 +197,14 @@ def test_describe_run_column_mapping(
         role="diagnostic",
         path=str(sample_path),
         description="mapped sample",
-        column_mapping={"feature_3": "source_neighborhood"},
+        column_mapping={group: source_name},
     )
 
     run(cfg, sample)
 
     summary = json.loads((tmp_path / "describe.json").read_text())
-    assert summary["group_column"] == "feature_3"
-    assert summary["source_group_column"] == "source_neighborhood"
+    assert summary["group_column"] == group
+    assert summary["source_group_column"] == source_name
     assert set(summary["groups"]) == {"A", "B", "C"}
     assert summary["groups"]["A"]["n"] == 2
     assert summary["groups"]["B"]["n"] == 3

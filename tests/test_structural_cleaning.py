@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pandas as pd
+from contract_fixture import frame_slots
 
 import broadway.etl.module as etl_module
 from broadway.cleaning.models import StructuralCleanResult
@@ -165,12 +166,13 @@ def test_etl_module_writes_canonical_and_result(
         update={"dataset": cfg.dataset.model_copy(update={"columns": columns})}
     )
 
+    feats, target = frame_slots(cfg.dataset)
     df = pd.DataFrame(
         {
-            "feature_2": [100, 100, 150, 200],
-            "feature_3": ["a", "a", "b", "c"],
-            "target": [10, 10, 30, 40],
-            "feature_1": [2, 2, 3, 4],
+            feats[1]: [100, 100, 150, 200],
+            feats[2]: ["a", "a", "b", "c"],
+            target: [10, 10, 30, 40],
+            feats[0]: [2, 2, 3, 4],
             "listed_at": [
                 "2024-01-01",
                 "2024-01-01",
@@ -205,13 +207,14 @@ def _etl_record_path(tmp_path: Path) -> Path:
     return tmp_path / "lineage" / "records" / "etl_test.json"
 
 
-def _simple_df() -> pd.DataFrame:
+def _simple_df(cfg) -> pd.DataFrame:
+    feats, target = frame_slots(cfg.dataset)
     return pd.DataFrame(
         {
-            "feature_2": [100, 101],
-            "feature_3": ["a", "b"],
-            "target": [10, 20],
-            "feature_1": [2, 3],
+            feats[1]: [100, 101],
+            feats[2]: ["a", "b"],
+            target: [10, 20],
+            feats[0]: [2, 3],
         }
     )
 
@@ -224,7 +227,7 @@ def test_etl_parent_defaults_to_dataset(tmp_path: Path, monkeypatch) -> None:
         }
     )
     monkeypatch.setattr(records, "LINEAGE_DIR", tmp_path / "lineage")
-    monkeypatch.setattr(etl_module, "load_with_audit", lambda dataset: (_simple_df().copy(), [], []))
+    monkeypatch.setattr(etl_module, "load_with_audit", lambda dataset: (_simple_df(cfg).copy(), [], []))
 
     etl_module.run(cfg)
 
@@ -248,7 +251,7 @@ def test_etl_parent_ingest_when_present(tmp_path: Path, monkeypatch) -> None:
         "data/processed/training_data.parquet",
         [node_id("dataset", "test")],
     )
-    monkeypatch.setattr(etl_module, "load_with_audit", lambda dataset: (_simple_df().copy(), [], []))
+    monkeypatch.setattr(etl_module, "load_with_audit", lambda dataset: (_simple_df(cfg).copy(), [], []))
 
     etl_module.run(cfg)
 
@@ -268,12 +271,13 @@ def test_etl_ci_sampling_gated(tmp_path: Path, monkeypatch) -> None:
     )
     monkeypatch.setattr(records, "LINEAGE_DIR", tmp_path / "lineage")
 
+    feats, target = frame_slots(cfg.dataset)
     df = pd.DataFrame(
         {
-            "feature_2": [100, 101, 102, 103, 104, 105],
-            "feature_3": ["a", "b", "c", "d", "e", "f"],
-            "target": [10, 20, 30, 40, 50, 60],
-            "feature_1": [2, 3, 2, 4, 3, 5],
+            feats[1]: [100, 101, 102, 103, 104, 105],
+            feats[2]: ["a", "b", "c", "d", "e", "f"],
+            target: [10, 20, 30, 40, 50, 60],
+            feats[0]: [2, 3, 2, 4, 3, 5],
         }
     )
     monkeypatch.setattr(etl_module, "load_with_audit", lambda dataset: (df.copy(), [], []))
@@ -302,13 +306,14 @@ def test_etl_with_lookups_writes_join_audit(tmp_path: Path, monkeypatch) -> None
     )
     monkeypatch.setattr(records, "LINEAGE_DIR", tmp_path / "lineage")
 
+    feats, target = frame_slots(cfg.dataset)
     raw_path = tmp_path / "raw.csv"
     pd.DataFrame(
         {
-            "feature_2": [100, 150, 200, 999],
-            "feature_3": ["a", "b", "c", "d"],
-            "target": [10, 20, 30, 40],
-            "feature_1": [2, 3, 4, 5],
+            feats[1]: [100, 150, 200, 999],
+            feats[2]: ["a", "b", "c", "d"],
+            target: [10, 20, 30, 40],
+            feats[0]: [2, 3, 4, 5],
         }
     ).to_csv(raw_path, index=False)
 
@@ -324,7 +329,7 @@ def test_etl_with_lookups_writes_join_audit(tmp_path: Path, monkeypatch) -> None
         update={
             "path": str(raw_path),
             "lookup_tables": {
-                "feature_2": LookupSpec(path=str(lookup_path), key="LocationID")
+                feats[1]: LookupSpec(path=str(lookup_path), key="LocationID")
             },
         }
     )
