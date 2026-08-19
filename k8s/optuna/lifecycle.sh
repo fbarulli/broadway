@@ -43,8 +43,10 @@ cluster_up() {
 restore_state() {
   [ -f "$OPTUNA_DUMP" ] || { log "no snapshot to restore"; return; }
   log "waiting for postgres + mlflow"
-  kubectl wait --for=condition=ready pod -l app=postgres --timeout=180s >/dev/null
-  kubectl wait --for=condition=ready pod -l app=mlflow --timeout=180s >/dev/null
+  # Wait on the DEPLOYMENTS (they exist immediately after apply; a pod
+  # selector wait errors when pods haven't been created yet).
+  kubectl wait --for=condition=available deployment/postgres --timeout=180s >/dev/null
+  kubectl wait --for=condition=available deployment/mlflow --timeout=180s >/dev/null
   PG=$(kubectl get pods -l app=postgres -o name | head -1)
   MF=$(kubectl get pods -l app=mlflow -o name | head -1)
   log "restoring optuna DB"
@@ -94,13 +96,76 @@ cluster_down() {
   kind delete cluster --name "$NAME"
 }
 
+show_ui() {
+  cluster_up
+  restore_state
+  # Probe the UI until it accepts connections (mlflow takes ~30s to start).
+  IP=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}')
+  URL="http://$IP:30500"
+  for _ in $(seq 1 30); do
+    if curl -s -o /dev/null --max-time 5 "$URL/"; then break; fi
+    sleep 5
+  done
+  echo "[lifecycle] mlflow UI (all dumped results): $URL"
+  if command -v xdg-open >/dev/null 2>&1; then xdg-open "$URL" >/dev/null 2>&1 || true
+  elif command -v open >/dev/null 2>&1; then open "$URL" >/dev/null 2>&1 || true
+  fi
+}
+
+view_local() {
+  # VIEW ONLY — no Kubernetes. Restore the dumped snapshot into a throwaway
+  # docker postgres and run mlflow locally; open the UI at localhost:5000.
+  # Stop when done: `docker rm -f broadway-view-pg` + kill the mlflow process.
+  PG_NAME=broadway-view-pg
+  VIEW_PORT=${MLFLOW_VIEW_PORT:-5000}
+  [ -f "$OPTUNA_DUMP" ] && [ -f "$MLFLOW_DUMP" ] || {
+    echo "[lifecycle] no snapshot in $BACKUP_DIR" >&2
+    exit 1
+  }
+  docker rm -f "$PG_NAME" >/dev/null 2>&1 || true
+  docker run -d --rm --name "$PG_NAME" \
+    -e POSTGRES_USER=view -e POSTGRES_PASSWORD=view -e POSTGRES_DB=mlflow \
+    -p 15433:5432 postgres:16-alpine >/dev/null
+  log "waiting for view postgres"
+  for _ in $(seq 1 30); do
+    docker exec "$PG_NAME" pg_isready -U view -q 2>/dev/null && break
+    sleep 2
+  done
+  docker exec "$PG_NAME" createdb -U view optuna
+  log "restoring dumps"
+  gunzip -c "$OPTUNA_DUMP" | docker exec -i "$PG_NAME" pg_restore -U view -d optuna --no-owner
+  gunzip -c "$MLFLOW_DUMP" | docker exec -i "$PG_NAME" pg_restore -U view -d mlflow --no-owner
+  ART_DIR=$BACKUP_DIR/artifacts-view
+  if [ -s "$ARTIFACTS_TAR" ]; then
+    rm -rf "$ART_DIR"; mkdir -p "$ART_DIR"
+    tar xzf "$ARTIFACTS_TAR" -C "$ART_DIR"
+  fi
+  log "starting local mlflow (artifact links may 404 — pod paths in the dump)"
+  (cd "$ROOT" && uv run mlflow server \
+    --backend-store-uri postgresql+psycopg2://view:view@127.0.0.1:15433/mlflow \
+    --default-artifact-root "$ART_DIR" \
+    --host 127.0.0.1 --port "$VIEW_PORT" >"$BACKUP_DIR/mlflow-view.log" 2>&1 &)
+  URL="http://127.0.0.1:$VIEW_PORT"
+  for _ in $(seq 1 30); do
+    if curl -s -o /dev/null --max-time 5 "$URL/"; then break; fi
+    sleep 3
+  done
+  echo "[lifecycle] mlflow UI (all dumped results): $URL"
+  echo "[lifecycle] stop: docker rm -f $PG_NAME; kill \$(pgrep -f 'mlflow server.*15433')"
+  if command -v xdg-open >/dev/null 2>&1; then xdg-open "$URL" >/dev/null 2>&1 || true
+  elif command -v open >/dev/null 2>&1; then open "$URL" >/dev/null 2>&1 || true
+  fi
+}
+
 case "${1:-}" in
   train) cluster_up; restore_state; run_hpo; dump_state; cluster_down ;;
   up)    cluster_up; restore_state ;;
+  ui)    show_ui ;;
+  view)  view_local ;;
   dump)  dump_state ;;
   down)  dump_state; cluster_down ;;
   *)
-    echo "usage: $0 {train|up|dump|down}" >&2
+    echo "usage: $0 {train|up|ui|view|dump|down}" >&2
     exit 2
     ;;
 esac
