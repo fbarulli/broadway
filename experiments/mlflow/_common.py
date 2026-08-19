@@ -27,7 +27,9 @@ from project.working import load_metered, time_bucket
 
 HERE = Path(__file__).resolve().parent
 RESULTS = HERE.parents[0] / "results" / "mlflow"   # experiments/results/mlflow
-REPO = HERE.parents[1]
+# Repo root; in the k8s worker image the script lives at /app/_common.py
+# (depth 1), so fall back to HERE when parents[1] does not exist.
+REPO = HERE.parents[1] if len(HERE.parents) > 1 else HERE
 MLRUNS = REPO / "mlruns"
 
 # Config path is env-overridable (the k8s worker image sets

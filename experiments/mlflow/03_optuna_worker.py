@@ -37,13 +37,13 @@ from broadway.training.optuna_worker import compose_db_url
 
 # HPO search spaces + budgets (configs/experiments/mlflow.yaml -> `hpo`).
 # Env-overridable: the k8s worker image sets BROADWAY_MLFLOW_CONFIG to its
-# mounted location; local default = repo path.
-HPO_CONFIG_PATH = Path(
-    os.environ.get(
-        "BROADWAY_MLFLOW_CONFIG",
-        Path(__file__).resolve().parents[2] / "configs" / "experiments" / "mlflow.yaml",
-    )
-)
+# mounted location; local default = repo path. Branch on env presence —
+# os.environ.get(default) evaluates the default eagerly, and the parents[2]
+# fallback raises at pod depth (/app/worker.py has only two parents).
+if "BROADWAY_MLFLOW_CONFIG" in os.environ:
+    HPO_CONFIG_PATH = Path(os.environ["BROADWAY_MLFLOW_CONFIG"])
+else:
+    HPO_CONFIG_PATH = Path(__file__).resolve().parents[2] / "configs" / "experiments" / "mlflow.yaml"
 
 
 def load_secret(secret_dir: str) -> dict:

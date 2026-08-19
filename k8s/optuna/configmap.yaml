@@ -13,7 +13,7 @@ data:
   config.yaml: |
     dataset:
       name: ratecode1_sample
-      parquet: /app/data/ratecode1_sample.parquet
+      parquet: /app/experiments/results/univariate/fare_amount_trip_distance/ratecode1_sample.parquet
       target: total_amount
       min_fare: 2.5
       max_duration_minutes: 240
