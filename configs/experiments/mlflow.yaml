@@ -1,5 +1,5 @@
 # mlflow model-battle experiment — run knobs + the unified HPO spec.
-# The dataset loader/filters/time_bucket are owned by project/working.py
+# HPO search spaces + budgets for the unified optuna API (synthetic demo).
 # (configs/experiments/working.yaml). Model recipes stay in code: they
 # reference the platform model registry / sklearn classes. The HPO search
 # spaces and trial budgets (hpo:) are the single source of truth for BOTH
