@@ -159,7 +159,7 @@ def test_suggest_normality_note_is_flagged() -> None:
     step = _step(
         "normality",
         StepStatus.NOTE,
-        {"Manhattan": {"skew": 3.0, "kurtosis": 8.0, "shapiro_p": 0.001}},
+        {"downtown": {"skew": 3.0, "kurtosis": 8.0, "shapiro_p": 0.001}},
         order=2,
     )
     suggestion = suggest_after("normality", [step], [], _cfg(), "test")

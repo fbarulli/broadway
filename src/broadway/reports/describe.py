@@ -48,7 +48,7 @@ def render(summary: GroupSummary) -> str:
     figures = "[describe.png](figures/describe.png)"
 
     sections = [
-        ("Question", "whether trip duration differs across pickup boroughs"),
+        ("Question", "whether the target differs across groups"),
         ("Sample", sample),
         ("Groups", groups_table),
         ("Imbalance", imbalance),

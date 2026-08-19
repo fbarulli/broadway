@@ -24,7 +24,14 @@ class FilterSpec(BaseModel):
 class DerivedSpec(BaseModel):
     model_config = ConfigDict(extra="forbid")
     name: str
-    formula: Literal["speed_mph"]
+    # Resolved at runtime against the shared transform registry
+    # (broadway.features.builders.BUILDERS) — same implementation functions
+    # the feature pipeline uses.
+    formula: str
+    # Role → source-column mapping for the formula's inputs; defaults to
+    # generic names ("distance", "duration_minutes"). Dataset-specific
+    # configs can map their own column names onto the roles.
+    columns: dict[str, str] = {}
 
 
 class SampleSpec(BaseModel):

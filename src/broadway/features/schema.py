@@ -14,23 +14,6 @@ import pandera as pa
 
 from broadway.contracts.pandera import pandera_dtype
 
-STREAM_FEATURE_TYPES = {
-    "pickup_location_id": int,
-    "dropoff_location_id": int,
-    "trip_distance": float,
-    "passenger_count": float,
-    "pickup_hour": int,
-    "pickup_day_of_week": int,
-    "pickup_month": int,
-}
-
-TARGET = "trip_duration_minutes"
-
-ROUTE_KEYS = [
-    "pickup_location_id",
-    "dropoff_location_id",
-]
-
 
 @dataclass(frozen=True)
 class FeatureSpec:

@@ -302,14 +302,14 @@ def test_plot_numeric_qq_discrete_feature(tmp_path) -> None:
     rng = np.random.default_rng(0)
     df = pd.DataFrame(
         {
-            "passenger_count": rng.integers(1, 6, 200).astype(float),
+            "rooms": rng.integers(1, 6, 200).astype(float),
             "continuous": rng.normal(0.0, 1.0, 200),
         }
     )
 
     overview = plot_numeric_qq(df, figures_dir, evidence_path, source_path="data.csv")
 
-    pc = next(f for f in overview.features if f.feature == "passenger_count")
+    pc = next(f for f in overview.features if f.feature == "rooms")
     assert pc.status == "discrete"
     assert pc.figure == ""
     assert pc.dist_figure == "figures/numeric_dist_1.png"
@@ -461,7 +461,7 @@ def test_plot_numeric_qq_discrete_right_skewed_no_log_figure(tmp_path) -> None:
     rng = np.random.default_rng(0)
     df = pd.DataFrame(
         {
-            "passenger_count": rng.choice(
+            "rooms": rng.choice(
                 [1, 2, 3, 4, 5], size=200, p=[0.7, 0.15, 0.08, 0.05, 0.02]
             ).astype(float),
             "skewed_positive": np.exp(rng.normal(0.0, 1.0, 200)),
@@ -470,7 +470,7 @@ def test_plot_numeric_qq_discrete_right_skewed_no_log_figure(tmp_path) -> None:
 
     overview = plot_numeric_qq(df, figures_dir, evidence_path, source_path="data.csv")
 
-    pc = next(f for f in overview.features if f.feature == "passenger_count")
+    pc = next(f for f in overview.features if f.feature == "rooms")
     assert pc.status == "discrete"
     assert pc.log_figure == ""
     assert overview.log_figures == ["figures/numeric_qq_log_1.png"]
@@ -484,23 +484,23 @@ def test_plot_numeric_qq_declared_id_excluded(tmp_path) -> None:
     rng = np.random.default_rng(0)
     df = pd.DataFrame(
         {
-            "pickup_location_id": rng.integers(1, 265, 200),
+            "location_id": rng.integers(1, 265, 200),
             "continuous": rng.normal(0.0, 1.0, 200),
         }
     )
 
     overview = plot_numeric_qq(
         df, figures_dir, evidence_path, source_path="data.csv",
-        exclude=["pickup_location_id"],
+        exclude=["location_id"],
     )
 
-    pid = next(f for f in overview.features if f.feature == "pickup_location_id")
+    pid = next(f for f in overview.features if f.feature == "location_id")
     assert pid.status == "excluded"
     assert pid.reason == "declared id"
     assert pid.figure == ""
     assert pid.dist_figure == ""
     assert overview.excluded_features == 1
-    assert "pickup_location_id: declared id" in overview.excluded_notes
+    assert "location_id: declared id" in overview.excluded_notes
     assert overview.flagged_id_columns == []
 
 

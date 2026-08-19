@@ -8,7 +8,7 @@ from broadway.config.schema import LookupSpec
 
 class JoinAudit(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    lookup: str            # left dataset column, e.g. "pickup_location_id"
+    lookup: str            # left dataset column, e.g. "location_id"
     lookup_path: str
     left_key: str
     right_key: str

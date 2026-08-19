@@ -36,7 +36,7 @@ def test_build_graph_links_nodes_and_records(tmp_path: Path) -> None:
                 "name": "airport",
                 "dataset": "test",
                 "description": "airport trips",
-                "filter_expression": "pickup_location_id == 132",
+                "filter_expression": "location_id == 132",
             }
         ),
         encoding="utf-8",

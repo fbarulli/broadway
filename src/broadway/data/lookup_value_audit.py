@@ -18,7 +18,7 @@ class LookupColumnValueAudit(BaseModel):
 
 class LookupValueAudit(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    lookup: str                      # left key, e.g. "pickup_location_id"
+    lookup: str                      # left key, e.g. "location_id"
     lookup_path: str
     matched: int
     na_values: list[str]

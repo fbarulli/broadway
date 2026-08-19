@@ -39,9 +39,9 @@ def _join_report(unmatched=0):
     return JoinAuditReport(
         joins=[
             JoinAudit(
-                lookup="pickup_location_id",
+                lookup="location_id",
                 lookup_path="data/raw/test_zone_lookup.csv",
-                left_key="pickup_location_id",
+                left_key="location_id",
                 right_key="LocationID",
                 rows_attempted=5,
                 matched=5 - unmatched,
@@ -57,13 +57,13 @@ def _lookup_report(affected_rows=0):
     return LookupValueAuditReport(
         lookups=[
             LookupValueAudit(
-                lookup="pickup_location_id",
+                lookup="location_id",
                 lookup_path="data/raw/test_zone_lookup.csv",
                 matched=100,
                 na_values=[],
                 columns=[
                     LookupColumnValueAudit(
-                        column="Borough",
+                        column="district",
                         null_count=0,
                         sentinel_counts={"Unknown": affected_rows},
                         affected_rows=affected_rows,
@@ -108,9 +108,9 @@ def test_render_join_distinguishes_rows_from_events() -> None:
     report = JoinAuditReport(
         joins=[
             JoinAudit(
-                lookup="pickup_location_id",
+                lookup="location_id",
                 lookup_path="data/raw/test_zone_lookup.csv",
-                left_key="pickup_location_id",
+                left_key="location_id",
                 right_key="LocationID",
                 rows_attempted=5,
                 matched=5,
@@ -119,9 +119,9 @@ def test_render_join_distinguishes_rows_from_events() -> None:
                 unmatched_rate=0.0,
             ),
             JoinAudit(
-                lookup="dropoff_location_id",
+                lookup="location_id",
                 lookup_path="data/raw/test_zone_lookup.csv",
-                left_key="dropoff_location_id",
+                left_key="location_id",
                 right_key="LocationID",
                 rows_attempted=5,
                 matched=5,
@@ -141,9 +141,9 @@ def test_join_counts_raises_on_divergent_row_counts() -> None:
     report = JoinAuditReport(
         joins=[
             JoinAudit(
-                lookup="pickup_location_id",
+                lookup="location_id",
                 lookup_path="data/raw/test_zone_lookup.csv",
-                left_key="pickup_location_id",
+                left_key="location_id",
                 right_key="LocationID",
                 rows_attempted=5,
                 matched=5,
@@ -152,9 +152,9 @@ def test_join_counts_raises_on_divergent_row_counts() -> None:
                 unmatched_rate=0.0,
             ),
             JoinAudit(
-                lookup="dropoff_location_id",
+                lookup="location_id",
                 lookup_path="data/raw/test_zone_lookup.csv",
-                left_key="dropoff_location_id",
+                left_key="location_id",
                 right_key="LocationID",
                 rows_attempted=4,
                 matched=4,

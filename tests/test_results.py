@@ -58,7 +58,7 @@ def _full_steps() -> list[AnalysisStep]:
             order=2,
             method="check_normality",
             result_summary={
-                "Manhattan": {"skew": 0.123456, "kurtosis": 0.1, "shapiro_p": 0.0004}
+                "downtown": {"skew": 0.123456, "kurtosis": 0.1, "shapiro_p": 0.0004}
             },
         ),
         _step(
@@ -94,8 +94,8 @@ def _posthoc_step() -> AnalysisStep:
             "significant_pairs": 2,
             "significant_pair_details": [
                 {
-                    "a": "Manhattan",
-                    "b": "Brooklyn",
+                    "a": "downtown",
+                    "b": "suburbs",
                     "p_value": 0.0004,
                     "cohens_d": 1.23456789,
                     "hedges_g": 1.24,
@@ -336,7 +336,7 @@ def test_posthoc_step_page_renders_significant_pairs() -> None:
     assert "## Significant pairs" in page
     assert "2 of 3 pairs significant" in page
     assert "| Pair | p | Cohen's d | Hedges' g | Note |" in page
-    assert "| Manhattan vs Brooklyn | < 0.001 | 1.23 | 1.24 | large |" in page
+    assert "| downtown vs suburbs | < 0.001 | 1.23 | 1.24 | large |" in page
     assert "| Queens vs Bronx | 0.010 | 0.5 | 0.49 | medium |" in page
     assert "significant_pair_details" not in page
     assert "[{" not in page
@@ -375,5 +375,5 @@ def test_render_timeline_posthoc_bullet() -> None:
     seq = load_walkthrough_sequence()
     timeline = render_timeline("test", seq, [_posthoc_step()], [])
     assert "2 of 3 pairs significant:" in timeline
-    assert "Manhattan vs Brooklyn: p < 0.001, Cohen's d 1.23, Hedges' g 1.24" in timeline
+    assert "downtown vs suburbs: p < 0.001, Cohen's d 1.23, Hedges' g 1.24" in timeline
     assert "Queens vs Bronx: p 0.010, Cohen's d 0.5, Hedges' g 0.49" in timeline

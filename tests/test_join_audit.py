@@ -23,7 +23,7 @@ def _lookup_spec(path: str) -> LookupSpec:
 def test_audit_join_matched_unmatched_null_keys() -> None:
     df = pd.DataFrame(
         {
-            "pickup_location_id": [1, 2, 3, None, 5],
+            "location_id": [1, 2, 3, None, 5],
         }
     )
     lookup_df = pd.DataFrame(
@@ -32,7 +32,7 @@ def test_audit_join_matched_unmatched_null_keys() -> None:
             "zone": ["a", "b", "c"],
         }
     )
-    audit = audit_join(df, "pickup_location_id", _lookup_spec("lookup.csv"), lookup_df)
+    audit = audit_join(df, "location_id", _lookup_spec("lookup.csv"), lookup_df)
 
     assert audit.matched == 3
     assert audit.unmatched == 1

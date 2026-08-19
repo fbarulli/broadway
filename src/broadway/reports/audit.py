@@ -494,16 +494,6 @@ def _lookup_affected_total(report: LookupValueAuditReport | None) -> int:
     return sum(col.affected_rows for l in report.lookups for col in l.columns)
 
 
-def _borough_deficient(report: LookupValueAuditReport | None) -> bool:
-    if report is None:
-        return False
-    return any(
-        "borough" in col.column.lower() and col.affected_rows > 0
-        for lookup in report.lookups
-        for col in lookup.columns
-    )
-
-
 def _join_summary(report: JoinAuditReport | None) -> str:
     if report is None:
         return "no join audit available"
@@ -588,8 +578,6 @@ def _considerations(
                         "the analytical population definition."
                     )
     consider.append("No decision has been made automatically.")
-    if _borough_deficient(lookup_report):
-        consider.append("If your analysis compares NYC boroughs, define the analytical population explicitly.")
     return consider
 
 
