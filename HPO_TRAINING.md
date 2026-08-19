@@ -96,25 +96,31 @@ paths); workers auto-delete ~2 min after finishing (`ttlSecondsAfterFinished`).
 
 ## 5. Viewing mlflow results
 
-**While the cluster is up** (during `train`, or after `up`):
+**The one command — no Kubernetes involved:**
 
 ```bash
-# NodePort UI (kind node IP — find it with: kubectl get nodes -o wide)
-open http://<node-ip>:30500
-
-# or port-forward
-kubectl port-forward svc/mlflow 5000:5000
-open http://localhost:5000
+k8s/optuna/lifecycle.sh view
+# restores the snapshot into a throwaway docker postgres, runs mlflow locally,
+# and prints:  mlflow UI (all dumped results): http://127.0.0.1:5000
 ```
 
-**With dumped results and the cluster down** — the snapshot is the access
-mechanism:
+Open `http://127.0.0.1:5000` — you'll see every completed run (params + metrics)
+from the snapshot (`data/optuna-backup/`), and the Optuna studies are restored in
+the same postgres. Stop when done:
 
 ```bash
-k8s/optuna/lifecycle.sh up     # recreates the cluster and restores the snapshot
-# → mlflow UI at http://<node-ip>:30500, Optuna studies in postgres
-k8s/optuna/lifecycle.sh down   # dump (idempotent) + delete the cluster
+docker rm -f broadway-view-pg          # the throwaway postgres
+kill $(pgrep -f 'mlflow server.*15433')  # the local mlflow
 ```
+
+Notes:
+- The cluster is **never** involved in viewing — it only exists for distributed
+  training (`train`/`up`/`down`).
+- Runs + metrics always display. Model **artifact links may 404** — the dump
+  records the pod's `/mlflow` paths, which a local server can't resolve; the
+  numeric results are unaffected.
+- While the cluster happens to be up (during `train`), the same runs are also at
+  `http://<node-ip>:30500` / `kubectl port-forward svc/mlflow 5000:5000`.
 
 **Per-model results without the UI** — the worker logs print the best run:
 
