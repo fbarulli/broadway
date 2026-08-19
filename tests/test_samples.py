@@ -341,9 +341,16 @@ def test_derived_formula_not_in_whitelist_raises(
         generate_sample("noguard", samples_dir=tmp_path / "samples")
 
 
-def test_existing_config_still_parses() -> None:
-    spec = load_sample("taxi_diagnostic")
-    assert spec.name == "taxi_diagnostic"
+def test_existing_config_still_parses(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Backward-compat: a v1-shaped SampleSpec (no derived/exclude_any fields)
+    # must still load. Uses a synthetic config — the suite is taxi-free.
+    _write_config(tmp_path, "legacy_v1", tmp_path / "src.parquet")
+    monkeypatch.setattr(loader, "CONFIGS_DIR", tmp_path / "configs")
+    spec = load_sample("legacy_v1")
+    assert spec.name == "legacy_v1"
     assert spec.version == "v1"
-    assert spec.source is None
-    assert spec.path == "data/processed/joined_sample_live.parquet"
+    assert spec.source is not None
+    assert spec.derived is None
+    assert spec.exclude_any is None
