@@ -148,8 +148,7 @@ jobs:
       # HPO_CONFIG_PATH via parents[] at the mirrored pod path, parses the HPO
       # spec and builds CLI choices. Catches the layout/import bug class.
       - name: Boot — worker imports + CLI
-        run: docker run --rm broadway-optuna-worker:test \
-          python /app/experiments/mlflow/03_optuna_worker.py --help
+        run: docker run --rm broadway-optuna-worker:test python /app/experiments/mlflow/03_optuna_worker.py --help
 
       # Config-load simulation with the committed fixture: verifies the
       # configmap structure + the HPO spec both parse inside the pod layout.
@@ -168,8 +167,7 @@ jobs:
           print('config load OK — models:', [m.name for m in hpo.models])"
 
       - name: Boot — mlflow image health
-        run: docker run --rm --entrypoint python mlflow-server:test \
-          -c "import mlflow; print('mlflow', mlflow.__version__)"
+        run: docker run --rm --entrypoint python mlflow-server:test -c "import mlflow; print('mlflow', mlflow.__version__)"
 
       # Persist the built images to the Actions cache for the next run.
       - name: Save cached images
