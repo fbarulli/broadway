@@ -19,6 +19,9 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Branch parity needs both branch tips.
+          fetch-depth: 0
 
       - uses: astral-sh/setup-uv@v5
         with:
@@ -27,6 +30,13 @@ jobs:
       # --frozen: fails if pyproject.toml and uv.lock have drifted.
       - name: Install
         run: uv sync --all-extras --frozen
+
+      # Branch parity: main and taxi's SHARED surface (src/tests/demo +
+      # synthetic-demo configs + k8s/docker/.github/pyproject) must be
+      # byte-identical. Fails loudly on drift — including deletions — so a
+      # change on one branch cannot silently diverge.
+      - name: Branch parity (main vs taxi)
+        run: bash scripts/check_branch_parity.sh
 
       # Lint the actively maintained surfaces (src, tests, experiments/mlflow,
       # fare_prediction, the root scripts, the project bindings). The legacy
