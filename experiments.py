@@ -76,7 +76,9 @@ EXPERIMENTS = ROOT / "experiments"
 UNIVARIATE = EXPERIMENTS / "univariate" / "fare_amount_trip_distance"
 MULTIVARIATE = EXPERIMENTS / "multivariate"
 MLFLOW = EXPERIMENTS / "mlflow"
-K8S_CONFIG_KEYS = ["dataset", "databases", "optuna", "mlflow"]
+# The k8s configmap carries infra only (dataset/databases/mlflow); the HPO
+# spec (search spaces, budgets) lives in configs/experiments/mlflow.yaml.
+K8S_CONFIG_KEYS = ["dataset", "databases", "mlflow"]
 
 
 def build_capped_sample(cap: int | None = None) -> pd.DataFrame:
