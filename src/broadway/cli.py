@@ -141,13 +141,7 @@ def main() -> None:
 
         audit_run(args.dataset, args.analysis, args.environment)
     elif args.step == "ingest":
-        try:
-            from project.etl.process import process_data
-        except ImportError as exc:
-            raise SystemExit(
-                "ingest is a dataset-demo command (needs the project/ layer) "
-                "and is not available on this build"
-            ) from exc
+        from project.etl.process import process_data
 
         process_data(args.dataset)
     elif args.step == "init":

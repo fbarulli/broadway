@@ -11,6 +11,7 @@ dist/
 build/
 data/raw/
 data/processed/
+data/samples/
 artifacts/
 /results/
 experiments/results/**
@@ -25,3 +26,5 @@ graphify-out/
 .mplconfig/
 diagnostics_experiment/
 legend_experiment/
+.coverage
+data/optuna-backup/

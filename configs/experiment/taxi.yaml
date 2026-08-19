@@ -1,0 +1,42 @@
+features:
+  include:
+    - pickup_location_id
+    - dropoff_location_id
+    - trip_distance
+    - passenger_count
+  exclude: []
+  derived:
+    - name: pickup_hour
+      func: pickup_hour
+      source: pickup_datetime
+    - name: pickup_day_of_week
+      func: pickup_day_of_week
+      source: pickup_datetime
+    - name: pickup_month
+      func: pickup_month
+      source: pickup_datetime
+    - name: is_weekend
+      func: is_weekend
+      source: pickup_datetime
+    - name: rush_hour
+      func: rush_hour
+      source: pickup_datetime
+    - name: is_night
+      func: is_night
+      source: pickup_datetime
+    - name: same_borough
+      func: same_borough
+      source: pickup_location_id
+  encodings:
+    - type: target
+      columns:
+        - pickup_location_id
+      smoothing: 20
+model:
+  type: linear
+  params: {}
+split:
+  type: time
+  validation_size: 0.2
+random_state: 42
+target_metric: rmse

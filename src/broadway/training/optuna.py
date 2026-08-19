@@ -1,4 +1,9 @@
-"""HPO — run an Optuna study and return the best parameters."""
+"""HPO — run an Optuna study and return the best parameters.
+
+Runs persist to RDB storage with heartbeats, so an interrupted worker's stale
+RUNNING trial is recovered on resume: run_study_rdb/run_worker pick up from the
+completed trials instead of carrying a permanent phantom.
+"""
 
 from __future__ import annotations
 
@@ -9,19 +14,29 @@ import numpy as np
 import optuna
 from sqlalchemy.exc import IntegrityError, OperationalError
 
+HEARTBEAT_INTERVAL = 60.0
+GRACE_PERIOD = 300.0
+
 _STUDY_CREATE_ATTEMPTS = 8
 _STUDY_CREATE_RETRY_SECONDS = 5.0
 
 
-def _create_study_with_retry(study_name: str, storage_url: str, direction: str) -> optuna.Study:
+def _create_study_with_retry(
+    study_name: str,
+    storage: optuna.storages.RDBStorage,
+    direction: str,
+    sampler: optuna.samplers.BaseSampler | None,
+) -> optuna.Study:
+    """Create or reopen a study in RDB storage, retrying transient create races."""
     last_error: Exception | None = None
     for _ in range(_STUDY_CREATE_ATTEMPTS):
         try:
             return optuna.create_study(
                 study_name=study_name,
-                storage=storage_url,
+                storage=storage,
                 load_if_exists=True,
                 direction=direction,
+                sampler=sampler,
             )
         except (IntegrityError, OperationalError) as exc:
             last_error = exc
@@ -38,10 +53,22 @@ def run_study_rdb(
     direction: str = "minimize",
     random_state: int | None = None,
 ) -> optuna.Study:
-    """Run an Optuna study persisted to an RDB storage URL and return the study."""
-    study = _create_study_with_retry(study_name, storage_url, direction)
-    if random_state is not None:
-        study.sampler.seed = random_state  # type: ignore[union-attr]
+    """Run an Optuna study persisted to an RDB storage URL and return the study.
+
+    The TPE sampler is seeded at construction time — Optuna 4.x builds its
+    internal RNG from the constructor's seed argument only, so a post-hoc
+    attribute assignment is a no-op. The same (study_name, random_state)
+    reproduces the same trajectory, including on study reopen.
+    """
+    storage = optuna.storages.RDBStorage(
+        url=storage_url,
+        heartbeat_interval=int(HEARTBEAT_INTERVAL),
+        grace_period=int(GRACE_PERIOD),
+    )
+    sampler = (
+        optuna.samplers.TPESampler(seed=random_state) if random_state is not None else None
+    )
+    study = _create_study_with_retry(study_name, storage, direction, sampler)
     study.optimize(objective, n_trials=n_trials)
     return study
 
@@ -53,9 +80,15 @@ def run_study(
     direction: str = "minimize",
     random_state: int | None = None,
 ) -> dict[str, float | int]:
-    study = optuna.create_study(direction=direction)
-    if random_state is not None:
-        study.sampler.seed = random_state  # type: ignore[union-attr]
+    """Run an in-memory Optuna study over search_space and return the best params.
+
+    The TPE sampler is seeded at construction time, so the same random_state
+    reproduces the same trajectory across runs.
+    """
+    sampler = (
+        optuna.samplers.TPESampler(seed=random_state) if random_state is not None else None
+    )
+    study = optuna.create_study(direction=direction, sampler=sampler)
 
     def _objective(trial: optuna.Trial) -> float:
         params: dict[str, float | int] = {}

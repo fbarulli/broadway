@@ -267,6 +267,7 @@ name = "broadway"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "fastapi" },
     { name = "joblib" },
     { name = "kubernetes" },
     { name = "lightgbm" },
@@ -294,6 +295,7 @@ dependencies = [
     { name = "sqlalchemy" },
     { name = "statsmodels" },
     { name = "tqdm" },
+    { name = "uvicorn" },
     { name = "xgboost" },
 ]
 
@@ -326,6 +328,7 @@ spark = [
 [package.metadata]
 requires-dist = [
     { name = "broadway", extras = ["spark", "db", "k8s", "dev"], marker = "extra == 'all'" },
+    { name = "fastapi", specifier = ">=0.141.1" },
     { name = "joblib", specifier = ">=1.5.0" },
     { name = "kubernetes", specifier = ">=32.0.0" },
     { name = "kubernetes", marker = "extra == 'k8s'", specifier = ">=32.0.0" },
@@ -351,7 +354,7 @@ requires-dist = [
     { name = "python-dotenv", specifier = ">=1.1.0" },
     { name = "pyyaml", specifier = ">=6.0.0" },
     { name = "requests", specifier = ">=2.32.0" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.9.0" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = "==0.16.3" },
     { name = "scikit-learn", specifier = ">=1.7.0" },
     { name = "scipy", specifier = ">=1.16.0" },
     { name = "seaborn", specifier = ">=0.13.0" },
@@ -360,6 +363,7 @@ requires-dist = [
     { name = "sqlalchemy", marker = "extra == 'db'", specifier = ">=2.0.0" },
     { name = "statsmodels", specifier = ">=0.14.6" },
     { name = "tqdm", specifier = ">=4.66.0" },
+    { name = "uvicorn", specifier = ">=0.52.1" },
     { name = "xgboost", specifier = ">=3.4.0" },
 ]
 provides-extras = ["dev", "spark", "db", "k8s", "all"]

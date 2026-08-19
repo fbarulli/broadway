@@ -6,9 +6,15 @@ on:
   pull_request:
     branches: [main, taxi]
 
+# Rapid pushes to the same branch/PR cancel the in-flight run — no wasted
+# compute on superseded commits.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   platform:
-    name: Platform gates (src + tests only — experiments/ excluded)
+    name: Platform gates (src + tests + maintained surfaces)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -18,22 +24,173 @@ jobs:
         with:
           version: "0.5.x"
 
+      # --frozen: fails if pyproject.toml and uv.lock have drifted.
       - name: Install
-        run: uv sync --all-extras
+        run: uv sync --all-extras --frozen
 
+      # Lint the actively maintained surfaces (src, tests, experiments/mlflow,
+      # fare_prediction, the root scripts, the project bindings). The legacy
+      # experiments tree is intentionally excluded (scratch).
       - name: Lint (ruff)
-        run: uv run ruff check src tests
+        run: >
+          uv run ruff check src tests experiments/mlflow experiments/fare_prediction
+          experiments.py experiments_ui.py project/working.py project/data.py
 
       - name: Type check (mypy)
         run: uv run mypy src/broadway
+
+      # k8s lifecycle + entrypoint scripts must at least be valid shell; the
+      # runner ships shellcheck (syntax-level CI — the deployment itself is a
+      # manual on-demand run via k8s/optuna/lifecycle.sh).
+      - name: Shell scripts (sh -n + shellcheck)
+        run: |
+          set -e
+          for f in k8s/optuna/*.sh; do sh -n "$f"; done
+          command -v shellcheck >/dev/null && shellcheck k8s/optuna/*.sh || \
+            echo "shellcheck not available — sh -n passed"
+
+      # Manifests must be structurally valid Kubernetes (no cluster needed).
+      - name: Manifests (kubeconform)
+        run: |
+          docker run --rm -v "$PWD":/work -w /work ghcr.io/yannh/kubeconform:v0.6.7 \
+            -strict -summary -ignore-filename-pattern "kind-config\\.yaml" k8s/optuna/ 2>&1 | tail -3
+
+      # Every REAL experiment config must parse against the config schema —
+      # a config that fails to load breaks the build.
+      - name: Configs (parse every configs/experiment/*.yaml)
+        run: |
+          uv run python -c "
+          from pathlib import Path
+          from broadway.config.loader import load_config
+          paths = sorted(Path('configs/experiment').glob('*.yaml'))
+          assert paths, 'no experiment configs found'
+          for p in paths:
+              load_config('train', dataset='test', experiment=p.stem)
+              print(f'OK {p.stem}')
+          "
+
+      # Orchestrator dry-run: render the worker Jobs for the HPO spec's models
+      # and assert they are valid Kubernetes with the right image/env/args.
+      - name: Orchestrator dry-run (render worker jobs)
+        run: |
+          mkdir -p /tmp/jobs
+          uv run python k8s/optuna/render_worker_jobs.py --image broadway-optuna-worker:ci > /tmp/jobs/jobs.yaml
+          grep -q "broadway-optuna-worker:ci" /tmp/jobs/jobs.yaml
+          grep -q "BROADWAY_MLFLOW_CONFIG" /tmp/jobs/jobs.yaml
+          grep -q -- "--model" /tmp/jobs/jobs.yaml
+          docker run --rm -v /tmp/jobs:/work ghcr.io/yannh/kubeconform:v0.6.7 \
+            -strict -summary /work/jobs.yaml 2>&1 | tail -1
 
       - name: Tests + coverage (platform suite)
         env:
           MPLCONFIGDIR: ${{ runner.temp }}/mplconfig
         run: uv run pytest tests/ --cov=src/broadway --cov-report=term-missing --cov-fail-under=85
 
-      - name: Experiment smoke (taxi branch only — verify_experiments.py)
+      - name: Experiment smoke (taxi branch only — experiments.py)
         if: github.ref == 'refs/heads/taxi' || (github.event_name == 'pull_request' && github.base_ref == 'taxi')
         env:
           MPLCONFIGDIR: ${{ runner.temp }}/mplconfig
-        run: uv run python verify_experiments.py
+        run: uv run python experiments.py verify
+
+  # Build & Boot — structural determinism of the deployment images WITHOUT a
+  # cluster. Catches missing files / broken COPY paths / PYTHONPATH and import
+  # failures / parents[] resolution / eager-default traps / config structure.
+  # Runtime semantics (kind cluster + workers + dump/restore) stay a manual,
+  # on-demand `lifecycle.sh train` — this gate never runs training.
+  # Images are cached via docker/load + docker/save (GitHub-native): the base
+  # image's slow uv-sync layers persist across runs when pyproject/lock don't
+  # change. (buildx's container driver can't chain FROM across separate builds
+  # — verified empirically — so plain `docker build` is kept.)
+  build-and-boot:
+    name: Build & Boot (docker images — no cluster)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      # Restore previously saved images so the chained FROM resolves instantly
+      # and unchanged base layers skip rebuilding.
+      - name: Load cached images
+        uses: docker/load@v1
+        with:
+          images: broadway-base:test, broadway-optuna-worker:test, mlflow-server:test
+
+      - name: Build base image
+        run: docker build -f k8s/optuna/Dockerfile.base -t broadway-base:test .
+
+      - name: Build worker image
+        run: docker build -f k8s/optuna/Dockerfile.worker -t broadway-optuna-worker:test .
+
+      - name: Build mlflow image
+        run: docker build -f k8s/optuna/Dockerfile.mlflow -t mlflow-server:test .
+
+      # Imports _common -> project.working (working.yaml), resolves
+      # HPO_CONFIG_PATH via parents[] at the mirrored pod path, parses the HPO
+      # spec and builds CLI choices. Catches the layout/import bug class.
+      - name: Boot — worker imports + CLI
+        run: docker run --rm broadway-optuna-worker:test \
+          python /app/experiments/mlflow/03_optuna_worker.py --help
+
+      # Config-load simulation with the committed fixture: verifies the
+      # configmap structure + the HPO spec both parse inside the pod layout.
+      - name: Boot — config-load simulation
+        run: >
+          docker run --rm
+          -v "$PWD/.github/ci-fixtures/k8s-config.yaml:/etc/broadway/config.yaml"
+          broadway-optuna-worker:test python -c
+          "import yaml
+          from pathlib import Path
+          from broadway.config.schema import HPOConfig
+          cfg = yaml.safe_load(Path('/etc/broadway/config.yaml').read_text())
+          assert {'dataset','databases','mlflow'} <= set(cfg), 'configmap structure'
+          hpo = HPOConfig(**yaml.safe_load(
+              Path('/app/configs/experiments/mlflow.yaml').read_text())['hpo'])
+          print('config load OK — models:', [m.name for m in hpo.models])"
+
+      - name: Boot — mlflow image health
+        run: docker run --rm --entrypoint python mlflow-server:test \
+          -c "import mlflow; print('mlflow', mlflow.__version__)"
+
+      # Persist the built images to the Actions cache for the next run.
+      - name: Save cached images
+        uses: docker/save@v1
+        with:
+          images: broadway-base:test, broadway-optuna-worker:test, mlflow-server:test
+
+  # CD — push the verified images to GHCR on push to main/taxi ONLY (never on
+  # PRs). lifecycle.sh consumes the built tag via OPTUNA_WORKER_IMAGE.
+  cd:
+    name: CD (push images to GHCR)
+    needs: build-and-boot
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/taxi')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Chained local builds (plain docker build — the proven pattern), then
+      # tag + push each with the commit sha and :latest.
+      - name: Build images
+        run: |
+          docker build -f k8s/optuna/Dockerfile.base -t broadway-base:latest .
+          docker build -f k8s/optuna/Dockerfile.worker -t broadway-optuna-worker:latest .
+          docker build -f k8s/optuna/Dockerfile.mlflow -t mlflow-server:latest .
+
+      - name: Push to GHCR
+        run: |
+          for img in broadway-base broadway-optuna-worker mlflow-server; do
+            docker tag "$img:latest" "ghcr.io/${{ github.repository }}/$img:${{ github.sha }}"
+            docker tag "$img:latest" "ghcr.io/${{ github.repository }}/$img:latest"
+            docker push "ghcr.io/${{ github.repository }}/$img:${{ github.sha }}"
+            docker push "ghcr.io/${{ github.repository }}/$img:latest"
+          done

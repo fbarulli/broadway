@@ -1,7 +1,10 @@
-# Single source of truth for the k8s optuna stack — mounted as a FILE
-# (/etc/broadway/config.yaml), never injected as env vars. Optuna and mlflow
-# MUST use separate databases: both use Alembic's `alembic_version` table,
-# which would otherwise clash in a shared DB.
+# Single source of truth for the k8s optuna stack's INFRA — dataset source, DB
+# endpoints, mlflow — mounted as a FILE (/etc/broadway/config.yaml), never
+# injected as env vars. Optuna and mlflow MUST use separate databases: both use
+# Alembic's `alembic_version` table, which would otherwise clash in a shared DB.
+# The HPO spec (search spaces + trial budgets) lives in
+# configs/experiments/mlflow.yaml (`hpo:`) — the worker reads it from there and
+# only injects the RDB storage_url at runtime.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -10,7 +13,7 @@ data:
   config.yaml: |
     dataset:
       name: ratecode1_sample
-      parquet: /app/data/ratecode1_sample.parquet
+      parquet: /app/experiments/results/univariate/fare_amount_trip_distance/ratecode1_sample.parquet
       target: total_amount
       min_fare: 2.5
       max_duration_minutes: 240
@@ -20,13 +23,6 @@ data:
     databases:
       optuna: {driver: postgresql+psycopg2, host: postgres, port: "5432", name: optuna}
       mlflow: {driver: postgresql+psycopg2, host: postgres, port: "5432", name: mlflow}
-    optuna:
-      seed: 42
-      test_fraction: 0.2
-      studies:
-        ols: {n_trials: 10}
-        lgbm: {n_trials: 10}
-        xgb: {n_trials: 10}
     mlflow:
       tracking_uri: http://mlflow:5000
       experiment: ratecode1_model_battle

@@ -1,7 +1,16 @@
 # Optuna worker image: shared base + the file-config worker script +
-# the baked-in working parquet.
+# its shared helpers (MODELS map + config) + the baked-in working parquet.
+# The image MIRRORS the repo layout so every __file__-relative path
+# (03_optuna_worker.py, _common.py, project.working) resolves in the pod
+# exactly as it does locally — the repo layout is the single source of truth.
 FROM broadway-base:latest
-COPY experiments/mlflow/03_optuna_worker.py /app/worker.py
+COPY experiments/mlflow/03_optuna_worker.py /app/experiments/mlflow/03_optuna_worker.py
+COPY experiments/mlflow/_common.py /app/experiments/mlflow/_common.py
+COPY configs/experiments/mlflow.yaml /app/configs/experiments/mlflow.yaml
+COPY configs/experiments/working.yaml /app/configs/experiments/working.yaml
 COPY experiments/results/univariate/fare_amount_trip_distance/ratecode1_sample.parquet \
-     /app/data/ratecode1_sample.parquet
-CMD ["python", "/app/worker.py"]
+     /app/experiments/results/univariate/fare_amount_trip_distance/ratecode1_sample.parquet
+# Base image sets PYTHONPATH=/app/src (for broadway.*); the worker ALSO needs
+# the repo root on the path so `project.*` and the baked _common.py resolve.
+ENV PYTHONPATH="/app/src:/app"
+CMD ["python", "/app/experiments/mlflow/03_optuna_worker.py"]

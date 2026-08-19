@@ -23,8 +23,9 @@ print(f"[mlflow] hostname={socket.gethostname()} "
       f"backend={db['host']}:{db['port']}/{db['name']} "
       f"tracking_uri={cfg['mlflow']['tracking_uri']}")
 PY
-BACKEND_URI=$(cat /tmp/backend_uri)
-export MLFLOW_SERVER_ALLOWED_HOSTS=$(cat /tmp/allowed_hosts)
+BACKEND_URI="$(cat /tmp/backend_uri)"
+MLFLOW_SERVER_ALLOWED_HOSTS="$(cat /tmp/allowed_hosts)"
+export MLFLOW_SERVER_ALLOWED_HOSTS
 
 python - <<'PY'
 import time
@@ -43,6 +44,9 @@ for attempt in range(30):
         time.sleep(2)
 PY
 
+# Single uvicorn worker: mlflow 3.15 defaults to 4 workers, which multiplies
+# memory (~2Gi+) and OOM-kills tight limits. --workers 1 keeps the tracking
+# UI lean (true minimal resources) and stable.
 exec mlflow server --backend-store-uri "$BACKEND_URI" \
     --default-artifact-root /mlflow/artifacts \
-    --host 0.0.0.0 --port 5000
+    --host 0.0.0.0 --port 5000 --workers 1

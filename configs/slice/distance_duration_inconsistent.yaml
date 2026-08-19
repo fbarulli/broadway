@@ -1,0 +1,4 @@
+name: distance_duration_inconsistent
+dataset: taxi
+description: trips with near-zero distance but long duration (flat-rate/negotiated fares)
+filter_expression: trip_distance < 0.05 and trip_duration_minutes > 60

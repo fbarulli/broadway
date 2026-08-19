@@ -20,11 +20,15 @@ random_state: 42
 target_metric: rmse
 hpo:
   engine: optuna
-  trials: 50
-  search_space:
-    max_depth:
-      - 3
-      - 10
-    learning_rate:
-      - 0.01
-      - 0.3
+  direction: minimize
+  target_metric: rmse
+  total_trials: 50
+  initial_trials_per_model: 20
+  top_k: 1
+  models:
+    - name: lgbm
+      search_space:
+        max_depth: [3, 10]
+        learning_rate: [0.01, 0.3]
+        subsample: [0.6, 1.0]
+        colsample_bytree: [0.6, 1.0]

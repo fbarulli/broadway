@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 import yaml
 from pydantic import ValidationError
@@ -11,6 +13,7 @@ from broadway.config.schema import (
     HPOConfig,
     LookupSpec,
     ModelConfig,
+    ModelHPOSpec,
     SplitConfig,
 )
 
@@ -85,7 +88,14 @@ def _experiment_config(model_type: str, search_space: dict[str, list[float | int
         split=SplitConfig(type="random", validation_size=0.2),
         random_state=42,
         target_metric="rmse",
-        hpo=HPOConfig(engine="optuna", trials=10, search_space=search_space),
+        hpo=HPOConfig(
+            engine="optuna",
+            total_trials=10,
+            initial_trials_per_model=5,
+            top_k=1,
+            target_metric="rmse",
+            models=[ModelHPOSpec(name=model_type, search_space=search_space)],
+        ),
     )
 
 
@@ -95,12 +105,34 @@ def test_hpo_search_space_valid_for_lgbm() -> None:
         {"max_depth": [3, 10], "learning_rate": [0.01, 0.3]},
     )
     assert config.hpo is not None
-    assert set(config.hpo.search_space) == {"max_depth", "learning_rate"}
+    assert set(config.hpo.models[0].search_space) == {"max_depth", "learning_rate"}
 
 
 def test_hpo_search_space_invalid_for_linear_raises() -> None:
     with pytest.raises(ValidationError):
         _experiment_config("linear", {"max_depth": [3, 10]})
+
+
+def test_hpo_search_space_validated_per_model() -> None:
+    with pytest.raises(ValidationError):
+        ExperimentConfig(
+            features=FeatureConfig(include=["rooms"], exclude=[], derived=[], encodings=[]),
+            model=ModelConfig(type="lgbm", params={}),
+            split=SplitConfig(type="random", validation_size=0.2),
+            random_state=42,
+            target_metric="rmse",
+            hpo=HPOConfig(
+                engine="optuna",
+                total_trials=10,
+                initial_trials_per_model=5,
+                top_k=1,
+                target_metric="rmse",
+                models=[
+                    ModelHPOSpec(name="lgbm", search_space={"learning_rate": [0.01, 0.3]}),
+                    ModelHPOSpec(name="xgb", search_space={"num_leaves": [10, 50]}),
+                ],
+            ),
+        )
 
 
 def test_lookup_spec_value_policies_parse() -> None:
@@ -138,3 +170,19 @@ def test_lookup_spec_na_values_parse() -> None:
 def test_lookup_spec_na_values_default_empty() -> None:
     spec = LookupSpec(path="lookup.csv", key="LocationID")
     assert spec.na_values == []
+
+
+def test_hpo_configs_parse() -> None:
+    """Both HPO configs must parse as the unified HPOConfig schema."""
+    import yaml
+
+    from broadway.config.schema import HPOConfig
+
+    for path in (
+        Path(__file__).resolve().parents[1] / "configs" / "experiment" / "hyperopt.yaml",
+        Path(__file__).resolve().parents[1] / "configs" / "experiments" / "mlflow.yaml",
+    ):
+        raw = yaml.safe_load(path.read_text())
+        assert "hpo" in raw, f"{path.name} missing hpo block"
+        cfg = HPOConfig(**raw["hpo"])
+        assert cfg.models, f"{path.name}: no models in hpo spec"

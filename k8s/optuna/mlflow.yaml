@@ -25,6 +25,12 @@ spec:
           image: mlflow-server:latest
           imagePullPolicy: IfNotPresent
           ports: [{containerPort: 5000}]
+          # Single uvicorn worker (entrypoint passes --workers 1): mlflow's
+          # default 4 workers multiply memory past 2Gi and OOM-kill; one
+          # worker keeps the tracking UI lean and stable at 1Gi.
+          resources:
+            requests: {cpu: 100m, memory: 256Mi}
+            limits: {cpu: 500m, memory: 1536Mi}
           volumeMounts:
             - {name: config, mountPath: /etc/broadway/config.yaml, subPath: config.yaml, readOnly: true}
             - {name: optuna-db, mountPath: /etc/broadway/secret, readOnly: true}
@@ -42,4 +48,5 @@ kind: Service
 metadata: {name: mlflow}
 spec:
   selector: {app: mlflow}
-  ports: [{port: 5000, targetPort: 5000}]
+  type: NodePort
+  ports: [{port: 5000, targetPort: 5000, nodePort: 30500}]

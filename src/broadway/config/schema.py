@@ -6,6 +6,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from broadway.analysis.contracts import AnalysisContract, AnalysisMode
+from broadway.training.models.registry import allowed_params
 
 
 class TaskType(str, Enum):
@@ -108,18 +109,21 @@ class SplitConfig(BaseModel):
     validation_size: float = Field(ge=0.0, le=1.0)
 
 
+class ModelHPOSpec(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: str
+    search_space: dict[str, list[float | int]] = {}
+
+
 class HPOConfig(BaseModel):
     engine: str
-    trials: int
-    search_space: dict[str, list[float | int]]
-
-
-VALID_MODEL_PARAMS: dict[str, frozenset[str]] = {
-    "linear": frozenset({"fit_intercept", "positive", "copy_X", "n_jobs"}),
-    "lgbm": frozenset({"n_estimators", "learning_rate", "num_leaves", "max_depth", "subsample", "colsample_bytree", "random_state", "n_jobs"}),
-    "xgb": frozenset({"n_estimators", "learning_rate", "max_depth", "subsample", "colsample_bytree", "random_state", "n_jobs", "tree_method"}),
-    "rf": frozenset({"n_estimators", "max_depth", "max_samples", "random_state", "n_jobs"}),
-}
+    direction: str = "minimize"
+    total_trials: int
+    initial_trials_per_model: int
+    top_k: int
+    target_metric: str
+    models: list[ModelHPOSpec]
+    storage_url: str | None = None
 
 
 class ExperimentConfig(BaseModel):
@@ -134,13 +138,14 @@ class ExperimentConfig(BaseModel):
     def _validate_hpo_search_space(self) -> ExperimentConfig:
         if self.hpo is None:
             return self
-        valid_params = VALID_MODEL_PARAMS.get(self.model.type, frozenset())
-        invalid_params = set(self.hpo.search_space) - valid_params
-        if invalid_params:
-            raise ValueError(
-                f"invalid HPO search-space params for model type '{self.model.type}': "
-                f"{sorted(invalid_params)}. valid params: {sorted(valid_params)}"
-            )
+        for spec in self.hpo.models:
+            valid_params = allowed_params(spec.name)
+            invalid_params = set(spec.search_space) - valid_params
+            if invalid_params:
+                raise ValueError(
+                    f"invalid HPO search-space params for model '{spec.name}': "
+                    f"{sorted(invalid_params)}. valid params: {sorted(valid_params)}"
+                )
         return self
 
 

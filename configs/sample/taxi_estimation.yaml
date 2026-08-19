@@ -1,0 +1,4 @@
+name: taxi_estimation
+role: estimation
+path: data/processed/taxi_canonical.parquet
+description: canonical 50K random sample — estimation population
