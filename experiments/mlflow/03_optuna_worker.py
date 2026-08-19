@@ -8,8 +8,10 @@ include it). Composes the RDB URL via the promoted
 study through `broadway.training.hpo.run_model_study` (heartbeat + load_if_exists
 included). K8s parallelizes HPO phase 1: one pod per model, each running
 `initial_trials_per_model` trials. Phase-2 bandit allocation is the in-process
-orchestrator's job (01, `hpo.run_hpo`). Modes: `--model ols|lgbm|xgb` runs
-trials; `--init-only` pre-creates the studies (optuna-init Job).
+orchestrator's job (01, `hpo.run_hpo`). Modes: `--model ols|lgbm|xgb` (battle
+display aliases, mapped via MODEL_KEYS to the registry key that the HPO spec
+lookup and objective use) runs trials; `--init-only` pre-creates the studies
+(optuna-init Job).
 """
 
 import argparse
@@ -20,7 +22,7 @@ from pathlib import Path
 import mlflow
 import pandas as pd
 import yaml
-from _common import MODELS
+from _common import MODEL_KEYS
 from sklearn.model_selection import train_test_split
 
 from broadway.config.schema import HPOConfig
@@ -96,7 +98,7 @@ def log_to_mlflow(model_name: str, best, cfg: dict, dataset_path: str,
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", default="ols", choices=sorted(MODELS))
+    parser.add_argument("--model", default="ols", choices=sorted(MODEL_KEYS))
     parser.add_argument("--config", default="/etc/broadway/config.yaml")
     parser.add_argument("--secret-dir", default="/etc/broadway/secret")
     parser.add_argument("--init-only", action="store_true")
@@ -126,9 +128,12 @@ def main() -> None:
     X = df[ds["features"]]
     X_train, X_val, y_train, y_val = train_test_split(
         X, df[ds["target"]], test_size=test_fraction, random_state=seed)
-    spec = next(s for s in hpo_cfg.models if s.name == args.model)
+    # Resolve the display alias to the registry key — the spec lookup and the
+    # objective MUST use the canonical key (the config's hpo.models are keys).
+    key = MODEL_KEYS[args.model]
+    spec = next(s for s in hpo_cfg.models if s.name == key)
     objective = hpo.make_objective(
-        model_type=MODELS[args.model][0], target_metric=hpo_cfg.target_metric,
+        model_type=key, target_metric=hpo_cfg.target_metric,
         X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val)
     study = hpo.run_model_study(
         spec, objective, n_trials=hpo_cfg.initial_trials_per_model,

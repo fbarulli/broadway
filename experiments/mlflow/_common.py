@@ -46,17 +46,18 @@ SEED = int(_cfg["seed"])
 CONTINUOUS_FEATURES = list(_cfg["continuous_features"])
 CATEGORICAL_FEATURES = list(_cfg["categorical_features"])
 
-# name -> (registry key, constructor params) — registry from broadway.training.
-# These base params are for the non-tuned comparison fits only; the HPO search
-# spaces now live in configs/experiments/mlflow.yaml (`hpo.models`), not here.
-MODELS = {
-    "ols": ("linear", {}),
-    "lgbm": ("lgbm", {"n_estimators": 100, "learning_rate": 0.1,
-                      "max_depth": 5, "random_state": SEED, "verbosity": -1}),
-    "xgb": ("xgb", {"n_estimators": 100, "learning_rate": 0.1,
-                    "max_depth": 5, "random_state": SEED, "verbosity": 0,
-                    "tree_method": "hist"}),
+# Display alias -> registry key. The registry is the single canonical model
+# identity (configs and HPO name models by key); this map exists ONLY so the
+# battle keeps its historical display names on the CLI and in labels (01/03).
+# It carries NO params — comparison fits use get_model(key), which applies the
+# registry's default params.
+MODEL_KEYS = {
+    "ols": "linear",
+    "lgbm": "lgbm",
+    "xgb": "xgb",
 }
+# BONUS_MODELS are intentionally OUTSIDE the platform model registry: they demo
+# sklearn classes (Ridge / RandomForestRegressor) the registry does not own.
 BONUS_MODELS = {
     "ridge": (Ridge, {"alpha": 1.0, "random_state": SEED}),
     "rf": (RandomForestRegressor, {"n_estimators": 100, "max_depth": 5,

@@ -31,5 +31,5 @@ hpo:
         max_depth: [3, 8]
         learning_rate: [0.05, 0.3]
         reg_lambda: [1e-3, 10.0]
-    - name: ols
+    - name: linear
       search_space: {}

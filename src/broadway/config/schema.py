@@ -6,6 +6,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from broadway.analysis.contracts import AnalysisContract, AnalysisMode
+from broadway.training.models.registry import allowed_params
 
 
 class TaskType(str, Enum):
@@ -125,14 +126,6 @@ class HPOConfig(BaseModel):
     storage_url: str | None = None
 
 
-VALID_MODEL_PARAMS: dict[str, frozenset[str]] = {
-    "linear": frozenset({"fit_intercept", "positive", "copy_X", "n_jobs"}),
-    "lgbm": frozenset({"n_estimators", "learning_rate", "num_leaves", "max_depth", "subsample", "colsample_bytree", "random_state", "n_jobs"}),
-    "xgb": frozenset({"n_estimators", "learning_rate", "max_depth", "subsample", "colsample_bytree", "random_state", "n_jobs", "tree_method"}),
-    "rf": frozenset({"n_estimators", "max_depth", "max_samples", "random_state", "n_jobs"}),
-}
-
-
 class ExperimentConfig(BaseModel):
     features: FeatureConfig
     model: ModelConfig
@@ -146,7 +139,7 @@ class ExperimentConfig(BaseModel):
         if self.hpo is None:
             return self
         for spec in self.hpo.models:
-            valid_params = VALID_MODEL_PARAMS.get(spec.name, frozenset())
+            valid_params = allowed_params(spec.name)
             invalid_params = set(spec.search_space) - valid_params
             if invalid_params:
                 raise ValueError(

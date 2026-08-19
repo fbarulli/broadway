@@ -6,10 +6,10 @@ never logged), every regression metric plus binarized ROC/PR AUC, and
 metadata (training time, prediction time, model size in bytes). Uses a
 seeded 80/20 holdout on a 1000-row sample through sklearn Pipelines (the
 categorical branch is ready for future pipeline steps), RFECV feature
-selection with a plot, and a config-driven HPO bandit (lgbm/xgb/ols) via
-the unified `broadway.training.hpo.run_hpo` — search spaces come from
-`configs/experiments/mlflow.yaml` (`hpo.models`), and the final best is
-logged to MLflow.
+selection with a plot, and a config-driven HPO bandit (lgbm/xgb/linear) via
+the unified `broadway.training.hpo.run_hpo` — models are named by REGISTRY
+key in `configs/experiments/mlflow.yaml` (`hpo.models`), defaults come from
+the registry, and the final best is logged to MLflow.
 """
 
 import pickle
@@ -28,7 +28,7 @@ from _common import (
     CATEGORICAL_FEATURES,
     CONTINUOUS_FEATURES,
     MLRUNS,
-    MODELS,
+    MODEL_KEYS,
     REPO,
     RESULTS,
     SEED,
@@ -49,7 +49,7 @@ from broadway.training.mlflow_utils import (
     log_params,
     setup_mlflow,
 )
-from broadway.training.models.registry import get_model
+from broadway.training.models.registry import display_name, get_model
 
 EXPERIMENT = "ratecode1_model_battle"
 # Platform metrics default to 4 decimals, but the battle CSV writer rounds to
@@ -57,17 +57,9 @@ EXPERIMENT = "ratecode1_model_battle"
 METRIC_DECIMALS = 6
 
 
-def _make_model(factory: str | type, params: dict) -> object:
-    """Build a model from the platform registry (str key) or a class."""
-    if isinstance(factory, str):
-        return get_model(factory, **params)
-    return factory(**params)
-
-
-def fit_and_evaluate(name: str, factory: str | type, params: dict,
+def fit_and_evaluate(name: str, model: object,
                      X_train, X_test, y_train, y_test, threshold: float) -> dict:
     """Fit pipeline, time it, compute holdout metrics + size; returns summary."""
-    model = _make_model(factory, params)
     pipe = make_pipeline(model)
     t0 = time.perf_counter()
     pipe.fit(X_train, y_train)
@@ -105,10 +97,8 @@ def log_run(summary: dict, n_train: int, n_test: int) -> None:
         mlflow.set_tag("model", summary["name"])
 
 
-def rfe_curve(name: str, factory: str | type, params: dict,
-              X_train, y_train) -> dict:
-    """RFECV over the pipeline; returns (transformed n_features, cv MAE)."""
-    model = _make_model(factory, params)
+def rfe_curve(name: str, model: object, X_train, y_train) -> dict:
+    """RFECV over the model; returns (transformed n_features, cv MAE)."""
     pre = make_pipeline(model).named_steps["pre"]
     X_num = pre.fit_transform(X_train)
     selector = RFECV(model, step=1, cv=3,
@@ -164,10 +154,11 @@ def main() -> None:
     threshold = binary_threshold(y_train.to_numpy())
     print(f"sample: {len(df)} rows | train {len(X_train)} / test {len(X_test)}")
 
+    # Battle comparison fits: registry defaults apply via get_model(key).
     summaries = [
-        fit_and_evaluate(name, factory, params, X_train, X_test,
+        fit_and_evaluate(display_name(key), get_model(key), X_train, X_test,
                          y_train, y_test, threshold)
-        for name, (factory, params) in MODELS.items()
+        for key in MODEL_KEYS.values()
     ]
     for s in summaries:
         log_run(s, len(X_train), len(X_test))
@@ -181,7 +172,7 @@ def main() -> None:
 
     # Bonus models computed in parallel (joblib), logged sequentially
     bonus = Parallel(n_jobs=-1)(
-        delayed(fit_and_evaluate)(name, factory, params, X_train, X_test,
+        delayed(fit_and_evaluate)(name, factory(**params), X_train, X_test,
                                   y_train, y_test, threshold)
         for name, (factory, params) in BONUS_MODELS.items()
     )
@@ -207,8 +198,8 @@ def main() -> None:
     plot_metrics(summaries, RESULTS / "01_model_battle_metrics.png")
 
     curves = [
-        rfe_curve(name, factory, params, X_train, y_train)
-        for name, (factory, params) in MODELS.items()
+        rfe_curve(display_name(key), get_model(key), X_train, y_train)
+        for key in MODEL_KEYS.values()
     ]
     rfe_csv = RESULTS / "01_model_battle_rfe.csv"
     pd.DataFrame([
@@ -221,33 +212,28 @@ def main() -> None:
     print("\n=== HPO bandit (unified API, config-driven spaces) ===")
     raw_hpo = yaml.safe_load(
         (REPO / "configs" / "experiments" / "mlflow.yaml").read_text())["hpo"]
-    # run_hpo resolves model names as REGISTRY keys (make_objective ->
-    # get_model); the battle's display names (e.g. "ols" -> "linear") map via
-    # MODELS. Its objective also fits raw registry models, so feed it the
+    # The config already names models by REGISTRY key (the single canonical
+    # name) — no remap needed; run_hpo -> make_objective -> get_model resolves
+    # them directly. Its objective fits raw registry models, so feed it the
     # encoded X (categoricals one-hot via the battle pipeline preprocessor).
-    hpo_cfg = HPOConfig(**{**raw_hpo, "models": [
-        {**spec, "name": MODELS[spec["name"]][0]} if spec["name"] in MODELS else spec
-        for spec in raw_hpo["models"]
-    ]})
+    hpo_cfg = HPOConfig(**raw_hpo)
     pre = make_pipeline(LinearRegression()).named_steps["pre"]
     result = hpo.run_hpo(hpo_cfg, pre.fit_transform(X_train), y_train,
                          pre.transform(X_test), y_test, SEED)
-    # registry key -> battle name (inverse of MODELS) for the leaderboard.
-    display = {key: name for name, (key, _) in MODELS.items()}
     with mlflow.start_run(run_name="hpo_bandit"):
         log_params(result["best_params"])
         mlflow.log_metric("mae", result["best_value"])
-        mlflow.set_tag("model", display.get(result["best_model"], result["best_model"]))
+        mlflow.set_tag("model", display_name(result["best_model"]))
     print("leaderboard (per-model best MAE):")
     for name, res in result["models"].items():
-        print(f"{display.get(name, name):<6} best_mae={res['best_value']:.4f} "
+        print(f"{display_name(name):<6} best_mae={res['best_value']:.4f} "
               f"n_trials={res['n_trials']}")
     best = result["best_model"]
-    print(f"best model: {display.get(best, best)} | "
+    print(f"best model: {display_name(best)} | "
           f"best MAE: {result['best_value']:.4f} | "
           f"params: {result['best_params']}")
     pd.DataFrame([
-        {"model": display.get(name, name), "best_mae": res["best_value"],
+        {"model": display_name(name), "best_mae": res["best_value"],
          **res["best_params"]}
         for name, res in result["models"].items()
     ]).to_csv(RESULTS / "01_model_battle_optuna.csv", index=False)
