@@ -23,8 +23,9 @@ print(f"[mlflow] hostname={socket.gethostname()} "
       f"backend={db['host']}:{db['port']}/{db['name']} "
       f"tracking_uri={cfg['mlflow']['tracking_uri']}")
 PY
-BACKEND_URI=$(cat /tmp/backend_uri)
-export MLFLOW_SERVER_ALLOWED_HOSTS=$(cat /tmp/allowed_hosts)
+BACKEND_URI="$(cat /tmp/backend_uri)"
+MLFLOW_SERVER_ALLOWED_HOSTS="$(cat /tmp/allowed_hosts)"
+export MLFLOW_SERVER_ALLOWED_HOSTS
 
 python - <<'PY'
 import time

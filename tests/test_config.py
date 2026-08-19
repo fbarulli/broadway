@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 import yaml
 from pydantic import ValidationError
@@ -168,3 +170,19 @@ def test_lookup_spec_na_values_parse() -> None:
 def test_lookup_spec_na_values_default_empty() -> None:
     spec = LookupSpec(path="lookup.csv", key="LocationID")
     assert spec.na_values == []
+
+
+def test_hpo_configs_parse() -> None:
+    """Both HPO configs must parse as the unified HPOConfig schema."""
+    import yaml
+
+    from broadway.config.schema import HPOConfig
+
+    for path in (
+        Path(__file__).resolve().parents[1] / "configs" / "experiment" / "hyperopt.yaml",
+        Path(__file__).resolve().parents[1] / "configs" / "experiments" / "mlflow.yaml",
+    ):
+        raw = yaml.safe_load(path.read_text())
+        assert "hpo" in raw, f"{path.name} missing hpo block"
+        cfg = HPOConfig(**raw["hpo"])
+        assert cfg.models, f"{path.name}: no models in hpo spec"

@@ -27,18 +27,19 @@ import tempfile
 from pathlib import Path
 
 import matplotlib
+
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt
 import matplotlib.colors
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import polars as pl
-from scipy import stats
 import yaml
+from scipy import stats
 
-import broadway.discover.qq as qq
 from broadway import viz
 from broadway.config.viz import load_viz_config
+from broadway.discover import qq
 from broadway.evaluate.metrics import binary_metrics, compute_metrics
 from broadway.stats import diagnostics, regression
 from broadway.stats.describe import describe, plot_describe_figures
@@ -111,7 +112,7 @@ def fit_and_plot(df: pd.DataFrame, out_dir: Path, label: str) -> dict:
     dw = diagnostics.durbin_watson(model.resid)
     row = {
         "step": label,
-        "n": int(len(df)),
+        "n": len(df),
         "r2": round(float(model.rsquared), 4),
         "jb_skew": round(result["skew"], 3),
         "jb_kurtosis": round(result["kurtosis"], 3),

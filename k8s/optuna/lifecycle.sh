@@ -112,8 +112,8 @@ view_local() {
   }
   docker rm -f "$PG_NAME" >/dev/null 2>&1 || true
   docker run -d --rm --name "$PG_NAME" \
-    -e POSTGRES_USER=$VIEW_PG_USER -e POSTGRES_PASSWORD=$VIEW_PG_PASSWORD -e POSTGRES_DB=mlflow \
-    -p 15433:5432 postgres:16-alpine >/dev/null
+    -e POSTGRES_USER="$VIEW_PG_USER" -e POSTGRES_PASSWORD="$VIEW_PG_PASSWORD" -e POSTGRES_DB=mlflow \
+    -p "$VIEW_PG_PORT:5432" postgres:16-alpine >/dev/null
   log "waiting for view postgres"
   for _ in $(seq 1 30); do
     docker exec "$PG_NAME" pg_isready -U view -q 2>/dev/null && break
@@ -130,7 +130,7 @@ view_local() {
   fi
   log "starting local mlflow (artifact links may 404 — pod paths in the dump)"
   (cd "$ROOT" && uv run mlflow server \
-    --backend-store-uri postgresql+psycopg2://$VIEW_PG_USER:$VIEW_PG_PASSWORD@127.0.0.1:$VIEW_PG_PORT/mlflow \
+    --backend-store-uri "postgresql+psycopg2://$VIEW_PG_USER:$VIEW_PG_PASSWORD@127.0.0.1:$VIEW_PG_PORT/mlflow" \
     --default-artifact-root "$ART_DIR" \
     --host 127.0.0.1 --port "$VIEW_PORT" >"$BACKUP_DIR/mlflow-view.log" 2>&1 &)
   URL="http://127.0.0.1:$VIEW_PORT"
@@ -139,7 +139,7 @@ view_local() {
     sleep 3
   done
   echo "[lifecycle] mlflow UI (all dumped results): $URL"
-  echo "[lifecycle] stop: docker rm -f $PG_NAME; kill \$(pgrep -f "mlflow server.*$VIEW_PG_PORT")"
+  echo   echo "[lifecycle] stop: docker rm -f '$PG_NAME'; kill \$(pgrep -f 'mlflow server.*$VIEW_PG_PORT')"
   if command -v xdg-open >/dev/null 2>&1; then xdg-open "$URL" >/dev/null 2>&1 || true
   elif command -v open >/dev/null 2>&1; then open "$URL" >/dev/null 2>&1 || true
   fi

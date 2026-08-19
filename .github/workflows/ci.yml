@@ -8,7 +8,7 @@ on:
 
 jobs:
   platform:
-    name: Platform gates (src + tests only — experiments/ excluded)
+    name: Platform gates (src + tests + maintained surfaces)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -18,14 +18,36 @@ jobs:
         with:
           version: "0.5.x"
 
+      # --frozen: fails if pyproject.toml and uv.lock have drifted.
       - name: Install
-        run: uv sync --all-extras
+        run: uv sync --all-extras --frozen
 
+      # Lint the actively maintained surfaces (src, tests, experiments/mlflow,
+      # fare_prediction, the root scripts, the project bindings). The legacy
+      # experiments tree is intentionally excluded (scratch).
       - name: Lint (ruff)
-        run: uv run ruff check src tests
+        run: >
+          uv run ruff check src tests experiments/mlflow experiments/fare_prediction
+          experiments.py experiments_ui.py project/working.py project/data.py
 
       - name: Type check (mypy)
         run: uv run mypy src/broadway
+
+      # k8s lifecycle + entrypoint scripts must at least be valid shell; the
+      # runner ships shellcheck (syntax-level CI — the deployment itself is a
+      # manual on-demand run via k8s/optuna/lifecycle.sh).
+      - name: Shell scripts (sh -n + shellcheck)
+        run: |
+          set -e
+          for f in k8s/optuna/*.sh; do sh -n "$f"; done
+          command -v shellcheck >/dev/null && shellcheck k8s/optuna/*.sh || \
+            echo "shellcheck not available — sh -n passed"
+
+      # Manifests must be structurally valid Kubernetes (no cluster needed).
+      - name: Manifests (kubeconform)
+        run: |
+          docker run --rm -v "$PWD":/work -w /work ghcr.io/yannh/kubeconform:v0.6.7 \
+            -strict -summary -ignore-filename-pattern "kind-config\\.yaml" k8s/optuna/ 2>&1 | tail -3
 
       - name: Tests + coverage (platform suite)
         env:
