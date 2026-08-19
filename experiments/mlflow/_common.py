@@ -16,12 +16,11 @@ import pandas as pd
 import yaml
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.linear_model import LinearRegression, Ridge
+from sklearn.linear_model import Ridge
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder
 
-from broadway.evaluate.metrics import binary_metrics, compute_metrics
 from broadway.utils import require_keys
 from project.working import load_metered, time_bucket
 
@@ -41,7 +40,9 @@ SEED = int(_cfg["seed"])
 CONTINUOUS_FEATURES = list(_cfg["continuous_features"])
 CATEGORICAL_FEATURES = list(_cfg["categorical_features"])
 
-# name -> (registry key, constructor params) — registry from broadway.training
+# name -> (registry key, constructor params) — registry from broadway.training.
+# These base params are for the non-tuned comparison fits only; the HPO search
+# spaces now live in configs/experiments/mlflow.yaml (`hpo.models`), not here.
 MODELS = {
     "ols": ("linear", {}),
     "lgbm": ("lgbm", {"n_estimators": 100, "learning_rate": 0.1,

@@ -1,12 +1,15 @@
-"""03: kubernetes optuna worker — config FILES only (no env vars).
+"""03: kubernetes optuna worker — per-model phase-1 study via the unified HPO API.
 
-Reads the mounted ConfigMap (`/etc/broadway/config.yaml`) and Secret files
-(`/etc/broadway/secret/<KEY>`), composes the RDB URL via the promoted
-`broadway.training.optuna_worker.compose_db_url`, runs storage-backed trials
-via `run_study_rdb` (schema-race retry included), and logs the run to MLflow
-via `mlflow_utils.log_metadata` / `log_dataset`. Logs the resolved endpoints
-at startup. Modes: `--model ols|lgbm|xgb` runs trials; `--init-only` creates
-the configured studies once (run by the optuna-init Job).
+Reads the mounted ConfigMap (`/etc/broadway/config.yaml`) for dataset, DB and
+MLflow infra, and the unified HPO spec (search spaces + budget) from
+`configs/experiments/mlflow.yaml` (repo-relative — the worker image must
+include it). Composes the RDB URL via the promoted
+`broadway.training.optuna_worker.compose_db_url` and runs the requested model's
+study through `broadway.training.hpo.run_model_study` (heartbeat + load_if_exists
+included). K8s parallelizes HPO phase 1: one pod per model, each running
+`initial_trials_per_model` trials. Phase-2 bandit allocation is the in-process
+orchestrator's job (01, `hpo.run_hpo`). Modes: `--model ols|lgbm|xgb` runs
+trials; `--init-only` pre-creates the studies (optuna-init Job).
 """
 
 import argparse
@@ -16,20 +19,21 @@ from pathlib import Path
 import mlflow
 import pandas as pd
 import yaml
-from sklearn.metrics import mean_absolute_error
+from _common import MODELS
 from sklearn.model_selection import train_test_split
 
+from broadway.config.schema import HPOConfig
+from broadway.training import hpo
 from broadway.training.mlflow_utils import (
     log_dataset,
     log_metadata,
     log_params,
     setup_mlflow,
 )
-from broadway.training.models.registry import get_model
-from broadway.training.optuna import run_study_rdb
 from broadway.training.optuna_worker import compose_db_url
 
-REGISTRY_KEY = {"ols": "linear", "lgbm": "lgbm", "xgb": "xgb"}
+# HPO search spaces + budgets (configs/experiments/mlflow.yaml -> `hpo`).
+HPO_CONFIG_PATH = Path(__file__).resolve().parents[2] / "configs" / "experiments" / "mlflow.yaml"
 
 
 def load_secret(secret_dir: str) -> dict:
@@ -54,28 +58,9 @@ def load_dataset(cfg: dict) -> pd.DataFrame:
     return df
 
 
-def make_objective(model_name: str, X_train, y_train, X_test, y_test,
-                   cfg: dict):
-    """Optuna objective for one model; hyperparameters sampled per model."""
-    seed = cfg["optuna"]["seed"]
-
-    def objective(trial) -> float:
-        params = {}
-        if model_name in ("lgbm", "xgb"):
-            params["random_state"] = seed
-            params["n_estimators"] = trial.suggest_int("n_estimators", 50, 200)
-            params["max_depth"] = trial.suggest_int("max_depth", 3, 8)
-            params["learning_rate"] = trial.suggest_float(
-                "learning_rate", 0.05, 0.3, log=True)
-            if model_name == "lgbm":
-                params["num_leaves"] = trial.suggest_int("num_leaves", 8, 63)
-            else:
-                params["reg_lambda"] = trial.suggest_float(
-                    "reg_lambda", 1e-3, 10.0, log=True)
-        model = get_model(REGISTRY_KEY[model_name], **params)
-        model.fit(X_train, y_train)
-        return float(mean_absolute_error(y_test, model.predict(X_test)))
-    return objective
+def _dummy_objective(params: dict) -> float:
+    """Placeholder objective — init-only materializes studies, never evaluates."""
+    return 0.0
 
 
 def log_endpoints(model_name: str, cfg: dict, db_url: str) -> None:
@@ -103,13 +88,17 @@ def log_to_mlflow(model_name: str, best, cfg: dict, dataset_path: str,
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", default="ols", choices=sorted(REGISTRY_KEY))
+    parser.add_argument("--model", default="ols", choices=sorted(MODELS))
     parser.add_argument("--config", default="/etc/broadway/config.yaml")
     parser.add_argument("--secret-dir", default="/etc/broadway/secret")
     parser.add_argument("--init-only", action="store_true")
     args = parser.parse_args()
 
     cfg = yaml.safe_load(Path(args.config).read_text())
+    mlflow_cfg = yaml.safe_load(HPO_CONFIG_PATH.read_text())
+    hpo_cfg = HPOConfig(**mlflow_cfg["hpo"])
+    seed = int(mlflow_cfg["seed"])
+    test_fraction = float(mlflow_cfg["test_fraction"])
     secret = load_secret(args.secret_dir)
     db = cfg["databases"]["optuna"]
     db_url = compose_db_url(db["driver"], secret["DB_USER"], secret["DB_PASSWORD"],
@@ -117,27 +106,28 @@ def main() -> None:
     log_endpoints(args.model, cfg, db_url)
 
     if args.init_only:
-        for name in cfg["optuna"]["studies"]:
-            run_study_rdb(lambda trial: 0.0, name, db_url, n_trials=0,
-                          direction="minimize",
-                          random_state=cfg["optuna"]["seed"])
+        for spec in hpo_cfg.models:
+            hpo.run_model_study(spec, _dummy_objective, n_trials=0,
+                                random_state=seed, storage_url=db_url,
+                                direction=hpo_cfg.direction)
         print("[worker] init complete")
         return
 
     ds = cfg["dataset"]
     df = load_dataset(cfg)
     X = df[ds["features"]]
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, df[ds["target"]], test_size=cfg["optuna"]["test_fraction"],
-        random_state=cfg["optuna"]["seed"])
-    study = run_study_rdb(
-        make_objective(args.model, X_train, y_train, X_test, y_test, cfg),
-        study_name=f"ratecode1_{args.model}", storage_url=db_url,
-        n_trials=cfg["optuna"]["studies"][args.model]["n_trials"],
-        direction="minimize", random_state=cfg["optuna"]["seed"])
+    X_train, X_val, y_train, y_val = train_test_split(
+        X, df[ds["target"]], test_size=test_fraction, random_state=seed)
+    spec = next(s for s in hpo_cfg.models if s.name == args.model)
+    objective = hpo.make_objective(
+        model_type=MODELS[args.model][0], target_metric=hpo_cfg.target_metric,
+        X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val)
+    study = hpo.run_model_study(
+        spec, objective, n_trials=hpo_cfg.initial_trials_per_model,
+        random_state=seed, storage_url=db_url, direction=hpo_cfg.direction)
     best = study.best_trial
     log_to_mlflow(args.model, best, cfg, ds["parquet"],
-                  cfg["optuna"]["studies"][args.model]["n_trials"])
+                  hpo_cfg.initial_trials_per_model)
     print(f"[worker] DONE model={args.model} best_mae={best.value:.4f} "
           f"params={best.params}")
 

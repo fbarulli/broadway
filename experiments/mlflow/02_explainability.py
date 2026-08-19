@@ -11,20 +11,15 @@ residual diagnostics. All figures are logged to MLflow as artifacts
 from pathlib import Path
 
 import matplotlib
+
 matplotlib.use("Agg")
+import lightgbm as lgb
 import matplotlib.pyplot as plt
 import mlflow
 import numpy as np
 import pandas as pd
 import shap
 import xgboost as xgb
-from lime.lime_tabular import LimeTabularExplainer
-from sklearn.inspection import PartialDependenceDisplay, permutation_importance
-from sklearn.linear_model import LinearRegression
-from sklearn.model_selection import train_test_split
-
-import lightgbm as lgb
-
 from _common import (
     CONTINUOUS_FEATURES,
     MLRUNS,
@@ -33,6 +28,11 @@ from _common import (
     TEST_FRACTION,
     load_sample,
 )
+from lime.lime_tabular import LimeTabularExplainer
+from sklearn.inspection import PartialDependenceDisplay, permutation_importance
+from sklearn.linear_model import LinearRegression
+from sklearn.model_selection import train_test_split
+
 from broadway.training.mlflow_utils import setup_mlflow
 
 EXPERIMENT = "ratecode1_model_battle"

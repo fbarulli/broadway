@@ -6,8 +6,10 @@ never logged), every regression metric plus binarized ROC/PR AUC, and
 metadata (training time, prediction time, model size in bytes). Uses a
 seeded 80/20 holdout on a 1000-row sample through sklearn Pipelines (the
 categorical branch is ready for future pipeline steps), RFECV feature
-selection with a plot, and an end-to-end Optuna single trial wired to
-MLflow via the official callback.
+selection with a plot, and a config-driven HPO bandit (lgbm/xgb/ols) via
+the unified `broadway.training.hpo.run_hpo` — search spaces come from
+`configs/experiments/mlflow.yaml` (`hpo.models`), and the final best is
+logged to MLflow.
 """
 
 import pickle
@@ -15,22 +17,19 @@ import time
 from pathlib import Path
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import mlflow
-import optuna
 import pandas as pd
-from joblib import Parallel, delayed
-from optuna.integration.mlflow import MLflowCallback
-from sklearn.feature_selection import RFECV
-from sklearn.metrics import mean_absolute_error
-
+import yaml
 from _common import (
     BONUS_MODELS,
     CATEGORICAL_FEATURES,
     CONTINUOUS_FEATURES,
-    MODELS,
     MLRUNS,
+    MODELS,
+    REPO,
     RESULTS,
     SEED,
     binary_threshold,
@@ -38,7 +37,13 @@ from _common import (
     make_pipeline,
     split_data,
 )
+from joblib import Parallel, delayed
+from sklearn.feature_selection import RFECV
+from sklearn.linear_model import LinearRegression
+
+from broadway.config.schema import HPOConfig
 from broadway.evaluate.metrics import binary_metrics, compute_metrics
+from broadway.training import hpo
 from broadway.training.mlflow_utils import (
     log_metrics,
     log_params,
@@ -150,26 +155,6 @@ def plot_rfe(curves: list[dict], out: Path) -> None:
     plt.close(fig)
 
 
-def make_objective(X_train, X_test, y_train, y_test):
-    """Optuna objective: model + tree hyperparams; returns holdout MAE."""
-    def objective(trial: optuna.Trial) -> float:
-        name = trial.suggest_categorical("model", list(MODELS))
-        factory, base = MODELS[name]
-        params = dict(base)
-        if name in ("lgbm", "xgb"):
-            params["n_estimators"] = trial.suggest_int("n_estimators", 50, 200)
-            params["max_depth"] = trial.suggest_int("max_depth", 3, 8)
-            params["learning_rate"] = trial.suggest_float(
-                "learning_rate", 0.05, 0.3, log=True)
-            params["random_state"] = SEED
-        model = _make_model(factory, params)
-        pipe = make_pipeline(model)
-        pipe.fit(X_train, y_train)
-        preds = pipe.predict(X_test)
-        return float(mean_absolute_error(y_test, preds))
-    return objective
-
-
 def main() -> None:
     setup_mlflow(str(MLRUNS), EXPERIMENT)
     RESULTS.mkdir(parents=True, exist_ok=True)
@@ -233,17 +218,41 @@ def main() -> None:
     plot_rfe(curves, RESULTS / "01_model_battle_rfe.png")
     print(f"wrote {rfe_csv}")
 
-    print("\n=== Optuna single trial (mlflow-optuna end to end) ===")
-    study = optuna.create_study(direction="minimize",
-                                study_name="ratecode1_optuna_battle")
-    study.optimize(make_objective(X_train, X_test, y_train, y_test),
-                   n_trials=1,
-                   callbacks=[MLflowCallback(metric_name="mae",
-                                             create_experiment=False)])
-    best = study.best_trial
-    print(f"best MAE: {best.value:.4f} | params: {best.params}")
-    pd.DataFrame([{"trial": 0, "value": best.value, **best.params}]
-                 ).to_csv(RESULTS / "01_model_battle_optuna.csv", index=False)
+    print("\n=== HPO bandit (unified API, config-driven spaces) ===")
+    raw_hpo = yaml.safe_load(
+        (REPO / "configs" / "experiments" / "mlflow.yaml").read_text())["hpo"]
+    # run_hpo resolves model names as REGISTRY keys (make_objective ->
+    # get_model); the battle calls the linear model "ols", so remap the name
+    # at the API boundary. Its objective also fits raw registry models, so
+    # feed it the encoded X (categoricals one-hot via the battle pipeline
+    # preprocessor).
+    hpo_cfg = HPOConfig(**{**raw_hpo, "models": [
+        {**spec, "name": "linear"} if spec["name"] == "ols" else spec
+        for spec in raw_hpo["models"]
+    ]})
+    pre = make_pipeline(LinearRegression()).named_steps["pre"]
+    result = hpo.run_hpo(hpo_cfg, pre.fit_transform(X_train), y_train,
+                         pre.transform(X_test), y_test, SEED)
+    # registry key -> battle name (inverse of MODELS) for the leaderboard.
+    display = {key: name for name, (key, _) in MODELS.items()}
+    with mlflow.start_run(run_name="hpo_bandit"):
+        log_params(result["best_params"])
+        mlflow.log_metric("mae", result["best_value"])
+        mlflow.set_tag("model", display.get(result["best_model"], result["best_model"]))
+    print("leaderboard (per-model best MAE):")
+    for name, res in result["models"].items():
+        print(f"{display.get(name, name):<6} best_mae={res['best_value']:.4f} "
+              f"n_trials={res['n_trials']}")
+    best = result["best_model"]
+    print(f"best model: {display.get(best, best)} | "
+          f"best MAE: {result['best_value']:.4f} | "
+          f"params: {result['best_params']}")
+    pd.DataFrame([
+        {"model": display.get(name, name), "best_mae": res["best_value"],
+         **res["best_params"]}
+        for name, res in result["models"].items()
+    ]).to_csv(RESULTS / "01_model_battle_optuna.csv", index=False)
+    print(f"wrote {RESULTS / '01_model_battle_optuna.csv'}")
 
 
 if __name__ == "__main__":

@@ -1,9 +1,35 @@
-# mlflow model-battle experiment — run knobs (data-agnostic).
+# mlflow model-battle experiment — run knobs + the unified HPO spec.
 # The dataset loader/filters/time_bucket are owned by project/working.py
 # (configs/experiments/working.yaml). Model recipes stay in code: they
-# reference the platform model registry / sklearn classes.
+# reference the platform model registry / sklearn classes. The HPO search
+# spaces and trial budgets (hpo:) are the single source of truth for BOTH
+# the battle orchestrator (01, hpo.run_hpo) and the k8s per-model workers
+# (03, hpo.run_model_study) — the k8s worker only injects the RDB storage_url
+# at runtime, so no storage_url is set here.
 sample_size: 1000
 test_fraction: 0.2
 seed: 42
 continuous_features: [trip_distance, duration_minutes, pickup_hour]
 categorical_features: [time_bucket]
+hpo:
+  engine: optuna
+  direction: minimize
+  target_metric: mae
+  total_trials: 100
+  initial_trials_per_model: 20
+  top_k: 2
+  models:
+    - name: lgbm
+      search_space:
+        n_estimators: [50, 200]
+        max_depth: [3, 8]
+        learning_rate: [0.05, 0.3]
+        num_leaves: [8, 63]
+    - name: xgb
+      search_space:
+        n_estimators: [50, 200]
+        max_depth: [3, 8]
+        learning_rate: [0.05, 0.3]
+        reg_lambda: [1e-3, 10.0]
+    - name: ols
+      search_space: {}
