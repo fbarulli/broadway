@@ -25,11 +25,12 @@ spec:
           image: mlflow-server:latest
           imagePullPolicy: IfNotPresent
           ports: [{containerPort: 5000}]
-          # Minimal-resource footprint, but not OOM-tight: mlflow + uvicorn
-          # needs ~1Gi to serve (512Mi OOM-kills it — verified on kind).
+          # Single uvicorn worker (entrypoint passes --workers 1): mlflow's
+          # default 4 workers multiply memory past 2Gi and OOM-kill; one
+          # worker keeps the tracking UI lean and stable at 1Gi.
           resources:
             requests: {cpu: 100m, memory: 256Mi}
-            limits: {cpu: 500m, memory: 2Gi}
+            limits: {cpu: 500m, memory: 1Gi}
           volumeMounts:
             - {name: config, mountPath: /etc/broadway/config.yaml, subPath: config.yaml, readOnly: true}
             - {name: optuna-db, mountPath: /etc/broadway/secret, readOnly: true}
