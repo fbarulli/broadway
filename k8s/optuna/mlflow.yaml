@@ -30,7 +30,7 @@ spec:
           # worker keeps the tracking UI lean and stable at 1Gi.
           resources:
             requests: {cpu: 100m, memory: 256Mi}
-            limits: {cpu: 500m, memory: 1Gi}
+            limits: {cpu: 500m, memory: 1536Mi}
           volumeMounts:
             - {name: config, mountPath: /etc/broadway/config.yaml, subPath: config.yaml, readOnly: true}
             - {name: optuna-db, mountPath: /etc/broadway/secret, readOnly: true}
