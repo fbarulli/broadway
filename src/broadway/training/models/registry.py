@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from broadway.training.models.knn import create as create_knn
 from broadway.training.models.lightgbm import create as create_lgbm
 from broadway.training.models.linear import create as create_linear
 from broadway.training.models.random_forest import create as create_rf
@@ -20,6 +21,7 @@ _REGISTRY = {
     "lgbm": create_lgbm,
     "rf": create_rf,
     "xgb": create_xgb,
+    "knn": create_knn,
 }
 
 MODEL_META: dict[str, dict] = {
@@ -32,7 +34,8 @@ MODEL_META: dict[str, dict] = {
         "display": "lgbm",
         "allowed_params": frozenset({
             "n_estimators", "learning_rate", "num_leaves", "max_depth",
-            "subsample", "colsample_bytree", "random_state", "n_jobs",
+            "subsample", "colsample_bytree", "min_child_samples",
+            "reg_alpha", "reg_lambda", "random_state", "n_jobs",
         }),
         "default_params": {
             "n_estimators": 100,
@@ -45,7 +48,8 @@ MODEL_META: dict[str, dict] = {
         "display": "xgb",
         "allowed_params": frozenset({
             "n_estimators", "learning_rate", "max_depth", "subsample",
-            "colsample_bytree", "random_state", "n_jobs", "tree_method",
+            "colsample_bytree", "min_child_weight", "reg_alpha", "gamma",
+            "random_state", "n_jobs", "tree_method",
         }),
         "default_params": {
             "n_estimators": 100,
@@ -58,7 +62,15 @@ MODEL_META: dict[str, dict] = {
     "rf": {
         "display": "rf",
         "allowed_params": frozenset({
-            "n_estimators", "max_depth", "max_samples", "random_state", "n_jobs",
+            "n_estimators", "max_depth", "max_samples", "min_samples_split",
+            "min_samples_leaf", "random_state", "n_jobs",
+        }),
+        "default_params": {},
+    },
+    "knn": {
+        "display": "knn",
+        "allowed_params": frozenset({
+            "n_neighbors", "weights", "p", "algorithm", "leaf_size", "n_jobs",
         }),
         "default_params": {},
     },

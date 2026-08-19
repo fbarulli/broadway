@@ -15,9 +15,11 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import yaml
+from sklearn.cluster import KMeans
 from sklearn.compose import ColumnTransformer
+from sklearn.decomposition import PCA
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.linear_model import Ridge
+from sklearn.linear_model import LinearRegression, Ridge
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder
@@ -55,12 +57,27 @@ CATEGORICAL_FEATURES = list(_cfg["categorical_features"])
 # params — comparison fits use get_model(key), which applies the registry's
 # default params.
 MODEL_KEYS = {display_name(key): key for key in model_keys()}
+def _pca_pipeline(**params: float) -> Pipeline:
+    """Battle-only PCA -> LinearRegression pipeline (dimensionality-reduction surface)."""
+    return Pipeline([
+        ("pca", PCA(n_components=int(params["n_components"]),
+                    random_state=params.get("random_state"))),
+        ("lr", LinearRegression()),
+    ])
+
+
 # BONUS_MODELS are intentionally OUTSIDE the platform model registry: they demo
 # sklearn classes (Ridge / RandomForestRegressor) the registry does not own.
+# PCA/K-Means are battle-only surfaces (dimensionality-reduction / clustering);
+# they are NOT registry models and NOT optuna-tunable — that is the intended
+# boundary. KNN, by contrast, is registry-backed and tunable via the unified
+# optuna API.
 BONUS_MODELS = {
     "ridge": (Ridge, {"alpha": 1.0, "random_state": SEED}),
     "rf": (RandomForestRegressor, {"n_estimators": 100, "max_depth": 5,
                                    "random_state": SEED}),
+    "pca": (_pca_pipeline, {"n_components": 5, "random_state": SEED}),
+    "kmeans": (KMeans, {"n_clusters": 8, "random_state": SEED}),
 }
 
 

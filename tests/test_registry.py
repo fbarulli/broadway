@@ -50,7 +50,7 @@ def test_display_name_linear_is_ols() -> None:
 
 
 def test_model_keys_match_meta_keys() -> None:
-    assert set(model_keys()) == {"linear", "lgbm", "rf", "xgb"}
+    assert set(model_keys()) == {"linear", "lgbm", "rf", "xgb", "knn"}
     assert set(model_keys()) == set(MODEL_META)
 
 
@@ -74,7 +74,7 @@ def test_schema_rejects_search_space_outside_allowed_params() -> None:
                 initial_trials_per_model=5,
                 top_k=1,
                 target_metric="rmse",
-                models=[ModelHPOSpec(name="lgbm", search_space={"reg_lambda": [0.1, 1.0]})],
+                models=[ModelHPOSpec(name="lgbm", search_space={"fit_intercept": [0.1, 1.0]})],
             ),
         )
 
@@ -82,3 +82,47 @@ def test_schema_rejects_search_space_outside_allowed_params() -> None:
 def test_allowed_params_unknown_key_empty() -> None:
     # Schema treats an unknown model's search space as invalid (empty allowlist).
     assert allowed_params("ghost") == frozenset()
+
+
+def test_knn_get_model_no_defaults_and_overrides() -> None:
+    model = get_model("knn")
+    assert model.n_neighbors == 5
+    tuned = get_model("knn", n_neighbors=12, p=2)
+    assert tuned.n_neighbors == 12
+    assert tuned.p == 2
+
+
+def test_knn_display_name() -> None:
+    assert display_name("knn") == "knn"
+
+
+def test_knn_allowed_params() -> None:
+    assert allowed_params("knn") == frozenset({
+        "n_neighbors", "weights", "p", "algorithm", "leaf_size", "n_jobs",
+    })
+
+
+def test_knn_hpo_spec_passes_validation() -> None:
+    spec = ModelHPOSpec(name="knn", search_space={
+        "n_neighbors": [3, 50], "p": [1, 2], "leaf_size": [10, 100],
+    })
+    config = HPOConfig(
+        engine="optuna",
+        total_trials=10,
+        initial_trials_per_model=5,
+        top_k=1,
+        target_metric="rmse",
+        models=[spec],
+    )
+    assert config.models[0].name == "knn"
+    assert set(config.models[0].search_space) == {"n_neighbors", "p", "leaf_size"}
+    # The registry-validated ExperimentConfig path also accepts the knn space.
+    exp = ExperimentConfig(
+        features=FeatureConfig(include=["rooms"], exclude=[], derived=[], encodings=[]),
+        model=ModelConfig(type="knn", params={}),
+        split=SplitConfig(type="random", validation_size=0.2),
+        random_state=42,
+        target_metric="rmse",
+        hpo=config,
+    )
+    assert exp.hpo is not None
