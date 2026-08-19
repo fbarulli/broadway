@@ -1,0 +1,18 @@
+# Build & Boot CI fixture: a minimal k8s-configmap-shaped config for the
+# worker's config-load simulation. Real infra (DB URLs, secrets) is never
+# exercised — this only verifies the code parses the expected structure.
+dataset:
+  name: ratecode1_sample
+  parquet: /app/data/ratecode1_sample.parquet
+  target: total_amount
+  min_fare: 2.5
+  max_duration_minutes: 240
+  pickup_datetime: tpep_pickup_datetime
+  dropoff_datetime: tpep_dropoff_datetime
+  features: [trip_distance, duration_minutes, pickup_hour, pickup_weekday]
+databases:
+  optuna: {driver: postgresql+psycopg2, host: postgres, port: "5432", name: optuna}
+  mlflow: {driver: postgresql+psycopg2, host: postgres, port: "5432", name: mlflow}
+mlflow:
+  tracking_uri: http://mlflow:5000
+  experiment: ratecode1_model_battle

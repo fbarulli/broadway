@@ -59,3 +59,51 @@ jobs:
         env:
           MPLCONFIGDIR: ${{ runner.temp }}/mplconfig
         run: uv run python experiments.py verify
+
+  # Build & Boot — structural determinism of the deployment images WITHOUT a
+  # cluster. Catches missing files / broken COPY paths / PYTHONPATH and import
+  # failures / parents[] resolution / eager-default traps / config structure.
+  # Runtime semantics (kind cluster + workers + dump/restore) stay a manual,
+  # on-demand `lifecycle.sh train` — this gate never runs training.
+  build-and-boot:
+    name: Build & Boot (docker images — no cluster)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build base image
+        run: docker build -f k8s/optuna/Dockerfile.base -t broadway-base:test .
+
+      - name: Build worker image
+        run: docker build -f k8s/optuna/Dockerfile.worker -t broadway-optuna-worker:test .
+
+      - name: Build mlflow image
+        run: docker build -f k8s/optuna/Dockerfile.mlflow -t mlflow-server:test .
+
+      # Imports _common -> project.working (working.yaml), resolves
+      # HPO_CONFIG_PATH via parents[] at the mirrored pod path, parses the HPO
+      # spec and builds CLI choices. Catches the layout/import bug class.
+      - name: Boot — worker imports + CLI
+        run: docker run --rm broadway-optuna-worker:test \
+          python /app/experiments/mlflow/03_optuna_worker.py --help
+
+      # Config-load simulation with the committed fixture: verifies the
+      # configmap structure + the HPO spec both parse inside the pod layout.
+      - name: Boot — config-load simulation
+        run: >
+          docker run --rm
+          -v "$PWD/.github/ci-fixtures/k8s-config.yaml:/etc/broadway/config.yaml"
+          broadway-optuna-worker:test python -c
+          "import yaml
+          from pathlib import Path
+          from broadway.config.schema import HPOConfig
+          cfg = yaml.safe_load(Path('/etc/broadway/config.yaml').read_text())
+          assert {'dataset','databases','mlflow'} <= set(cfg), 'configmap structure'
+          hpo = HPOConfig(**yaml.safe_load(
+              Path('/app/configs/experiments/mlflow.yaml').read_text())['hpo'])
+          print('config load OK — models:', [m.name for m in hpo.models])"
+
+      - name: Boot — mlflow image health
+        run: docker run --rm --entrypoint python mlflow-server:test \
+          -c "import mlflow; print('mlflow', mlflow.__version__)"
