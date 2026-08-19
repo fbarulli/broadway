@@ -5,10 +5,11 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-import project.etl.process_config as process_config
 import broadway.lineage.records as lineage_records
 from broadway.config.loader import load_config
 from broadway.config.schema import DatasetContract
+from broadway.lineage.models import LineageRecord
+from project.etl import process_config
 from project.etl.process import (
     compute_trip_duration,
     filter_valid_duration,
@@ -20,14 +21,13 @@ from project.etl.process import (
     select_and_clean_columns,
 )
 from project.etl.process_config import (
-    min_trip_duration_minutes,
+    max_trip_distance,
     max_trip_duration_minutes,
     min_trip_distance,
-    max_trip_distance,
+    min_trip_duration_minutes,
     rename_map,
 )
-from broadway.features.schema import TARGET
-from broadway.lineage.models import LineageRecord
+from project.features import TARGET
 
 
 @pytest.fixture

@@ -4,11 +4,10 @@ under all remediations (kurtosis=25.5, Breusch-Pagan/Jarque-Bera p≈0)."""
 import numpy as np
 import pandas as pd
 
-from project import data
-from project.ml_pipeline import FeaturePipeline
-from broadway.features.schema import TARGET
-from project.features import ENGINEERED_FEATURES
 from broadway.stats import baseline
+from project import data
+from project.features import ENGINEERED_FEATURES, TARGET
+from project.ml_pipeline import FeaturePipeline
 
 
 def load_and_split() -> tuple[pd.DataFrame, pd.DataFrame, np.ndarray, np.ndarray]:

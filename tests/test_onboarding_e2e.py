@@ -1,7 +1,7 @@
-"""End-to-end acceptance test: onboard + run a totally non-taxi dataset.
+"""End-to-end acceptance test: onboard + run a totally external dataset.
 
 Proves the generic pipeline (init -> etl -> contracts -> baseline -> features
--> train -> evaluate) works for an arbitrary CSV without touching any taxi or
+-> train -> evaluate) works for an arbitrary CSV without touching any
 project-specific code.
 """
 
@@ -24,7 +24,7 @@ from broadway.pipeline import run as run_pipeline
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_init_and_run_non_taxi_dataset(
+def test_init_and_run_external_dataset(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     # 1. Isolate configs, artifacts, and lineage into tmp_path.
@@ -40,7 +40,7 @@ def test_init_and_run_non_taxi_dataset(
     monkeypatch.setattr(discover_module, "ARTIFACTS_DIR", tmp_path / "artifacts")
     monkeypatch.setattr(records, "LINEAGE_DIR", tmp_path / "lineage")
 
-    # 2. Write a synthetic non-taxi CSV.
+    # 2. Write a synthetic external CSV.
     rng = np.random.default_rng(42)
     n = 200
     listed_at = pd.date_range("2024-01-01", periods=n, freq="h").strftime(

@@ -47,7 +47,7 @@ def build_raw_schema(contract: DatasetContract) -> pa.DataFrameSchema:
     """Build a structure-only schema for the raw columns in ``contract``.
 
     Columns come directly from ``contract.columns``; join-derived columns
-    (e.g. ``pickup_borough``) are not part of the raw contract. Dtypes are
+    (e.g. ``enriched_group``) are not part of the raw contract. Dtypes are
     checked strictly (``coerce=False``) and nulls are permitted
     (``nullable=True``) — the contract's ``null_count`` is observed, not an
     invariant.

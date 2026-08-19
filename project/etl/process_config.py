@@ -4,7 +4,8 @@ and generic etl knobs from configs/step/etl.yaml."""
 import yaml
 
 from broadway.config.loader import CONFIGS_DIR
-from broadway.config.schema import EtlStep, ProjectConfig
+from broadway.config.schema import EtlStep
+from project.config import ProjectConfig
 
 _PROJECT_YAML = CONFIGS_DIR / "project" / "taxi.yaml"
 _project = ProjectConfig(**yaml.safe_load(_PROJECT_YAML.read_text()))

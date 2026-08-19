@@ -66,14 +66,14 @@ def test_load_sample_column_mapping_round_trip(
         "path: results/foo.parquet\n"
         "description: a diagnostic sample\n"
         "column_mapping:\n"
-        "  Borough: pickup_borough\n",
+        "  district: source_district\n",
         encoding="utf-8",
     )
     monkeypatch.setattr(loader, "CONFIGS_DIR", tmp_path)
 
     spec = load_sample("foo")
 
-    assert spec.column_mapping == {"Borough": "pickup_borough"}
+    assert spec.column_mapping == {"district": "source_district"}
 
 
 def _setup_test_cfg(

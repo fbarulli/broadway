@@ -141,12 +141,12 @@ def test_lookup_spec_value_policies_parse() -> None:
         path: lookup.csv
         key: LocationID
         value_policies:
-          Borough:
+          district:
             sentinel_values:
               - Unknown
         """
     ))
-    assert spec.value_policies["Borough"].sentinel_values == ["Unknown"]
+    assert spec.value_policies["district"].sentinel_values == ["Unknown"]
 
 
 def test_lookup_spec_value_policies_default_empty() -> None:

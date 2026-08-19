@@ -16,9 +16,9 @@ from broadway.stats.describe import GroupStat, GroupSummary
 
 def _summary() -> GroupSummary:
     return GroupSummary(
-        group_column="Borough",
-        source_group_column="pickup_borough",
-        target="trip_duration_minutes",
+        group_column="district",
+        source_group_column="source_district",
+        target="price",
         total_n=5,
         source_path="x.parquet",
         sample_name="diagnostic",

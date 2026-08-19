@@ -11,7 +11,7 @@ from pathlib import Path
 
 import yaml
 
-from broadway.config.schema import ProjectConfig
+from project.config import ProjectConfig
 from project.etl.process_config import (
     max_trip_distance,
     max_trip_duration_minutes,

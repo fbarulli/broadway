@@ -1,4 +1,13 @@
-"""Feature derivation — compute derived columns from source data."""
+"""Feature derivation — compute derived columns from source data.
+
+``BUILDERS`` is the shared registry of pure column transforms. Both the
+feature-engineering pipeline (``features.derived[].func`` in experiment
+configs) and the named-sample pipeline (``SampleSpec.derived[].formula`` in
+sample configs) resolve their functions here. It is an *implementation*
+registry only — which features exist, their names, and their dtypes are
+declared in the dataset layer (``project/features.py`` for model-facing
+features; sample configs declare their own derived columns).
+"""
 
 from __future__ import annotations
 
@@ -10,32 +19,40 @@ import pandas as pd
 from broadway.config.schema import DerivedFeature
 
 
-def _same_borough(df: pd.DataFrame, borough_col: str, lookup_col: str) -> pd.Series:
-    if borough_col not in df.columns:
-        raise ValueError(f"same_borough requires column '{borough_col}'")
+def _same_group(df: pd.DataFrame, group_col: str, lookup_col: str) -> pd.Series:
+    if group_col not in df.columns:
+        raise ValueError(f"same_group requires column {group_col!r}.")
     if lookup_col not in df.columns:
-        raise ValueError(f"same_borough requires column '{lookup_col}'")
-    pu = df[borough_col]
+        raise ValueError(f"same_group requires column {lookup_col!r}")
+    pu = df[group_col]
     do = df[lookup_col]
     return (pu == do).astype(int)
 
 
-def _rush_hour(df: pd.DataFrame, source: str, hours: list[int]) -> pd.Series:
+def _in_hour_window(df: pd.DataFrame, source: str, hours: list[int]) -> pd.Series:
     return pd.to_datetime(df[source]).dt.hour.isin(hours).astype(int)
 
 
-_BUILDERS = {
+def _rate_per_hour(df: pd.DataFrame, columns: dict[str, str]) -> pd.Series:
+    """distance / (duration_minutes / 60). Column names come from the
+    dataset's role mapping (``columns``), falling back to generic names."""
+    distance = columns.get("distance", "distance")
+    duration = columns.get("duration_minutes", "duration_minutes")
+    return df[distance] / (df[duration] / 60)
+
+
+# Shared transform registry. Contract: callable(df, src=None, **kw); a
+# multi-input transform reads its input columns by role from kw["columns"].
+BUILDERS = {
     "datetime_hour": lambda df, src, **kw: pd.to_datetime(df[src]).dt.hour.astype(int),
     "datetime_dayofweek": lambda df, src, **kw: pd.to_datetime(df[src]).dt.dayofweek.astype(int),
     "datetime_month": lambda df, src, **kw: pd.to_datetime(df[src]).dt.month.astype(int),
-    "pickup_hour": lambda df, src, **kw: pd.to_datetime(df[src]).dt.hour.astype(int),
-    "pickup_day_of_week": lambda df, src, **kw: pd.to_datetime(df[src]).dt.dayofweek.astype(int),
-    "pickup_month": lambda df, src, **kw: pd.to_datetime(df[src]).dt.month.astype(int),
     "is_weekend": lambda df, src, **kw: pd.to_datetime(df[src]).dt.dayofweek.isin([5, 6]).astype(int),
-    "rush_hour": lambda df, src, **kw: _rush_hour(df, src, kw.get("rush_hour_hours", [7, 8, 9, 17, 18, 19])),
+    "in_hour_window": lambda df, src, **kw: _in_hour_window(df, src, kw.get("hour_window", [7, 8, 9, 17, 18, 19])),
     "is_night": lambda df, src, **kw: pd.to_datetime(df[src]).dt.hour.isin([0, 1, 2, 3, 4, 5, 21, 22, 23]).astype(int),
     "log_distance": lambda df, src, **kw: np.log1p(df[src]),
-    "same_borough": lambda df, src, **kw: _same_borough(df, kw.get("borough_col", "Borough"), kw.get("lookup_col", "Borough_lookup")),
+    "same_group": lambda df, src, **kw: _same_group(df, kw.get("group_col", "group"), kw.get("lookup_col", "group_lookup")),
+    "rate_per_hour": lambda df, src, **kw: _rate_per_hour(df, kw.get("columns", {})),
     "price / area": lambda df, src, **kw: df[src],
 }
 
@@ -43,13 +60,11 @@ _BUILDER_DTYPES: dict[str, str] = {
     "datetime_hour": "int64",
     "datetime_dayofweek": "int64",
     "datetime_month": "int64",
-    "pickup_hour": "int64",
-    "pickup_day_of_week": "int64",
-    "pickup_month": "int64",
     "is_weekend": "int64",
-    "rush_hour": "int64",
+    "in_hour_window": "int64",
     "is_night": "int64",
-    "same_borough": "int64",
+    "same_group": "int64",
+    "rate_per_hour": "float64",
     "log_distance": "float64",
     "price / area": "float64",
 }
@@ -65,7 +80,7 @@ def load_custom_builders(builder_module: str | None) -> dict:
     builders = getattr(mod, "BUILDERS", None)
     if not isinstance(builders, dict):
         raise ValueError(f"builder module '{builder_module}' must define a BUILDERS dict of name -> callable")
-    collisions = sorted(set(builders) & set(_BUILDERS))
+    collisions = sorted(set(builders) & set(BUILDERS))
     if collisions:
         raise ValueError(
             f"builder module '{builder_module}' collides with generic builder name(s): {collisions}"
@@ -79,12 +94,12 @@ def builder_dtype(func: str) -> str:
 
 def build_derived(df: pd.DataFrame, features: list[DerivedFeature], target: str,
                   extra_builders: dict | None = None,
-                  borough_col: str = "Borough",
-                  lookup_col: str = "Borough_lookup",
-                  rush_hour_hours: list[int] | None = None) -> pd.DataFrame:
-    _rush_hours = rush_hour_hours if rush_hour_hours is not None else [7, 8, 9, 17, 18, 19]
-    builder_kwargs = {"borough_col": borough_col, "lookup_col": lookup_col, "rush_hour_hours": _rush_hours}
-    registry = dict(_BUILDERS)
+                  group_col: str = "group",
+                  lookup_col: str = "group_lookup",
+                  hour_window: list[int] | None = None) -> pd.DataFrame:
+    _window = hour_window if hour_window is not None else [7, 8, 9, 17, 18, 19]
+    builder_kwargs = {"group_col": group_col, "lookup_col": lookup_col, "hour_window": _window}
+    registry = dict(BUILDERS)
     if extra_builders:
         registry.update(extra_builders)
     result = df.copy()

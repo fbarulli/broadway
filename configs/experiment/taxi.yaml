@@ -7,25 +7,25 @@ features:
   exclude: []
   derived:
     - name: pickup_hour
-      func: pickup_hour
+      func: datetime_hour
       source: pickup_datetime
     - name: pickup_day_of_week
-      func: pickup_day_of_week
+      func: datetime_dayofweek
       source: pickup_datetime
     - name: pickup_month
-      func: pickup_month
+      func: datetime_month
       source: pickup_datetime
     - name: is_weekend
       func: is_weekend
       source: pickup_datetime
     - name: rush_hour
-      func: rush_hour
+      func: in_hour_window
       source: pickup_datetime
     - name: is_night
       func: is_night
       source: pickup_datetime
     - name: same_borough
-      func: same_borough
+      func: same_group
       source: pickup_location_id
   encodings:
     - type: target

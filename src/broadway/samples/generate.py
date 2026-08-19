@@ -7,13 +7,13 @@ from __future__ import annotations
 import hashlib
 import json
 import operator
-from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 
 import pandas as pd
 
 from broadway.config.loader import CONFIGS_DIR
+from broadway.features.builders import BUILDERS
 from broadway.lineage.models import DerivedSpec, FilterSpec, SampleSpec
 from broadway.lineage.sample import load_sample
 
@@ -26,11 +26,6 @@ _OPERATORS = {
     "<=": operator.le,
     "==": operator.eq,
     "!=": operator.ne,
-}
-
-# Safe whitelist of derived-column formulas — never eval/exec user code.
-_DERIVED_FUNCS: dict[str, Callable[[pd.DataFrame], pd.Series]] = {
-    "speed_mph": lambda df: df["trip_distance"] / (df["trip_duration_minutes"] / 60),
 }
 
 
@@ -61,15 +56,21 @@ def _apply_filters(df: pd.DataFrame, filters: list[FilterSpec]) -> pd.DataFrame:
 
 
 def _apply_derived(df: pd.DataFrame, derived: list[DerivedSpec]) -> pd.DataFrame:
-    """Compute whitelisted derived columns; unknown formulas raise."""
+    """Compute shared-registry derived columns; unknown formulas raise.
+
+    Formulas resolve against the shared transform registry
+    (``broadway.features.builders.BUILDERS``) — the same implementation
+    functions the feature pipeline uses. Dataset configs declare which
+    columns feed each formula role via ``DerivedSpec.columns``.
+    """
     for spec in derived:
-        func = _DERIVED_FUNCS.get(spec.formula)
+        func = BUILDERS.get(spec.formula)
         if func is None:
             raise ValueError(
                 f"unknown derived formula '{spec.formula}' "
-                f"(whitelist: {sorted(_DERIVED_FUNCS)})"
+                f"(registry: {sorted(BUILDERS)})"
             )
-        df = df.assign(**{spec.name: func(df)})
+        df = df.assign(**{spec.name: func(df, None, columns=spec.columns)})
     return df
 
 

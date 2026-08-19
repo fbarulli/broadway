@@ -1,4 +1,4 @@
-"""Named-sample registry tests — synthetic data only (no taxi coupling).
+"""Named-sample registry tests — synthetic data only (no project-layer coupling).
 
 Covers the definition → generation → immutable artifact → validated
 consumption loop: generate/read round-trip, immutability, and every loader
@@ -14,7 +14,6 @@ import pandas as pd
 import pytest
 import yaml
 from pandera.errors import SchemaErrors
-from pydantic import ValidationError
 
 import broadway.samples.generate as generate_module
 from broadway.config import loader
@@ -199,13 +198,13 @@ def test_schema_violation_raises(
 
 
 def _exclude_source(tmp_path: Path) -> Path:
-    """12-row source with fares/distances/durations spanning the rule groups."""
+    """12-row source with prices/distances/durations spanning the rule groups."""
     src = tmp_path / "src.parquet"
     pd.DataFrame({
         "id": list(range(12)),
-        "fare_amount": [2.5, 2.5, 3.0, 4.0, 5.0, 6.0, 6.5, 7.0, 7.5, 8.0, 3.5, 8.0],
-        "trip_distance": [0.5, 3.5, 4.0, 2.0, 0.5, 1.0, 3.5, 2.0, 3.5, 0.5, 3.5, 0.5],
-        "trip_duration_minutes": [
+        "price": [2.5, 2.5, 3.0, 4.0, 5.0, 6.0, 6.5, 7.0, 7.5, 8.0, 3.5, 8.0],
+        "distance": [0.5, 3.5, 4.0, 2.0, 0.5, 1.0, 3.5, 2.0, 3.5, 0.5, 3.5, 0.5],
+        "duration_minutes": [
             1.0, 1.0, 10.0, 2.0, 1.0, 4.0, 12.0, 4.0, 2.0, 15.0, 4.0, 5.0,
         ],
     }).to_parquet(src, index=False)
@@ -213,14 +212,14 @@ def _exclude_source(tmp_path: Path) -> Path:
 
 
 LOW_GROUP = [
-    {"column": "fare_amount", "op": "<=", "value": 4.0},
-    {"column": "trip_distance", "op": ">", "value": 3.0},
+    {"column": "price", "op": "<=", "value": 4.0},
+    {"column": "distance", "op": ">", "value": 3.0},
 ]
 HIGH_GROUP = [
-    {"column": "fare_amount", "op": ">=", "value": 6.0},
-    {"column": "trip_duration_minutes", "op": "<", "value": 5.0},
+    {"column": "price", "op": ">=", "value": 6.0},
+    {"column": "duration_minutes", "op": "<", "value": 5.0},
 ]
-EXCLUDE_COLS = ["id", "fare_amount", "trip_distance", "trip_duration_minutes"]
+EXCLUDE_COLS = ["id", "price", "distance", "duration_minutes"]
 
 
 def test_derived_column_computed_and_recorded(
@@ -228,30 +227,30 @@ def test_derived_column_computed_and_recorded(
 ) -> None:
     src = tmp_path / "src.parquet"
     pd.DataFrame({
-        "trip_distance": [6.0, 30.0, 10.0],
-        "trip_duration_minutes": [60.0, 120.0, 60.0],
+        "distance": [6.0, 30.0, 10.0],
+        "duration_minutes": [60.0, 120.0, 60.0],
     }).to_parquet(src, index=False)
     _write_config(
         tmp_path, "derived", src,
         size=3,
-        columns=["trip_distance", "trip_duration_minutes"],
-        derived=[{"name": "speed_mph", "formula": "speed_mph"}],
+        columns=["distance", "duration_minutes"],
+        derived=[{"name": "rate", "formula": "rate_per_hour"}],
         filters=None,
         schema=None,
     )
     samples_dir = _generated(tmp_path, monkeypatch, "derived", src)
 
     df = pd.read_parquet(samples_dir / "derived@v1.parquet")
-    assert list(df.columns) == ["trip_distance", "trip_duration_minutes", "speed_mph"]
-    # 6 mi in 1 h → 6 mph; 30 mi in 2 h → 15 mph; 10 mi in 1 h → 10 mph.
-    assert sorted(df["speed_mph"]) == [6.0, 10.0, 15.0]
+    assert list(df.columns) == ["distance", "duration_minutes", "rate"]
+    # 6 in 1 h → 6/h; 30 in 2 h → 15/h; 10 in 1 h → 10/h.
+    assert sorted(df["rate"]) == [6.0, 10.0, 15.0]
 
     provenance = json.loads(
         (samples_dir / "derived@v1.json").read_text(encoding="utf-8")
     )
-    assert provenance["derived"] == ["speed_mph"]
+    assert provenance["derived"] == ["rate"]
     assert provenance["columns"] == [
-        "trip_distance", "trip_duration_minutes", "speed_mph",
+        "distance", "duration_minutes", "rate",
     ]
 
 
@@ -292,7 +291,7 @@ def test_v2_immutable_and_v1_preserved(
     _write_config(
         tmp_path, "multiver", src,
         version="v2", path="data/samples/multiver@v2.parquet",
-        derived=[{"name": "speed_mph", "formula": "speed_mph"}],
+        derived=[{"name": "rate", "formula": "rate_per_hour"}],
         **base,
     )
     _generated(tmp_path, monkeypatch, "multiver", src)
@@ -313,30 +312,30 @@ def test_unknown_derived_formula_rejected(
         tmp_path, "badformula", src,
         size=12,
         columns=EXCLUDE_COLS,
-        derived=[{"name": "speed_mph", "formula": "teleport_mph"}],
+        derived=[{"name": "rate", "formula": "teleport_mph"}],
         filters=None,
         schema=None,
     )
     monkeypatch.setattr(loader, "CONFIGS_DIR", tmp_path / "configs")
-    with pytest.raises(ValidationError):
+    with pytest.raises(ValueError, match="unknown derived formula"):
         generate_sample("badformula", samples_dir=tmp_path / "samples")
 
 
-def test_derived_formula_not_in_whitelist_raises(
+def test_derived_formula_not_in_registry_raises(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The generate-time guard fires when the whitelist lacks a declared formula."""
+    """The generate-time guard fires when the registry lacks a declared formula."""
     src = _exclude_source(tmp_path)
     _write_config(
         tmp_path, "noguard", src,
         size=12,
         columns=EXCLUDE_COLS,
-        derived=[{"name": "speed_mph", "formula": "speed_mph"}],
+        derived=[{"name": "rate", "formula": "rate_per_hour"}],
         filters=None,
         schema=None,
     )
     monkeypatch.setattr(loader, "CONFIGS_DIR", tmp_path / "configs")
-    monkeypatch.setattr(generate_module, "_DERIVED_FUNCS", {})
+    monkeypatch.setattr(generate_module, "BUILDERS", {})
     with pytest.raises(ValueError, match="unknown derived formula"):
         generate_sample("noguard", samples_dir=tmp_path / "samples")
 
@@ -345,7 +344,7 @@ def test_existing_config_still_parses(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     # Backward-compat: a v1-shaped SampleSpec (no derived/exclude_any fields)
-    # must still load. Uses a synthetic config — the suite is taxi-free.
+    # must still load. Uses a synthetic config — the suite is project-free.
     _write_config(tmp_path, "legacy_v1", tmp_path / "src.parquet")
     monkeypatch.setattr(loader, "CONFIGS_DIR", tmp_path / "configs")
     spec = load_sample("legacy_v1")

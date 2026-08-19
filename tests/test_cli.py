@@ -37,9 +37,9 @@ class TestDiscoverCLI:
         _write_csv(
             csv_path,
             [
-                {"trip_distance": 1.5, "duration_min": 10.0, "passenger_count": 1, "fare": 15.0},
-                {"trip_distance": 3.2, "duration_min": 22.0, "passenger_count": 2, "fare": 30.0},
-                {"trip_distance": 0.8, "duration_min":  8.0, "passenger_count": 1, "fare":  9.0},
+                {"area": 1.5, "duration_min": 10.0, "rooms": 1, "price": 15.0},
+                {"area": 3.2, "duration_min": 22.0, "rooms": 2, "price": 30.0},
+                {"area": 0.8, "duration_min":  8.0, "rooms": 1, "price":  9.0},
             ],
         )
 
@@ -58,7 +58,7 @@ class TestDiscoverCLI:
         result = _run(
             "discover",
             "--csv", str(csv_path),
-            "--target", "fare",
+            "--target", "price",
             "--task", "regression",
             env=env,
         )
@@ -72,7 +72,7 @@ class TestDiscoverCLI:
         result = _run(
             "discover",
             "--csv", "/nonexistent/path.csv",
-            "--target", "fare",
+            "--target", "price",
             "--task", "regression",
         )
         assert result.returncode != 0

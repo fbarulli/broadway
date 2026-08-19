@@ -19,7 +19,6 @@ YAML → Pydantic loading and dataframe contract enforcement.
 
 Ingest, structural cleaning, joins, and the dataset loaders.
 
-- `test_process.py` — ETL function units (`filter_valid_trips`, `compute_trip_duration`, …) on synthetic frames.
 - `test_structural_cleaning.py` — `standardize_missing`, `parse_datetime`, duplicate/target-null removal, `StructuralCleanResult`.
 - `test_join_audit.py`, `test_lookup_value_audit.py` — `JoinAudit` / `LookupValueAudit` evidence.
 

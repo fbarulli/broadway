@@ -18,13 +18,13 @@ from broadway.analysis.contracts import AnalysisContract
 from broadway.config.schema import (
     DatasetContract,
     FeaturesStep,
-    ProjectConfig,
     StatsStep,
     TrainStep,
 )
 from broadway.contracts.pandera import build_raw_schema
 from broadway.data import loader as _loader
 from broadway.stats.effect_size import group_imbalance
+from project.config import ProjectConfig
 
 logger = logging.getLogger(__name__)
 

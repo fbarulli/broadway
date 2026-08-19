@@ -10,6 +10,13 @@ from __future__ import annotations
 
 from broadway.features.schema import FeatureSpec, build_engineered_schema
 
+TARGET = "trip_duration_minutes"
+
+ROUTE_KEYS = [
+    "pickup_location_id",
+    "dropoff_location_id",
+]
+
 FEATURE_SPECS: dict[str, FeatureSpec] = {
     "pickup_hour": FeatureSpec("pickup_hour", "int32"),
     "pickup_day_of_week": FeatureSpec("pickup_day_of_week", "int32"),

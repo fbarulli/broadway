@@ -10,7 +10,7 @@ seed: 42
 size: 1000000
 columns: [pickup_datetime, pickup_location_id, dropoff_location_id, fare_amount, trip_distance, trip_duration_minutes]
 derived:
-  - {name: speed_mph, formula: speed_mph}
+  - {name: speed_mph, formula: rate_per_hour, columns: {distance: trip_distance, duration_minutes: trip_duration_minutes}}
 # Plausibility exclusions from the 04 percentile-extremes audit (recorded
 # decision: drop implausible low/high-fare trips — 189 rows on v1). Each
 # inner group is AND; a row is dropped when ANY group fully matches.

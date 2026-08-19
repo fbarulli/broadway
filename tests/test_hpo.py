@@ -1,7 +1,7 @@
 """Unified HPO API tests — bandit allocation, objective, studies, run_hpo.
 
 Synthetic only: the run_hpo orchestration tests stub make_objective with a
-parabola objective so no real model training or taxi data is involved. The
+parabola objective so no real model training or external data is involved. The
 mlflow tracking tests log runs to a hermetic tmp file store (no server) and
 fit a linear model on the tiny 4-row fixture.
 """

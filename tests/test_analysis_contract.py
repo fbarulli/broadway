@@ -185,13 +185,13 @@ def test_hypothesis_mode_with_block_parses() -> None:
         leakage_notes=[],
         success_criterion="s",
         hypothesis={
-            "group_column": "Borough",
-            "group_values": ["Manhattan", "Brooklyn"],
+            "group_column": "district",
+            "group_values": ["downtown", "suburbs"],
         },
     )
     assert contract.mode == AnalysisMode.HYPOTHESIS
-    assert contract.hypothesis.group_column == "Borough"
-    assert contract.hypothesis.group_values == ["Manhattan", "Brooklyn"]
+    assert contract.hypothesis.group_column == "district"
+    assert contract.hypothesis.group_values == ["downtown", "suburbs"]
 
 
 def test_prediction_mode_allows_omitted_hypothesis() -> None:

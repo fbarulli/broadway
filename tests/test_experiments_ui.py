@@ -1,4 +1,4 @@
-"""UI surface tests — synthetic only (no taxi coupling, no server).
+"""UI surface tests — synthetic only (no project-layer coupling, no server).
 
 Covers the failure classes that have bitten the experiment UI:
 raw-JS leaking out of its ``<script>`` tags, evidence-table rendering,
@@ -45,7 +45,7 @@ def test_evidence_table_escapes_and_formats(monkeypatch, tmp_path) -> None:
     csv_path = tmp_path / "05_step_describe.csv"
     pd.DataFrame(
         {
-            "feature": ["fare_amount", "trip_distance"],
+            "feature": ["price", "area"],
             "mean": [10.5, 3.25],
             "count": [988077.0, 988077.0],
         },
