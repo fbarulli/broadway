@@ -18,7 +18,7 @@ def _summary() -> GroupSummary:
     return GroupSummary(
         group_column="district",
         source_group_column="source_district",
-        target="price",
+        target="target",
         total_n=5,
         source_path="x.parquet",
         sample_name="diagnostic",

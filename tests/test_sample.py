@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pandas as pd
 import pytest
+from contract_fixture import categorical_column, target_column
 from pydantic import ValidationError
 
 from broadway.config import loader
@@ -76,9 +77,19 @@ def test_load_sample_column_mapping_round_trip(
     assert spec.column_mapping == {"district": "source_district"}
 
 
+def _demo_columns() -> tuple[str, str]:
+    """(group column, target column) from the demo dataset contract."""
+    cfg = load_config("contracts", dataset="test", experiment="baseline")
+    assert cfg.dataset is not None
+    group = categorical_column(cfg.dataset)
+    assert group is not None
+    return group, target_column(cfg.dataset)
+
+
 def _setup_test_cfg(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    group, _ = _demo_columns()
     configs_dir = tmp_path / "configs"
     shutil.copytree(REPO_ROOT / "configs" / "environment", configs_dir / "environment")
     shutil.copytree(REPO_ROOT / "configs" / "dataset", configs_dir / "dataset")
@@ -90,12 +101,12 @@ def _setup_test_cfg(
         "goal: test whether target differs across feature groups\n"
         "row_definition: one listing\n"
         "decision_moment: post-hoc analysis\n"
-        "available_info:\n"
-        "  - feature_3\n"
+        f"available_info:\n"
+        f"  - {group}\n"
         "leakage_notes: []\n"
         "success_criterion: report effect size\n"
         "hypothesis:\n"
-        "  group_column: feature_3\n"
+        f"  group_column: {group}\n"
         "  group_values:\n"
         "    - A\n"
         "    - B\n",
@@ -105,30 +116,35 @@ def _setup_test_cfg(
     monkeypatch.setattr(records, "LINEAGE_DIR", tmp_path / "lineage")
 
 
+def _mapped_sample(tmp_path: Path, group: str, target: str) -> SampleSpec:
+    sample_path = tmp_path / "sample.parquet"
+    pd.DataFrame(
+        {
+            group: ["A", "A", "B", "B", "B"],
+            target: [10.0, 12.0, 20.0, 22.0, 24.0],
+        }
+    ).to_parquet(sample_path, index=False)
+    return SampleSpec(
+        name="test_estimation",
+        role="estimation",
+        path=str(sample_path),
+        description="canonical sample",
+    )
+
+
 def test_describe_run_stamps_sample(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    group, target = _demo_columns()
     _setup_test_cfg(tmp_path, monkeypatch)
     cfg = load_config("stats", dataset="test", analysis="sample_hypothesis")
     assert cfg.dataset is not None
     assert cfg.stats is not None
 
-    sample_path = tmp_path / "sample.parquet"
-    pd.DataFrame(
-        {
-            "feature_3": ["A", "A", "B", "B", "B"],
-            "target": [10.0, 12.0, 20.0, 22.0, 24.0],
-        }
-    ).to_parquet(sample_path, index=False)
+    sample = _mapped_sample(tmp_path, group, target)
 
     cfg = cfg.model_copy(
         update={"stats": cfg.stats.model_copy(update={"output_dir": str(tmp_path)})}
-    )
-    sample = SampleSpec(
-        name="test_estimation",
-        role="estimation",
-        path=str(sample_path),
-        description="canonical sample",
     )
 
     describe_module.run(cfg, sample)
@@ -136,32 +152,22 @@ def test_describe_run_stamps_sample(
     summary = json.loads((tmp_path / "describe.json").read_text())
     assert summary["sample_name"] == "test_estimation"
     assert summary["sample_role"] == "estimation"
-    assert summary["source_path"] == str(sample_path)
+    assert summary["source_path"] == str(sample.path)
 
 
 def test_describe_lineage_sidecar_stamps_sample(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    group, target = _demo_columns()
     _setup_test_cfg(tmp_path, monkeypatch)
     cfg = load_config("stats", dataset="test", analysis="sample_hypothesis")
     assert cfg.dataset is not None
     assert cfg.stats is not None
 
-    sample_path = tmp_path / "sample.parquet"
-    pd.DataFrame(
-        {
-            "feature_3": ["A", "A", "B", "B", "B"],
-            "target": [10.0, 12.0, 20.0, 22.0, 24.0],
-        }
-    ).to_parquet(sample_path, index=False)
+    sample = _mapped_sample(tmp_path, group, target)
 
     cfg = cfg.model_copy(
         update={"stats": cfg.stats.model_copy(update={"output_dir": str(tmp_path)})}
-    )
-    sample = SampleSpec(
-        name="test_estimation",
-        role="estimation",
-        path=str(sample_path),
     )
 
     describe_module.run(cfg, sample)
