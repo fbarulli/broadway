@@ -17,6 +17,7 @@ lookup and objective use) runs trials; `--init-only` pre-creates the studies
 import argparse
 import os
 import socket
+import sys
 from pathlib import Path
 
 import mlflow
@@ -113,6 +114,29 @@ def log_to_mlflow(
         hpo.log_best_artifacts(key, best.params, X_train, y_train, X_val, y_val)
 
 
+def preflight(db_url: str, tracking_uri: str) -> None:
+    """Loud early failure: verify Optuna storage + MLflow are reachable FIRST.
+
+    A bad DB URL or an unreachable tracking server would otherwise surface as
+    an obscure crash/hang mid-trial; here it exits loudly before any trial.
+    """
+    try:
+        import sqlalchemy
+        sqlalchemy.create_engine(db_url).connect().close()
+    except Exception as exc:
+        print(f"[worker] FATAL: cannot reach Optuna storage {db_url!r}: {exc}",
+              file=sys.stderr)
+        sys.exit(1)
+    try:
+        mlflow.set_tracking_uri(tracking_uri)
+        mlflow.tracking.MlflowClient().search_experiments(max_results=1)
+    except Exception as exc:
+        print(f"[worker] FATAL: cannot reach MLflow {tracking_uri!r}: {exc}",
+              file=sys.stderr)
+        sys.exit(1)
+    print(f"[worker] preflight OK: optuna + mlflow reachable ({tracking_uri})")
+
+
 def main() -> None:
     mlflow_cfg = yaml.safe_load(HPO_CONFIG_PATH.read_text())
     hpo_cfg = HPOConfig(**mlflow_cfg["hpo"])
@@ -134,6 +158,7 @@ def main() -> None:
     db = cfg["databases"]["optuna"]
     db_url = compose_db_url(db["driver"], secret["DB_USER"], secret["DB_PASSWORD"],
                             db["host"], db["port"], db["name"])
+    preflight(db_url, cfg["mlflow"]["tracking_uri"])
     log_endpoints(args.model, cfg, db_url)
 
     if args.init_only:

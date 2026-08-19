@@ -49,6 +49,32 @@ jobs:
           docker run --rm -v "$PWD":/work -w /work ghcr.io/yannh/kubeconform:v0.6.7 \
             -strict -summary -ignore-filename-pattern "kind-config\\.yaml" k8s/optuna/ 2>&1 | tail -3
 
+      # Every REAL experiment config must parse against the config schema —
+      # a config that fails to load breaks the build.
+      - name: Configs (parse every configs/experiment/*.yaml)
+        run: |
+          uv run python -c "
+          from pathlib import Path
+          from broadway.config.loader import load_config
+          paths = sorted(Path('configs/experiment').glob('*.yaml'))
+          assert paths, 'no experiment configs found'
+          for p in paths:
+              load_config('train', dataset='test', experiment=p.stem)
+              print(f'OK {p.stem}')
+          "
+
+      # Orchestrator dry-run: render the worker Jobs for the HPO spec's models
+      # and assert they are valid Kubernetes with the right image/env/args.
+      - name: Orchestrator dry-run (render worker jobs)
+        run: |
+          mkdir -p /tmp/jobs
+          uv run python k8s/optuna/render_worker_jobs.py --image broadway-optuna-worker:ci > /tmp/jobs/jobs.yaml
+          grep -q "broadway-optuna-worker:ci" /tmp/jobs/jobs.yaml
+          grep -q "BROADWAY_MLFLOW_CONFIG" /tmp/jobs/jobs.yaml
+          grep -q -- "--model" /tmp/jobs/jobs.yaml
+          docker run --rm -v /tmp/jobs:/work ghcr.io/yannh/kubeconform:v0.6.7 \
+            -strict -summary /work/jobs.yaml 2>&1 | tail -1
+
       - name: Tests + coverage (platform suite)
         env:
           MPLCONFIGDIR: ${{ runner.temp }}/mplconfig

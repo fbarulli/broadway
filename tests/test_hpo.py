@@ -11,10 +11,12 @@ from __future__ import annotations
 from typing import Self
 
 import mlflow
+import numpy as np
 import pandas as pd
 import pytest
 
 from broadway.config.schema import HPOConfig, ModelHPOSpec
+from broadway.training import hpo
 from broadway.training import hpo as hpo_module
 from broadway.training.hpo import (
     bandit_allocate,
@@ -291,3 +293,21 @@ def test_log_best_artifacts_tree_importance_plot(tmp_path, tiny_data,
     assert has_model
     assert "predictions.csv" in artifacts
     assert "feature_importance.png" in artifacts
+
+
+def test_make_objective_returns_float() -> None:
+    """The objective must return a finite, non-negative float on synthetic data.
+
+    The objective receives a params dict (the run_study contract); passing {}
+    exercises the default-params path, and a small hyperparam set exercises
+    the tuned path — no exceptions on either.
+    """
+    rng = np.random.default_rng(0)
+    X = pd.DataFrame({"a": rng.normal(size=40), "b": rng.normal(size=40)})
+    y = pd.Series(2.0 * X["a"] + 0.5 + rng.normal(scale=0.1, size=40))
+    for model_type in ("linear", "lgbm", "xgb"):
+        objective = hpo.make_objective(model_type, "mae", X, y, X, y)
+        value = objective({})
+        assert isinstance(value, float) and np.isfinite(value) and value >= 0.0
+        tuned = objective({"n_estimators": 10, "max_depth": 2} if model_type != "linear" else {})
+        assert isinstance(tuned, float) and np.isfinite(tuned)
