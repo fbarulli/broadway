@@ -87,15 +87,15 @@ def _setup_test_cfg(
     (configs_dir / "analysis" / "sample_hypothesis.yaml").write_text(
         "name: sample_hypothesis\n"
         "mode: hypothesis\n"
-        "goal: test whether price differs across neighborhoods\n"
+        "goal: test whether target differs across feature groups\n"
         "row_definition: one listing\n"
         "decision_moment: post-hoc analysis\n"
         "available_info:\n"
-        "  - neighborhood\n"
+        "  - feature_3\n"
         "leakage_notes: []\n"
         "success_criterion: report effect size\n"
         "hypothesis:\n"
-        "  group_column: neighborhood\n"
+        "  group_column: feature_3\n"
         "  group_values:\n"
         "    - A\n"
         "    - B\n",
@@ -116,8 +116,8 @@ def test_describe_run_stamps_sample(
     sample_path = tmp_path / "sample.parquet"
     pd.DataFrame(
         {
-            "neighborhood": ["A", "A", "B", "B", "B"],
-            "price": [10.0, 12.0, 20.0, 22.0, 24.0],
+            "feature_3": ["A", "A", "B", "B", "B"],
+            "target": [10.0, 12.0, 20.0, 22.0, 24.0],
         }
     ).to_parquet(sample_path, index=False)
 
@@ -150,8 +150,8 @@ def test_describe_lineage_sidecar_stamps_sample(
     sample_path = tmp_path / "sample.parquet"
     pd.DataFrame(
         {
-            "neighborhood": ["A", "A", "B", "B", "B"],
-            "price": [10.0, 12.0, 20.0, 22.0, 24.0],
+            "feature_3": ["A", "A", "B", "B", "B"],
+            "target": [10.0, 12.0, 20.0, 22.0, 24.0],
         }
     ).to_parquet(sample_path, index=False)
 

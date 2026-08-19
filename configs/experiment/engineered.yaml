@@ -1,17 +1,17 @@
 features:
   include:
-    - rooms
-    - area
-    - neighborhood
+    - feature_1
+    - feature_2
+    - feature_3
   exclude: []
   derived:
-    - name: price_per_area
-      func: price / area
-      source: area
+    - name: engineered_feature_1
+      func: source_copy
+      source: feature_2
   encodings:
     - type: target
       columns:
-        - neighborhood
+        - feature_3
       smoothing: 20
 model:
   type: linear

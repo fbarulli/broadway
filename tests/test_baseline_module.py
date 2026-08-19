@@ -85,7 +85,7 @@ def test_module_dispatch_prediction(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     )
     monkeypatch.setattr(records, "LINEAGE_DIR", tmp_path / "lineage")
     monkeypatch.setattr(
-        module, "load", lambda dataset: pd.DataFrame({"price": [10.0, 20.0, 30.0]})
+        module, "load", lambda dataset: pd.DataFrame({"target": [10.0, 20.0, 30.0]})
     )
     module.run(cfg)
     p = tmp_path / cfg.baseline.output_file
@@ -94,7 +94,7 @@ def test_module_dispatch_prediction(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     assert r.mode == AnalysisMode.PREDICTION
     assert r.trace is not None
     assert r.trace.dataset == "test"
-    assert r.trace.analysis_goal == "predict price"
+    assert r.trace.analysis_goal == "predict target"
     assert r.trace.commit
 
 

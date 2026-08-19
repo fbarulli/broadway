@@ -31,7 +31,7 @@ def _make_canonical(tmp_path: Path) -> Path:
     ]
     frames = [
         pd.DataFrame(
-            {"neighborhood": [name] * 60, "price": rng.normal(mean, std, 60)}
+            {"feature_3": [name] * 60, "target": rng.normal(mean, std, 60)}
         )
         for name, mean, std in specs
     ]
@@ -249,12 +249,12 @@ def test_load_frame_and_groups_from_canonical(
 
     df, group_column, source_group_column, groups, attrition = runners.load_frame_and_groups(cfg, None)
 
-    assert group_column == "neighborhood"
-    assert source_group_column == "neighborhood"
+    assert group_column == "feature_3"
+    assert source_group_column == "feature_3"
     assert set(groups) == set(cfg.analysis.hypothesis.group_values)
     assert groups["A"].shape[0] == 60
     assert groups["B"].shape[0] == 60
-    assert "neighborhood" in df.columns
+    assert "feature_3" in df.columns
     assert cfg.dataset.target in df.columns
     assert attrition["n_total"] == 120
     assert attrition["n_used"] == 120
@@ -438,7 +438,7 @@ def test_walkthrough_posthoc_gated_on_insignificant_omnibus(
     rng = np.random.default_rng(1)
     frames = [
         pd.DataFrame(
-            {"neighborhood": [name] * 60, "price": rng.normal(10.0, 1.0, 60)}
+            {"feature_3": [name] * 60, "target": rng.normal(10.0, 1.0, 60)}
         )
         for name in ("A", "B")
     ]
@@ -529,11 +529,11 @@ def test_run_describe_attrition_none(
     _setup(monkeypatch, tmp_path)
     cfg = _load_cfg()
     df = pd.DataFrame(
-        {"neighborhood": ["A", "B"], "price": [10.0, 20.0]}
+        {"feature_3": ["A", "B"], "target": [10.0, 20.0]}
     )
     step = runners.run_describe(
-        cfg.analysis, 1, "q?", df, "neighborhood", "neighborhood",
-        ["A", "B"], "price", "x.parquet",
+        cfg.analysis, 1, "q?", df, "feature_3", "feature_3",
+        ["A", "B"], "target", "x.parquet",
         None, "canonical", tmp_path / "timeline" / "test_hypothesis",
         tmp_path / "reports" / "figures",
     )
@@ -552,13 +552,13 @@ def test_run_describe_attrition_null_group(
     cfg = _load_cfg()
     df = pd.DataFrame(
         {
-            "neighborhood": ["A", "B", None],
-            "price": [10.0, 20.0, 30.0],
+            "feature_3": ["A", "B", None],
+            "target": [10.0, 20.0, 30.0],
         }
     )
     step = runners.run_describe(
-        cfg.analysis, 1, "q?", df, "neighborhood", "neighborhood",
-        ["A", "B"], "price", "x.parquet",
+        cfg.analysis, 1, "q?", df, "feature_3", "feature_3",
+        ["A", "B"], "target", "x.parquet",
         None, "canonical", tmp_path / "timeline" / "test_hypothesis",
         tmp_path / "reports" / "figures",
     )
@@ -574,13 +574,13 @@ def test_run_describe_attrition_unlisted_group(
     cfg = _load_cfg()
     df = pd.DataFrame(
         {
-            "neighborhood": ["A", "B", "C"],
-            "price": [10.0, 20.0, 30.0],
+            "feature_3": ["A", "B", "C"],
+            "target": [10.0, 20.0, 30.0],
         }
     )
     step = runners.run_describe(
-        cfg.analysis, 1, "q?", df, "neighborhood", "neighborhood",
-        ["A", "B"], "price", "x.parquet",
+        cfg.analysis, 1, "q?", df, "feature_3", "feature_3",
+        ["A", "B"], "target", "x.parquet",
         None, "canonical", tmp_path / "timeline" / "test_hypothesis",
         tmp_path / "reports" / "figures",
     )

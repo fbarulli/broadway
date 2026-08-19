@@ -78,23 +78,23 @@ def test_parse_numeric_failure_stays_float() -> None:
 def test_canonicalize_coerces_numeric() -> None:
     df = pd.DataFrame(
         {
-            "rooms": ["1", "2", "x", "4"],
-            "price": [10.0, 20.0, 30.0, 40.0],
+            "feature_1": ["1", "2", "x", "4"],
+            "target": [10.0, 20.0, 30.0, 40.0],
         }
     )
     out, _, parse_failures, _ = canonicalize(
         df,
-        target="price",
+        target="target",
         datetime_columns=[],
-        numeric_columns={"rooms": "int64"},
+        numeric_columns={"feature_1": "int64"},
         missing_encodings=[],
     )
     assert len(parse_failures) == 1
-    assert parse_failures[0].column == "rooms"
+    assert parse_failures[0].column == "feature_1"
     assert parse_failures[0].count == 1
     assert parse_failures[0].examples == ["x"]
-    assert pd.api.types.is_numeric_dtype(out["rooms"])
-    assert out["rooms"].isna().tolist() == [False, False, True, False]
+    assert pd.api.types.is_numeric_dtype(out["feature_1"])
+    assert out["feature_1"].isna().tolist() == [False, False, True, False]
 
 
 def test_canonicalize_order() -> None:
@@ -167,10 +167,10 @@ def test_etl_module_writes_canonical_and_result(
 
     df = pd.DataFrame(
         {
-            "area": [100, 100, 150, 200],
-            "neighborhood": ["a", "a", "b", "c"],
-            "price": [10, 10, 30, 40],
-            "rooms": [2, 2, 3, 4],
+            "feature_2": [100, 100, 150, 200],
+            "feature_3": ["a", "a", "b", "c"],
+            "target": [10, 10, 30, 40],
+            "feature_1": [2, 2, 3, 4],
             "listed_at": [
                 "2024-01-01",
                 "2024-01-01",
@@ -208,10 +208,10 @@ def _etl_record_path(tmp_path: Path) -> Path:
 def _simple_df() -> pd.DataFrame:
     return pd.DataFrame(
         {
-            "area": [100, 101],
-            "neighborhood": ["a", "b"],
-            "price": [10, 20],
-            "rooms": [2, 3],
+            "feature_2": [100, 101],
+            "feature_3": ["a", "b"],
+            "target": [10, 20],
+            "feature_1": [2, 3],
         }
     )
 
@@ -270,10 +270,10 @@ def test_etl_ci_sampling_gated(tmp_path: Path, monkeypatch) -> None:
 
     df = pd.DataFrame(
         {
-            "area": [100, 101, 102, 103, 104, 105],
-            "neighborhood": ["a", "b", "c", "d", "e", "f"],
-            "price": [10, 20, 30, 40, 50, 60],
-            "rooms": [2, 3, 2, 4, 3, 5],
+            "feature_2": [100, 101, 102, 103, 104, 105],
+            "feature_3": ["a", "b", "c", "d", "e", "f"],
+            "target": [10, 20, 30, 40, 50, 60],
+            "feature_1": [2, 3, 2, 4, 3, 5],
         }
     )
     monkeypatch.setattr(etl_module, "load_with_audit", lambda dataset: (df.copy(), [], []))
@@ -305,10 +305,10 @@ def test_etl_with_lookups_writes_join_audit(tmp_path: Path, monkeypatch) -> None
     raw_path = tmp_path / "raw.csv"
     pd.DataFrame(
         {
-            "area": [100, 150, 200, 999],
-            "neighborhood": ["a", "b", "c", "d"],
-            "price": [10, 20, 30, 40],
-            "rooms": [2, 3, 4, 5],
+            "feature_2": [100, 150, 200, 999],
+            "feature_3": ["a", "b", "c", "d"],
+            "target": [10, 20, 30, 40],
+            "feature_1": [2, 3, 4, 5],
         }
     ).to_csv(raw_path, index=False)
 
@@ -324,7 +324,7 @@ def test_etl_with_lookups_writes_join_audit(tmp_path: Path, monkeypatch) -> None
         update={
             "path": str(raw_path),
             "lookup_tables": {
-                "area": LookupSpec(path=str(lookup_path), key="LocationID")
+                "feature_2": LookupSpec(path=str(lookup_path), key="LocationID")
             },
         }
     )

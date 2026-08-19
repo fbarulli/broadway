@@ -1,5 +1,5 @@
 treatment_column: treatment
-outcome_column: price
+outcome_column: target
 power: 0.8
 alpha: 0.05
 effect_size: 0.5

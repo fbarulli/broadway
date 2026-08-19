@@ -17,9 +17,9 @@ def tmp_dataset(tmp_path: Path) -> Path:
     rows = 100
     df = pd.DataFrame(
         {
-            "rooms": [1 + i % 6 for i in range(rows)],
-            "area": [30.0 + i * 1.5 for i in range(rows)],
-            "price": [100.0 + i * 8.0 for i in range(rows)],
+            "feature_1": [1 + i % 6 for i in range(rows)],
+            "feature_2": [30.0 + i * 1.5 for i in range(rows)],
+            "target": [100.0 + i * 8.0 for i in range(rows)],
         }
     )
     f = tmp_path / "training_data.parquet"
