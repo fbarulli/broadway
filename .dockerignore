@@ -1,0 +1,16 @@
+# Docker build context exclusions — keep the worker image lean.
+.git
+.venv
+__pycache__
+*.pyc
+data/
+mlruns/
+node_modules/
+.mplconfig/
+.pytest_cache/
+diagnostics_experiment/
+legend_experiment/
+experiments/results/*
+!experiments/results/univariate/
+!experiments/results/univariate/fare_amount_trip_distance/
+!experiments/results/univariate/fare_amount_trip_distance/ratecode1_sample.parquet
