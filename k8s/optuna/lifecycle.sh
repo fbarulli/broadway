@@ -75,7 +75,12 @@ run_hpo() {
 dump_state() {
   log "dumping state"
   PG=$(kubectl get pods -l app=postgres -o name | head -1)
-  MF=$(kubectl get pods -l app=mlflow -o name | head -1)
+  # Re-resolve the mlflow pod right before use: it can briefly be mid-rollout.
+  for _ in 1 2 3; do
+    MF=$(kubectl get pods -l app=mlflow -o name 2>/dev/null | head -1)
+    if kubectl exec "$MF" -- true 2>/dev/null; then break; fi
+    sleep 5
+  done
   kubectl exec "$PG" -- sh -c "PGPASSWORD='$DB_PASSWORD' pg_dump -U '$DB_USER' -Fc optuna" \
     | gzip > "$OPTUNA_DUMP"
   kubectl exec "$PG" -- sh -c "PGPASSWORD='$DB_PASSWORD' pg_dump -U '$DB_USER' -Fc mlflow" \
