@@ -34,6 +34,7 @@ from broadway.training.mlflow_utils import (
     log_params,
     setup_mlflow,
 )
+from broadway.training.models.registry import display_name
 from broadway.training.optuna_worker import compose_db_url
 
 # HPO search spaces + budgets (configs/experiments/mlflow.yaml -> `hpo`).
@@ -113,16 +114,20 @@ def log_to_mlflow(
 
 
 def main() -> None:
+    mlflow_cfg = yaml.safe_load(HPO_CONFIG_PATH.read_text())
+    hpo_cfg = HPOConfig(**mlflow_cfg["hpo"])
+    # CLI choices come from the HPO spec (single source) as REGISTRY DISPLAY
+    # names (registry is the single source for ols<->linear); no hardcoded
+    # model list.
+    available = {display_name(m.name) for m in hpo_cfg.models}
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", default="ols", choices=sorted(MODEL_KEYS))
+    parser.add_argument("--model", default="ols", choices=sorted(available))
     parser.add_argument("--config", default="/etc/broadway/config.yaml")
     parser.add_argument("--secret-dir", default="/etc/broadway/secret")
     parser.add_argument("--init-only", action="store_true")
     args = parser.parse_args()
 
     cfg = yaml.safe_load(Path(args.config).read_text())
-    mlflow_cfg = yaml.safe_load(HPO_CONFIG_PATH.read_text())
-    hpo_cfg = HPOConfig(**mlflow_cfg["hpo"])
     seed = int(mlflow_cfg["seed"])
     test_fraction = float(mlflow_cfg["test_fraction"])
     secret = load_secret(args.secret_dir)

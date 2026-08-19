@@ -22,6 +22,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder
 
+from broadway.training.models.registry import display_name, model_keys
 from broadway.utils import require_keys
 from project.working import load_metered, time_bucket
 
@@ -48,16 +49,12 @@ SEED = int(_cfg["seed"])
 CONTINUOUS_FEATURES = list(_cfg["continuous_features"])
 CATEGORICAL_FEATURES = list(_cfg["categorical_features"])
 
-# Display alias -> registry key. The registry is the single canonical model
-# identity (configs and HPO name models by key); this map exists ONLY so the
-# battle keeps its historical display names on the CLI and in labels (01/03).
-# It carries NO params — comparison fits use get_model(key), which applies the
-# registry's default params.
-MODEL_KEYS = {
-    "ols": "linear",
-    "lgbm": "lgbm",
-    "xgb": "xgb",
-}
+# Display alias -> registry key, DERIVED from the registry (single source of
+# truth: MODEL_META's display names). Exists only so the battle keeps its
+# historical display names on the CLI and in labels (01/03); it carries NO
+# params — comparison fits use get_model(key), which applies the registry's
+# default params.
+MODEL_KEYS = {display_name(key): key for key in model_keys()}
 # BONUS_MODELS are intentionally OUTSIDE the platform model registry: they demo
 # sklearn classes (Ridge / RandomForestRegressor) the registry does not own.
 BONUS_MODELS = {
