@@ -54,7 +54,10 @@ _VERDICTS = ("supported", "refuted", "inconclusive", "partial")
 _UPSTREAM_LABEL = "upstream (project data / working dataset)"
 
 app = FastAPI()
-app.mount("/results", StaticFiles(directory=EXPERIMENTS_ROOT / "results"), name="results")
+# Results are experiment-scratch and may be absent (e.g. a platform-only
+# checkout) — only mount the static surface when the directory exists.
+if (EXPERIMENTS_ROOT / "results").is_dir():
+    app.mount("/results", StaticFiles(directory=EXPERIMENTS_ROOT / "results"), name="results")
 
 
 @dataclass
