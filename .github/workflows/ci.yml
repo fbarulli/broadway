@@ -134,7 +134,9 @@ jobs:
         run: docker load < /tmp/images.tar.gz
 
       - name: Build base image
-        run: docker build -f k8s/optuna/Dockerfile.base -t broadway-base:test .
+        # Tag :latest so worker/mlflow `FROM broadway-base:latest` resolves
+        # locally on a cold cache (docker pulls from the registry otherwise).
+        run: docker build -f k8s/optuna/Dockerfile.base -t broadway-base:latest .
 
       - name: Build worker image
         run: docker build -f k8s/optuna/Dockerfile.worker -t broadway-optuna-worker:test .
@@ -171,7 +173,7 @@ jobs:
 
       # Persist the built images to the Actions cache for the next run.
       - name: Save cached images
-        run: docker save broadway-base:test broadway-optuna-worker:test mlflow-server:test | gzip > /tmp/images.tar.gz
+        run: docker save broadway-base:latest broadway-optuna-worker:test mlflow-server:test | gzip > /tmp/images.tar.gz
 
       - name: Cache images
         uses: actions/cache@v4
