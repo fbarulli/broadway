@@ -364,6 +364,7 @@ Typed step outputs follow `artifacts/<step>/` and reports follow
 | Dataset loaders + constants | `project/data.py` |
 | Script index | `project/STATS.md` |
 | Config schema | `src/broadway/config/schema.py` |
+| HPO / Optuna training + mlflow viewing | `HPO_TRAINING.md` |
 | Tests | `tests/` |
 
 ### Conventions (for agents and humans)
