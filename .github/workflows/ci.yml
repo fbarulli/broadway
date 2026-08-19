@@ -107,10 +107,12 @@ jobs:
   # failures / parents[] resolution / eager-default traps / config structure.
   # Runtime semantics (kind cluster + workers + dump/restore) stay a manual,
   # on-demand `lifecycle.sh train` — this gate never runs training.
-  # Images are cached via docker/load + docker/save (GitHub-native): the base
-  # image's slow uv-sync layers persist across runs when pyproject/lock don't
-  # change. (buildx's container driver can't chain FROM across separate builds
-  # — verified empirically — so plain `docker build` is kept.)
+  # Images are cached as a gzipped `docker save` tarball via actions/cache:
+  # the base image's slow uv-sync layers persist across runs when
+  # pyproject/lock don't change. (buildx's container driver can't chain FROM
+  # across separate builds — verified empirically — so plain `docker build`
+  # is kept; the tarball is keyed on the lockfile so cache hits only happen
+  # when nothing that affects the base image changed.)
   build-and-boot:
     name: Build & Boot (docker images — no cluster)
     runs-on: ubuntu-latest
@@ -120,10 +122,16 @@ jobs:
 
       # Restore previously saved images so the chained FROM resolves instantly
       # and unchanged base layers skip rebuilding.
-      - name: Load cached images
-        uses: docker/load@v1
+      - name: Restore cached images
+        id: restore
+        uses: actions/cache@v4
         with:
-          images: broadway-base:test, broadway-optuna-worker:test, mlflow-server:test
+          path: /tmp/images.tar.gz
+          key: broadway-images-${{ hashFiles('pyproject.toml', 'uv.lock', 'k8s/optuna/Dockerfile.base') }}
+
+      - name: Load cached images
+        if: steps.restore.outputs.cache-hit == 'true'
+        run: docker load < /tmp/images.tar.gz
 
       - name: Build base image
         run: docker build -f k8s/optuna/Dockerfile.base -t broadway-base:test .
@@ -163,9 +171,13 @@ jobs:
 
       # Persist the built images to the Actions cache for the next run.
       - name: Save cached images
-        uses: docker/save@v1
+        run: docker save broadway-base:test broadway-optuna-worker:test mlflow-server:test | gzip > /tmp/images.tar.gz
+
+      - name: Cache images
+        uses: actions/cache@v4
         with:
-          images: broadway-base:test, broadway-optuna-worker:test, mlflow-server:test
+          path: /tmp/images.tar.gz
+          key: broadway-images-${{ hashFiles('pyproject.toml', 'uv.lock', 'k8s/optuna/Dockerfile.base') }}
 
   # CD — push the verified images to GHCR on push to main/taxi ONLY (never on
   # PRs). lifecycle.sh consumes the built tag via OPTUNA_WORKER_IMAGE.
