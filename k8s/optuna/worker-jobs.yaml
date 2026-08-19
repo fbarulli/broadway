@@ -1,14 +1,15 @@
 # Three optuna worker Jobs — one pod per model, run to completion.
 # Config/credentials come from mounted FILES; restartPolicy Never +
 # backoffLimit bounds retries (no infinite restarts);
-# ttlSecondsAfterFinished auto-deletes each Job 10 min after completion.
+# ttlSecondsAfterFinished auto-deletes each Job ~2 min after completion
+# (the HPO run tears itself down; mlflow/postgres stay for the UI).
 apiVersion: batch/v1
 kind: Job
 metadata:
   name: optuna-ols
 spec:
   backoffLimit: 2
-  ttlSecondsAfterFinished: 600
+  ttlSecondsAfterFinished: 120
   template:
     spec:
       restartPolicy: Never
@@ -33,7 +34,7 @@ metadata:
   name: optuna-lgbm
 spec:
   backoffLimit: 2
-  ttlSecondsAfterFinished: 600
+  ttlSecondsAfterFinished: 120
   template:
     spec:
       restartPolicy: Never
@@ -58,7 +59,7 @@ metadata:
   name: optuna-xgb
 spec:
   backoffLimit: 2
-  ttlSecondsAfterFinished: 600
+  ttlSecondsAfterFinished: 120
   template:
     spec:
       restartPolicy: Never
