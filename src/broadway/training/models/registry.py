@@ -11,6 +11,7 @@ from __future__ import annotations
 from typing import Any
 
 from broadway.training.models.knn import create as create_knn
+from broadway.training.models.knn import create_classifier as create_knn_classifier
 from broadway.training.models.lightgbm import create as create_lgbm
 from broadway.training.models.linear import create as create_linear
 from broadway.training.models.random_forest import create as create_rf
@@ -22,6 +23,7 @@ _REGISTRY = {
     "rf": create_rf,
     "xgb": create_xgb,
     "knn": create_knn,
+    "knn_classifier": create_knn_classifier,
 }
 
 MODEL_META: dict[str, dict] = {
@@ -69,6 +71,13 @@ MODEL_META: dict[str, dict] = {
     },
     "knn": {
         "display": "knn",
+        "allowed_params": frozenset({
+            "n_neighbors", "weights", "p", "algorithm", "leaf_size", "n_jobs",
+        }),
+        "default_params": {},
+    },
+    "knn_classifier": {
+        "display": "knn_classifier",
         "allowed_params": frozenset({
             "n_neighbors", "weights", "p", "algorithm", "leaf_size", "n_jobs",
         }),

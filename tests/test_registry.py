@@ -50,7 +50,7 @@ def test_display_name_linear_is_ols() -> None:
 
 
 def test_model_keys_match_meta_keys() -> None:
-    assert set(model_keys()) == {"linear", "lgbm", "rf", "xgb", "knn"}
+    assert set(model_keys()) == {"linear", "lgbm", "rf", "xgb", "knn", "knn_classifier"}
     assert set(model_keys()) == set(MODEL_META)
 
 
