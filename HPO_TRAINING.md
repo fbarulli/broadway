@@ -94,6 +94,16 @@ teardown + recreate + restore, `ratecode1_lgbm` still had its 40 trials, `ols` 4
 The worker image mirrors the repo layout (single source of truth — no remapped
 paths); workers auto-delete ~2 min after finishing (`ttlSecondsAfterFinished`).
 
+## 4a. CI boundary (what is and isn't automated)
+
+- **CI — structural determinism, no cluster, no training:** the platform gates
+  (ruff/mypy/pytest+coverage, shellcheck, kubeconform, frozen lockfile) plus the
+  **Build & Boot** job — builds the three images and boots the worker container
+  (imports, CLI, config-load simulation) to catch layout/import bugs.
+- **Manual — runtime semantics:** `lifecycle.sh train` (kind cluster + workers +
+  dump/restore) runs only on demand. **There is no scheduled retraining, by
+  design** — HPO answers the question you ask, when you ask it.
+
 ## 5. Viewing mlflow results
 
 **The one command — no Kubernetes involved:**
