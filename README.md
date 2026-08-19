@@ -5,6 +5,11 @@ Generalized ML experimentation platform. Two surfaces: a pipeline CLI
 (`project/scripts/`). Full architecture map in `dataflow.md`; status
 snapshot in `HANDOFF.md`.
 
+Two branches with a deliberate split: **`taxi`** is the working branch
+(platform + the NYC taxi demo), **`main`** is the public platform branch
+(synthetic demo, no taxi content). Their shared surface must stay
+byte-identical — see [§7 Branch parity](#7-branch-parity--main-vs-taxi).
+
 ## Install
 
 ```bash
@@ -366,9 +371,94 @@ Typed step outputs follow `artifacts/<step>/` and reports follow
 | Config schema | `src/broadway/config/schema.py` |
 | HPO / Optuna training + mlflow viewing | `HPO_TRAINING.md` |
 | Tests | `tests/` |
+| Branch parity gate | `scripts/check_branch_parity.sh` |
 
 ### Conventions (for agents and humans)
 
 1. No hardcoded values — config YAML / `schema.py` / env var only.
 2. Shared functions live in one place and are imported, never duplicated.
 3. The agent making a change updates `dataflow.md` in the same commit.
+
+---
+
+## 7. Branch parity — main vs taxi
+
+The repo keeps two branches with a deliberate split:
+
+| Branch | Role | Contents |
+|--------|------|----------|
+| `taxi` | working branch | platform + the NYC taxi demo (taxi configs, `experiments/`, `project/`, scratch docs, generated `reports/`) |
+| `main` | public platform | platform only — synthetic demo (`demo/demo.csv`, `configs/dataset/test.yaml`, `configs/experiment/{baseline,engineered,hyperopt}.yaml`, `configs/analysis/test*.yaml`) |
+
+The **shared surface** — `src/`, `tests/`, `demo/`, the synthetic-demo
+configs, `k8s/`, `docker/`, `.github/workflows/`, `pyproject.toml`,
+`Dockerfile`, `docker-compose.yml`, `.gitignore`, `.dockerignore`, and the
+parity script itself — must be **byte-identical on both branches**. Anything
+not on that list is deliberately branch-specific (taxi-only content lives on
+`taxi`; `main` ships no taxi configs, no `experiments/`, no `project/`).
+
+### Parity gate
+
+`scripts/check_branch_parity.sh` diffs `origin/main` vs `origin/taxi` over
+the shared-surface list and **fails on any drift, including deletions and
+content changes** — the two failure modes the old manual
+`git checkout taxi -- <paths>` sync could not catch. CI runs it on every
+push/PR to both branches (`fetch-depth: 0`), so drift breaks the build
+instead of silently rotting (this is how the `docker/mlflow/Dockerfile`
+`2.22.1` vs `3.15.1` divergence was found and fixed).
+
+```bash
+scripts/check_branch_parity.sh          # check (exit 0 = in sync; 1 = drift)
+scripts/check_branch_parity.sh --sync   # mirror taxi's shared surface onto main
+```
+
+### Making a shared change (src / tests / demo / configs / k8s / docker)
+
+1. Work on `taxi` (the working branch): make the change, run the gates
+   (`uv run pytest`, `uv run ruff check src tests …`, `uv run mypy src/broadway`),
+   commit, `git push origin taxi`.
+2. Run `scripts/check_branch_parity.sh` — it compares the **pushed** tips, so
+   run it after pushing.
+3. If it reports drift, sync: `scripts/check_branch_parity.sh --sync`
+   (checks out `main`, copies taxi's shared surface over it — including
+   deletions — and stages the result). Review, run main's gates, commit, push.
+4. CI re-checks parity on both branches, so an accidental divergence after
+   the fact also fails the build.
+
+Taxi-only content never syncs — edit it freely on `taxi`; `main` will not
+see it (by design).
+
+### Adding or removing a feature (or renaming one)
+
+Features are **config-declared, not code**. The single source of truth is
+`configs/dataset/<name>.yaml`:
+
+- **Add a raw feature**: add a column block (name, dtype, role) to
+  `configs/dataset/<name>.yaml`, add the column to the data file
+  (e.g. the `demo/demo.csv` header), and — if an experiment should use it —
+  add it to that experiment's `features.include` list in
+  `configs/experiment/<name>.yaml`. No code change. Probe the source file's
+  dtypes with `ds-pipeline columns --csv <path>` first.
+- **Remove a raw feature**: delete the column block from the dataset YAML
+  and drop it from any experiment `include` lists. (`check_columns` fails
+  loudly if the data file still has the column and the config doesn't
+  declare it — that mismatch is caught, not silently tolerated.)
+- **Rename a column**: edit the name in the dataset YAML **and** the data
+  file header. Contract-bound tests need **zero edits** — their fixtures are
+  derived from the contract via `tests/contract_fixture.py`
+  (`feature_columns` / `target_column` / `make_contract_frame`), so a rename
+  flows through automatically (verified: renaming `feature_3` →
+  `group_label` passed the suite unchanged).
+- **Engineered features**: declared in `configs/experiment/<name>.yaml`
+  (`features.derived` / `features.encodings`); the transform *functions*
+  live in `src/broadway/features/builders.py` (the shared `BUILDERS`
+  registry). A derived feature's `func` must exist in that registry.
+- Then follow the shared-change flow above (gates → push taxi → parity →
+  sync → push main).
+
+### Changing the shared surface itself
+
+Add or remove a path in the `SHARED` array at the top of
+`scripts/check_branch_parity.sh`, then run `--sync` so both branches carry
+the new list. Anything added must exist byte-identically on both branches;
+anything removed is free to diverge.
