@@ -222,12 +222,11 @@ def main() -> None:
     raw_hpo = yaml.safe_load(
         (REPO / "configs" / "experiments" / "mlflow.yaml").read_text())["hpo"]
     # run_hpo resolves model names as REGISTRY keys (make_objective ->
-    # get_model); the battle calls the linear model "ols", so remap the name
-    # at the API boundary. Its objective also fits raw registry models, so
-    # feed it the encoded X (categoricals one-hot via the battle pipeline
-    # preprocessor).
+    # get_model); the battle's display names (e.g. "ols" -> "linear") map via
+    # MODELS. Its objective also fits raw registry models, so feed it the
+    # encoded X (categoricals one-hot via the battle pipeline preprocessor).
     hpo_cfg = HPOConfig(**{**raw_hpo, "models": [
-        {**spec, "name": "linear"} if spec["name"] == "ols" else spec
+        {**spec, "name": MODELS[spec["name"]][0]} if spec["name"] in MODELS else spec
         for spec in raw_hpo["models"]
     ]})
     pre = make_pipeline(LinearRegression()).named_steps["pre"]
