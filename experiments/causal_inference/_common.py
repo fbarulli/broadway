@@ -29,3 +29,12 @@ def load_sample() -> pd.DataFrame:
 def numeric_features(df: pd.DataFrame, target: str = TARGET) -> list[str]:
     """Numeric candidate features, excluding the target."""
     return [c for c in df.select_dtypes("number").columns if c != target]
+
+
+# Independent numeric features only.
+# Excludes speed_mph (deterministic ratio of distance/time)
+# Excludes location_ids (these are categorical zones, not continuous numbers)
+INDEPENDENT_NUMERIC_FEATURES = [
+    "trip_distance",
+    "trip_duration_minutes",
+]
