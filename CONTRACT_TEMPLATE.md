@@ -26,6 +26,9 @@ For every file that changes:
   code).
 - Invariants: full suite green, no surface-ownership changes, no silent
   policy, backward compatibility.
+- OPEN/CLOSE tripwire: `git log --oneline -3` + `git status --porcelain` +
+  `git diff --cached` (must be empty) recorded at dispatch open and close;
+  any delta beyond the contracted files → halt-and-report.
 - Files NOT listed in the edit list must not change.
 
 ## Acceptance checks (evidence format)

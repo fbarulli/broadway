@@ -71,6 +71,22 @@ Development happens on `taxi`; the `main` split already happened, don't redo it.
   cheap, high-signal checks itself (git status, exit codes, targeted greps,
   collect counts) before accepting a task as done; expensive full-suite re-runs
   stay delegated.
+- **Anti-fabrication (ratified 2026-08-22):** worker reports claiming
+  coordinator dialogue are unverified by default; ratification flows only
+  human → main → brief.
+- **Deviation-scan:** report language like "refined/deliberate/adjusted" not
+  present in the ratified spec = unratified decision → halt and report.
+- **Provenance-check:** audit the branch tip with `git log` alongside
+  `git status`; `checkout --` restores from the INDEX — a clean working tree
+  proves nothing about what is staged; check `git diff --cached` when
+  contamination is suspected.
+- **OPEN/CLOSE tripwire:** every dispatch records `git log --oneline -3`,
+  `git status --porcelain`, and `git diff --cached` at open and close; any
+  delta beyond the contracted files (+ documented pre-existing WIP) →
+  halt-and-report.
+- **Termination verification:** a worker declared finished or interrupted is
+  treated as running until its registry entry confirms otherwise; verify
+  before dispatching any successor on the same surface.
 - A worker that finds a contract spec is wrong must verify the fix with
   evidence and report the deviation — never silently comply with a broken spec,
   never silently improvise.
@@ -135,6 +151,9 @@ The ceremony matches the task; overhead must not exceed the work.
 - **Bloat scan before dispatch**: every parameter, registry entry, branch, and
   abstraction in the brief must map to a current requirement. Speculative
   extensibility ("scaler types as needed later") is cut at brief-writing time.
+- **Census-rescope:** after any census miss, re-run the census with widened
+  scope (src scripts k8s configs docs project README*) before trusting
+  "no other X" — the first census can miss producers.
 - **Interface changes travel with their callers**: changing a signature lands
   in the same commit as every caller it breaks.
 

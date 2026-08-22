@@ -86,7 +86,16 @@ platform adopts this pattern; experiments stop being ahead of it.
 - Acceptance: full suite green; README + dataflow.md updated in same commit
   (inference section); manifest-check output pasted.
 
-## Decision 5 — column selection philosophy (ACTIVE — Contract C/D spec)
+## Decision 5 — column selection philosophy (RATIFIED 2026-08-22 — Contract C/D spec)
+
+Human-ratified this date; portable, do not re-litigate. Two corrections to the
+earlier text: (a) **frame column order is preserved, NOT sorted** — the retired
+dtype selector kept frame order and eligible-column output stays byte-identical,
+including MLflow logged-signature column stability; (b) **decision-6 extension**:
+the schema contract may name features-step output — `schema_contract:
+"engineered"` resolves through `build_generic_feature_specs(dataset, features)`
+(base ∪ derived ∪ encodings), so an experiment's declared surface is its model
+input contract.
 
 Name-driven selection, enforced by the schema contract referenced in
 `DataSourceRef` (not a separate dtype-vs-name debate). The dtype-driven
