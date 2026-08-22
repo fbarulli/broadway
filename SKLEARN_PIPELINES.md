@@ -175,6 +175,48 @@ change before Slice 4.
    breaks "absent block = passthrough identity" for zero functional gain;
    (c) rejected — deferral leaves Decision 5 open in practice forever (same
    shape as the `fit(X, y)` deferral).
+   *Refined resolution (Contract C — census-verified, read-only):* the
+   numeric-post-engineering assumption does NOT hold for any shipped
+   experiment; the assertion will fire on current configs until each leak is
+   repointed to its single declaration home. Leak census (post-engineering
+   frames, exact pipeline path):
+   - test / `raw`: `feature_3` (object) — declared `object` in
+     `configs/dataset/test.yaml` and stays object post-engineering (the
+     features step keeps all raw columns; include/derived/encodings only
+     add). Affects `baseline`, `engineered`, `hyperopt`.
+   - taxi / `joined`: `pickup_datetime` (datetime64[ns]) and
+     `Borough`/`Zone`/`service_zone` plus their `_lookup` duplicates
+     (object) in the joined frame.
+   Repoint mapping — every leak resolves to exactly one declaration home; no
+   schema-module extension needed:
+   - `engineered_feature_1` (float64, builder `source_copy`) and
+     `feature_3_target_enc` (float64, target-encoding output) →
+     `features.derived`/`features.encodings` → the generic engineered schema
+     (`build_generic_feature_specs`, validated in `features/module.py`) —
+     the only engineered-column declaration mechanism the sklearn path sees.
+   - taxi derived (`pickup_hour`…`same_borough`) and
+     `pickup_location_id_target_enc` → the generic engineered schema. The
+     legacy `project/features.py` `FEATURE_SPECS` is NOT a candidate home:
+     `src` has zero `project.*` imports (the generic path is deliberately
+     legacy-free), and legacy declares `passenger_count` int64 in direct
+     contradiction of the dataset contract float64 — a dtype-correctness
+     failure on its own terms, independent of reachability. The taxi home is
+     settled twice over: reachability + dtype-correctness.
+   Sequenced-after (separate contract, NOT this decision): taxi's generic
+   features step aborts at `same_borough` (`same_group` requires
+   `group_col`/`lookup_col`; taxi.yaml supplies neither and generic defaults
+   are `group`/`group_lookup`). The pointer repoint does NOT unblock taxi.
+   Category-match semantics pinned to observed variance: numeric-category
+   matching over runtime dtypes {int32, int64, float64} — int32 vs int64 is
+   legitimate observed variance (taxi/base). No float32, no nullable
+   Int64/Float64, no bool in any shipped post-engineering frame; the
+   float32→float64 widening example is not census-observed and rests on
+   external authority only — dropped from the justification. Non-numeric
+   context excluded by the assertion: object, datetime64[ns].
+   Acceptance pins: after repoint, the inverse census (numeric runtime
+   columns − schema-module-declared − target) is empty for every shipped
+   experiment; the assertion fires with the exact named-column message for
+   categorical-in-schema-without-step; explicit recipe columns bypass.
 6. **RESOLVED — schema_contract names the loader path's true output shape
    (2b cross-check)**: the 2b column cross-check validates recipe columns
    against the schema module named by `data_source.schema_contract`, and
