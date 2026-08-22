@@ -24,6 +24,10 @@ changes promote/comparison behavior between identical runs; it removes only the
 regenerable demo registry state (`.mlflow.db` + `mlruns/`) — never
 `artifacts/` or `data/`.
 
+End-to-end determinism between identical pipeline runs is enforced by
+`scripts/check_e2e_determinism.sh` (whitelist + exit-code bar documented in
+`SKLEARN_PIPELINES.md`, "End-to-end verification criteria").
+
 ## Quick start (taxi)
 
 ```bash
