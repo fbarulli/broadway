@@ -41,6 +41,22 @@ def test_datetime_builders() -> None:
     assert result["dw"].tolist() == [0, 5]
 
 
+def test_source_copy_casts_to_declared_float64() -> None:
+    # GAP-2: source_copy must honor the declared dtype (float64) regardless of
+    # the source column's dtype — _BUILDER_DTYPES is the dtype SSOT.
+    frames = {
+        "int64": pd.DataFrame({"src": pd.Series([1, 2, 3], dtype="int64")}),
+        "float64": pd.DataFrame({"src": pd.Series([1.5, 2.5, 3.5], dtype="float64")}),
+    }
+    for source_dtype, df in frames.items():
+        result = build_derived(
+            df, [DerivedFeature(name="copy", func="source_copy", source="src")], "t"
+        )
+        assert str(result["copy"].dtype) == "float64", f"source dtype {source_dtype}"
+        assert result["copy"].notna().all()
+        assert result["copy"].tolist() == df["src"].tolist()
+
+
 def test_load_custom_builders_import_error() -> None:
     with pytest.raises(ValueError):
         load_custom_builders("does_not_exist_xyz")

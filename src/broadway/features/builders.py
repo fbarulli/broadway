@@ -53,7 +53,10 @@ BUILDERS = {
     "log_distance": lambda df, src, **kw: np.log1p(df[src]),
     "same_group": lambda df, src, **kw: _same_group(df, kw.get("group_col", "group"), kw.get("lookup_col", "group_lookup")),
     "rate_per_hour": lambda df, src, **kw: _rate_per_hour(df, kw.get("columns", {})),
-    "source_copy": lambda df, src, **kw: df[src],
+    # source_copy casts to the declared dtype: copy-source dtype varies with the
+    # source, so _BUILDER_DTYPES is the SSOT ("derived dtype == declared dtype
+    # regardless of source"); downstream numeric feature selection takes float64.
+    "source_copy": lambda df, src, **kw: df[src].astype(_BUILDER_DTYPES["source_copy"]),
 }
 
 _BUILDER_DTYPES: dict[str, str] = {
