@@ -14,6 +14,14 @@ DatasetContract → FeatureSpec → TrainingConfig → Optuna → TrainingResult
   → champion model → prediction
 ```
 
+Inference: new-path artifacts are sklearn Pipelines logged with an explicit
+signature (`Pipeline([("pre", …), ("model", …)])` via `infer_signature(X, y)`,
+cloudpickle); they load through MLflow's native pyfunc flavor
+(`evaluate/module.py::_load_candidate/_load_champion`) and predict on RAW
+input frames — the pre-preprocessing feature frame — with MLflow enforcing
+the logged signature at predict time. Previously logged bare-model artifacts
+remain loadable via `ModelPyFunc` (`training/models/pyfunc_wrapper.py`).
+
 ## Artifacts
 
 Typed execution outputs live under `artifacts/<step>/` (training/, evaluation/,
@@ -229,7 +237,7 @@ broadway/
         xgboost.py          # XGBRegressor factory
         lightgbm.py         # LGBMRegressor factory
         registry.py         # get_model(name, **params)
-        pyfunc_wrapper.py   # ModelPyFunc (MLflow PyFunc over a pickled model)
+        pyfunc_wrapper.py   # ModelPyFunc — backward-compat loader for previously logged bare-model artifacts
     lineage/                # decision + lineage graph (sidecar records, Mermaid, run state)
       models.py             # DatasetRef, DatasetSlice, DecisionRecord, LineageRecord, LineageNode/Edge, LineageGraph, RunState
       ids.py                # node_id(kind, name) -> "kind:name"

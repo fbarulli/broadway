@@ -68,6 +68,13 @@ DatasetContract → FeatureSpec → TrainingConfig → Optuna → TrainingResult
 
 Declared intent (`AnalysisContract`) gates which steps are valid: stats→hypothesis, causal→causal, train/evaluate→prediction.
 
+Inference: new-path model artifacts are sklearn Pipelines logged with an
+explicit signature; they load through MLflow's native pyfunc flavor and
+predict on RAW input frames (the pre-preprocessing feature frame), with
+MLflow enforcing the logged signature at predict time. Previously logged
+bare-model artifacts remain loadable via `ModelPyFunc`
+(`src/broadway/training/models/pyfunc_wrapper.py`).
+
 Pipelines are mode-specific; `full` is a dispatcher that reads
 `AnalysisContract.mode` and resolves the matching `configs/flow/{prediction,hypothesis,causal}.yaml`.
 
