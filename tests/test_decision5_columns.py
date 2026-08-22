@@ -17,8 +17,8 @@ from sklearn.linear_model import LinearRegression
 from broadway.config.loader import load_config
 from broadway.config.schema import (
     FeatureConfig,
-    PreprocessingStepConfig,
     PipelineConfig,
+    PreprocessingStepConfig,
 )
 from broadway.evaluate.metrics import compute_metrics
 from broadway.schemas import schema_columns
@@ -177,3 +177,45 @@ def test_raw_and_joined_ignore_features_argument() -> None:
     assert schema_columns("raw", cfg.dataset, features=features) == frozenset(
         cfg.dataset.columns
     )
+
+
+def _shipped_post_features_frame(cfg: PipelineConfig) -> pd.DataFrame:
+    """Synthetic post-features frame shaped by the experiment's own declarations
+    (the features step keeps raw columns and appends derived/encoded ones)."""
+    feats = cfg.experiment.features
+    n = 12
+    rng = np.random.default_rng(7)
+    data: dict[str, object] = {
+        "feature_1": rng.integers(0, 100, n),
+        "feature_2": rng.integers(0, 100, n),
+        "feature_3": rng.choice(["A", "B"], n),
+    }
+    for derived in feats.derived:
+        data[derived.name] = rng.normal(size=n)
+    for enc in feats.encodings:
+        for col in enc.columns:
+            suffix = "target_enc" if enc.type == "target" else "freq_enc"
+            data[f"{col}_{suffix}"] = rng.normal(size=n)
+    data["target"] = rng.integers(0, 100, n)
+    return pd.DataFrame(data)
+
+
+@pytest.mark.parametrize("experiment_name", ["baseline", "engineered", "hyperopt"])
+def test_shipped_config_passes_and_matches_retired_selector(
+    experiment_name: str,
+) -> None:
+    """Shipped-pass + inverse census pins (Contract C gates): the repointed
+    config raises nothing, equals the retired selector byte-for-byte, and no
+    numeric runtime column sits outside the declared surface."""
+    cfg = load_config("train", dataset="test", experiment=experiment_name)
+    df = _shipped_post_features_frame(cfg)
+    eligible = eligible_feature_columns(df, cfg)
+    assert_frame_equal(eligible, _retired_selector(df, "target"))
+    assert cfg.experiment is not None and cfg.dataset is not None
+    declared = schema_columns(
+        cfg.experiment.data_source.schema_contract,
+        cfg.dataset,
+        features=cfg.experiment.features,
+    )
+    numeric = set(df.select_dtypes(include="number").columns) - {"target"}
+    assert numeric - declared == set()
