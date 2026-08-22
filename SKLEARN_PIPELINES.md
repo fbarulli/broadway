@@ -68,22 +68,6 @@ platform adopts this pattern; experiments stop being ahead of it.
 
 ## Change list (ordered slices)
 
-### Slice 1 — platform transformers (foundation)
-
-- New `src/broadway/features/transformers.py`:
-  - `TargetEncoding(BaseEstimator, TransformerMixin)` — columns, target,
-    smoothing; `fit` computes mappings, `transform` applies with global-mean
-    fill. Delegates to (or absorbs) `features/encodings.py` math.
-  - `FrequencyEncoding(BaseEstimator, TransformerMixin)` — same shape.
-  - Both must survive `sklearn.base.clone` and refit-per-fold cleanly
-    (`get_params`/`set_params` correct — no state leaked through constructor).
-- `src/broadway/features/pipeline.py::FeaturePipeline` re-expressed over the
-  transformers (public behavior unchanged: `fit(df, target, smoothing)` /
-  `transform(df, cfg, target, freq_fill)` signatures preserved this slice).
-- Tests: fit/transform equivalence vs old encodings (golden numbers),
-  clone-refit independence, unseen-category fill behavior.
-- Acceptance: full suite green; no renderer/evidence changes.
-
 ### Slice 2 — config schema, pipeline builder, DataSourceRef
 
 - `src/broadway/config/schema.py`: `PreprocessingStepConfig` (type, columns,
@@ -170,7 +154,7 @@ the record. REMAINING in this slice:
 
 - `project/ml_pipeline.py::FeaturePipeline`: internals re-expressed as
   sklearn-compatible transformer chain (deterministic feature step + the two
-  encodings from Slice 1); row-count merge guard stays in `transform`;
+  encodings, now the landed transformers); row-count merge guard stays in `transform`;
   `ENGINEERED_SCHEMA.validate` stays terminal. Public API
   (`fit`/`transform`/`fit_transform`) unchanged.
 - `project/scripts/12_lgbm_baseline.py`: passes the single pipeline object;
@@ -232,8 +216,6 @@ Existing test files that touch migration sites (verified by import grep):
 
 | Test file | Site it pins | Slice |
 |---|---|---|
-| `tests/test_generic_features.py` | `features/pipeline.py` fit/transform | 1 |
-| `tests/test_builders.py` | `features/builders.py` (derived steps) | 1 |
 | `tests/test_config.py` | config schema/loader round-trip | 2 |
 | `tests/test_contracts.py` | engineered schema / contract fixtures | 2 |
 | `tests/test_hpo.py` | `training/hpo.py` objective/study | 3 |
@@ -250,9 +232,6 @@ Existing test files that touch migration sites (verified by import grep):
 
 New tests per slice:
 
-- Slice 1: `tests/test_transformers.py` — golden equivalence vs old encoding
-  math, `clone` + refit independence, unseen-category fill, synthetic data
-  only.
 - Slice 2: `tests/test_recipe.py` — YAML → Pipeline round-trip, unknown step
   fails loud, empty block = passthrough identity.
 - Slice 3: extend `tests/test_hpo.py` — preprocessing refits per trial
@@ -314,9 +293,10 @@ All conflicts live where the custom loaders hand data to the Pipeline.
    config-validation time.
 4. **Index alignment.** Lookup joins (`load_with_audit`, `_join_boroughs`)
    and both target/frequency encoders merge → non-default, possibly
-   non-unique indexes; sklearn transforms are positional. Mitigation: Slice 1
-   transformers apply mappings by key-map (no merge) so row order and index
-   are preserved; the taxi row-count guard stays.
+   non-unique indexes; sklearn transforms are positional. Resolution: the
+   landed transformers (Slice 1, commit `7ad52e7`) apply mappings
+   by key-map (no merge) so row order and index are preserved; the taxi
+   row-count guard stays.
 5. **dtype drift through parquet round-trips.** etl writes `index=False`
    parquet; re-read can shift datetime units / nullable dtypes. Resolution
    (structural): versioned schema modules under `schemas/` bound by
@@ -350,9 +330,9 @@ All conflicts live where the custom loaders hand data to the Pipeline.
 
 ## Sequencing & gates
 
-Slices 1→2→3 are strictly sequential (each builds on the previous commit).
-4, 5 independent after 3. 6, 7 independent of 3–5 (depend on 1 only) — can
-run parallel to 4/5. Detailed contracts authored just-in-time per
+Slices 2→3 are strictly sequential (each builds on the previous commit).
+4, 5 independent after 3. 6, 7 depended only on the landed Slice 1 — can run
+parallel to 2/3. Detailed contracts authored just-in-time per
 `CONTRACT_TEMPLATE.md`, against the just-committed state. Every slice: green
 suite (direct exit code), ruff, mypy `src/broadway`, one logical commit,
 push `taxi`, then parity check/sync to `main`.
