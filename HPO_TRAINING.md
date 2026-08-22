@@ -163,9 +163,3 @@ kubectl logs job/optuna-lgbm | grep DONE
 
 Parameter names must be in the model's `allowed_params` (registry) or the config
 fails validation.
-
-Search spaces may also tune preprocessing when the experiment declares a
-`preprocessing:` recipe: keys prefixed `pre__<step>__<param>` (e.g.
-`pre__target_encoding_0__smoothing`) are applied to the pipeline, not the
-model. Registry validation (`allowed_params`) covers the model segment only;
-unknown `pre__` keys fail loud at trial time via `set_params`.

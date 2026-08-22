@@ -156,13 +156,6 @@ class DataSourceRef(BaseModel):
         return self
 
 
-class PreprocessingStepConfig(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    type: Literal["target_encoding", "frequency_encoding", "one_hot", "passthrough"]
-    columns: list[str]
-    params: dict[str, float | int | str | bool] = {}
-
-
 class ExperimentConfig(BaseModel):
     data_source: DataSourceRef
     features: FeatureConfig
@@ -171,7 +164,6 @@ class ExperimentConfig(BaseModel):
     random_state: int
     target_metric: str
     hpo: HPOConfig | None = None
-    preprocessing: list[PreprocessingStepConfig] = []
 
     @model_validator(mode="after")
     def _validate_hpo_search_space(self) -> ExperimentConfig:
@@ -179,17 +171,11 @@ class ExperimentConfig(BaseModel):
             return self
         for spec in self.hpo.models:
             valid_params = allowed_params(spec.name)
-            model_params = {
-                key: value
-                for key, value in spec.search_space.items()
-                if not key.startswith("pre__")
-            }
-            invalid_params = set(model_params) - valid_params
+            invalid_params = set(spec.search_space) - valid_params
             if invalid_params:
                 raise ValueError(
                     f"invalid HPO search-space params for model '{spec.name}': "
-                    f"{sorted(invalid_params)}. valid params: {sorted(valid_params)} "
-                    f"(pre__ params tune preprocessing and are not registry-validated)"
+                    f"{sorted(invalid_params)}. valid params: {sorted(valid_params)}"
                 )
         return self
 

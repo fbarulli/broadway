@@ -68,6 +68,67 @@ platform adopts this pattern; experiments stop being ahead of it.
 
 ## Change list (ordered slices)
 
+### Slice 2 — preprocessing schema + recipe builder (DataSourceRef landed, `6d8bf00`)
+
+LANDED in 2a (`6d8bf00`): `DataSourceRef` required on `ExperimentConfig`
+(`loader` Literal + version-iff-`named_sample` validator + `schema_contract`),
+all four experiment YAMLs bound (canonical ×3, joined for taxi), etl
+step-eligibility dispatch consumes the ref at etl start — git history is
+the record. Full ref-driven resolution in train/predict arrives with Slices
+3–4; the column-cross-check validator is a named gap closed below.
+
+2a enforcement scope — exact, so "fails loud" is never assumed beyond what
+exists:
+
+- **The only loader dispatch in 2a is the etl step-eligibility guard**
+  (`src/broadway/etl/module.py::_assert_data_source_supported`, called before
+  any data is read). An experiment declaring a pre-built loader
+  (`named_sample`/`pinned`) fails etl with
+  `ValueError: etl cannot run for data_source.loader 'named_sample'
+  (supported: canonical, joined)` — the message names the field, the
+  offending value, and the supported set; there is no KeyError or
+  FileNotFoundError from inside a loader. It fires at etl start, not at
+  config-load: `load_config` accepts any loader value, and train/predict do
+  not read the ref until Slices 3–4.
+- **`schema_contract` is required but NOT cross-checked in 2a.** A wrong
+  value (e.g. `schema_contract: raw` on a dataset whose contract is not raw)
+  passes config-load silently — same status as `preprocessing:`, which is
+  still absent from `ExperimentConfig` until 2b. The chosen values (`raw` for
+  test-canonical and taxi-joined) are truthful bindings to the raw-boundary
+  contract (`build_raw_schema`), not enforced invariants — and they were
+  accurate only for 2a's scope (the etl step-eligibility guard reads no
+  columns). They are NOT the final word for 2b's column cross-check: taxi
+  rebases to a `joined` schema module in 2b (decision 6), because the joined
+  loader's true output includes lookup columns the raw contract never lists.
+  The cross-check against the referenced schema module lands in 2b with the
+  recipe builder.
+
+REMAINING in this slice:
+
+- `src/broadway/config/schema.py`: `PreprocessingStepConfig` (type, columns,
+  params) + `ExperimentConfig.preprocessing: list[PreprocessingStepConfig] = []`.
+- New versioned schema modules under `schemas/` (e.g.
+  `schemas/named_sample_v3.py`) reusing `build_raw_schema` /
+  engineered-schema builders — reviewable code diffs + explicit version
+  tags, NOT serialized JSON snapshots (stored derived state is forbidden by
+  `AGENT_WORKER_CONTRACT.md`; pinned artifacts like `ratecode1_sample.json`
+  remain the precedent for deliberate pins). The joined loader path gets a
+  derived `schemas/joined.py` (raw contract + lookup columns under
+  `load_with_audit`'s merge naming) and `configs/experiment/taxi.yaml`
+  rebases `schema_contract: raw` → `joined` (decision 6).
+- New `src/broadway/features/recipe.py::build_pipeline(cfg) -> sklearn.pipeline.Pipeline`
+  — generic registry of step types (`target_encoding`, `frequency_encoding`,
+  `one_hot`, `passthrough`, scaler types as needed later). Unknown type fails
+  loud. Column lists are name-driven, enforced against the schema contract
+  referenced by `data_source` (closes the cross-check gap named above).
+- Tests: builder round-trip (YAML → Pipeline → get_params), unknown-step
+  failure, empty-block passthrough identity, cross-check validator (recipe
+  columns must exist in the bound schema module — a lookup-derived column
+  recipe passes against `joined` and fails against `raw`, decision 6).
+- Acceptance: full suite green; CI parse-all passes over every experiment
+  YAML; `ds-pipeline train --experiment baseline` produces identical metrics
+  to pre-change run (evidence: pasted metric lines).
+
 ### Slice 3 — trainer + HPO on the whole Pipeline
 
 - `src/broadway/training/trainer.py::train`: build Pipeline from
@@ -187,6 +248,8 @@ Existing test files that touch migration sites (verified by import grep):
 
 | Test file | Site it pins | Slice |
 |---|---|---|
+| `tests/test_config.py` | config schema/loader round-trip | 2 |
+| `tests/test_contracts.py` | engineered schema / contract fixtures | 2 |
 | `tests/test_hpo.py` | `training/hpo.py` objective/study | 3 |
 | `tests/test_optuna_extended.py` | HPO determinism/resume | 3 |
 | `tests/test_registry.py` | model registry params/allowed_params | 3 |
@@ -198,6 +261,8 @@ Existing test files that touch migration sites (verified by import grep):
 
 New tests per slice:
 
+- Slice 2: `tests/test_recipe.py` — YAML → Pipeline round-trip, unknown step
+  fails loud, empty block = passthrough identity.
 - Slice 3: extend `tests/test_hpo.py` — preprocessing refits per trial
   (counting-transformer leakage guard); trainer returns Pipeline; logged
   artifact reloads and predicts on raw frame.

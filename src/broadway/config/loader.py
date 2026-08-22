@@ -27,7 +27,6 @@ from broadway.config.schema import (
     StatsStep,
     TrainStep,
 )
-from broadway.features.recipe import validate_preprocessing_columns
 
 logger = logging.getLogger(__name__)
 
@@ -136,7 +135,6 @@ def _build_config(merged: dict, step: str) -> PipelineConfig:
         experiment=ExperimentConfig(**merged["experiment"]) if "experiment" in merged else None,
         **{step: step_model(**merged["step"])},
     )
-    validate_preprocessing_columns(config)
     for section in _STEP_SECTION_REQUIREMENTS.get(step, ()):
         if section in _TOP_LEVEL_SECTIONS or section == step:
             continue
