@@ -324,3 +324,17 @@ parallel to 2/3. Detailed contracts authored just-in-time per
 `CONTRACT_TEMPLATE.md`, against the just-committed state. Every slice: green
 suite (direct exit code), ruff, mypy `src/broadway`, one logical commit,
 push `taxi`, then parity check/sync to `main`.
+
+### End-to-end verification criteria
+
+Standing bar for any end-to-end/dogfood verification: numerics must be
+identical across identical invocations — all metric values, `cv_metrics`
+values, and params. Only volatile-by-design fields, compared by name, are
+excluded from byte-equality: `trace.created_at`
+(`artifacts/baseline/baseline.json`); the MLflow-generated `artifact_path`
+`models:/m-<id>` (`artifacts/training/training_result.json`); the
+champion-registry state fields `promote`, `reason`,
+`comparison.metrics.*.champion`, `warnings`
+(`artifacts/evaluation/metrics.json`). Timestamps, registry-assigned URIs, and
+mutable champion state are external-world coupling, not pipeline
+non-determinism.
