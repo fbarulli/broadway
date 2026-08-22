@@ -16,7 +16,13 @@ byte-identical — see [§7 Branch parity](#7-branch-parity--main-vs-taxi).
 uv sync --extra dev        # install deps incl. dev toolchain (ruff/mypy/pytest-cov); add --extra spark only for genuinely large datasets
 docker compose up -d       # mlflow + postgres (optional; training logs runs + artifacts here)
 uv run mlflow server --backend-store-uri sqlite:///$(pwd)/.mlflow.db --artifacts-destination file://$(pwd)/mlruns   # no-docker local MLflow server (MLflow 3.x; listens on :5000; mlruns/ is gitignored)
+rm -f .mlflow.db && rm -rf mlruns   # reset the demo registry when a stale champion skews promote/comparison between identical runs
 ```
+
+Run the reset one-liner when a stale champion from an earlier session silently
+changes promote/comparison behavior between identical runs; it removes only the
+regenerable demo registry state (`.mlflow.db` + `mlruns/`) — never
+`artifacts/` or `data/`.
 
 ## Quick start (taxi)
 
