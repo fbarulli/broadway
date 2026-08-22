@@ -139,17 +139,6 @@ platform adopts this pattern; experiments stop being ahead of it.
 - Acceptance: full suite green; README + dataflow.md updated in same commit
   (inference section); manifest-check output pasted.
 
-### Slice 5 — cross-validation correctness
-
-LANDED (`aee531b` on `sklearn`): `cross_validate` swap, golden parity,
-fold-independence, JSON-safe types, Pipeline forward-compat — git history is
-the record. REMAINING in this slice:
-
-- Config-driven `cv` kind (conflict-7 mitigation): a config knob selecting
-  `kfold` vs `time_series_split`, so time-ordered experiments stop routing
-  through `KFold(shuffle=True)` — which the swapped implementation still
-  hardcodes. Tests: time-split path uses contiguous folds; default unchanged.
-
 ### Slice 6 — taxi binding
 
 - `project/ml_pipeline.py::FeaturePipeline`: internals re-expressed as
@@ -179,8 +168,8 @@ the record. REMAINING in this slice:
 1. **RESOLVED — CV implementation**: `sklearn.model_selection.cross_validate`
    replaces the hand loop. Standard-library mechanism over a hand-maintained
    loop doing the same job; the `_mean_metrics` decimals contract is a test
-   concern, handled by the parity-test-first sequencing in Slice 5. No dual
-   path survives the swap commit.
+   concern, handled by the parity-test-first sequencing used when the swap
+   landed (`aee531b`). No dual path survived the swap commit.
 2. **RESOLVED — encoder origin**: custom sklearn-compatible wrappers around
    the existing smoothed math. Correctness/compatibility fork, not an
    enforcement question: `sklearn.preprocessing.TargetEncoder` silently
@@ -238,7 +227,6 @@ New tests per slice:
   (counting-transformer leakage guard); trainer returns Pipeline; logged
   artifact reloads and predicts on raw frame.
 - Slice 4: champion predict path test on raw input frame.
-- Slice 5: fold-independence test (fresh fit per fold) + seeded score parity.
 - Slice 6: new `project/tests/test_ml_pipeline.py` — transform-equivalence
   golden check vs old implementation on a seeded sample (taxi-tier tests may
   couple to taxi).
@@ -312,9 +300,9 @@ All conflicts live where the custom loaders hand data to the Pipeline.
    never resamples.
 7. **Time-ordering vs CV shuffle.** `evaluate/validation.py::cross_validate`
    uses `KFold(shuffle=True)` — shuffled folds destroy time structure (the
-   script-10 DW lesson). Mitigation: Slice 5 adds a config-driven `cv` kind
-   (`kfold` vs `time_series_split`) instead of a hardcoded shuffle; time-split
-   experiments route to `TimeSeriesSplit`.
+   script-10 DW lesson). Resolution: config-driven `cv_kind`
+   (`kfold` vs `time_series_split`) landed in place of the hardcoded shuffle;
+   time-split experiments route to `TimeSeriesSplit`.
 8. **Polars→pandas edge.** `read_sample` ends `df.to_pandas()`, which can
    yield Arrow-backed `str` dtype; some sklearn selector paths expect
    `object`. Mitigation: explicit dtype normalization at the loader boundary
