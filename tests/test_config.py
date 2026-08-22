@@ -289,3 +289,49 @@ def test_experiment_config_parses_with_data_source() -> None:
     )
     assert config.data_source.loader == "canonical"
     assert config.data_source.schema_contract == "raw"
+
+
+def test_experiment_preprocessing_defaults_to_empty_list() -> None:
+    config = ExperimentConfig(
+        data_source=DataSourceRef(loader="canonical", schema_contract="raw"),
+        **_experiment_kwargs(),
+    )
+    assert config.preprocessing == []
+
+
+def test_experiment_preprocessing_steps_parse() -> None:
+    config = ExperimentConfig(
+        data_source=DataSourceRef(loader="canonical", schema_contract="raw"),
+        preprocessing=[
+            {
+                "type": "target_encoding",
+                "columns": ["rooms"],
+                "params": {"smoothing": 20},
+            },
+            {"type": "passthrough", "columns": ["area"]},
+        ],
+        **_experiment_kwargs(),
+    )
+    assert [step.type for step in config.preprocessing] == [
+        "target_encoding",
+        "passthrough",
+    ]
+    assert config.preprocessing[0].params == {"smoothing": 20}
+
+
+def test_preprocessing_step_unknown_type_rejected() -> None:
+    with pytest.raises(ValidationError):
+        ExperimentConfig(
+            data_source=DataSourceRef(loader="canonical", schema_contract="raw"),
+            preprocessing=[{"type": "bogus", "columns": ["rooms"]}],
+            **_experiment_kwargs(),
+        )
+
+
+def test_preprocessing_step_extra_fields_forbidden() -> None:
+    with pytest.raises(ValidationError):
+        ExperimentConfig(
+            data_source=DataSourceRef(loader="canonical", schema_contract="raw"),
+            preprocessing=[{"type": "one_hot", "columns": ["rooms"], "extra": 1}],
+            **_experiment_kwargs(),
+        )

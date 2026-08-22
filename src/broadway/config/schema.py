@@ -156,6 +156,21 @@ class DataSourceRef(BaseModel):
         return self
 
 
+class PreprocessingStepConfig(BaseModel):
+    """One ordered preprocessing step of an experiment's pipeline recipe.
+
+    ``type`` names the builder-registered step kind (``target_encoding``,
+    ``frequency_encoding``, ``one_hot``, ``passthrough``); ``columns`` is the
+    name-driven column list enforced against the bound schema contract;
+    ``params`` carries step-specific tuning values (e.g. ``smoothing``).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+    type: Literal["target_encoding", "frequency_encoding", "one_hot", "passthrough"]
+    columns: list[str]
+    params: dict[str, float | int | str | bool] = {}
+
+
 class ExperimentConfig(BaseModel):
     data_source: DataSourceRef
     features: FeatureConfig
@@ -164,6 +179,7 @@ class ExperimentConfig(BaseModel):
     random_state: int
     target_metric: str
     hpo: HPOConfig | None = None
+    preprocessing: list[PreprocessingStepConfig] = []
 
     @model_validator(mode="after")
     def _validate_hpo_search_space(self) -> ExperimentConfig:
