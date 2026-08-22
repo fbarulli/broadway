@@ -24,7 +24,7 @@ import mlflow
 import optuna
 import pandas as pd
 import yaml
-from _common import MODEL_KEYS
+from _common import MODEL_KEYS, battle_pipeline_config
 from sklearn.model_selection import train_test_split
 
 from broadway.config.schema import HPOConfig
@@ -111,7 +111,8 @@ def log_to_mlflow(
         mlflow.set_tag("model", model_name)
         mlflow.set_tag("study", study_name)
         mlflow.set_tag("seed", str(seed))
-        hpo.log_best_artifacts(key, best.params, X_train, y_train, X_val, y_val)
+        hpo.log_best_artifacts(battle_pipeline_config(), key, best.params,
+                               X_train, y_train, X_val, y_val)
 
 
 def preflight(db_url: str, tracking_uri: str) -> None:
@@ -179,7 +180,8 @@ def main() -> None:
     key = MODEL_KEYS[args.model]
     spec = next(s for s in hpo_cfg.models if s.name == key)
     objective = hpo.make_objective(
-        model_type=key, target_metric=hpo_cfg.target_metric,
+        cfg=battle_pipeline_config(), model_type=key,
+        target_metric=hpo_cfg.target_metric,
         X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val)
     study_name = f"hpo-{key}"
     # Point the per-trial callback at the configmap tracking store + experiment

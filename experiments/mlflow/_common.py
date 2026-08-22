@@ -24,6 +24,19 @@ from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder
 
+from broadway.config.schema import (
+    ColumnRole,
+    ColumnSchema,
+    DatasetContract,
+    DataSourceRef,
+    EnvironmentConfig,
+    ExperimentConfig,
+    FeatureConfig,
+    ModelConfig,
+    PipelineConfig,
+    SplitConfig,
+    TaskType,
+)
 from broadway.training.models.registry import display_name, model_keys
 from broadway.utils import require_keys
 from project.working import load_metered, time_bucket
@@ -117,3 +130,56 @@ def make_pipeline(model: object) -> Pipeline:
 def binary_threshold(y_train: np.ndarray) -> float:
     """Binarization threshold from TRAIN only (no leakage into the metric)."""
     return float(np.median(y_train))
+
+
+def battle_pipeline_config() -> PipelineConfig:
+    """Minimal experiment config for the unified HPO API: passthrough recipe.
+
+    The battle feeds already-encoded frames into run_hpo/make_objective/
+    log_best_artifacts, whose objectives compose ``Pipeline([pre, model])``
+    from a PipelineConfig; with no ``preprocessing`` block the pre step is
+    the identity passthrough, so behavior matches the historical bare-model
+    fits. The config is scratch-local — the platform trainer derives its own
+    recipe from real experiment YAML.
+    """
+    environment = EnvironmentConfig(
+        log_level="INFO",
+        data_dir="data",
+        raw_subdir="raw",
+        processed_subdir="processed",
+        download_chunk_size=8192,
+        mlflow_tracking_uri=str(MLRUNS),
+        database_user="user",
+        database_password="pass",
+        database_name="db",
+        database_host="localhost",
+        database_port=5432,
+        sample_size_ci=1000,
+        sample_size_stats=10000,
+        api_replicas_min=1,
+        api_replicas_max=3,
+        api_hpa_cpu_threshold=80,
+        monitoring_schedule="0 * * * *",
+    )
+    dataset = DatasetContract(
+        name="battle",
+        path="battle.parquet",
+        target="fare_amount",
+        task=TaskType.REGRESSION,
+        datetime_column=None,
+        columns={
+            "fare_amount": ColumnSchema(
+                dtype="float64", null_count=0, role=ColumnRole.TARGET
+            )
+        },
+        lookup_tables={},
+    )
+    experiment = ExperimentConfig(
+        data_source=DataSourceRef(loader="canonical", schema_contract="raw"),
+        features=FeatureConfig(include=[], exclude=[], derived=[], encodings=[]),
+        model=ModelConfig(type="linear", params={}),
+        split=SplitConfig(type="random", validation_size=TEST_FRACTION),
+        random_state=SEED,
+        target_metric="mae",
+    )
+    return PipelineConfig(dataset=dataset, environment=environment, experiment=experiment)

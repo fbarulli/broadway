@@ -9,6 +9,7 @@ from typing import Any
 
 import mlflow
 import pandas as pd
+from mlflow.models import ModelSignature
 
 logger = logging.getLogger(__name__)
 
@@ -82,8 +83,20 @@ def log_dataset(dataset_id: str, source_path: str, context: str = "train") -> No
     mlflow.log_input(dataset, context=context)
 
 
-def log_model(model: Any, artifact_path: str) -> str:
-    info = mlflow.sklearn.log_model(model, artifact_path)
+def log_model(model: Any, artifact_path: str, signature: ModelSignature | None = None) -> str:
+    """Log a fitted model (bare or Pipeline) with cloudpickle serialization.
+
+    MLflow 3.15's skops untrusted-type audit false-positives on tree models,
+    so both log paths use the cloudpickle serialization format. An explicit
+    ``signature`` (from ``infer_signature(X, y)``) makes MLflow own the
+    fit/predict shape contract; without one MLflow's own inference applies.
+    """
+    info = mlflow.sklearn.log_model(
+        model,
+        artifact_path,
+        signature=signature,
+        serialization_format=mlflow.sklearn.SERIALIZATION_FORMAT_CLOUDPICKLE,
+    )
     return info.model_uri
 
 

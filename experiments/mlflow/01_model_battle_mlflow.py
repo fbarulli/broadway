@@ -32,6 +32,7 @@ from _common import (
     REPO,
     RESULTS,
     SEED,
+    battle_pipeline_config,
     binary_threshold,
     load_sample,
     make_pipeline,
@@ -220,15 +221,17 @@ def main() -> None:
     pre = make_pipeline(LinearRegression()).named_steps["pre"]
     X_train_enc = pre.fit_transform(X_train)
     X_val_enc = pre.transform(X_test)
-    result = hpo.run_hpo(hpo_cfg, X_train_enc, y_train, X_val_enc, y_test, SEED,
+    result = hpo.run_hpo(battle_pipeline_config(), hpo_cfg, X_train_enc, y_train,
+                         X_val_enc, y_test, SEED,
                          mlflow_tracking=True,
                          mlflow_tags={"experiment": "ratecode1_model_battle"})
     with mlflow.start_run(run_name="hpo_bandit"):
         log_params(result["best_params"])
         mlflow.log_metric("mae", result["best_value"])
         mlflow.set_tag("model", display_name(result["best_model"]))
-        hpo.log_best_artifacts(result["best_model"], result["best_params"],
-                               X_train_enc, y_train, X_val_enc, y_test)
+        hpo.log_best_artifacts(battle_pipeline_config(), result["best_model"],
+                               result["best_params"], X_train_enc, y_train,
+                               X_val_enc, y_test)
     print("leaderboard (per-model best MAE):")
     for name, res in result["models"].items():
         print(f"{display_name(name):<6} best_mae={res['best_value']:.4f} "

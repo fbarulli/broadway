@@ -187,11 +187,17 @@ class ExperimentConfig(BaseModel):
             return self
         for spec in self.hpo.models:
             valid_params = allowed_params(spec.name)
-            invalid_params = set(spec.search_space) - valid_params
+            model_params = {
+                key: value
+                for key, value in spec.search_space.items()
+                if not key.startswith("pre__")
+            }
+            invalid_params = set(model_params) - valid_params
             if invalid_params:
                 raise ValueError(
                     f"invalid HPO search-space params for model '{spec.name}': "
-                    f"{sorted(invalid_params)}. valid params: {sorted(valid_params)}"
+                    f"{sorted(invalid_params)}. valid params: {sorted(valid_params)} "
+                    f"(pre__ params tune preprocessing and are not registry-validated)"
                 )
         return self
 

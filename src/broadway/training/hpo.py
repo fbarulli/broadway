@@ -9,7 +9,6 @@ search spaces still diverge deterministically and parallel == sequential.
 
 from __future__ import annotations
 
-import logging
 import tempfile
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
@@ -20,13 +19,12 @@ import mlflow
 import numpy as np
 import optuna
 import pandas as pd
+from mlflow.models import infer_signature
 
-from broadway.config.schema import HPOConfig, ModelHPOSpec
+from broadway.config.schema import HPOConfig, ModelHPOSpec, PipelineConfig
 from broadway.evaluate.metrics import compute_metrics
-from broadway.training.models.registry import get_model
 from broadway.training.optuna import GRACE_PERIOD, HEARTBEAT_INTERVAL
-
-logger = logging.getLogger(__name__)
+from broadway.training.trainer import build_model_pipeline
 
 # Params-dict objective that may also receive the active optuna trial so the
 # trial can carry the full metric set as a user attr (mlflow per-trial logging).
@@ -34,6 +32,7 @@ Objective = Callable[[dict[str, float | int], optuna.Trial | None], float]
 
 
 def make_objective(
+    cfg: PipelineConfig,
     model_type: str,
     target_metric: str,
     X_train: pd.DataFrame,
@@ -41,7 +40,11 @@ def make_objective(
     X_val: pd.DataFrame,
     y_val: pd.Series,
 ) -> Objective:
-    """Build the HPO objective: fit a model with params, score target metric on val.
+    """Build the HPO objective: fit the composed Pipeline with params, score on val.
+
+    The objective fits the composed Pipeline (preprocessing refits per trial);
+    HPO uses a single train/val split — there is no internal folding, so
+    per-trial refit IS the complete leakage guard.
 
     The returned objective takes the active optuna trial as an optional second
     argument and, when given, attaches the FULL compute_metrics set to the
@@ -52,9 +55,9 @@ def make_objective(
     def objective(
         params: dict[str, float | int], trial: optuna.Trial | None = None
     ) -> float:
-        model = get_model(model_type, **params)
-        model.fit(X_train, y_train)
-        metrics = compute_metrics(y_val.to_numpy(), model.predict(X_val))
+        pipeline = build_model_pipeline(cfg, model_type, params)
+        pipeline.fit(X_train, y_train)
+        metrics = compute_metrics(y_val.to_numpy(), pipeline.predict(X_val))
         if trial is not None:
             trial.set_user_attr(
                 "broadway_metrics", {name: float(v) for name, v in metrics.items()}
@@ -98,6 +101,7 @@ def _mlflow_callback(
 
 
 def log_best_artifacts(
+    cfg: PipelineConfig,
     model_type: str,
     params: dict[str, float | int],
     X_train: pd.DataFrame,
@@ -107,33 +111,27 @@ def log_best_artifacts(
 ) -> None:
     """Log best-run artifacts to the active mlflow run.
 
-    Refits the model with the best params on train, logs it via its mlflow
-    flavor (lgbm/xgb, sklearn for the rest), writes the val predictions CSV,
-    and plots the feature importances of tree models. A model without a
-    registered flavor is skipped with a warning; failures elsewhere bubble up.
+    Refits the composed Pipeline with the best params on train, logs it via
+    the sklearn flavor (a Pipeline always has one — no flavor dispatch) with
+    an explicit signature and cloudpickle serialization, writes the val
+    predictions CSV, and plots the feature importances of tree models.
     """
-    model = get_model(model_type, **params)
-    model.fit(X_train, y_train)
-    try:
-        if model_type == "lgbm":
-            mlflow.lightgbm.log_model(model, "model")
-        elif model_type == "xgb":
-            mlflow.xgboost.log_model(model, "model")
-        else:
-            mlflow.sklearn.log_model(model, "model")
-    except Exception as exc:
-        logger.warning(
-            "no mlflow model flavor for %s, skipping model artifact: %s",
-            model_type,
-            exc,
-        )
+    pipeline = build_model_pipeline(cfg, model_type, params)
+    pipeline.fit(X_train, y_train)
+    mlflow.sklearn.log_model(
+        pipeline,
+        "model",
+        signature=infer_signature(X_train, y_train),
+        serialization_format=mlflow.sklearn.SERIALIZATION_FORMAT_CLOUDPICKLE,
+    )
     with tempfile.TemporaryDirectory() as tmp:
-        preds = model.predict(X_val)
+        preds = pipeline.predict(X_val)
         csv_path = Path(tmp) / "predictions.csv"
         pd.DataFrame({"actual": y_val.to_numpy(), "predicted": preds}).to_csv(
             csv_path, index=False
         )
         mlflow.log_artifact(str(csv_path))
+        model = pipeline.named_steps["model"]
         if hasattr(model, "feature_importances_"):
             importance = model.feature_importances_
             fig, ax = plt.subplots(figsize=(6, 4))
@@ -319,6 +317,7 @@ def _leaderboard(studies: dict[str, optuna.Study]) -> dict[str, float]:
 
 
 def run_hpo(
+    cfg: PipelineConfig,
     hpo: HPOConfig,
     X_train: pd.DataFrame,
     y_train: pd.Series,
@@ -343,7 +342,7 @@ def run_hpo(
     if not hpo.models:
         raise ValueError("hpo requires at least one model in `models`")
     objectives = {
-        spec.name: make_objective(spec.name, hpo.target_metric, X_train, y_train, X_val, y_val)
+        spec.name: make_objective(cfg, spec.name, hpo.target_metric, X_train, y_train, X_val, y_val)
         for spec in hpo.models
     }
     studies = _initial_round(hpo, objectives, random_state, mlflow_tracking, mlflow_tags)

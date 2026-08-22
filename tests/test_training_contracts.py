@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 import pytest
 from sklearn.linear_model import LinearRegression
+from sklearn.pipeline import Pipeline
 
 from broadway.analysis.contracts import AnalysisContract, AnalysisMode
 from broadway.config.schema import (
@@ -20,6 +21,7 @@ from broadway.config.schema import (
     FeatureConfig,
     ModelConfig,
     PipelineConfig,
+    PreprocessingStepConfig,
     SplitConfig,
     TaskType,
     TrainStep,
@@ -30,7 +32,7 @@ from broadway.training.contracts import TrainingResult
 from broadway.training.mlflow_utils import log_metrics, log_model, setup_mlflow
 from broadway.training.models.base import BaseModel
 from broadway.training.optuna import run_study
-from broadway.training.trainer import train
+from broadway.training.trainer import build_model_pipeline, train
 
 
 def test_training_result_json_round_trip() -> None:
@@ -84,15 +86,39 @@ def test_base_model_is_importable_and_abstract() -> None:
         BaseModel()
 
 
-def test_trainer_returns_training_result() -> None:
+def test_trainer_returns_training_result(tmp_path: Path) -> None:
+    cfg = _make_config(tmp_path)
     X = pd.DataFrame({"a": [1.0, 2.0, 3.0], "b": [2.0, 4.0, 6.0]})
     y = pd.Series([3.0, 6.0, 9.0])
-    model, result = train("linear", X, y, n_jobs=1)
+    model, result = train(cfg, X, y, n_jobs=1)
+    assert isinstance(model, Pipeline)
     assert result.model_type == "linear"
     assert result.params == {"n_jobs": 1}
     assert result.train_time_seconds >= 0
     assert result.artifact_path is None
     assert hasattr(model, "predict")
+
+
+def test_build_model_pipeline_applies_pre_params(tmp_path: Path) -> None:
+    """pre__<step>__<param> keys address the preprocessing segment of the
+    Pipeline (the HPO search-space contract); model keys stay bare."""
+    cfg = _make_config(tmp_path)
+    experiment = cfg.experiment.model_copy(
+        update={
+            "preprocessing": [
+                PreprocessingStepConfig(
+                    type="target_encoding", columns=["rooms"], params={"smoothing": 20}
+                )
+            ]
+        }
+    )
+    cfg = cfg.model_copy(update={"experiment": experiment})
+    pipeline = build_model_pipeline(
+        cfg, "lgbm", {"n_estimators": 10, "pre__target_encoding_0__smoothing": 35}
+    )
+    params = pipeline.get_params()
+    assert params["pre__target_encoding_0__smoothing"] == 35
+    assert params["model__n_estimators"] == 10
 
 
 def _make_config(tmp_path: Path) -> PipelineConfig:
