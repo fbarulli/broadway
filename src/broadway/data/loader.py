@@ -21,6 +21,10 @@ READERS = {
 
 MERGE_HOW = "left"
 
+# Single source of the collision-suffix rule: shared by the rename in
+# merged_lookup_column_names and by the merge call's pandas ``suffixes``.
+_LOOKUP_SUFFIX = "_lookup"
+
 
 def merged_lookup_column_names(
     existing_columns: set[str], lookup_columns: Iterable[str]
@@ -30,8 +34,10 @@ def merged_lookup_column_names(
     The single implementation of the ``_lookup`` suffix rule — consumed by the
     loader's ``merged_names`` audit dict and by the joined schema module, so
     the rule cannot drift between the loader and the schema (Decision 6).
+    Shares ``_LOOKUP_SUFFIX`` with the merge call in ``load_with_audit``, so
+    this rename rule and the pandas ``suffixes`` argument cannot drift apart.
     """
-    return {c: (c if c not in existing_columns else c + "_lookup") for c in lookup_columns}
+    return {c: (c if c not in existing_columns else c + _LOOKUP_SUFFIX) for c in lookup_columns}
 
 
 def canonical_path(dataset: DatasetContract, environment: EnvironmentConfig) -> Path:
@@ -60,7 +66,7 @@ def load_with_audit(dataset: DatasetContract) -> tuple[pd.DataFrame, list[JoinAu
         audit = audit_join(df, col, lookup, lookup_df)
         audits.append(audit)
         merged_names = merged_lookup_column_names(set(df.columns), lookup_df.columns)
-        df = df.merge(lookup_df, left_on=col, right_on=right_on, how=MERGE_HOW, suffixes=("", "_lookup"))
+        df = df.merge(lookup_df, left_on=col, right_on=right_on, how=MERGE_HOW, suffixes=("", _LOOKUP_SUFFIX))
         value_audits.append(
             audit_lookup_values(
                 df_merged=df,

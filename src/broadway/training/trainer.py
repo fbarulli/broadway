@@ -8,12 +8,10 @@ from collections.abc import Mapping
 import pandas as pd
 from sklearn.pipeline import Pipeline
 
-from broadway.config.schema import PipelineConfig
+from broadway.config.schema import PRE_PARAM_PREFIX, PipelineConfig
 from broadway.features.recipe import build_pipeline
 from broadway.training.contracts import TrainingResult
 from broadway.training.models.registry import allowed_params, get_model
-
-_PRE_PARAM_PREFIX = "pre__"
 
 
 def build_model_pipeline(
@@ -33,7 +31,7 @@ def build_model_pipeline(
     if cfg.experiment is None:
         raise ValueError("model pipeline requires an experiment config")
     model_params = {
-        key: value for key, value in params.items() if not key.startswith(_PRE_PARAM_PREFIX)
+        key: value for key, value in params.items() if not key.startswith(PRE_PARAM_PREFIX)
     }
     if "random_state" in allowed_params(model_type) and "random_state" not in model_params:
         model_params["random_state"] = cfg.experiment.random_state
@@ -44,7 +42,7 @@ def build_model_pipeline(
         ]
     )
     pre_params = {
-        key: value for key, value in params.items() if key.startswith(_PRE_PARAM_PREFIX)
+        key: value for key, value in params.items() if key.startswith(PRE_PARAM_PREFIX)
     }
     if pre_params:
         pipeline.set_params(**pre_params)

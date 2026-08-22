@@ -17,30 +17,29 @@ from broadway.config.schema import PipelineConfig, PreprocessingStepConfig
 from broadway.features.transformers import FrequencyEncoding, TargetEncoding
 from broadway.schemas import schema_columns
 
-_STEP_ALLOWED_PARAMS: dict[str, frozenset[str]] = {
-    "target_encoding": frozenset({"smoothing"}),
-    "frequency_encoding": frozenset({"normalize"}),
-    "one_hot": frozenset(),
-    "passthrough": frozenset(),
-}
-
-_REQUIRED_STEP_PARAMS: dict[str, frozenset[str]] = {
-    "target_encoding": frozenset({"smoothing"}),
-    "frequency_encoding": frozenset(),
-    "one_hot": frozenset(),
-    "passthrough": frozenset(),
+# one_hot and passthrough take ZERO recipe params BY DESIGN: _build_step
+# hardcodes OneHotEncoder(handle_unknown="ignore") internally (single-use, no
+# config surface) and passthrough is the identity step — the empty tuples are
+# intentional, not unimplemented.
+_STEP_PARAM_SPEC: dict[str, tuple[frozenset[str], frozenset[str]]] = {
+    #                       required                    optional
+    "target_encoding":    (frozenset({"smoothing"}),   frozenset()),
+    "frequency_encoding": (frozenset(),                frozenset({"normalize"})),
+    "one_hot":            (frozenset(),                frozenset()),
+    "passthrough":        (frozenset(),                frozenset()),
 }
 
 
 def _validate_step_params(step: PreprocessingStepConfig) -> None:
-    allowed = _STEP_ALLOWED_PARAMS[step.type]
+    required, optional = _STEP_PARAM_SPEC[step.type]
+    allowed = required | optional
     invalid = sorted(set(step.params) - allowed)
     if invalid:
         raise ValueError(
             f"invalid params for preprocessing step '{step.type}': {invalid}. "
             f"valid params: {sorted(allowed)}"
         )
-    missing = sorted(_REQUIRED_STEP_PARAMS[step.type] - set(step.params))
+    missing = sorted(required - set(step.params))
     if missing:
         raise ValueError(
             f"preprocessing step '{step.type}' requires param(s) {missing}"
@@ -60,17 +59,20 @@ def _coerce_bool_param(value: object, step: str, param: str) -> bool:
 
 
 def _build_step(step: PreprocessingStepConfig) -> object:
+    required, optional = _STEP_PARAM_SPEC[step.type]
     _validate_step_params(step)
     if step.type == "target_encoding":
+        smoothing = next(iter(required))
         return TargetEncoding(
             columns=step.columns,
-            smoothing=float(step.params["smoothing"]),
+            smoothing=float(step.params[smoothing]),
         )
     if step.type == "frequency_encoding":
-        if "normalize" in step.params:
+        normalize = next(iter(optional), None)
+        if normalize is not None and normalize in step.params:
             return FrequencyEncoding(
                 columns=step.columns,
-                normalize=_coerce_bool_param(step.params["normalize"], step.type, "normalize"),
+                normalize=_coerce_bool_param(step.params[normalize], step.type, normalize),
             )
         return FrequencyEncoding(columns=step.columns)
     if step.type == "one_hot":

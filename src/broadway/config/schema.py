@@ -171,6 +171,12 @@ class PreprocessingStepConfig(BaseModel):
     params: dict[str, float | int | str | bool] = {}
 
 
+# Prefix marking HPO search-space params that tune preprocessing (pre__<step>__<param>)
+# rather than the registry-validated model params. Single source: schema.py owns the
+# constant, trainer.py imports it — never reversed.
+PRE_PARAM_PREFIX = "pre__"
+
+
 class ExperimentConfig(BaseModel):
     data_source: DataSourceRef
     features: FeatureConfig
@@ -190,14 +196,14 @@ class ExperimentConfig(BaseModel):
             model_params = {
                 key: value
                 for key, value in spec.search_space.items()
-                if not key.startswith("pre__")
+                if not key.startswith(PRE_PARAM_PREFIX)
             }
             invalid_params = set(model_params) - valid_params
             if invalid_params:
                 raise ValueError(
                     f"invalid HPO search-space params for model '{spec.name}': "
                     f"{sorted(invalid_params)}. valid params: {sorted(valid_params)} "
-                    f"(pre__ params tune preprocessing and are not registry-validated)"
+                    f"({PRE_PARAM_PREFIX} params tune preprocessing and are not registry-validated)"
                 )
         return self
 
