@@ -15,9 +15,13 @@ from sklearn.metrics import (
     roc_auc_score,
 )
 
+# Single source of the rounding precision for every metric the platform
+# reports; the CV path (validation.py) imports it from here as well.
+METRIC_DECIMALS: int = 4
+
 
 def compute_metrics(
-    y_true: np.ndarray, y_pred: np.ndarray, *, decimals: int = 4
+    y_true: np.ndarray, y_pred: np.ndarray, *, decimals: int = METRIC_DECIMALS
 ) -> dict[str, float]:
     y_true = np.asarray(y_true, dtype=float)
     y_pred = np.asarray(y_pred, dtype=float)
@@ -39,7 +43,11 @@ def compute_metrics(
 
 
 def binary_metrics(
-    y_true: np.ndarray, y_pred: np.ndarray, threshold: float, *, decimals: int = 4
+    y_true: np.ndarray,
+    y_pred: np.ndarray,
+    threshold: float,
+    *,
+    decimals: int = METRIC_DECIMALS,
 ) -> dict[str, float]:
     y_true = np.asarray(y_true, dtype=float)
     y_pred = np.asarray(y_pred, dtype=float)

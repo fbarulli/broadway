@@ -16,6 +16,7 @@ from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import cross_validate as sklearn_cross_validate
 from sklearn.pipeline import Pipeline
 
+from broadway.evaluate.metrics import compute_metrics
 from broadway.evaluate.validation import _SCORING, _make_cv, _mean_metrics, cross_validate
 
 
@@ -44,6 +45,15 @@ def test_mean_metrics_sign_and_rounding() -> None:
         "test_r2": np.array([0.5, 0.7]),
     }
     assert _mean_metrics(scores, decimals=2) == {"mae": 1.67, "rmse": 3.5, "r2": 0.6}
+
+
+def test_metric_vocabulary_parity_holdout_vs_cv() -> None:
+    # evaluate/module.py consumes both paths — compute_metrics on the holdout
+    # split and _SCORING through cross_validate — so the vocabularies are
+    # coupled by design; drift here silently diverges holdout vs CV metrics.
+    X, y = make_regression(n_samples=40, n_features=3, noise=1.0, random_state=7)
+    y_pred = LinearRegression().fit(X, y).predict(X)
+    assert set(compute_metrics(y, y_pred)) == {name for name in _SCORING}
 
 
 def test_cross_validate_reproducible() -> None:

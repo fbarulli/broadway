@@ -7,6 +7,8 @@ from sklearn.base import BaseEstimator
 from sklearn.model_selection import BaseCrossValidator, KFold, TimeSeriesSplit
 from sklearn.model_selection import cross_validate as sklearn_cross_validate
 
+from broadway.evaluate.metrics import METRIC_DECIMALS
+
 _SCORING: dict[str, str] = {
     "mae": "neg_mean_absolute_error",
     "rmse": "neg_root_mean_squared_error",
@@ -17,12 +19,14 @@ _SCORING: dict[str, str] = {
     "explained_var": "explained_variance",
 }
 
-# Metrics whose sklearn scorers return negated values (lower is better).
-# max_error is included even though its scorer is not neg_-prefixed: sklearn
-# registers it with greater_is_better=False, so its values are also negated.
+# The only negated metric whose scorer name lacks the neg_ prefix: sklearn
+# registers max_error with greater_is_better=False
+# (sklearn.metrics.get_scorer("max_error")._sign < 0), so its values are
+# negated despite the plain name. Everything else is derivable from _SCORING.
+_NEGATED_WITHOUT_PREFIX: frozenset[str] = frozenset({"max_error"})
 _NEGATED_METRICS: frozenset[str] = frozenset(
-    {"mae", "rmse", "mape", "median_ae", "max_error"}
-)
+    metric for metric, scorer in _SCORING.items() if scorer.startswith("neg_")
+) | _NEGATED_WITHOUT_PREFIX
 
 
 def _make_cv(cv_kind: str, cv_folds: int, random_state: int) -> BaseCrossValidator:
@@ -42,7 +46,7 @@ def cross_validate(
     cv_folds: int,
     random_state: int,
     cv_kind: str,
-    decimals: int = 4,
+    decimals: int = METRIC_DECIMALS,
 ) -> dict[str, float]:
     if not np.all(np.isfinite(y)):
         raise ValueError("y contains NaN or infinite values")
@@ -62,7 +66,9 @@ def residual_summary(y_true: np.ndarray, y_pred: np.ndarray) -> dict[str, float]
     }
 
 
-def _mean_metrics(scores: dict[str, np.ndarray], decimals: int = 4) -> dict[str, float]:
+def _mean_metrics(
+    scores: dict[str, np.ndarray], decimals: int = METRIC_DECIMALS
+) -> dict[str, float]:
     means: dict[str, float] = {}
     for name, fold_values in scores.items():
         if not name.startswith("test_"):
