@@ -71,25 +71,6 @@ def test_pdp_ice_writes_figure(tmp_path) -> None:
     _assert_nonempty(out)
 
 
-def test_lime_explanation_writes_figure(tmp_path) -> None:
-    X, _, model = _synthetic_data()
-    out = tmp_path / "lime.png"
-    explain.lime_explanation(model, X, X.iloc[0], list(X.columns), out)
-    _assert_nonempty(out)
-
-
-def test_lime_explanation_no_feature_name_warning(tmp_path) -> None:
-    import warnings
-
-    X, _, model = _synthetic_data()
-    out = tmp_path / "lime_nowarn.png"
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always")
-        explain.lime_explanation(model, X, X.iloc[0], list(X.columns), out)
-    assert not any("feature names" in str(w.message) for w in caught)
-    _assert_nonempty(out)
-
-
 def test_residual_plot_writes_figure(tmp_path) -> None:
     X, y, model = _synthetic_data()
     out = tmp_path / "residuals.png"

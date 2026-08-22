@@ -1,4 +1,4 @@
-"""Generic model-explainability helpers: SHAP, permutation importance, PDP/ICE, LIME, residuals."""
+"""Generic model-explainability helpers: SHAP, permutation importance, PDP/ICE, residuals."""
 
 from __future__ import annotations
 
@@ -13,7 +13,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import shap
-from lime.lime_tabular import LimeTabularExplainer
 from sklearn.inspection import PartialDependenceDisplay, permutation_importance
 
 
@@ -69,40 +68,6 @@ def pdp_ice(model: Predictable, X: pd.DataFrame, features: list[str], out_path: 
     display = PartialDependenceDisplay.from_estimator(model, X, features, kind="both")
     display.figure_.savefig(out_path, dpi=150, bbox_inches="tight")
     plt.close(display.figure_)
-
-
-def lime_explanation(
-    model: Predictable,
-    X_train: pd.DataFrame,
-    row: pd.Series,
-    feature_names: list[str],
-    out_path: Path,
-) -> None:
-    explainer = LimeTabularExplainer(
-        X_train.to_numpy(),
-        feature_names=feature_names,
-        mode="regression",
-        random_state=0,
-        verbose=False,
-    )
-
-    def _predict(X: np.ndarray) -> np.ndarray:
-        # LIME perturbs samples as ndarrays, but our models are fitted on
-        # DataFrames; hand the model back the same frame kind (with matching
-        # feature names) so sklearn does not warn about missing feature names.
-        frame = pd.DataFrame(X, columns=feature_names)
-        return np.asarray(model.predict(frame))
-
-    explanation = explainer.explain_instance(
-        row.to_numpy(), _predict, num_features=min(3, len(feature_names))
-    )
-    items = explanation.as_list()
-    fig, ax = plt.subplots(figsize=(8, 4))
-    ax.barh([name for name, _ in items], [weight for _, weight in items])
-    ax.set_xlabel("Weight")
-    fig.tight_layout()
-    fig.savefig(out_path, dpi=150, bbox_inches="tight")
-    plt.close(fig)
 
 
 def residual_plot(preds: np.ndarray, actuals: np.ndarray, out_path: Path) -> None:
