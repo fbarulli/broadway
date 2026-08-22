@@ -161,30 +161,6 @@ REMAINING in this slice:
 - Acceptance: full suite green; README + dataflow.md updated in same commit
   (inference section); manifest-check output pasted.
 
-### Slice 6 — taxi binding
-
-- `project/ml_pipeline.py::FeaturePipeline`: internals re-expressed as
-  sklearn-compatible transformer chain (deterministic feature step + the two
-  encodings, now the landed transformers); row-count merge guard stays in `transform`;
-  `ENGINEERED_SCHEMA.validate` stays terminal. Public API
-  (`fit`/`transform`/`fit_transform`) unchanged.
-- `project/scripts/12_lgbm_baseline.py`: passes the single pipeline object;
-  outputs identical.
-- Tests under `project/tests/`: transform-equivalence golden check vs old
-  implementation on a seeded sample.
-- Acceptance: full suite green; script `12` rerun evidence (pasted metrics).
-
-### Slice 7 — experiments de-hazard
-
-- `experiments/causal_inference/05_joint_model_top10_zones.py`,
-  `06_joint_model_time_of_day.py`: replace pre-split `pd.get_dummies` with
-  `ColumnTransformer([OneHotEncoder(handle_unknown="ignore")])` inside a
-  Pipeline fitted on train only.
-- `experiments/mlflow/_common.py::make_pipeline`: leave as-is (already the
-  reference); optionally note it now mirrors the platform builder.
-- Acceptance: ruff + touched scripts rerun (experiments tier — pytest does
-  not collect `experiments/`); pasted script output.
-
 ## Decision points — all resolved
 
 1. **RESOLVED — CV implementation**: `sklearn.model_selection.cross_validate`
@@ -249,9 +225,6 @@ New tests per slice:
   (counting-transformer leakage guard); trainer returns Pipeline; logged
   artifact reloads and predicts on raw frame.
 - Slice 4: champion predict path test on raw input frame.
-- Slice 6: new `project/tests/test_ml_pipeline.py` — transform-equivalence
-  golden check vs old implementation on a seeded sample (taxi-tier tests may
-  couple to taxi).
 
 ## GitHub Actions impact
 
@@ -345,8 +318,8 @@ All conflicts live where the custom loaders hand data to the Pipeline.
 ## Sequencing & gates
 
 Slices 2→3 are strictly sequential (each builds on the previous commit).
-4, 5 independent after 3. 6, 7 depended only on the landed Slice 1 — can run
-parallel to 2/3. Detailed contracts authored just-in-time per
+4, 5 independent after 3. 6, 7 landed on the Slice 1 foundation (`99acdba`,
+`c593c88`). Detailed contracts authored just-in-time per
 `CONTRACT_TEMPLATE.md`, against the just-committed state. Every slice: green
 suite (direct exit code), ruff, mypy `src/broadway`, one logical commit,
 push `taxi`, then parity check/sync to `main`.
