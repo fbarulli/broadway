@@ -157,18 +157,14 @@ platform adopts this pattern; experiments stop being ahead of it.
 
 ### Slice 5 — cross-validation correctness
 
-- `src/broadway/evaluate/validation.py::cross_validate`: accept any estimator
-  (model or Pipeline); replace the hand loop with
-  `sklearn.model_selection.cross_validate` (RESOLVED — decision 1).
-  Sequencing: write the seeded score-parity test FIRST, confirm
-  `cross_validate` output matches `_mean_metrics` to required decimal
-  precision, then delete the loop in the same commit. No dual path, no
-  "keep just in case" — if precision differs it is an aggregation-order/ddof
-  artifact fixed inside the `_mean_metrics` wrapper.
-- Tests: fold-independence with a counting transformer (each fold sees fresh
-  fit), seeded score parity written before the swap.
-- Acceptance: full suite green; hand loop absent from `validation.py`
-  (grep evidence pasted).
+LANDED (`aee531b` on `sklearn`): `cross_validate` swap, golden parity,
+fold-independence, JSON-safe types, Pipeline forward-compat — git history is
+the record. REMAINING in this slice:
+
+- Config-driven `cv` kind (conflict-7 mitigation): a config knob selecting
+  `kfold` vs `time_series_split`, so time-ordered experiments stop routing
+  through `KFold(shuffle=True)` — which the swapped implementation still
+  hardcodes. Tests: time-split path uses contiguous folds; default unchanged.
 
 ### Slice 6 — taxi binding
 
