@@ -85,8 +85,16 @@ def lime_explanation(
         random_state=0,
         verbose=False,
     )
+
+    def _predict(X: np.ndarray) -> np.ndarray:
+        # LIME perturbs samples as ndarrays, but our models are fitted on
+        # DataFrames; hand the model back the same frame kind (with matching
+        # feature names) so sklearn does not warn about missing feature names.
+        frame = pd.DataFrame(X, columns=feature_names)
+        return np.asarray(model.predict(frame))
+
     explanation = explainer.explain_instance(
-        row.to_numpy(), model.predict, num_features=min(3, len(feature_names))
+        row.to_numpy(), _predict, num_features=min(3, len(feature_names))
     )
     items = explanation.as_list()
     fig, ax = plt.subplots(figsize=(8, 4))

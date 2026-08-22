@@ -206,6 +206,43 @@ def _qq_columns(n: int) -> pd.DataFrame:
     return pd.DataFrame({f"f{i}": rng.normal(float(i), 1.0, 20) for i in range(n)})
 
 
+def test_plot_numeric_qq_all_nan_zero_rate_defined_no_warning(tmp_path) -> None:
+    import warnings
+
+    figures_dir = tmp_path / "reports" / "figures"
+    df = pd.DataFrame({"allnan": np.full(20, np.nan), "ok": np.arange(20.0)})
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        overview = plot_numeric_qq(
+            df, figures_dir, tmp_path / "artifacts" / "qq_overview.json", source_path="data.csv"
+        )
+
+    assert not any(
+        "empty slice" in str(w.message) or "invalid value" in str(w.message)
+        for w in caught
+    )
+    allnan = next(f for f in overview.features if f.feature == "allnan")
+    assert allnan.status == "excluded"
+    assert allnan.reason == "non-finite"
+    assert allnan.zero_rate == 0.0
+
+
+def test_qq_figures_do_not_accumulate_in_pyplot_registry(tmp_path, monkeypatch) -> None:
+    import matplotlib.pyplot as plt
+
+    figures_dir = tmp_path / "reports" / "figures"
+    # Simulate the recording-close test seam: no figure actually gets closed.
+    monkeypatch.setattr(plt, "close", lambda fig: None)
+    before = len(plt.get_fignums())
+    for _ in range(3):
+        plot_numeric_qq(
+            _qq_columns(13), figures_dir, tmp_path / "artifacts" / "qq_overview.json",
+            source_path="data.csv",
+        )
+    assert len(plt.get_fignums()) == before
+
+
 def test_plot_numeric_qq_excludes_and_splits(tmp_path) -> None:
     df = _qq_df()
     figures_dir = tmp_path / "reports" / "figures"

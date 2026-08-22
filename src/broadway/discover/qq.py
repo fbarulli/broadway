@@ -15,6 +15,7 @@ from __future__ import annotations
 import logging
 import os
 from pathlib import Path
+from typing import Literal
 
 import matplotlib
 
@@ -23,6 +24,8 @@ import matplotlib.colors
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from matplotlib.backends.backend_agg import FigureCanvasAgg
+from matplotlib.figure import Figure
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 from pydantic import BaseModel, ConfigDict
@@ -222,6 +225,23 @@ def attach_qq_legend(fig, zones: QqZonesConfig, any_shelf: bool, markers: QqMark
                frameon=True, framealpha=0.85)
 
 
+def _new_figure(
+    *,
+    figsize: tuple[float, float],
+    layout: Literal["constrained", "compressed", "tight"] = "constrained",
+) -> Figure:
+    """Create an Agg figure that never enters the pyplot figure registry.
+
+    Unlike plt.subplots, the figure carries no pyplot manager, so it cannot
+    accumulate toward matplotlib's max-open-figures warning when pyplot.close
+    is stubbed out (the test seam records figures instead of closing them).
+    Callers still invoke plt.close(fig) after savefig for symmetry.
+    """
+    fig = Figure(figsize=figsize, layout=layout)
+    FigureCanvasAgg(fig)
+    return fig
+
+
 def _plot_chunk(
     traces: list[tuple[str, np.ndarray, np.ndarray, float, float, float | None]],
     out_path: Path,
@@ -237,12 +257,8 @@ def _plot_chunk(
     n = len(traces)
     grid_rows, grid_cols = _grid_dims(n)
     colors = viz.palette_colors(n, palette)
-    fig, axes = plt.subplots(
-        grid_rows, grid_cols,
-        figsize=(grid_cols * subplot_size, grid_rows * subplot_size),
-        squeeze=False,
-        layout="constrained",
-    )
+    fig = _new_figure(figsize=(grid_cols * subplot_size, grid_rows * subplot_size))
+    axes = fig.subplots(grid_rows, grid_cols, squeeze=False)
     ax_flat = axes.ravel()
     any_shelf = False
     for color, ax, (name, osm, osr, slope, intercept, zero_rate) in zip(colors, ax_flat, traces):
@@ -297,14 +313,8 @@ def _plot_raw_log_pairs(
 ) -> None:
     n = len(pairs)
     colors = viz.palette_colors(n, palette)
-    fig, axes = plt.subplots(
-        2, n,
-        figsize=(n * subplot_size, 2 * subplot_size),
-        sharex="col",
-        sharey="col",
-        squeeze=False,
-        layout="constrained",
-    )
+    fig = _new_figure(figsize=(n * subplot_size, 2 * subplot_size))
+    axes = fig.subplots(2, n, sharex="col", sharey="col", squeeze=False)
     any_shelf = False
     for j, (name, raw_trace, log_trace, raw_skew, log_skew) in enumerate(pairs):
         axes[0][j].set_title(name, fontsize=viz.TITLE_FONTSIZE)
@@ -406,13 +416,10 @@ def _plot_qq_joint(
     n_cols = max(1, int(np.ceil(np.sqrt(n))))
     n_rows = max(1, int(np.ceil(n / n_cols)))
     colors = viz.palette_colors(n)
-    fig, axes = plt.subplots(
-        n_rows,
-        n_cols,
-        figsize=(n_cols * viz_cfg.fig_size_per_subplot, n_rows * viz_cfg.fig_size_per_subplot),
-        squeeze=False,
-        layout="constrained",
+    fig = _new_figure(
+        figsize=(n_cols * viz_cfg.fig_size_per_subplot, n_rows * viz_cfg.fig_size_per_subplot)
     )
+    axes = fig.subplots(n_rows, n_cols, squeeze=False)
     ax_flat = axes.ravel()
     skipped: list[str] = []
     any_shelf = False
@@ -486,12 +493,8 @@ def _plot_dist_chunk(
     n = len(hists)
     grid_rows, grid_cols = _grid_dims(n)
     colors = viz.palette_colors(n, palette)
-    fig, axes = plt.subplots(
-        grid_rows, grid_cols,
-        figsize=(grid_cols * subplot_size, grid_rows * subplot_size),
-        squeeze=False,
-        layout="constrained",
-    )
+    fig = _new_figure(figsize=(grid_cols * subplot_size, grid_rows * subplot_size))
+    axes = fig.subplots(grid_rows, grid_cols, squeeze=False)
     ax_flat = axes.ravel()
     for color, ax, (name, counts, edges) in zip(colors, ax_flat, hists):
         ax.stairs(counts, edges, fill=True, color=color)
@@ -529,9 +532,8 @@ def _plot_diagnostics_heatmap(
             z[:, col] = 0.0
         else:
             z[:, col] = (col_vals - col_vals.mean()) / col_std
-    fig, ax = plt.subplots(
-        figsize=(8.0, max(2.0, 0.35 * n_features)), layout="constrained",
-    )
+    fig = _new_figure(figsize=(8.0, max(2.0, 0.35 * n_features)))
+    ax = fig.subplots()
     norm = matplotlib.colors.TwoSlopeNorm(
         vcenter=0,
         vmin=z.min() if z.min() < 0 else -1e-9,
@@ -625,7 +627,10 @@ def plot_numeric_qq(
 
         arr = pd.to_numeric(df[name], errors="coerce").to_numpy(dtype=float)
         finite = arr[np.isfinite(arr)]
-        zero_rate = float((finite == 0).mean())
+        # All-non-finite columns have no observable zero rate; the feature is
+        # excluded as "non-finite" below and the neutral 0.0 never reaches the
+        # diagnostics heatmap (plotted/discrete features only).
+        zero_rate = float((finite == 0).mean()) if finite.size else 0.0
         n_valid = int(finite.size)
         n_excluded = int(arr.size) - n_valid
 
