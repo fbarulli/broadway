@@ -28,7 +28,11 @@ Development happens on `taxi`; the `main` split already happened, don't redo it.
 - The main agent only: **plans**, writes precise agent contracts, dispatches the
   right number of agents, and **surfaces decisions** to the user.
 - Agents (Task tool, `subagent_type="general"`) implement, run the full suite,
-  fix failures, then **commit + push** to `taxi`.
+  fix failures, then **commit locally** — workers NEVER push to origin. Only
+  the main agent pushes, after independently verifying the worker's gate
+  evidence (exit codes, counts, `git status`, `git log`, empty
+  `git diff --cached`). Ratified by the human 2026-08-22 after the
+  unauthorized `9c8f7f6` push by a terminated worker thread.
 - Break work into small, single-purpose agent tasks with SHORT instructions (no
   long monolithic contracts). Every agent instruction must carry the immutable
   worker rules from `AGENT_WORKER_CONTRACT.md` (or a hard reference to it).
@@ -104,7 +108,8 @@ The ceremony matches the task; overhead must not exceed the work.
 
 - Independent tasks → **parallel** agents.
 - Dependent tasks → run only after upstream agents have **committed + pushed**.
-- If two agents both commit/push, **sequence them** (avoid git races).
+- Workers never push (§3), so push races are structurally impossible; the
+  main agent pushes one branch at a time, only after verification.
 - Read-only review agents (`subagent_type="explore"`) may run in parallel and
   never commit; dispatch them after substantial work to audit the changes and
   report findings (they do not self-fix).
@@ -200,4 +205,4 @@ cd /home/opc/ONE/broad-way && uv run pytest -q
   `report`, `lineage`, `profile`, `discover`, `init`, ...).
 - `uv run python -m project.scripts.NN_name` — taxi analysis scripts.
 - Agents: Task tool, `subagent_type="general"`, contract per tier (§3c);
-  commit + push to `taxi`.
+  commit locally, never push — main agent verifies, then pushes.
