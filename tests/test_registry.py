@@ -9,6 +9,7 @@ import pytest
 from pydantic import ValidationError
 
 from broadway.config.schema import (
+    DataSourceRef,
     ExperimentConfig,
     FeatureConfig,
     HPOConfig,
@@ -63,6 +64,7 @@ def test_allowed_params_match_schema_validation() -> None:
 def test_schema_rejects_search_space_outside_allowed_params() -> None:
     with pytest.raises(ValidationError):
         ExperimentConfig(
+            data_source=DataSourceRef(loader="canonical", schema_contract="raw"),
             features=FeatureConfig(include=["rooms"], exclude=[], derived=[], encodings=[]),
             model=ModelConfig(type="lgbm", params={}),
             split=SplitConfig(type="random", validation_size=0.2),
@@ -118,6 +120,7 @@ def test_knn_hpo_spec_passes_validation() -> None:
     assert set(config.models[0].search_space) == {"n_neighbors", "p", "leaf_size"}
     # The registry-validated ExperimentConfig path also accepts the knn space.
     exp = ExperimentConfig(
+        data_source=DataSourceRef(loader="canonical", schema_contract="raw"),
         features=FeatureConfig(include=["rooms"], exclude=[], derived=[], encodings=[]),
         model=ModelConfig(type="knn", params={}),
         split=SplitConfig(type="random", validation_size=0.2),

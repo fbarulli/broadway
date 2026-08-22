@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pandas as pd
+import pytest
 from contract_fixture import frame_slots
 
 import broadway.etl.module as etl_module
@@ -13,7 +14,7 @@ from broadway.cleaning.structural import (
     standardize_missing,
 )
 from broadway.config.loader import load_config
-from broadway.config.schema import ColumnRole, ColumnSchema, LookupSpec
+from broadway.config.schema import ColumnRole, ColumnSchema, DataSourceRef, LookupSpec
 from broadway.contracts.pandera import is_numeric_dtype
 from broadway.data.cleaner import canonicalize
 from broadway.lineage import records
@@ -363,3 +364,24 @@ def test_etl_with_lookups_writes_join_audit(tmp_path: Path, monkeypatch) -> None
 def test_column_schema_normalizes_datetime_dtype() -> None:
     col = ColumnSchema(dtype="datetime64[us]", null_count=0, role=ColumnRole.DATETIME)
     assert col.dtype == "datetime64"
+
+
+def test_etl_data_source_loader_drives_step_eligibility() -> None:
+    cfg = load_config("etl", dataset="test", experiment="baseline")
+    assert cfg.experiment is not None
+
+    # Raw-ingest loaders (canonical, joined) may run etl.
+    etl_module._assert_data_source_supported(cfg)
+
+    joined = cfg.experiment.model_copy(
+        update={"data_source": DataSourceRef(loader="joined", schema_contract="raw")}
+    )
+    etl_module._assert_data_source_supported(cfg.model_copy(update={"experiment": joined}))
+
+    # Pre-built loaders cannot be re-ingested — the declared loader fails loud.
+    for loader, version in (("named_sample", "v3"), ("pinned", None)):
+        ref = cfg.experiment.model_copy(
+            update={"data_source": DataSourceRef(loader=loader, version=version, schema_contract="raw")}
+        )
+        with pytest.raises(ValueError, match="cannot run for data_source.loader"):
+            etl_module._assert_data_source_supported(cfg.model_copy(update={"experiment": ref}))

@@ -8,6 +8,7 @@ from pydantic import ValidationError
 
 from broadway.config.loader import load_config
 from broadway.config.schema import (
+    DataSourceRef,
     ExperimentConfig,
     FeatureConfig,
     HPOConfig,
@@ -126,6 +127,7 @@ def test_stats_config_fields(stats_cfg) -> None:
 
 def _experiment_config(model_type: str, search_space: dict[str, list[float | int]]) -> ExperimentConfig:
     return ExperimentConfig(
+        data_source=DataSourceRef(loader="canonical", schema_contract="raw"),
         features=FeatureConfig(include=["rooms"], exclude=[], derived=[], encodings=[]),
         model=ModelConfig(type=model_type, params={}),
         split=SplitConfig(type="random", validation_size=0.2),
@@ -159,6 +161,7 @@ def test_hpo_search_space_invalid_for_linear_raises() -> None:
 def test_hpo_search_space_validated_per_model() -> None:
     with pytest.raises(ValidationError):
         ExperimentConfig(
+            data_source=DataSourceRef(loader="canonical", schema_contract="raw"),
             features=FeatureConfig(include=["rooms"], exclude=[], derived=[], encodings=[]),
             model=ModelConfig(type="lgbm", params={}),
             split=SplitConfig(type="random", validation_size=0.2),
@@ -229,3 +232,60 @@ def test_hpo_configs_parse() -> None:
         assert "hpo" in raw, f"{path.name} missing hpo block"
         cfg = HPOConfig(**raw["hpo"])
         assert cfg.models, f"{path.name}: no models in hpo spec"
+
+
+def _experiment_kwargs() -> dict[str, object]:
+    return {
+        "features": FeatureConfig(include=["rooms"], exclude=[], derived=[], encodings=[]),
+        "model": ModelConfig(type="linear", params={}),
+        "split": SplitConfig(type="random", validation_size=0.2),
+        "random_state": 42,
+        "target_metric": "rmse",
+    }
+
+
+def test_experiment_config_requires_data_source() -> None:
+    with pytest.raises(ValidationError):
+        ExperimentConfig(**_experiment_kwargs())
+
+
+@pytest.mark.parametrize("loader", ["bogus", "canonical_", "Joined"])
+def test_data_source_rejects_invalid_loader(loader: str) -> None:
+    with pytest.raises(ValidationError):
+        DataSourceRef(loader=loader, schema_contract="raw")
+
+
+def test_named_sample_requires_version() -> None:
+    with pytest.raises(ValidationError, match="requires data_source.version"):
+        DataSourceRef(loader="named_sample", schema_contract="raw")
+
+
+@pytest.mark.parametrize("loader", ["canonical", "joined", "pinned"])
+def test_version_rejected_for_non_named_sample_loader(loader: str) -> None:
+    with pytest.raises(ValidationError, match="only valid for loader='named_sample'"):
+        DataSourceRef(loader=loader, version="v3", schema_contract="raw")
+
+
+@pytest.mark.parametrize(
+    ("loader", "version"),
+    [
+        ("canonical", None),
+        ("joined", None),
+        ("named_sample", "v3"),
+        ("pinned", None),
+    ],
+)
+def test_data_source_valid_cases_parse(loader: str, version: str | None) -> None:
+    ref = DataSourceRef(loader=loader, version=version, schema_contract="raw")
+    assert ref.loader == loader
+    assert ref.version == version
+    assert ref.schema_contract == "raw"
+
+
+def test_experiment_config_parses_with_data_source() -> None:
+    config = ExperimentConfig(
+        data_source=DataSourceRef(loader="canonical", schema_contract="raw"),
+        **_experiment_kwargs(),
+    )
+    assert config.data_source.loader == "canonical"
+    assert config.data_source.schema_contract == "raw"

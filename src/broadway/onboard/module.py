@@ -15,6 +15,7 @@ from broadway.config.schema import (
     ColumnRole,
     ColumnSchema,
     DatasetContract,
+    DataSourceRef,
     DerivedFeature,
     EncodingConfig,
     ExperimentConfig,
@@ -149,6 +150,7 @@ def build_experiment_config(
         else []
     )
     return ExperimentConfig(
+        data_source=DataSourceRef(loader="canonical", schema_contract="raw"),
         features=FeatureConfig(include=include, exclude=[], derived=derived, encodings=encodings),
         model=ModelConfig(type="linear", params={}),
         split=SplitConfig(type="time" if split_column else "random", validation_size=0.2),

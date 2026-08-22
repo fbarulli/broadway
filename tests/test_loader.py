@@ -45,6 +45,7 @@ _DATASET = {
 }
 
 _EXPERIMENT = {
+    "data_source": {"loader": "canonical", "schema_contract": "raw"},
     "features": {"include": ["feature_1"], "exclude": [], "derived": [], "encodings": []},
     "model": {"type": "linear", "params": {}},
     "split": {"type": "random", "validation_size": 0.2},

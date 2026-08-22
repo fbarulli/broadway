@@ -13,6 +13,7 @@ from broadway.config.schema import (
     ColumnRole,
     ColumnSchema,
     DatasetContract,
+    DataSourceRef,
     EnvironmentConfig,
     EtlStep,
     ExperimentConfig,
@@ -128,6 +129,7 @@ def _make_config(tmp_path: Path) -> PipelineConfig:
         lookup_tables={},
     )
     experiment = ExperimentConfig(
+        data_source=DataSourceRef(loader="canonical", schema_contract="raw"),
         features=FeatureConfig(include=["rooms", "area"], exclude=[], derived=[], encodings=[]),
         model=ModelConfig(type="linear", params={}),
         split=SplitConfig(type="random", validation_size=0.2),

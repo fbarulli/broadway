@@ -126,7 +126,38 @@ class HPOConfig(BaseModel):
     storage_url: str | None = None
 
 
+class DataSourceRef(BaseModel):
+    """The experiment's declared data source — a required, typed config field.
+
+    ``loader`` names the loader that resolves the experiment's data
+    (``canonical`` parquet, ``joined`` cache, ``named_sample`` @version,
+    ``pinned`` artifact); ``version`` is the immutable sample version and is
+    required exactly when ``loader == "named_sample"``; ``schema_contract``
+    names the schema module the source is bound to.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+    loader: Literal["canonical", "joined", "named_sample", "pinned"]
+    version: str | None = None
+    schema_contract: str
+
+    @model_validator(mode="after")
+    def _validate_version_rule(self) -> DataSourceRef:
+        if self.loader == "named_sample" and self.version is None:
+            raise ValueError(
+                "data_source.loader='named_sample' requires data_source.version "
+                "(the immutable sample version, e.g. 'v3')"
+            )
+        if self.loader != "named_sample" and self.version is not None:
+            raise ValueError(
+                f"data_source.version is only valid for loader='named_sample'; "
+                f"got version={self.version!r} for loader={self.loader!r}"
+            )
+        return self
+
+
 class ExperimentConfig(BaseModel):
+    data_source: DataSourceRef
     features: FeatureConfig
     model: ModelConfig
     split: SplitConfig
