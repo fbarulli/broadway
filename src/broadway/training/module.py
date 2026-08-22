@@ -25,7 +25,7 @@ from broadway.training.mlflow_utils import (
     setup_mlflow,
 )
 from broadway.training.trainer import train
-from broadway.utils import feature_columns
+from broadway.utils import eligible_feature_columns
 
 logger = logging.getLogger(__name__)
 
@@ -43,8 +43,10 @@ def _load_features(cfg: PipelineConfig) -> tuple[pd.DataFrame, pd.DataFrame | No
     return train_df, val_df
 
 
-def _xy(df: pd.DataFrame, target: str) -> tuple[pd.DataFrame, pd.Series]:
-    return feature_columns(df, target), df[target]
+def _xy(cfg: PipelineConfig, df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series]:
+    cols = eligible_feature_columns(df, cfg)
+    assert cfg.dataset is not None
+    return df[cols], df[cfg.dataset.target]
 
 
 def _resolve_params(
@@ -84,13 +86,12 @@ def run(cfg: PipelineConfig) -> None:
     assert cfg.analysis is not None and cfg.analysis.name is not None
 
     train_df, val_df = _load_features(cfg)
-    target = cfg.dataset.target
 
     if val_df is None:
         train_df, val_df = split(train_df, cfg.dataset, cfg.experiment.split, cfg.experiment.random_state)
 
-    X_train, y_train = _xy(train_df, target)
-    X_val, y_val = _xy(val_df, target)
+    X_train, y_train = _xy(cfg, train_df)
+    X_val, y_val = _xy(cfg, val_df)
 
     params = _resolve_params(cfg, X_train, y_train, X_val, y_val)
 
