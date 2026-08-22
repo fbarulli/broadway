@@ -161,7 +161,7 @@ def test_target_encoding_requires_smoothing(lookup_dataset: DatasetContract) -> 
         lookup_dataset,
         "joined",
     )
-    with pytest.raises(KeyError):
+    with pytest.raises(ValueError, match="requires param"):
         build_pipeline(cfg)
 
 

@@ -41,7 +41,7 @@ def test_pipeline_on_synthetic_data(tmp_dataset: Path) -> None:
     drop_cols = [target] + ([dt_col] if dt_col else [])
     X_train = train_df.drop(columns=drop_cols)
     y_train = train_df[target]
-    model, result = train(cfg.experiment.model.type, X_train, y_train)
+    model, result = train(cfg, X_train, y_train)
     assert result.train_time_seconds >= 0
     X_val = val_df.drop(columns=drop_cols)
     y_val = val_df[target]
@@ -59,6 +59,6 @@ def test_linear_model_coefficients(tmp_dataset: Path) -> None:
     drop_cols = [target] + ([dt_col] if dt_col else [])
     X = df.drop(columns=drop_cols)
     y = df[target]
-    model, _ = train(cfg.experiment.model.type, X, y)
-    assert hasattr(model, "coef_")
-    assert len(model.coef_) == len(X.columns)
+    model, _ = train(cfg, X, y)
+    assert hasattr(model.named_steps["model"], "coef_")
+    assert len(model.named_steps["model"].coef_) == len(X.columns)

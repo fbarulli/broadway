@@ -15,7 +15,23 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from broadway.config.schema import HPOConfig, ModelHPOSpec
+from broadway.config.schema import (
+    ColumnRole,
+    ColumnSchema,
+    DatasetContract,
+    DataSourceRef,
+    EnvironmentConfig,
+    ExperimentConfig,
+    FeatureConfig,
+    HPOConfig,
+    ModelConfig,
+    ModelHPOSpec,
+    PipelineConfig,
+    PreprocessingStepConfig,
+    SplitConfig,
+    TaskType,
+)
+from broadway.features import recipe as recipe_module
 from broadway.training import hpo
 from broadway.training import hpo as hpo_module
 from broadway.training.hpo import (
@@ -26,6 +42,54 @@ from broadway.training.hpo import (
     run_model_study,
 )
 from broadway.training.mlflow_utils import setup_mlflow
+
+
+def _pipeline_config(
+    preprocessing: list[PreprocessingStepConfig] | None = None,
+) -> PipelineConfig:
+    """Minimal PipelineConfig for synthetic HPO tests (no preprocessing by default)."""
+    environment = EnvironmentConfig(
+        log_level="INFO",
+        data_dir="data",
+        raw_subdir="raw",
+        processed_subdir="processed",
+        download_chunk_size=8192,
+        mlflow_tracking_uri="mlruns",
+        database_user="user",
+        database_password="pass",
+        database_name="db",
+        database_host="localhost",
+        database_port=5432,
+        sample_size_ci=1000,
+        sample_size_stats=10000,
+        api_replicas_min=1,
+        api_replicas_max=3,
+        api_hpa_cpu_threshold=80,
+        monitoring_schedule="0 * * * *",
+    )
+    dataset = DatasetContract(
+        name="synthetic",
+        path="synthetic.parquet",
+        target="price",
+        task=TaskType.REGRESSION,
+        datetime_column=None,
+        columns={
+            "cat": ColumnSchema(dtype="object", null_count=0, role=ColumnRole.FEATURE),
+            "num": ColumnSchema(dtype="float64", null_count=0, role=ColumnRole.FEATURE),
+            "price": ColumnSchema(dtype="float64", null_count=0, role=ColumnRole.TARGET),
+        },
+        lookup_tables={},
+    )
+    experiment = ExperimentConfig(
+        data_source=DataSourceRef(loader="canonical", schema_contract="raw"),
+        features=FeatureConfig(include=["cat", "num"], exclude=[], derived=[], encodings=[]),
+        model=ModelConfig(type="linear", params={}),
+        split=SplitConfig(type="random", validation_size=0.2),
+        random_state=42,
+        target_metric="rmse",
+        preprocessing=preprocessing or [],
+    )
+    return PipelineConfig(dataset=dataset, environment=environment, experiment=experiment)
 
 
 def _parabola(params: dict[str, float | int], trial=None) -> float:
@@ -106,9 +170,10 @@ def test_bandit_allocate_zero_top_k() -> None:
 
 def test_make_objective_returns_target_metric(tiny_data) -> None:
     X_train, y_train, X_val, y_val = tiny_data
-    objective = make_objective("linear", "rmse", X_train, y_train, X_val, y_val)
+    cfg = _pipeline_config()
+    objective = make_objective(cfg, "linear", "rmse", X_train, y_train, X_val, y_val)
     assert objective({}) == pytest.approx(0.0, abs=0.1)
-    objective_r2 = make_objective("linear", "r2", X_train, y_train, X_val, y_val)
+    objective_r2 = make_objective(cfg, "linear", "r2", X_train, y_train, X_val, y_val)
     assert objective_r2({}) == pytest.approx(1.0, abs=0.05)
 
 
@@ -159,7 +224,7 @@ def _stub_objective(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_run_hpo_end_to_end(tiny_data, monkeypatch: pytest.MonkeyPatch) -> None:
     _stub_objective(monkeypatch)
     X_train, y_train, X_val, y_val = tiny_data
-    result = run_hpo(_hpo_config(), X_train, y_train, X_val, y_val, random_state=42)
+    result = run_hpo(_pipeline_config(), _hpo_config(), X_train, y_train, X_val, y_val, random_state=42)
     assert result["best_params"]["x"] == pytest.approx(3.0, abs=1.0)
     assert result["best_value"] == pytest.approx(0.0, abs=1.0)
     assert result["best_model"] in {"m0", "m1"}
@@ -171,24 +236,24 @@ def test_run_hpo_end_to_end(tiny_data, monkeypatch: pytest.MonkeyPatch) -> None:
 def test_run_hpo_deterministic(tiny_data, monkeypatch: pytest.MonkeyPatch) -> None:
     _stub_objective(monkeypatch)
     X_train, y_train, X_val, y_val = tiny_data
-    first = run_hpo(_hpo_config(), X_train, y_train, X_val, y_val, random_state=7)
-    second = run_hpo(_hpo_config(), X_train, y_train, X_val, y_val, random_state=7)
+    first = run_hpo(_pipeline_config(), _hpo_config(), X_train, y_train, X_val, y_val, random_state=7)
+    second = run_hpo(_pipeline_config(), _hpo_config(), X_train, y_train, X_val, y_val, random_state=7)
     assert first == second
 
 
 def test_run_hpo_parallel_equals_sequential(tiny_data, monkeypatch: pytest.MonkeyPatch) -> None:
     _stub_objective(monkeypatch)
     X_train, y_train, X_val, y_val = tiny_data
-    parallel = run_hpo(_hpo_config(n_models=3, top_k=2), X_train, y_train, X_val, y_val, random_state=3)
+    parallel = run_hpo(_pipeline_config(), _hpo_config(n_models=3, top_k=2), X_train, y_train, X_val, y_val, random_state=3)
     monkeypatch.setattr(hpo_module, "ThreadPoolExecutor", _ImmediateExecutor)
-    sequential = run_hpo(_hpo_config(n_models=3, top_k=2), X_train, y_train, X_val, y_val, random_state=3)
+    sequential = run_hpo(_pipeline_config(), _hpo_config(n_models=3, top_k=2), X_train, y_train, X_val, y_val, random_state=3)
     assert parallel == sequential
 
 
 def test_run_hpo_no_bandit_when_budget_exhausted(tiny_data, monkeypatch: pytest.MonkeyPatch) -> None:
     _stub_objective(monkeypatch)
     X_train, y_train, X_val, y_val = tiny_data
-    result = run_hpo(_hpo_config(total_trials=20, initial=10), X_train, y_train, X_val, y_val, random_state=1)
+    result = run_hpo(_pipeline_config(), _hpo_config(total_trials=20, initial=10), X_train, y_train, X_val, y_val, random_state=1)
     assert sum(model["n_trials"] for model in result["models"].values()) == 20
 
 
@@ -197,7 +262,7 @@ def test_run_hpo_requires_models(tiny_data, monkeypatch: pytest.MonkeyPatch) -> 
     X_train, y_train, X_val, y_val = tiny_data
     hpo = _hpo_config(n_models=0)
     with pytest.raises(ValueError, match="at least one model"):
-        run_hpo(hpo, X_train, y_train, X_val, y_val, random_state=1)
+        run_hpo(_pipeline_config(), hpo, X_train, y_train, X_val, y_val, random_state=1)
 
 
 def test_run_hpo_no_valid_trial_raises(tiny_data, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -208,7 +273,7 @@ def test_run_hpo_no_valid_trial_raises(tiny_data, monkeypatch: pytest.MonkeyPatc
     monkeypatch.setattr(hpo_module, "make_objective", lambda *args, **kwargs: _nan)
     X_train, y_train, X_val, y_val = tiny_data
     with pytest.raises(ValueError, match="no valid trial"):
-        run_hpo(_hpo_config(), X_train, y_train, X_val, y_val, random_state=1)
+        run_hpo(_pipeline_config(), _hpo_config(), X_train, y_train, X_val, y_val, random_state=1)
 
 
 # --- mlflow tracking (hermetic tmp file store, no server) -------------------
@@ -224,7 +289,7 @@ def _mlflow_file_store(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
 def test_mlflow_tracking_logs_trials(tmp_path, tiny_data, monkeypatch: pytest.MonkeyPatch) -> None:
     _mlflow_file_store(tmp_path, monkeypatch)
     X_train, y_train, X_val, y_val = tiny_data
-    objective = make_objective("linear", "rmse", X_train, y_train, X_val, y_val)
+    objective = make_objective(_pipeline_config(), "linear", "rmse", X_train, y_train, X_val, y_val)
     spec = ModelHPOSpec(name="m0", search_space={"n_jobs": [1, 4]})
     n_trials = 5
     run_model_study(spec, objective, n_trials=n_trials, random_state=42,
@@ -248,7 +313,7 @@ def test_run_hpo_mlflow_tags(tmp_path, tiny_data, monkeypatch: pytest.MonkeyPatc
     _mlflow_file_store(tmp_path, monkeypatch)
     _stub_objective(monkeypatch)
     X_train, y_train, X_val, y_val = tiny_data
-    run_hpo(_hpo_config(), X_train, y_train, X_val, y_val, random_state=42,
+    run_hpo(_pipeline_config(), _hpo_config(), X_train, y_train, X_val, y_val, random_state=42,
             mlflow_tracking=True, mlflow_tags={"exp": "x"})
     runs = mlflow.search_runs(experiment_names=["test_experiment"])
     assert len(runs) == 50
@@ -271,7 +336,7 @@ def test_log_best_artifacts_linear_model_and_csv(tmp_path, tiny_data,
     _mlflow_file_store(tmp_path, monkeypatch)
     X_train, y_train, X_val, y_val = tiny_data
     with mlflow.start_run():
-        log_best_artifacts("linear", {}, X_train, y_train, X_val, y_val)
+        log_best_artifacts(_pipeline_config(), "linear", {}, X_train, y_train, X_val, y_val)
     runs = mlflow.search_runs(experiment_names=["test_experiment"])
     assert len(runs) == 1
     artifacts, has_model = _run_artifacts(runs.iloc[0]["run_id"])
@@ -285,7 +350,7 @@ def test_log_best_artifacts_tree_importance_plot(tmp_path, tiny_data,
     _mlflow_file_store(tmp_path, monkeypatch)
     X_train, y_train, X_val, y_val = tiny_data
     with mlflow.start_run():
-        log_best_artifacts("lgbm", {"n_estimators": 5, "max_depth": 2},
+        log_best_artifacts(_pipeline_config(), "lgbm", {"n_estimators": 5, "max_depth": 2},
                            X_train, y_train, X_val, y_val)
     runs = mlflow.search_runs(experiment_names=["test_experiment"])
     assert len(runs) == 1
@@ -305,9 +370,55 @@ def test_make_objective_returns_float() -> None:
     rng = np.random.default_rng(0)
     X = pd.DataFrame({"a": rng.normal(size=40), "b": rng.normal(size=40)})
     y = pd.Series(2.0 * X["a"] + 0.5 + rng.normal(scale=0.1, size=40))
+    cfg = _pipeline_config()
     for model_type in ("linear", "lgbm", "xgb"):
-        objective = hpo.make_objective(model_type, "mae", X, y, X, y)
+        objective = hpo.make_objective(cfg, model_type, "mae", X, y, X, y)
         value = objective({})
         assert isinstance(value, float) and np.isfinite(value) and value >= 0.0
         tuned = objective({"n_estimators": 10, "max_depth": 2} if model_type != "linear" else {})
         assert isinstance(tuned, float) and np.isfinite(tuned)
+
+
+def test_hpo_trial_refits_preprocessing_each_trial(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Guards PER-TRIAL refit of preprocessing: make_objective fits the composed Pipeline each trial. HPO uses a single train/val split (no internal CV), so per-trial refit is the complete leakage guard — this is NOT a per-fold guard."""
+    shared = {"fits": 0}
+
+    class _CountingTransformer:
+        """Target-encoding stand-in: counts refits and maps categories to numbers."""
+
+        def __init__(self, state: dict) -> None:
+            self._state = state
+
+        def fit(self, X: pd.DataFrame, y=None):
+            self._state["fits"] += 1
+            self._mapping = {
+                value: float(i) for i, value in enumerate(sorted(set(X["cat"])))
+            }
+            return self
+
+        def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+            return X.assign(cat=X["cat"].map(self._mapping))
+
+    def counting_build_step(step, target):
+        if step.type == "target_encoding":
+            return _CountingTransformer(shared)
+        raise AssertionError(f"unexpected step type in leakage test: {step.type}")
+
+    monkeypatch.setattr(recipe_module, "_build_step", counting_build_step)
+    cfg = _pipeline_config(
+        [
+            PreprocessingStepConfig(
+                type="target_encoding", columns=["cat"], params={"smoothing": 20}
+            )
+        ]
+    )
+    X_train = pd.DataFrame({"cat": ["a", "b", "a", "b"], "num": [1.0, 2.0, 3.0, 4.0]})
+    y_train = pd.Series([2.0, 4.0, 6.0, 8.0])
+    X_val = pd.DataFrame({"cat": ["a", "b"], "num": [5.0, 6.0]})
+    y_val = pd.Series([10.0, 12.0])
+    objective = make_objective(cfg, "linear", "rmse", X_train, y_train, X_val, y_val)
+    assert objective({}) == pytest.approx(0.0, abs=0.1)
+    assert objective({}) == pytest.approx(0.0, abs=0.1)
+    assert shared["fits"] == 2

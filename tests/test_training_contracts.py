@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 import pytest
 from sklearn.linear_model import LinearRegression
+from sklearn.pipeline import Pipeline
 
 from broadway.analysis.contracts import AnalysisContract, AnalysisMode
 from broadway.config.schema import (
@@ -84,10 +85,12 @@ def test_base_model_is_importable_and_abstract() -> None:
         BaseModel()
 
 
-def test_trainer_returns_training_result() -> None:
+def test_trainer_returns_training_result(tmp_path: Path) -> None:
+    cfg = _make_config(tmp_path)
     X = pd.DataFrame({"a": [1.0, 2.0, 3.0], "b": [2.0, 4.0, 6.0]})
     y = pd.Series([3.0, 6.0, 9.0])
-    model, result = train("linear", X, y, n_jobs=1)
+    model, result = train(cfg, X, y, n_jobs=1)
+    assert isinstance(model, Pipeline)
     assert result.model_type == "linear"
     assert result.params == {"n_jobs": 1}
     assert result.train_time_seconds >= 0

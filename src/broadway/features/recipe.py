@@ -17,6 +17,8 @@ _STEP_ALLOWED_PARAMS: dict[str, frozenset[str]] = {
     "passthrough": frozenset(),
 }
 
+_REQUIRED_STEP_PARAMS: dict[str, frozenset[str]] = {"target_encoding": frozenset({"smoothing"})}
+
 
 def _validate_step_params(step: PreprocessingStepConfig) -> None:
     allowed = _STEP_ALLOWED_PARAMS[step.type]
@@ -25,6 +27,11 @@ def _validate_step_params(step: PreprocessingStepConfig) -> None:
         raise ValueError(
             f"invalid params for preprocessing step '{step.type}': {invalid}. "
             f"valid params: {sorted(allowed)}"
+        )
+    missing = sorted(_REQUIRED_STEP_PARAMS.get(step.type, frozenset()) - set(step.params))
+    if missing:
+        raise ValueError(
+            f"preprocessing step '{step.type}' requires param(s) {missing}: {sorted(allowed)}"
         )
 
 

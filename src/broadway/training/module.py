@@ -7,6 +7,7 @@ from pathlib import Path
 
 import mlflow
 import pandas as pd
+from mlflow.models import infer_signature
 
 from broadway.analysis.contracts import AnalysisMode, require_mode
 from broadway.baseline.improvement import improvement_vs_baseline
@@ -57,6 +58,7 @@ def _resolve_params(
     if cfg.experiment.hpo is None:
         return cfg.experiment.model.params
     result = run_hpo(
+        cfg,
         cfg.experiment.hpo,
         X_train,
         y_train,
@@ -92,11 +94,18 @@ def run(cfg: PipelineConfig) -> None:
 
     params = _resolve_params(cfg, X_train, y_train, X_val, y_val)
 
-    model, result = train(cfg.experiment.model.type, X_train, y_train, **params)
+    model, result = train(cfg, X_train, y_train, **params)
 
     setup_mlflow(cfg.environment.mlflow_tracking_uri, cfg.dataset.name)
     with mlflow.start_run():
         log_params(params)
+        log_params(
+            {
+                f"data_source.{key}": value
+                for key, value in cfg.experiment.data_source.model_dump().items()
+                if value is not None
+            }
+        )
         metrics = compute_metrics(y_val.to_numpy(), model.predict(X_val))
         log_metrics(metrics)
         baseline_result = load_persisted(cfg)
@@ -105,7 +114,8 @@ def run(cfg: PipelineConfig) -> None:
             if improvement is not None:
                 mlflow.log_metric("baseline_improvement", improvement)
                 logger.info(f"train: improvement over {baseline_result.strategy} baseline = {improvement:.1%}")
-        artifact_path = log_model(model, "model")
+        signature = infer_signature(X_train, y_train)
+        artifact_path = log_model(model, "model", signature=signature)
 
     result = result.model_copy(update={"artifact_path": artifact_path})
 
