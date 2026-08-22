@@ -375,8 +375,10 @@ excluded from byte-equality: `trace.created_at`
 (`artifacts/baseline/baseline.json`); the MLflow-generated `artifact_path`
 `models:/m-<id>` (`artifacts/training/training_result.json`); the
 champion-registry state fields `promote`, `reason`,
-`comparison.metrics.*.champion`, `warnings`
-(`artifacts/evaluation/metrics.json`). Timestamps, registry-assigned URIs, and
+`comparison.metrics.*.{champion,delta,delta_pct}`, `warnings`
+(`artifacts/evaluation/metrics.json`; the delta pair is champion-derived —
+null on a first run with no champion, computed once a champion exists —
+enforced by `scripts/check_e2e_determinism.sh`). Timestamps, registry-assigned URIs, and
 mutable champion state are external-world coupling, not pipeline
 non-determinism.
 
