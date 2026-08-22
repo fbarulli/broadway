@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -12,6 +13,24 @@ import pandas as pd
 from mlflow.models import ModelSignature
 
 logger = logging.getLogger(__name__)
+
+# Champion manifest buckets (SKLEARN_PIPELINES.md Slice 4, decision 3): a
+# deployed champion's logging path. ModelPyFunc retirement is the CHECKED
+# condition "bare_model is empty"; ambiguous always needs a human look.
+BARE_MODEL = "bare_model"
+PIPELINE_SIGNATURE = "pipeline_signature"
+AMBIGUOUS = "ambiguous"
+
+
+@dataclass(frozen=True)
+class ChampionArtifact:
+    """One deployed champion: a registered model version holding the alias."""
+
+    model_name: str
+    version: str
+    artifact_uri: str | None
+    bucket: str
+    reason: str = ""
 
 _MLFLOW_FILE_STORE_ENV = "MLFLOW_ALLOW_FILE_STORE"
 
@@ -109,3 +128,61 @@ def get_champion(model_name: str, alias: str = "champion") -> str | None:
 def promote_candidate(model_name: str, model_uri: str, alias: str = "champion") -> None:
     version = mlflow.register_model(model_uri, model_name)
     mlflow.tracking.MlflowClient().set_registered_model_alias(model_name, alias, version.version)
+
+
+def classify_champion(artifact_uri: str) -> tuple[str, str]:
+    """Classify a champion artifact by logging path from its MLmodel metadata.
+
+    bare_model — python_function pythonmodel/code wrapper (the ModelPyFunc
+    path) with no sklearn flavor. pipeline_signature — sklearn flavor with an
+    explicit signature (the new-path Pipeline logging). Anything else is
+    ambiguous with a reason string: never force a bucket without clean
+    evidence (e.g. a signature-less sklearn artifact is the pre-Slice-3 bare
+    logging path, which is neither of the two named paths).
+    """
+    try:
+        info = mlflow.models.get_model_info(artifact_uri)
+    except mlflow.exceptions.MlflowException as exc:
+        return AMBIGUOUS, f"metadata unreadable: {exc}"
+    flavors = info.flavors or {}
+    pyfunc = flavors.get("python_function") or {}
+    wrapped = bool(pyfunc) and (
+        pyfunc.get("python_model") is not None or pyfunc.get("code") is not None
+    )
+    if "sklearn" in flavors:
+        if info.signature is not None:
+            return PIPELINE_SIGNATURE, ""
+        return AMBIGUOUS, "sklearn flavor without explicit signature — pre-Slice-3 bare-model logging path"
+    if wrapped:
+        return BARE_MODEL, ""
+    return AMBIGUOUS, "no sklearn flavor and no ModelPyFunc wrapper signal in metadata"
+
+
+def list_champions(tracking_uri: str, alias: str = "champion") -> list[ChampionArtifact]:
+    """List deployed champions, each classified by artifact logging path.
+
+    A champion is a registered model version holding ``alias`` (set by
+    promote_candidate). Registration and classification read the same file
+    store the training path uses; see classify_champion for the bucket rules.
+    """
+    if "://" not in tracking_uri:
+        os.environ[_MLFLOW_FILE_STORE_ENV] = "true"
+    mlflow.set_tracking_uri(tracking_uri)
+    client = mlflow.tracking.MlflowClient()
+    champions: list[ChampionArtifact] = []
+    for model in client.search_registered_models():
+        try:
+            version = client.get_model_version_by_alias(model.name, alias)
+        except mlflow.exceptions.MlflowException:
+            continue
+        source = version.source
+        if source is None:
+            champions.append(
+                ChampionArtifact(model.name, version.version, None, AMBIGUOUS, "registered version has no artifact URI")
+            )
+            continue
+        bucket, reason = classify_champion(source)
+        champions.append(
+            ChampionArtifact(model.name, version.version, source, bucket, reason)
+        )
+    return champions
