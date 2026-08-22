@@ -2,8 +2,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from broadway.features.frequency import apply_frequency_encoding, make_frequency_encoding
-from broadway.features.ml_encodings import apply_target_encoding, make_target_encoding
+from broadway.features.transformers import FrequencyEncoding, TargetEncoding
 from project.basic import add_basic_features
 from project.boroughs import add_borough_features, load_zones
 from project.features import ENGINEERED_FEATURES, ENGINEERED_SCHEMA, ROUTE_KEYS, TARGET
@@ -32,9 +31,8 @@ class FeaturePipeline:
         self.night_start = night_start
         self.night_end = night_end
         self.zones: pd.DataFrame | None = None
-        self.route_stats: pd.DataFrame | None = None
-        self.route_frequency: pd.DataFrame | None = None
-        self.global_mean: float | None = None
+        self._route_target_encoder: TargetEncoding | None = None
+        self._route_frequency_encoder: FrequencyEncoding | None = None
         self.fitted: bool = False
 
     def fit(self, train_df: pd.DataFrame) -> FeaturePipeline:
@@ -42,31 +40,31 @@ class FeaturePipeline:
 
         engineered = self._add_deterministic_features(train_df)
 
-        self.route_stats, self.global_mean = make_target_encoding(
-            engineered,
-            ROUTE_KEYS,
-            TARGET,
-            "route_avg_duration",
-            self.encoding_smoothing,
-        )
+        self._route_target_encoder = TargetEncoding(
+            columns=ROUTE_KEYS,
+            target=TARGET,
+            smoothing=self.encoding_smoothing,
+            feature_name="route_avg_duration",
+        ).fit(engineered)
 
-        self.route_frequency = make_frequency_encoding(
-            engineered,
-            ROUTE_KEYS,
-            "route_frequency",
-        )
+        self._route_frequency_encoder = FrequencyEncoding(
+            columns=ROUTE_KEYS,
+            feature_name="route_frequency",
+            normalize=False,
+        ).fit(engineered)
 
         self.fitted = True
 
         return self
 
     def _apply_encodings(self, df: pd.DataFrame) -> pd.DataFrame:
-        df = apply_target_encoding(
-            df, self.route_stats, ROUTE_KEYS, "route_avg_duration", self.global_mean,
-        )
-        df = apply_frequency_encoding(
-            df, self.route_frequency, ROUTE_KEYS, "route_frequency", self.frequency_fill,
-        )
+        target_encoder = self._route_target_encoder
+        frequency_encoder = self._route_frequency_encoder
+        if target_encoder is None or frequency_encoder is None:
+            raise RuntimeError("FeaturePipeline must be fit() before transform().")
+        df = target_encoder.transform(df)
+        df = frequency_encoder.transform(df, fill=self.frequency_fill)
+        df["route_frequency"] = df["route_frequency"].astype("int32")
         return df
 
     def transform(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -80,7 +78,7 @@ class FeaturePipeline:
                 "FeaturePipeline.transform() changed row count from "
                 f"{input_rows} to {len(engineered)}. This usually means a "
                 "merge inside the pipeline matched a key more than once "
-                "(duplicate rows in zones, route_stats, or route_frequency). "
+                "(duplicate rows in zones or lookup tables). "
                 "Row-to-row alignment with the input dataframe can no "
                 "longer be trusted."
             )

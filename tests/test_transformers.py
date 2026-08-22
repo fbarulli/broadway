@@ -157,3 +157,20 @@ def test_pipeline_reexpression_output_identical() -> None:
     assert list(out.columns) == ["x", "city", "price", "city_freq_enc", "city_target_enc"]
     assert out["city_freq_enc"].tolist() == [0.4, 0.4, 0.4, 0.2, 0.4]
     assert out["city_target_enc"].round(10).tolist() == [187.5, 204.1666666667, 187.5, 209.0909090909, 204.1666666667]
+
+
+def test_feature_name_param_overrides_platform_default() -> None:
+    frame = _price_frame()
+    custom_target = TargetEncoding(
+        columns=["city"], target="price", smoothing=10, feature_name="custom_target"
+    )
+    custom_freq = FrequencyEncoding(columns=["city"], feature_name="custom_freq")
+    assert "custom_target" in custom_target.fit(frame).transform(frame).columns
+    assert "custom_freq" in custom_freq.fit(frame).transform(frame).columns
+    assert "city_target_enc" not in custom_target.fit(frame).transform(frame).columns
+    assert "city_freq_enc" not in custom_freq.fit(frame).transform(frame).columns
+
+    default_target = TargetEncoding(columns=["city"], target="price", smoothing=10)
+    default_freq = FrequencyEncoding(columns=["city"])
+    assert "city_target_enc" in default_target.fit(frame).transform(frame).columns
+    assert "city_freq_enc" in default_freq.fit(frame).transform(frame).columns

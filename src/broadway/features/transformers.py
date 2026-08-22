@@ -28,13 +28,21 @@ class TargetEncoding(BaseEstimator, TransformerMixin):
     per key with ``global_mean = X[target].mean()`` — identical to the legacy
     ``fit_target_encoding``. pandas ``groupby`` drops NaN keys at fit, so NaN
     categories resolve to the global-mean fallback at transform (the legacy
-    ``__unknown__`` sentinel equivalent).
+    ``__unknown__`` sentinel equivalent). The output column is named
+    ``feature_name`` when provided (verbatim), else ``<joined_cols>_target_enc``.
     """
 
-    def __init__(self, columns: list[str], target: str, smoothing: float) -> None:
+    def __init__(
+        self,
+        columns: list[str],
+        target: str,
+        smoothing: float,
+        feature_name: str | None = None,
+    ) -> None:
         self.columns = list(columns)
         self.target = target
         self.smoothing = smoothing
+        self.feature_name = feature_name
 
     def __sklearn_clone__(self) -> TargetEncoding:
         return type(self)(**self.get_params(deep=False))
@@ -47,7 +55,11 @@ class TargetEncoding(BaseEstimator, TransformerMixin):
         )
         self._mapping = encoded.to_dict()
         self._global_mean = float(X[self.target].mean())
-        self._column_name = f"{'_'.join(self.columns)}_target_enc"
+        self._column_name = (
+            self.feature_name
+            if self.feature_name is not None
+            else f"{'_'.join(self.columns)}_target_enc"
+        )
         return self
 
     def transform(self, X: pd.DataFrame) -> pd.DataFrame:
@@ -60,21 +72,35 @@ class TargetEncoding(BaseEstimator, TransformerMixin):
 class FrequencyEncoding(BaseEstimator, TransformerMixin):
     """Relative-frequency encoding keyed by one categorical column or a composite.
 
-    Fit computes ``value_counts(normalize=True)`` per key — identical to the
-    legacy ``fit_frequency_encoding``. Unseen/NaN keys at transform map to the
-    ``fill`` value (default 0, matching the legacy signature).
+    Fit computes ``value_counts`` per key — normalized by default (identical to
+    the legacy ``fit_frequency_encoding``); pass ``normalize=False`` for raw
+    counts (the taxi binding's ``route_frequency``). Unseen/NaN keys at
+    transform map to the ``fill`` value (default 0, matching the legacy
+    signature). The output column is named ``feature_name`` when provided
+    (verbatim), else ``<joined_cols>_freq_enc``.
     """
 
-    def __init__(self, columns: list[str]) -> None:
+    def __init__(
+        self,
+        columns: list[str],
+        feature_name: str | None = None,
+        normalize: bool = True,
+    ) -> None:
         self.columns = list(columns)
+        self.feature_name = feature_name
+        self.normalize = normalize
 
     def __sklearn_clone__(self) -> FrequencyEncoding:
         return type(self)(**self.get_params(deep=False))
 
     def fit(self, X: pd.DataFrame, y=None) -> FrequencyEncoding:
         key = self.columns if len(self.columns) > 1 else self.columns[0]
-        self._mapping = X[key].value_counts(normalize=True).to_dict()
-        self._column_name = f"{'_'.join(self.columns)}_freq_enc"
+        self._mapping = X[key].value_counts(normalize=self.normalize).to_dict()
+        self._column_name = (
+            self.feature_name
+            if self.feature_name is not None
+            else f"{'_'.join(self.columns)}_freq_enc"
+        )
         return self
 
     def transform(self, X: pd.DataFrame, fill: float = 0) -> pd.DataFrame:
