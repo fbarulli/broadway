@@ -15,6 +15,7 @@ from broadway.config.schema import (
     LookupSpec,
     ModelConfig,
     ModelHPOSpec,
+    PreprocessingStepConfig,
     SplitConfig,
     TrainStep,
 )
@@ -289,3 +290,54 @@ def test_experiment_config_parses_with_data_source() -> None:
     )
     assert config.data_source.loader == "canonical"
     assert config.data_source.schema_contract == "raw"
+
+
+def test_experiment_preprocessing_defaults_to_empty() -> None:
+    config = ExperimentConfig(
+        data_source=DataSourceRef(loader="canonical", schema_contract="raw"),
+        **_experiment_kwargs(),
+    )
+    assert config.preprocessing == []
+
+
+def _preprocessing_experiment(preprocessing: list[dict[str, object]]) -> ExperimentConfig:
+    return ExperimentConfig(
+        data_source=DataSourceRef(loader="canonical", schema_contract="raw"),
+        features=FeatureConfig(include=["rooms"], exclude=[], derived=[], encodings=[]),
+        model=ModelConfig(type="linear", params={}),
+        split=SplitConfig(type="random", validation_size=0.2),
+        random_state=42,
+        target_metric="rmse",
+        preprocessing=[PreprocessingStepConfig(**step) for step in preprocessing],
+    )
+
+
+def test_preprocessing_step_parses_with_params() -> None:
+    config = _preprocessing_experiment(
+        [
+            {"type": "target_encoding", "columns": ["neighborhood"], "params": {"smoothing": 20}},
+            {"type": "frequency_encoding", "columns": ["zip"], "params": {"normalize": False}},
+            {"type": "one_hot", "columns": ["style"]},
+            {"type": "passthrough", "columns": ["rooms"]},
+        ]
+    )
+    assert [step.type for step in config.preprocessing] == [
+        "target_encoding",
+        "frequency_encoding",
+        "one_hot",
+        "passthrough",
+    ]
+    assert config.preprocessing[0].params == {"smoothing": 20}
+    assert config.preprocessing[1].params == {"normalize": False}
+
+
+def test_preprocessing_step_rejects_invalid_type() -> None:
+    with pytest.raises(ValidationError):
+        PreprocessingStepConfig(type="bogus", columns=["rooms"])
+
+
+def test_preprocessing_step_rejects_unknown_top_level_key() -> None:
+    with pytest.raises(ValidationError):
+        PreprocessingStepConfig(
+            type="passthrough", columns=["rooms"], params={}, unexpected="nope"
+        )

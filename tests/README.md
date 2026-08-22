@@ -15,6 +15,11 @@ YAML → Pydantic loading and dataframe contract enforcement.
 - `test_analysis_contract.py` — `AnalysisContract` validation + `require_mode` guardrails.
 - `test_training_contracts.py`, `test_evaluate_contracts.py` — `TrainingResult` / `EvaluationResult` models.
 
+## Recipes (preprocessing pipelines)
+
+- `test_recipe.py` — YAML → Pipeline round trip, unknown step fails loud, empty
+  block = passthrough identity, schema-contract cross-check.
+
 ## Ingestion / ETL / data
 
 Ingest, structural cleaning, joins, and the dataset loaders.

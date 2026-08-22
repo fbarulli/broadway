@@ -66,7 +66,11 @@ jobs:
             -strict -summary -ignore-filename-pattern "kind-config\\.yaml" k8s/optuna/ 2>&1 | tail -3
 
       # Every REAL experiment config must parse against the config schema —
-      # a config that fails to load breaks the build.
+      # a config that fails to load breaks the build. dataset='test' for all
+      # experiments on purpose: taxi's lookup data lives under data/raw/ which
+      # is gitignored, so the gate proves schema-parse validity here; taxi's
+      # column cross-check against its real joined schema runs on the taxi
+      # branch where data/raw exists (SKLEARN_PIPELINES.md decision 6).
       - name: Configs (parse every configs/experiment/*.yaml)
         run: |
           uv run python -c "
