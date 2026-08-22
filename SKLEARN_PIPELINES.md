@@ -213,9 +213,6 @@ Existing test files that touch migration sites (verified by import grep):
 | `tests/test_integration.py` | end-to-end pipeline steps | 3 |
 | `tests/test_loud_failures.py` | failure-path loudness | 3 |
 | `tests/test_explain.py` | explainability over fitted model | 4 |
-| `tests/test_feature_selection.py` | estimator `.fit(X, y)` contract | 5 |
-| `tests/test_evaluate_contracts.py` | evaluation result shapes | 5 |
-| `tests/test_metrics_extended.py` | metrics consumed by CV | 5 |
 
 New tests per slice:
 
@@ -234,7 +231,7 @@ New tests per slice:
    gain `sklearn` so the branch gets CI from the first push. Without this the
    branch runs ungated.
 2. **Coverage gate** (`--cov-fail-under=85`) — unchanged command; new modules
-   (`features/transformers.py`, `features/recipe.py`) must land with tests to
+   (`features/recipe.py`, versioned `schemas/`) must land with tests to
    hold 85%.
 3. **Parity job** — unchanged: it diffs `origin/main` vs `origin/taxi`
    regardless of the branch CI runs on, and keeps passing while `sklearn`
