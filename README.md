@@ -308,7 +308,7 @@ DATA_MODE=live uv run python -m project.scripts.12_lgbm_baseline
 ## 4. Tests
 
 ```bash
-uv run pytest              # 638 tests: library (synthetic) + data layer (real .head(1000)/cache)
+uv run pytest              # library (synthetic) + data layer (real .head(1000)/cache); test count enforced in CI on every push
 ```
 
 ---

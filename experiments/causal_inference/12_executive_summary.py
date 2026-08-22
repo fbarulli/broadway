@@ -1,23 +1,16 @@
 import warnings
+
 warnings.filterwarnings("ignore", category=UserWarning)
 warnings.filterwarnings("ignore", category=FutureWarning)
 
-from pathlib import Path
-
-from _common import RESULTS, TARGET, load_sample
+from _common import RESULTS
 
 SUMMARY_OUT = RESULTS / "EXECUTIVE_SUMMARY.md"
 
 def main() -> None:
     RESULTS.mkdir(parents=True, exist_ok=True)
-    
-    # Path references for embedded charts
-    img_scatter = "11_pure_meter_scatter.png"
-    img_kde = "10_subpopulation_kde.png"
-    img_coefs = "05_zone_premiums.png"
-    img_time = "06_time_of_day_premiums.png"
 
-    md = f"""# Executive Audit: NYC Taxi Pricing Physics
+    md = """# Executive Audit: NYC Taxi Pricing Physics
 **Dataset:** 1,000,000 Fare Prediction Samples (1M Rows)  
 **Objective:** Reverse-engineer the underlying pricing mechanics, isolate structural anomalies, and validate linear assumptions using purely statistical techniques.
 

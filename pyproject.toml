@@ -70,6 +70,8 @@ warn_unused_ignores = true
 [tool.ruff]
 target-version = "py312"
 line-length = 100
+
+[tool.ruff.lint]
 # Rules that are INTENTIONAL in this codebase:
 #   B017  — test_loud_failures deliberately asserts blind Exception (that's the test's job)
 #   BLE001 — fail-loud wrappers catch Exception to annotate and re-raise

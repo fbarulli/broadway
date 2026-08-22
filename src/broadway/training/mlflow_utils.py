@@ -14,12 +14,43 @@ logger = logging.getLogger(__name__)
 
 _MLFLOW_FILE_STORE_ENV = "MLFLOW_ALLOW_FILE_STORE"
 
+# Connection-refusal markers inside MLflow's wrapped error message. MLflow's
+# HTTP store wraps the underlying requests/urllib3 connection failure into a
+# bare MlflowException (no __cause__), so the refusal is only visible in text.
+_CONNECTION_REFUSED_MARKERS = (
+    "Connection refused",
+    "Failed to establish a new connection",
+    "Max retries exceeded",
+)
+
 
 def setup_mlflow(tracking_uri: str, experiment_name: str) -> None:
     if "://" not in tracking_uri:
         os.environ[_MLFLOW_FILE_STORE_ENV] = "true"
-    mlflow.set_tracking_uri(tracking_uri)
-    mlflow.set_experiment(experiment_name)
+    try:
+        mlflow.set_tracking_uri(tracking_uri)
+        mlflow.set_experiment(experiment_name)
+    except (ConnectionError, mlflow.exceptions.MlflowException) as exc:
+        if not _is_unreachable_http_store(tracking_uri, exc):
+            raise
+        raise RuntimeError(_unreachable_server_hint(tracking_uri)) from exc
+
+
+def _is_unreachable_http_store(tracking_uri: str, exc: Exception) -> bool:
+    """True only for a connection refusal against an http(s) tracking store."""
+    if not tracking_uri.startswith(("http://", "https://")):
+        return False
+    if isinstance(exc, ConnectionError):
+        return True
+    return any(marker in str(exc) for marker in _CONNECTION_REFUSED_MARKERS)
+
+
+def _unreachable_server_hint(tracking_uri: str) -> str:
+    return (
+        f"MLflow server unreachable at {tracking_uri} — start it: "
+        "uv run mlflow server --backend-store-uri sqlite:///$(pwd)/.mlflow.db "
+        "--artifacts-destination file://$(pwd)/mlruns (README: dev setup)"
+    )
 
 
 def log_params(params: dict[str, float | int | str]) -> None:
