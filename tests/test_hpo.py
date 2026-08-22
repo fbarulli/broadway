@@ -37,7 +37,6 @@ from broadway.training import hpo
 from broadway.training import hpo as hpo_module
 from broadway.training.hpo import (
     bandit_allocate,
-    log_best_artifacts,
     make_objective,
     run_hpo,
     run_model_study,
@@ -322,44 +321,6 @@ def test_run_hpo_mlflow_tags(tmp_path, tiny_data, monkeypatch: pytest.MonkeyPatc
     assert set(runs["tags.model"]) == {"m0", "m1"}
     assert set(runs["tags.study"]) == {"hpo-m0", "hpo-m1"}
     assert (runs["tags.exp"] == "x").all()
-
-
-def _run_artifacts(run_id: str) -> tuple[list[str], bool]:
-    """Run artifact paths, plus whether it carries a logged model output."""
-    client = mlflow.tracking.MlflowClient()
-    artifacts = [a.path for a in client.list_artifacts(run_id)]
-    outputs = client.get_run(run_id).outputs
-    has_model = outputs is not None and len(outputs.model_outputs) == 1
-    return artifacts, has_model
-
-
-def test_log_best_artifacts_linear_model_and_csv(tmp_path, tiny_data,
-                                                 monkeypatch: pytest.MonkeyPatch) -> None:
-    _mlflow_file_store(tmp_path, monkeypatch)
-    X_train, y_train, X_val, y_val = tiny_data
-    with mlflow.start_run():
-        log_best_artifacts(_pipeline_config(), "linear", {}, X_train, y_train, X_val, y_val)
-    runs = mlflow.search_runs(experiment_names=["test_experiment"])
-    assert len(runs) == 1
-    artifacts, has_model = _run_artifacts(runs.iloc[0]["run_id"])
-    assert has_model
-    assert "predictions.csv" in artifacts
-    assert "feature_importance.png" not in artifacts
-
-
-def test_log_best_artifacts_tree_importance_plot(tmp_path, tiny_data,
-                                                 monkeypatch: pytest.MonkeyPatch) -> None:
-    _mlflow_file_store(tmp_path, monkeypatch)
-    X_train, y_train, X_val, y_val = tiny_data
-    with mlflow.start_run():
-        log_best_artifacts(_pipeline_config(), "lgbm", {"n_estimators": 5, "max_depth": 2},
-                           X_train, y_train, X_val, y_val)
-    runs = mlflow.search_runs(experiment_names=["test_experiment"])
-    assert len(runs) == 1
-    artifacts, has_model = _run_artifacts(runs.iloc[0]["run_id"])
-    assert has_model
-    assert "predictions.csv" in artifacts
-    assert "feature_importance.png" in artifacts
 
 
 def test_make_objective_returns_float() -> None:

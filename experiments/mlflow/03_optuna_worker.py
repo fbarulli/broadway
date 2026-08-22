@@ -24,7 +24,7 @@ import mlflow
 import optuna
 import pandas as pd
 import yaml
-from _common import MODEL_KEYS, battle_pipeline_config
+from _common import MODEL_KEYS, battle_pipeline_config, log_best_artifacts
 from sklearn.model_selection import train_test_split
 
 from broadway.config.schema import HPOConfig
@@ -111,8 +111,8 @@ def log_to_mlflow(
         mlflow.set_tag("model", model_name)
         mlflow.set_tag("study", study_name)
         mlflow.set_tag("seed", str(seed))
-        hpo.log_best_artifacts(battle_pipeline_config(), key, best.params,
-                               X_train, y_train, X_val, y_val)
+        log_best_artifacts(battle_pipeline_config(), key, best.params,
+                           X_train, y_train, X_val, y_val)
 
 
 def preflight(db_url: str, tracking_uri: str) -> None:

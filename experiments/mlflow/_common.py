@@ -10,11 +10,15 @@ reference the platform model registry / sklearn classes.
 """
 
 import os
+import tempfile
 from pathlib import Path
 
+import matplotlib.pyplot as plt
+import mlflow
 import numpy as np
 import pandas as pd
 import yaml
+from mlflow.models import infer_signature
 from sklearn.cluster import KMeans
 from sklearn.compose import ColumnTransformer
 from sklearn.decomposition import PCA
@@ -37,7 +41,9 @@ from broadway.config.schema import (
     SplitConfig,
     TaskType,
 )
+from broadway.training.mlflow_utils import log_model
 from broadway.training.models.registry import display_name, model_keys
+from broadway.training.trainer import build_model_pipeline
 from broadway.utils import require_keys
 from project.working import load_metered, time_bucket
 
@@ -183,3 +189,46 @@ def battle_pipeline_config() -> PipelineConfig:
         target_metric="mae",
     )
     return PipelineConfig(dataset=dataset, environment=environment, experiment=experiment)
+
+
+def log_best_artifacts(
+    cfg: PipelineConfig,
+    model_type: str,
+    params: dict[str, float | int],
+    X_train: pd.DataFrame,
+    y_train: pd.Series,
+    X_val: pd.DataFrame,
+    y_val: pd.Series,
+) -> None:
+    """Log best-run artifacts to the active mlflow run.
+
+    Refits the composed Pipeline with the best params on train, logs it via
+    the sklearn flavor (a Pipeline always has one — no flavor dispatch) with
+    an explicit signature and cloudpickle serialization, writes the val
+    predictions CSV, and plots the feature importances of tree models.
+    """
+    pipeline = build_model_pipeline(cfg, model_type, params)
+    pipeline.fit(X_train, y_train)
+    log_model(
+        pipeline,
+        "model",
+        signature=infer_signature(X_train, y_train),
+    )
+    with tempfile.TemporaryDirectory() as tmp:
+        preds = pipeline.predict(X_val)
+        csv_path = Path(tmp) / "predictions.csv"
+        pd.DataFrame({"actual": y_val.to_numpy(), "predicted": preds}).to_csv(
+            csv_path, index=False
+        )
+        mlflow.log_artifact(str(csv_path))
+        model = pipeline.named_steps["model"]
+        if hasattr(model, "feature_importances_"):
+            importance = model.feature_importances_
+            fig, ax = plt.subplots(figsize=(6, 4))
+            ax.bar(range(len(importance)), importance)
+            ax.set_title(f"{model_type} feature importance")
+            fig.tight_layout()
+            plot_path = Path(tmp) / "feature_importance.png"
+            fig.savefig(plot_path, dpi=150)
+            plt.close(fig)
+            mlflow.log_artifact(str(plot_path))

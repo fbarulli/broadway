@@ -35,6 +35,7 @@ from _common import (
     battle_pipeline_config,
     binary_threshold,
     load_sample,
+    log_best_artifacts,
     make_pipeline,
     split_data,
 )
@@ -214,8 +215,9 @@ def main() -> None:
     raw_hpo = yaml.safe_load(
         (REPO / "configs" / "experiments" / "mlflow.yaml").read_text())["hpo"]
     # The config already names models by REGISTRY key (the single canonical
-    # name) — no remap needed; run_hpo -> make_objective -> get_model resolves
-    # them directly. Its objective fits raw registry models, so feed it the
+    # name) — no remap needed; run_hpo -> make_objective composes
+    # Pipeline([pre, model]) via build_model_pipeline. With the battle's
+    # passthrough recipe the pre step is the identity, so feed it the
     # encoded X (categoricals one-hot via the battle pipeline preprocessor).
     hpo_cfg = HPOConfig(**raw_hpo)
     pre = make_pipeline(LinearRegression()).named_steps["pre"]
@@ -229,7 +231,7 @@ def main() -> None:
         log_params(result["best_params"])
         mlflow.log_metric("mae", result["best_value"])
         mlflow.set_tag("model", display_name(result["best_model"]))
-        hpo.log_best_artifacts(battle_pipeline_config(), result["best_model"],
+        log_best_artifacts(battle_pipeline_config(), result["best_model"],
                                result["best_params"], X_train_enc, y_train,
                                X_val_enc, y_test)
     print("leaderboard (per-model best MAE):")
