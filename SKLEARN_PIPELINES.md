@@ -219,6 +219,21 @@ REMAINING in this slice:
    schema) was rejected — it cannot distinguish a typo from a real
    post-join column and undercuts the "name-driven selection enforced
    against the schema contract" goal this slice exists to deliver.
+   Derivation mechanism (explicit — no drift): `schemas/joined.py` computes
+   the post-join column list by calling the SAME naming logic
+   `load_with_audit` uses — the `_lookup` suffix rule is extracted from
+   `data/loader.py:49-50` into one shared function (e.g.
+   `merged_lookup_column_names(existing, lookup_columns)`), consumed by the
+   loader (its `merged_names` audit dict) and by the schema module
+   (accumulated across `lookup_tables` in config order). Lookup column names
+   are read from the same lookup files' headers the loader reads; a missing
+   lookup file fails loud at config-load. One implementation, two
+   consumers — the rule cannot drift. The alternative — a second copy of
+   the suffix rule inside `schemas/joined.py`, acceptable only with a
+   never-divergence pinning test — is rejected: it recreates the GAP-2
+   `_BUILDER_DTYPES`-vs-builder drift class this doc eliminates. Acceptance
+   pins the derivation: on a synthetic lookup-bearing dataset, the joined
+   schema's column set equals the columns `load_with_audit` actually emits.
 
 ## Test-suite impact
 
