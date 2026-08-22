@@ -117,8 +117,6 @@ def test_yaml_to_pipeline_round_trip(lookup_dataset: DatasetContract) -> None:
         - type: frequency_encoding
           columns: [dropoff_location_id]
           params: {normalize: false}
-        - type: one_hot
-          columns: [Borough]
         - type: passthrough
           columns: [fare]
         """
@@ -128,13 +126,18 @@ def test_yaml_to_pipeline_round_trip(lookup_dataset: DatasetContract) -> None:
     assert [name for name, _ in pipeline.steps] == [
         "target_encoding_0",
         "frequency_encoding_1",
-        "one_hot_2",
-        "passthrough_3",
+        "passthrough_2",
     ]
     params = pipeline.get_params()
     assert params["target_encoding_0__smoothing"] == 20
     assert params["frequency_encoding_1__normalize"] is False
-    assert params["one_hot_2__one_hot__handle_unknown"] == "ignore"
+
+
+def test_one_hot_sole_step_builds(lookup_dataset: DatasetContract) -> None:
+    cfg = _recipe_cfg([{"type": "one_hot", "columns": ["Borough"]}], lookup_dataset, "joined")
+    pipeline = build_pipeline(cfg)
+    assert [name for name, _ in pipeline.steps] == ["one_hot_0"]
+    assert pipeline.get_params()["one_hot_0__one_hot__handle_unknown"] == "ignore"
 
 
 def test_unknown_step_type_rejected_at_parse() -> None:
@@ -278,3 +281,51 @@ def test_config_load_accepts_valid_recipe(
     cfg = load_config("baseline", dataset="syn", experiment="syn")
     assert cfg.experiment is not None
     assert cfg.experiment.preprocessing[0].columns == ["a"]
+
+
+def test_one_hot_mixed_with_other_steps_rejected_at_load(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write_config_tree(
+        tmp_path,
+        [
+            {"type": "one_hot", "columns": ["a"]},
+            {"type": "frequency_encoding", "columns": ["a"]},
+        ],
+    )
+    monkeypatch.setattr(config_loader, "CONFIGS_DIR", tmp_path)
+    with pytest.raises(ValueError, match="one_hot must be the sole preprocessing step"):
+        load_config("baseline", dataset="syn", experiment="syn")
+
+
+def test_normalize_accepts_string_bools(lookup_dataset: DatasetContract) -> None:
+    for raw, expected in (("true", True), ("false", False), ("TRUE", True), ("False", False)):
+        cfg = _recipe_cfg(
+            [
+                {
+                    "type": "frequency_encoding",
+                    "columns": ["pickup_location_id"],
+                    "params": {"normalize": raw},
+                }
+            ],
+            lookup_dataset,
+            "joined",
+        )
+        pipeline = build_pipeline(cfg)
+        assert pipeline.get_params()["frequency_encoding_0__normalize"] is expected
+
+
+def test_normalize_rejects_non_bool_values(lookup_dataset: DatasetContract) -> None:
+    cfg = _recipe_cfg(
+        [
+            {
+                "type": "frequency_encoding",
+                "columns": ["pickup_location_id"],
+                "params": {"normalize": 1},
+            }
+        ],
+        lookup_dataset,
+        "joined",
+    )
+    with pytest.raises(ValueError, match="normalize"):
+        build_pipeline(cfg)

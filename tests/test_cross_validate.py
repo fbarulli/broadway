@@ -66,6 +66,22 @@ def test_cross_validate_insufficient_samples_fails_loud() -> None:
         cross_validate(LinearRegression(), X, y, cv_folds=5, random_state=42, cv_kind="kfold")
 
 
+def test_cross_validate_nan_in_x_raises_instead_of_persisting_nan_metrics() -> None:
+    X, y = _fixture()
+    X_bad = X.copy()
+    X_bad[0, 0] = np.nan
+    with pytest.raises(ValueError, match="X contains NaN or infinite values"):
+        cross_validate(LinearRegression(), X_bad, y, cv_folds=5, random_state=42, cv_kind="kfold")
+
+
+def test_cross_validate_inf_in_x_raises_instead_of_persisting_nan_metrics() -> None:
+    X, y = _fixture()
+    X_bad = X.copy()
+    X_bad[0, 0] = np.inf
+    with pytest.raises(ValueError, match="X contains NaN or infinite values"):
+        cross_validate(LinearRegression(), X_bad, y, cv_folds=5, random_state=42, cv_kind="kfold")
+
+
 def test_cross_validate_output_types_are_json_safe() -> None:
     X, y = _fixture()
     result = cross_validate(LinearRegression(), X, y, cv_folds=5, random_state=42, cv_kind="kfold")

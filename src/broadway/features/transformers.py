@@ -10,6 +10,7 @@ mutated.
 
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
 from sklearn.base import BaseEstimator, TransformerMixin
 
@@ -25,9 +26,11 @@ class TargetEncoding(BaseEstimator, TransformerMixin):
     """Smoothed target encoding keyed by one categorical column or a composite.
 
     Fit computes ``(count * mean + smoothing * global_mean) / (count + smoothing)``
-    per key with ``global_mean = X[target].mean()`` — identical to the legacy
-    ``fit_target_encoding``. pandas ``groupby`` drops NaN keys at fit, so NaN
-    categories resolve to the global-mean fallback at transform (the legacy
+    per key with ``global_mean = y.mean()`` — identical to the legacy
+    ``fit_target_encoding``. The target series arrives via the standard
+    estimator ``fit(X, y)`` argument (sklearn convention), never by reading a
+    target column out of ``X``. pandas ``groupby`` drops NaN keys at fit, so
+    NaN categories resolve to the global-mean fallback at transform (the legacy
     ``__unknown__`` sentinel equivalent). The output column is named
     ``feature_name`` when provided (verbatim), else ``<joined_cols>_target_enc``.
     """
@@ -35,12 +38,10 @@ class TargetEncoding(BaseEstimator, TransformerMixin):
     def __init__(
         self,
         columns: list[str],
-        target: str,
         smoothing: float,
         feature_name: str | None = None,
     ) -> None:
         self.columns = list(columns)
-        self.target = target
         self.smoothing = smoothing
         self.feature_name = feature_name
 
@@ -48,14 +49,18 @@ class TargetEncoding(BaseEstimator, TransformerMixin):
         return type(self)(**self.get_params(deep=False))
 
     def fit(self, X: pd.DataFrame, y=None) -> TargetEncoding:
-        key = self.columns if len(self.columns) > 1 else self.columns[0]
-        stats = X.groupby(key)[self.target].agg(["mean", "count"])
-        encoded = (stats["count"] * stats["mean"] + self.smoothing * X[self.target].mean()) / (
+        if y is None:
+            raise ValueError(
+                "TargetEncoding.fit requires y — the target series comes from the fit argument"
+            )
+        target = y if isinstance(y, pd.Series) else pd.Series(np.asarray(y), index=X.index)
+        stats = target.groupby(_key_series(X, self.columns)).agg(["mean", "count"])
+        encoded = (stats["count"] * stats["mean"] + self.smoothing * float(target.mean())) / (
             stats["count"] + self.smoothing
         )
-        self._mapping = encoded.to_dict()
-        self._global_mean = float(X[self.target].mean())
-        self._column_name = (
+        self.mapping_ = encoded.to_dict()
+        self.global_mean_ = float(target.mean())
+        self.column_name_ = (
             self.feature_name
             if self.feature_name is not None
             else f"{'_'.join(self.columns)}_target_enc"
@@ -63,9 +68,9 @@ class TargetEncoding(BaseEstimator, TransformerMixin):
         return self
 
     def transform(self, X: pd.DataFrame) -> pd.DataFrame:
-        values = _key_series(X, self.columns).map(self._mapping).fillna(self._global_mean)
+        values = _key_series(X, self.columns).map(self.mapping_).fillna(self.global_mean_)
         result = X.copy()
-        result[self._column_name] = values
+        result[self.column_name_] = values
         return result
 
 
@@ -95,8 +100,8 @@ class FrequencyEncoding(BaseEstimator, TransformerMixin):
 
     def fit(self, X: pd.DataFrame, y=None) -> FrequencyEncoding:
         key = self.columns if len(self.columns) > 1 else self.columns[0]
-        self._mapping = X[key].value_counts(normalize=self.normalize).to_dict()
-        self._column_name = (
+        self.mapping_ = X[key].value_counts(normalize=self.normalize).to_dict()
+        self.column_name_ = (
             self.feature_name
             if self.feature_name is not None
             else f"{'_'.join(self.columns)}_freq_enc"
@@ -104,7 +109,7 @@ class FrequencyEncoding(BaseEstimator, TransformerMixin):
         return self
 
     def transform(self, X: pd.DataFrame, fill: float = 0) -> pd.DataFrame:
-        values = _key_series(X, self.columns).map(self._mapping).fillna(fill)
+        values = _key_series(X, self.columns).map(self.mapping_).fillna(fill)
         result = X.copy()
-        result[self._column_name] = values
+        result[self.column_name_] = values
         return result

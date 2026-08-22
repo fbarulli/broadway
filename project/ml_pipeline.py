@@ -42,10 +42,9 @@ class FeaturePipeline:
 
         self._route_target_encoder = TargetEncoding(
             columns=ROUTE_KEYS,
-            target=TARGET,
             smoothing=self.encoding_smoothing,
             feature_name="route_avg_duration",
-        ).fit(engineered)
+        ).fit(engineered, engineered[TARGET])
 
         self._route_frequency_encoder = FrequencyEncoding(
             columns=ROUTE_KEYS,

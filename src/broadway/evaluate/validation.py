@@ -46,6 +46,8 @@ def cross_validate(
 ) -> dict[str, float]:
     if not np.all(np.isfinite(y)):
         raise ValueError("y contains NaN or infinite values")
+    if not np.all(np.isfinite(X)):
+        raise ValueError("X contains NaN or infinite values")
     cv = _make_cv(cv_kind, cv_folds, random_state)
     scores = sklearn_cross_validate(model, X, y, cv=cv, scoring=_SCORING)
     return _mean_metrics(scores, decimals)

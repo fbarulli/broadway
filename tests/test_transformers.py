@@ -37,7 +37,7 @@ def test_target_encoding_matches_legacy_single_column() -> None:
     frame = _price_frame()
     legacy_map = fit_target_encoding(frame, "city", "price", 10)
     legacy_out = transform_target_encoding(frame, "city", legacy_map)
-    out = TargetEncoding(columns=["city"], target="price", smoothing=10).fit(frame).transform(frame)
+    out = TargetEncoding(columns=["city"], smoothing=10).fit(frame, frame["price"]).transform(frame)
     assert out.columns.tolist() == legacy_out.columns.tolist()
     pd.testing.assert_series_equal(out["city_target_enc"].round(10), legacy_out["city_target_enc"].round(10))
 
@@ -51,12 +51,12 @@ def test_target_encoding_multi_column_key_matches_formula() -> None:
     keys = list(zip(frame["city"], frame["zone"]))
     expected_series = pd.Series([expected[key] for key in keys], index=frame.index, name="city_zone_target_enc")
 
-    out = TargetEncoding(columns=["city", "zone"], target="price", smoothing=smoothing).fit(frame).transform(frame)
+    out = TargetEncoding(columns=["city", "zone"], smoothing=smoothing).fit(frame, frame["price"]).transform(frame)
 
     assert out.columns.tolist() == ["city", "zone", "price", "city_zone_target_enc"]
     pd.testing.assert_series_equal(out["city_zone_target_enc"].round(10), expected_series.round(10))
-    city_only = TargetEncoding(columns=["city"], target="price", smoothing=smoothing).fit(frame).transform(frame)
-    zone_only = TargetEncoding(columns=["zone"], target="price", smoothing=smoothing).fit(frame).transform(frame)
+    city_only = TargetEncoding(columns=["city"], smoothing=smoothing).fit(frame, frame["price"]).transform(frame)
+    zone_only = TargetEncoding(columns=["zone"], smoothing=smoothing).fit(frame, frame["price"]).transform(frame)
     assert not out["city_zone_target_enc"].round(10).equals(city_only["city_target_enc"].round(10))
     assert not out["city_zone_target_enc"].round(10).equals(zone_only["zone_target_enc"].round(10))
 
@@ -67,7 +67,7 @@ def test_target_encoding_nan_category_falls_back_like_legacy() -> None:
     )
     legacy_map = fit_target_encoding(frame, "city", "price", 10)
     legacy_out = transform_target_encoding(frame, "city", legacy_map)
-    out = TargetEncoding(columns=["city"], target="price", smoothing=10).fit(frame).transform(frame)
+    out = TargetEncoding(columns=["city"], smoothing=10).fit(frame, frame["price"]).transform(frame)
     pd.testing.assert_series_equal(out["city_target_enc"].round(10), legacy_out["city_target_enc"].round(10))
     assert out["city_target_enc"].iloc[1] == pytest.approx(186.66666666666666)
     assert out["city_target_enc"].iloc[4] == pytest.approx(186.66666666666666)
@@ -88,32 +88,32 @@ def test_frequency_encoding_matches_legacy() -> None:
 def test_clone_refit_independence() -> None:
     frame_a = _price_frame()
     frame_b = pd.DataFrame({"city": ["NYC", "SF"], "price": [400, 500]})
-    fitted = TargetEncoding(columns=["city"], target="price", smoothing=10).fit(frame_a)
+    fitted = TargetEncoding(columns=["city"], smoothing=10).fit(frame_a, frame_a["price"])
     baseline = fitted.transform(frame_a)["city_target_enc"].round(10).tolist()
     cloned = clone(fitted)
-    assert not hasattr(cloned, "_mapping")
-    cloned.fit(frame_b)
-    assert cloned._mapping != fitted._mapping
+    assert not hasattr(cloned, "mapping_")
+    cloned.fit(frame_b, frame_b["price"])
+    assert cloned.mapping_ != fitted.mapping_
     assert fitted.transform(frame_a)["city_target_enc"].round(10).tolist() == baseline
     assert cloned.transform(frame_a)["city_target_enc"].round(10).tolist() != baseline
 
 
 def test_get_params_set_params_round_trip() -> None:
     for transformer in (
-        TargetEncoding(columns=["city"], target="price", smoothing=10),
+        TargetEncoding(columns=["city"], smoothing=10),
         FrequencyEncoding(columns=["city"]),
     ):
         assert clone(transformer).get_params() == transformer.get_params()
 
     columns = ["city"]
-    target = TargetEncoding(columns=columns, target="price", smoothing=10)
+    target = TargetEncoding(columns=columns, smoothing=10)
     columns.append("zone")
     assert target.columns == ["city"]
 
     target.set_params(columns=["zone"], smoothing=5)
     assert target.columns == ["zone"]
     assert target.smoothing == 5
-    assert "zone_target_enc" in target.fit(_price_frame()).transform(_price_frame()).columns
+    assert "zone_target_enc" in target.fit(_price_frame(), _price_frame()["price"]).transform(_price_frame()).columns
 
     freq = FrequencyEncoding(columns=["city"])
     freq.set_params(columns=["zone"])
@@ -124,11 +124,11 @@ def test_get_params_set_params_round_trip() -> None:
 def test_index_and_row_order_preserved() -> None:
     frame = _price_frame().sample(frac=1, random_state=7)
     frame.index = frame.index + 100
-    target = TargetEncoding(columns=["city"], target="price", smoothing=10).fit(frame)
+    target = TargetEncoding(columns=["city"], smoothing=10).fit(frame, frame["price"])
     freq = FrequencyEncoding(columns=["city"]).fit(frame)
     for transformer, column, mapping in (
-        (target, "city_target_enc", target._mapping),
-        (freq, "city_freq_enc", freq._mapping),
+        (target, "city_target_enc", target.mapping_),
+        (freq, "city_freq_enc", freq.mapping_),
     ):
         out = transformer.transform(frame)
         assert out.index.tolist() == frame.index.tolist()
@@ -162,15 +162,15 @@ def test_pipeline_reexpression_output_identical() -> None:
 def test_feature_name_param_overrides_platform_default() -> None:
     frame = _price_frame()
     custom_target = TargetEncoding(
-        columns=["city"], target="price", smoothing=10, feature_name="custom_target"
+        columns=["city"], smoothing=10, feature_name="custom_target"
     )
     custom_freq = FrequencyEncoding(columns=["city"], feature_name="custom_freq")
-    assert "custom_target" in custom_target.fit(frame).transform(frame).columns
+    assert "custom_target" in custom_target.fit(frame, frame["price"]).transform(frame).columns
     assert "custom_freq" in custom_freq.fit(frame).transform(frame).columns
-    assert "city_target_enc" not in custom_target.fit(frame).transform(frame).columns
+    assert "city_target_enc" not in custom_target.fit(frame, frame["price"]).transform(frame).columns
     assert "city_freq_enc" not in custom_freq.fit(frame).transform(frame).columns
 
-    default_target = TargetEncoding(columns=["city"], target="price", smoothing=10)
+    default_target = TargetEncoding(columns=["city"], smoothing=10)
     default_freq = FrequencyEncoding(columns=["city"])
-    assert "city_target_enc" in default_target.fit(frame).transform(frame).columns
+    assert "city_target_enc" in default_target.fit(frame, frame["price"]).transform(frame).columns
     assert "city_freq_enc" in default_freq.fit(frame).transform(frame).columns

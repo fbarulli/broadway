@@ -27,7 +27,7 @@ from broadway.lineage.ids import node_id
 from broadway.lineage.records import write_record
 from broadway.training.contracts import TrainingResult
 from broadway.training.mlflow_utils import get_champion, promote_candidate, setup_mlflow
-from broadway.training.models.registry import get_model
+from broadway.training.trainer import build_model_pipeline
 from broadway.utils import feature_columns
 
 logger = logging.getLogger(__name__)
@@ -133,7 +133,10 @@ def run(cfg: PipelineConfig) -> None:
             warnings.append(f"promotion skipped — model registry unavailable: {exc}")
 
     X_train, y_train = _load_train_features(cfg)
-    cv_model = get_model(result.model_type, **result.params)
+    # Score the same composed Pipeline shape train/HPO fit (preprocessing +
+    # registry model), so CV reflects the deployed pipeline rather than a bare
+    # estimator; build_model_pipeline re-seeds from cfg.experiment.random_state.
+    cv_model = build_model_pipeline(cfg, result.model_type, result.params)
     cv_metrics = cross_validate(
         cv_model,
         X_train.to_numpy(),

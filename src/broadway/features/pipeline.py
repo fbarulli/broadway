@@ -23,8 +23,8 @@ class FeaturePipeline:
         for enc in self.encodings:
             for col in enc.columns:
                 if enc.type == "target":
-                    encoder = TargetEncoding(columns=[col], target=target, smoothing=smoothing)
-                    self._target_encoders.append(encoder.fit(df))
+                    encoder = TargetEncoding(columns=[col], smoothing=smoothing)
+                    self._target_encoders.append(encoder.fit(df, df[target]))
                 elif enc.type == "frequency":
                     encoder = FrequencyEncoding(columns=[col])
                     self._freq_encoders.append(encoder.fit(df))

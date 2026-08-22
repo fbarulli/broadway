@@ -47,18 +47,30 @@ def _validate_step_params(step: PreprocessingStepConfig) -> None:
         )
 
 
-def _build_step(step: PreprocessingStepConfig, target: str) -> object:
+def _coerce_bool_param(value: object, step: str, param: str) -> bool:
+    """Accept real bools and case-insensitive 'true'/'false'; fail loud otherwise."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str) and value.lower() in {"true", "false"}:
+        return value.lower() == "true"
+    raise ValueError(
+        f"preprocessing step '{step}' param '{param}' must be a bool or "
+        f"'true'/'false' (case-insensitive), got {value!r}"
+    )
+
+
+def _build_step(step: PreprocessingStepConfig) -> object:
     _validate_step_params(step)
     if step.type == "target_encoding":
         return TargetEncoding(
             columns=step.columns,
-            target=target,
             smoothing=float(step.params["smoothing"]),
         )
     if step.type == "frequency_encoding":
         if "normalize" in step.params:
             return FrequencyEncoding(
-                columns=step.columns, normalize=bool(step.params["normalize"])
+                columns=step.columns,
+                normalize=_coerce_bool_param(step.params["normalize"], step.type, "normalize"),
             )
         return FrequencyEncoding(columns=step.columns)
     if step.type == "one_hot":
@@ -81,7 +93,7 @@ def build_pipeline(cfg: PipelineConfig) -> Pipeline:
         return Pipeline([("passthrough", "passthrough")])
     return Pipeline(
         [
-            (f"{step.type}_{i}", _build_step(step, cfg.dataset.target))
+            (f"{step.type}_{i}", _build_step(step))
             for i, step in enumerate(cfg.experiment.preprocessing)
         ]
     )
@@ -92,13 +104,27 @@ def validate_preprocessing_columns(cfg: PipelineConfig) -> None:
 
     Strict subset: every preprocessing step's columns must exist in the
     schema module named by ``data_source.schema_contract``; a violation names
-    the offending step and columns and fails config-load.
+    the offending step and columns and fails config-load. ``one_hot`` must be
+    the SOLE preprocessing step: its ColumnTransformer emits an ndarray that
+    breaks chained encoders, and its remainder passthrough leaks raw
+    categorical columns into the model.
     """
     if cfg.experiment is None or not cfg.experiment.preprocessing:
         return
     if cfg.dataset is None:
         raise ValueError(
             "cannot cross-check preprocessing columns: experiment has a recipe but no dataset"
+        )
+    steps = cfg.experiment.preprocessing
+    if any(step.type == "one_hot" for step in steps) and len(steps) > 1:
+        # upgrade path: a frame-output ColumnTransformer (set_output(transform="pandas"))
+        # lifts this restriction — until then one_hot stays single-step.
+        raise ValueError(
+            f"preprocessing recipe {[step.type for step in steps]} mixes one_hot with "
+            "other steps: one_hot must be the sole preprocessing step (its "
+            "ColumnTransformer emits an ndarray that breaks chained encoders, and "
+            "the remainder passthrough leaks raw categorical columns). Use one_hot "
+            "alone, or move the other steps into a separate recipe."
         )
     bound = schema_columns(cfg.experiment.data_source.schema_contract, cfg.dataset)
     for step in cfg.experiment.preprocessing:

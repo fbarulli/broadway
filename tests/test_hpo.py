@@ -366,7 +366,7 @@ def test_hpo_trial_refits_preprocessing_each_trial(
         def transform(self, X: pd.DataFrame) -> pd.DataFrame:
             return X.assign(cat=X["cat"].map(self.mapping_))
 
-    def counting_build_step(step, target):
+    def counting_build_step(step):
         if step.type == "target_encoding":
             return _CountingTransformer(shared)
         raise AssertionError(f"unexpected step type in leakage test: {step.type}")

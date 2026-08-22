@@ -11,7 +11,7 @@ from sklearn.pipeline import Pipeline
 from broadway.config.schema import PipelineConfig
 from broadway.features.recipe import build_pipeline
 from broadway.training.contracts import TrainingResult
-from broadway.training.models.registry import get_model
+from broadway.training.models.registry import allowed_params, get_model
 
 _PRE_PARAM_PREFIX = "pre__"
 
@@ -26,12 +26,17 @@ def build_model_pipeline(
     Model params are passed bare; preprocessing params use the ``pre__``
     prefix (``pre__<step>__<param>``) and are applied after composition.
     Shared by the trainer and the HPO objective — one composition, no drift.
+    Estimators whose registry entry accepts ``random_state`` are seeded from
+    ``cfg.experiment.random_state`` unless params already carry an explicit
+    ``random_state`` (explicit wins; YAML remains the single source of truth).
     """
     if cfg.experiment is None:
         raise ValueError("model pipeline requires an experiment config")
     model_params = {
         key: value for key, value in params.items() if not key.startswith(_PRE_PARAM_PREFIX)
     }
+    if "random_state" in allowed_params(model_type) and "random_state" not in model_params:
+        model_params["random_state"] = cfg.experiment.random_state
     pipeline = Pipeline(
         [
             ("pre", build_pipeline(cfg)),

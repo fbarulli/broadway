@@ -121,6 +121,57 @@ def test_build_model_pipeline_applies_pre_params(tmp_path: Path) -> None:
     assert params["model__n_estimators"] == 10
 
 
+def test_target_encoding_recipe_end_to_end_fits_and_predicts(tmp_path: Path) -> None:
+    """C1 end-to-end: a target_encoding recipe composes through
+    build_model_pipeline, fits with the target passed as the ``y`` argument
+    (never read out of X — utils.feature_columns drops the target before
+    fit), and the fitted pipeline predicts on a fresh frame."""
+    cfg = _make_config(tmp_path)
+    experiment = cfg.experiment.model_copy(
+        update={
+            "preprocessing": [
+                PreprocessingStepConfig(
+                    type="target_encoding", columns=["zone_id"], params={"smoothing": 20}
+                )
+            ]
+        }
+    )
+    cfg = cfg.model_copy(update={"experiment": experiment})
+    rng = np.random.default_rng(7)
+    n = 60
+    X_train = pd.DataFrame(
+        {
+            "zone_id": rng.integers(1, 6, size=n),
+            "area": rng.normal(size=n),
+        }
+    )
+    y_train = pd.Series(
+        2.0 * X_train["zone_id"] + X_train["area"] + rng.normal(scale=0.1, size=n)
+    )
+    pipeline = build_model_pipeline(cfg, "linear", {})
+    pipeline.fit(X_train, y_train)
+    # Three coefficients prove the recipe step ran: zone_id, area, and the
+    # y-derived zone_id_target_enc column were all present at model fit.
+    assert pipeline.named_steps["model"].coef_.shape == (3,)
+    X_test = pd.DataFrame({"zone_id": [1, 3, 5], "area": [0.0, 1.0, -1.0]})
+    preds = pipeline.predict(X_test)
+    assert preds.shape == (3,)
+    assert np.all(np.isfinite(preds))
+
+
+def test_build_model_pipeline_seeds_estimator_from_experiment(tmp_path: Path) -> None:
+    """C2: models whose registry entry accepts random_state are seeded from
+    cfg.experiment.random_state; an explicit param random_state wins; models
+    without random_state stay unseeded."""
+    cfg = _make_config(tmp_path)
+    seeded = build_model_pipeline(cfg, "lgbm", {"n_estimators": 10})
+    assert seeded.get_params()["model__random_state"] == cfg.experiment.random_state
+    explicit = build_model_pipeline(cfg, "lgbm", {"n_estimators": 10, "random_state": 7})
+    assert explicit.get_params()["model__random_state"] == 7
+    unseeded = build_model_pipeline(cfg, "linear", {})
+    assert "model__random_state" not in unseeded.get_params()
+
+
 def _make_config(tmp_path: Path) -> PipelineConfig:
     environment = EnvironmentConfig(
         log_level="INFO",
