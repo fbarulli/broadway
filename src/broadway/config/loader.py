@@ -58,6 +58,24 @@ STEP_MODULES = {
     "baseline": "broadway.baseline.module",
 }
 
+# Sections loaded from configs/{section}/<name>.yaml via CLI args (--dataset,
+# --experiment, --analysis) rather than from step/<name>.yaml. The loader
+# attaches them when the arg is provided; their absence is guarded at runtime
+# by the step modules themselves (require_mode / presence checks).
+_TOP_LEVEL_SECTIONS: frozenset[str] = frozenset({"environment", "dataset", "experiment", "analysis"})
+
+# Single source of truth for standalone step configs: step name -> sibling
+# sections the step module reads at runtime (verified per module). Step
+# sections (e.g. "etl", "train") are attached here from step/<name>.yaml and
+# must exist for the step to run; top-level sections arrive via the CLI args.
+_STEP_SECTION_REQUIREMENTS: dict[str, tuple[str, ...]] = {
+    "features": ("environment", "dataset", "experiment", "etl"),
+    "train": ("environment", "dataset", "experiment", "etl", "analysis"),
+    "evaluate": ("environment", "dataset", "experiment", "etl", "train", "analysis"),
+    "baseline": ("analysis", "dataset"),
+    "stats": ("environment", "dataset", "analysis"),
+}
+
 
 def _deep_merge(base: dict, override: dict) -> dict:
     result = deepcopy(base)
@@ -91,9 +109,25 @@ def _merge_section(merged: dict, section: str, name: str | None, optional: bool)
     merged.update({section: _deep_merge(merged.get(section, {}), raw)})
 
 
+def _missing_step_sections(step: str) -> list[str]:
+    """Return required sibling step sections whose step/<name>.yaml is absent."""
+    missing: list[str] = []
+    for section in _STEP_SECTION_REQUIREMENTS.get(step, ()):
+        if section in _TOP_LEVEL_SECTIONS or section == step:
+            continue
+        if not (CONFIGS_DIR / "step" / f"{section}.yaml").exists():
+            missing.append(section)
+    return missing
+
+
 def _build_config(merged: dict, step: str) -> PipelineConfig:
     step_model = STEP_MODELS[step]
     merged = resolve_values(merged)
+    missing = _missing_step_sections(step)
+    if missing:
+        raise ValueError(
+            f"step '{step}' requires config section(s) not found: {', '.join(sorted(missing))}"
+        )
     config = PipelineConfig(
         analysis=AnalysisContract(**merged["analysis"]) if "analysis" in merged else None,
         dataset=DatasetContract(**merged["dataset"]) if "dataset" in merged else None,
@@ -101,6 +135,11 @@ def _build_config(merged: dict, step: str) -> PipelineConfig:
         experiment=ExperimentConfig(**merged["experiment"]) if "experiment" in merged else None,
         **{step: step_model(**merged["step"])},
     )
+    for section in _STEP_SECTION_REQUIREMENTS.get(step, ()):
+        if section in _TOP_LEVEL_SECTIONS or section == step:
+            continue
+        raw = _load_yaml(f"step/{section}.yaml")
+        setattr(config, section, STEP_MODELS[section](**resolve_values(raw)))
     if step == "full" and config.full:
         for sub_step in resolve_full_steps(config):
             if sub_step not in STEP_MODELS or sub_step == "full" or sub_step == "discover":
