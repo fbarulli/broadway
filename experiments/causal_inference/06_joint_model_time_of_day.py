@@ -1,18 +1,32 @@
+"""06: The Joint Model (Numeric + Time of Day).
+
+Models the isolated hourly fare premium against the noon baseline while
+holding trip distance and duration constant. Hour is one-hot encoded by a
+sklearn ColumnTransformer fit on the modeling partition only; an hour unseen
+at fit time encodes as an all-zeros row under ``handle_unknown="ignore"`` —
+i.e. it is treated as the reference level's effect. This is a stated modeling
+assumption for the causal reading of the results.
+"""
+
 import warnings
+
 warnings.filterwarnings("ignore", category=UserWarning)
 warnings.filterwarnings("ignore", category=FutureWarning)
 
 import matplotlib
+
 matplotlib.use("Agg")
 
+from pathlib import Path
+
 import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
 import seaborn as sns
 import statsmodels.api as sm
-from pathlib import Path
-
-from _common import RESULTS, TARGET, load_sample, INDEPENDENT_NUMERIC_FEATURES
+from _common import INDEPENDENT_NUMERIC_FEATURES, RESULTS, TARGET, load_sample
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import OneHotEncoder
 
 CSV_OUT = RESULTS / "06_time_of_day_coefs.csv"
 PNG_OUT = RESULTS / "06_time_of_day_premiums.png"
@@ -21,6 +35,7 @@ MD_OUT = RESULTS / "06_time_of_day_summary.md"
 BASELINE_HOUR = 12  # Noon
 
 def prepare_time_data(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series]:
+    """Prepare numeric features + hour dummies via a fit-on-train encoder."""
     # Extract hour if not already in the dataframe
     if "pickup_hour" not in df.columns:
         if "pickup_datetime" in df.columns:
@@ -29,16 +44,28 @@ def prepare_time_data(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series]:
             raise ValueError("Need pickup_datetime or pickup_hour to run time-of-day model.")
             
     valid = df[INDEPENDENT_NUMERIC_FEATURES + ["pickup_hour", TARGET]].dropna()
-    X_num = valid[INDEPENDENT_NUMERIC_FEATURES]
     y = valid[TARGET]
     
-    # Create hour dummies, dropping the baseline hour to prevent dummy variable trap
-    hour_dummies = pd.get_dummies(valid["pickup_hour"], prefix="hour", dtype=int)
+    raw = valid[INDEPENDENT_NUMERIC_FEATURES].copy()
+    raw["hour"] = valid["pickup_hour"]
+    
+    # OneHotEncoder fit on the modeling partition only; unseen hours at
+    # predict time encode as all-zeros (reference-level effect).
+    pre = ColumnTransformer([
+        ("num", "passthrough", INDEPENDENT_NUMERIC_FEATURES),
+        ("onehot", OneHotEncoder(handle_unknown="ignore", drop=None,
+                                 sparse_output=False), ["hour"]),
+    ])
+    pipeline = Pipeline([("pre", pre)])
+    encoded = pipeline.fit_transform(raw)
+    columns = [name.split("__", 1)[1] for name in pipeline.get_feature_names_out()]
+    X = pd.DataFrame(encoded, index=raw.index, columns=columns)
+    
+    # Drop the baseline hour to prevent the dummy variable trap
     baseline_col = f"hour_{BASELINE_HOUR}"
-    if baseline_col in hour_dummies.columns:
-        hour_dummies = hour_dummies.drop(columns=[baseline_col])
+    if baseline_col in X.columns:
+        X = X.drop(columns=[baseline_col])
         
-    X = pd.concat([X_num, hour_dummies], axis=1)
     X = sm.add_constant(X)
     return X, y
 

@@ -1,22 +1,31 @@
 """05: The Joint Model (Numeric + Top-10 Categorical Zones).
 
-Combines numeric features (distance, duration) with the top 10 most frequent 
-pickup zones. The most frequent zone is used as the baseline reference. 
-The model outputs the isolated dollar premium for each zone, holding trip 
+Combines numeric features (distance, duration) with the top 10 most frequent
+pickup zones. The most frequent zone is used as the baseline reference.
+The model outputs the isolated dollar premium for each zone, holding trip
 distance and duration perfectly constant.
+
+Encoding note: zones are one-hot encoded by a sklearn ColumnTransformer fit on
+the modeling partition only. A zone unseen at fit time encodes as an all-zeros
+row under ``handle_unknown="ignore"`` — i.e. it is treated as the reference
+level's effect. This is a stated modeling assumption for the causal reading of
+the results.
 """
 
 import matplotlib
+
 matplotlib.use("Agg")
 
+from pathlib import Path
+
 import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
 import seaborn as sns
 import statsmodels.api as sm
-from pathlib import Path
-
-from _common import RESULTS, TARGET, load_sample, INDEPENDENT_NUMERIC_FEATURES
+from _common import INDEPENDENT_NUMERIC_FEATURES, RESULTS, TARGET, load_sample
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import OneHotEncoder
 
 CONFIDENCE = 0.95
 
@@ -26,32 +35,39 @@ MD_OUT = RESULTS / "05_joint_model_summary.md"
 
 
 def prepare_joint_data(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series, str]:
-    """Prepare numeric features + top-10 zone dummies."""
+    """Prepare numeric features + top-10 zone dummies via a fit-on-train encoder."""
     num_cols = INDEPENDENT_NUMERIC_FEATURES
     cat_col = "pickup_location_id"
     
     valid = df[num_cols + [cat_col, TARGET]].dropna()
-    X_num = valid[num_cols]
     y = valid[TARGET]
     
     zone_counts = valid[cat_col].value_counts()
     top_10_zones = zone_counts.head(10).index.tolist()
     baseline_zone = str(top_10_zones[0])  # Most frequent zone
     
-    def map_zone(z):
-        return str(z) if z in top_10_zones else "Other"
-        
-    zones_mapped = valid[cat_col].apply(map_zone)
+    # Non-top-10 zones consolidate into "Other" before encoding.
+    mapped = valid[cat_col].map(lambda z: str(z) if z in top_10_zones else "Other")
+    raw = valid[num_cols].copy()
+    raw["zone"] = mapped
     
-    # Create dummies
-    dummies = pd.get_dummies(zones_mapped, prefix="zone", dtype=int)
+    # OneHotEncoder fit on the modeling partition only; unseen zones at
+    # predict time encode as all-zeros (reference-level effect).
+    pre = ColumnTransformer([
+        ("num", "passthrough", num_cols),
+        ("onehot", OneHotEncoder(handle_unknown="ignore", drop=None,
+                                 sparse_output=False), ["zone"]),
+    ])
+    pipeline = Pipeline([("pre", pre)])
+    encoded = pipeline.fit_transform(raw)
+    columns = [name.split("__", 1)[1] for name in pipeline.get_feature_names_out()]
+    X = pd.DataFrame(encoded, index=raw.index, columns=columns)
     
     # Drop the baseline zone to prevent the dummy variable trap
     baseline_col = f"zone_{baseline_zone}"
-    if baseline_col in dummies.columns:
-        dummies = dummies.drop(columns=[baseline_col])
+    if baseline_col in X.columns:
+        X = X.drop(columns=[baseline_col])
         
-    X = pd.concat([X_num, dummies], axis=1)
     X = sm.add_constant(X)
     
     return X, y, baseline_zone
