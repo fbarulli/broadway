@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 from _common import DATETIME_SRC, RESULTS, SAMPLE_NAME, build_temporal_features
 
-from broadway.features.encodings import fit_target_encoding, transform_target_encoding
+from broadway.features.transformers import TargetEncoding
 from broadway.samples import read_named_sample
 
 TRAIN_VAL_TEST = (0.8, 0.1, 0.1)
@@ -67,7 +67,7 @@ def _raw_ids(df: pd.DataFrame) -> pd.DataFrame:
 
     ``Series.map`` on a category column returns a categorical whenever every
     mapped value is distinct (true for dropoff zones on the full train); the
-    encodings' ``__unknown__`` fillna would then reject the float fallback.
+    encoders' global-mean fillna would then reject the float fallback.
     """
     out = df.copy()
     for col in LOCATION_COLS:
@@ -80,29 +80,27 @@ def _apply_encodings(splits: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]
     """Train-only log-target encodings (route + pickup + dropoff) + pu×time interactions.
 
     Fitted on the TRAIN slice against ``fare_amount_log``; unseen ids fall back
-    to the train global mean (the platform's ``__unknown__`` fallback). The
+    to the train global mean (the transformers' global-mean fallback). The
     route id is high-cardinality (~30k zone pairs), so it needs stronger
     shrinkage (ROUTE_SMOOTHING=50) than single zones (LOCATION_SMOOTHING=20).
     The pu interactions multiply the pickup encoding by each temporal flag.
     """
     train = splits["train"]
-    encodings = {
-        "route_id": fit_target_encoding(train, "route_id", ENCODING_TARGET, ROUTE_SMOOTHING),
-        PU_COL: fit_target_encoding(train, PU_COL, ENCODING_TARGET, LOCATION_SMOOTHING),
-        DO_COL: fit_target_encoding(train, DO_COL, ENCODING_TARGET, LOCATION_SMOOTHING),
-    }
+    route_encoder = TargetEncoding(
+        columns=["route_id"], smoothing=ROUTE_SMOOTHING, feature_name="route_id_encoded"
+    ).fit(train, train[ENCODING_TARGET])
+    pickup_encoder = TargetEncoding(
+        columns=[PU_COL], smoothing=LOCATION_SMOOTHING, feature_name="pickup_location_id_encoded"
+    ).fit(train, train[ENCODING_TARGET])
+    dropoff_encoder = TargetEncoding(
+        columns=[DO_COL], smoothing=LOCATION_SMOOTHING, feature_name="dropoff_location_id_encoded"
+    ).fit(train, train[ENCODING_TARGET])
     out = {}
     for name, df in splits.items():
         df = _raw_ids(df)
-        df = transform_target_encoding(df, "route_id", encodings["route_id"]).rename(
-            columns={"route_id_target_enc": "route_id_encoded"}
-        )
-        df = transform_target_encoding(df, PU_COL, encodings[PU_COL]).rename(
-            columns={f"{PU_COL}_target_enc": "pickup_location_id_encoded"}
-        )
-        df = transform_target_encoding(df, DO_COL, encodings[DO_COL]).rename(
-            columns={f"{DO_COL}_target_enc": "dropoff_location_id_encoded"}
-        )
+        df = route_encoder.transform(df)
+        df = pickup_encoder.transform(df)
+        df = dropoff_encoder.transform(df)
         for feat, flag in PU_INTERACTION_SPECS:
             df[feat] = df["pickup_location_id_encoded"] * df[flag]
         out[name] = df

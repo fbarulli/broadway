@@ -1,9 +1,10 @@
-"""Encoding transformer tests — synthetic frames, golden vs legacy free functions.
+"""Encoding transformer tests — synthetic frames, golden-value pins.
 
-Single-column behavior is compared live against the legacy
-``broadway.features.encodings`` free functions; the composite-key spec is
-re-derived in-test via explicit groupby + formula; the FeaturePipeline column
-names/values are the pre-change implementation's golden output.
+Single-column behavior is pinned to the exact outputs the legacy
+``broadway.features.encodings`` free functions produced (values captured
+before that module's deletion); the composite-key spec is re-derived in-test
+via explicit groupby + formula; the FeaturePipeline column names/values are
+the pre-change implementation's golden output.
 """
 
 from __future__ import annotations
@@ -13,12 +14,6 @@ import pytest
 from sklearn.base import clone
 
 from broadway.config.schema import EncodingConfig, FeatureConfig
-from broadway.features.encodings import (
-    fit_frequency_encoding,
-    fit_target_encoding,
-    transform_frequency_encoding,
-    transform_target_encoding,
-)
 from broadway.features.pipeline import FeaturePipeline
 from broadway.features.transformers import FrequencyEncoding, TargetEncoding
 
@@ -33,13 +28,23 @@ def _price_frame() -> pd.DataFrame:
     )
 
 
-def test_target_encoding_matches_legacy_single_column() -> None:
+def test_target_encoding_golden_values_single_column() -> None:
+    """Single-column output value-pinned from the legacy golden reference at deletion time."""
     frame = _price_frame()
-    legacy_map = fit_target_encoding(frame, "city", "price", 10)
-    legacy_out = transform_target_encoding(frame, "city", legacy_map)
     out = TargetEncoding(columns=["city"], smoothing=10).fit(frame, frame["price"]).transform(frame)
-    assert out.columns.tolist() == legacy_out.columns.tolist()
-    pd.testing.assert_series_equal(out["city_target_enc"].round(10), legacy_out["city_target_enc"].round(10))
+    assert out.columns.tolist() == ["city", "zone", "price", "city_target_enc"]
+    assert out["city_target_enc"].round(10).tolist() == [
+        182.8571428571,
+        209.2307692308,
+        182.8571428571,
+        227.6923076923,
+        209.2307692308,
+        182.8571428571,
+        227.6923076923,
+        227.6923076923,
+        182.8571428571,
+        209.2307692308,
+    ]
 
 
 def test_target_encoding_multi_column_key_matches_formula() -> None:
@@ -61,25 +66,41 @@ def test_target_encoding_multi_column_key_matches_formula() -> None:
     assert not out["city_zone_target_enc"].round(10).equals(zone_only["zone_target_enc"].round(10))
 
 
-def test_target_encoding_nan_category_falls_back_like_legacy() -> None:
+def test_target_encoding_nan_category_global_mean_fallback() -> None:
+    """NaN keys fall back to the global mean — values pinned from the legacy reference at deletion time."""
     frame = pd.DataFrame(
         {"city": ["NYC", None, "LA", "SF", None, "NYC"], "price": [100, 200, 150, 300, 250, 120]}
     )
-    legacy_map = fit_target_encoding(frame, "city", "price", 10)
-    legacy_out = transform_target_encoding(frame, "city", legacy_map)
     out = TargetEncoding(columns=["city"], smoothing=10).fit(frame, frame["price"]).transform(frame)
-    pd.testing.assert_series_equal(out["city_target_enc"].round(10), legacy_out["city_target_enc"].round(10))
+    assert out["city_target_enc"].round(10).tolist() == [
+        173.8888888889,
+        186.6666666667,
+        183.3333333333,
+        196.9696969697,
+        186.6666666667,
+        173.8888888889,
+    ]
     assert out["city_target_enc"].iloc[1] == pytest.approx(186.66666666666666)
     assert out["city_target_enc"].iloc[4] == pytest.approx(186.66666666666666)
 
 
-def test_frequency_encoding_matches_legacy() -> None:
+def test_frequency_encoding_golden_values() -> None:
+    """Normalized frequencies value-pinned from the legacy reference at deletion time."""
     frame = _price_frame()
-    legacy_map = fit_frequency_encoding(frame, "city")
-    legacy_out = transform_frequency_encoding(frame, "city", legacy_map)
     out = FrequencyEncoding(columns=["city"]).fit(frame).transform(frame)
-    assert out.columns.tolist() == legacy_out.columns.tolist()
-    pd.testing.assert_series_equal(out["city_freq_enc"].round(10), legacy_out["city_freq_enc"].round(10))
+    assert out.columns.tolist() == ["city", "zone", "price", "city_freq_enc"]
+    assert out["city_freq_enc"].round(10).tolist() == [
+        0.4,
+        0.3,
+        0.4,
+        0.3,
+        0.3,
+        0.4,
+        0.3,
+        0.3,
+        0.4,
+        0.3,
+    ]
     unseen = pd.DataFrame({"city": ["PARIS"]})
     filled = FrequencyEncoding(columns=["city"]).fit(frame).transform(unseen, fill=0.5)
     assert filled["city_freq_enc"].tolist() == [0.5]

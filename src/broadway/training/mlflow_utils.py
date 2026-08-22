@@ -47,11 +47,7 @@ def _is_unreachable_http_store(tracking_uri: str, exc: Exception) -> bool:
 
 
 def _unreachable_server_hint(tracking_uri: str) -> str:
-    return (
-        f"MLflow server unreachable at {tracking_uri} — start it: "
-        "uv run mlflow server --backend-store-uri sqlite:///$(pwd)/.mlflow.db "
-        "--artifacts-destination file://$(pwd)/mlruns (README: dev setup)"
-    )
+    return f"MLflow server unreachable at {tracking_uri} — start commands: README · MLflow dev setup"
 
 
 def log_params(params: dict[str, float | int | str]) -> None:

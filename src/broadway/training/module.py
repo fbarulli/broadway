@@ -106,6 +106,8 @@ def run(cfg: PipelineConfig) -> None:
                 if value is not None
             }
         )
+        # Val metrics are used for model selection — reported numbers carry
+        # selection bias (optimistic); no held-out third split exists.
         metrics = compute_metrics(y_val.to_numpy(), model.predict(X_val))
         log_metrics(metrics)
         baseline_result = load_persisted(cfg)

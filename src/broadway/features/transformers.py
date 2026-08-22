@@ -1,11 +1,11 @@
 """Sklearn-compatible smoothed target and frequency encoding transformers.
 
 ``TargetEncoding`` and ``FrequencyEncoding`` reproduce the exact smoothed
-formulas and output column names of the legacy free functions in
-``broadway.features.encodings`` (kept as the golden reference) behind the
-standard estimator ``fit``/``transform`` interface, so they can be composed
-into sklearn Pipelines. Transform always returns a copy — inputs are never
-mutated.
+formulas and output column names of the legacy ``broadway.features.encodings``
+free functions (deleted; their outputs are pinned as golden values in
+``tests/test_transformers.py``) behind the standard estimator
+``fit``/``transform`` interface, so they can be composed into sklearn
+Pipelines. Transform always returns a copy — inputs are never mutated.
 """
 
 from __future__ import annotations

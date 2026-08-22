@@ -208,7 +208,7 @@ broadway/
       module.py             # pipeline step: dispatches on mode, persists BaselineResult to artifacts/baseline/
     features/               # generic feature machinery + the config-driven pipeline step
       schema.py             # FeatureSpec, build_engineered_schema
-      pipeline.py, builders.py, encodings.py, module.py, contracts.py  # ds-pipeline features step
+      pipeline.py, builders.py, transformers.py, module.py, contracts.py  # ds-pipeline features step
     evaluate/               # model evaluation + promotion decision
       contracts.py          # EvaluationResult (Pydantic model)
       metrics.py            # compute_metrics (mae/rmse/r2)

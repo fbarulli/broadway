@@ -39,5 +39,5 @@ def test_unreachable_http_store_raises_clear_error(
         setup_mlflow(_UNREACHABLE_URI, "test_experiment")
     message = str(excinfo.value)
     assert "MLflow server unreachable at http://localhost:5000" in message
-    assert "uv run mlflow server" in message
+    assert "README" in message
     assert excinfo.value.__cause__ is failure

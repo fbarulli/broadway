@@ -34,7 +34,7 @@ platform adopts this pattern; experiments stop being ahead of it.
 | HPO | `src/broadway/training/hpo.py` (`make_objective`) | fits bare model per trial |
 | Model log/serve | `src/broadway/training/mlflow_utils.py::log_model`; `src/broadway/training/models/pyfunc_wrapper.py::ModelPyFunc` | logs/pickles bare model; caller must re-apply FeaturePipeline manually at inference |
 | CV | `src/broadway/evaluate/validation.py::cross_validate` | manual KFold loop, `clone(model)` only — preprocessing outside folds would leak |
-| Platform features | `src/broadway/features/pipeline.py::FeaturePipeline` | dict-based `_target_mappings` / `_freq_mappings`, free functions in `features/encodings.py` |
+| Platform features | `src/broadway/features/pipeline.py::FeaturePipeline` | fits/transforms sklearn `TargetEncoding` / `FrequencyEncoding` transformers (`features/transformers.py`), output value-pinned in tests |
 | Taxi binding | `project/ml_pipeline.py::FeaturePipeline` | deterministic features + merge-based target/frequency encodings + row-count guard |
 | Script consumer | `project/scripts/12_lgbm_baseline.py` | carries FeaturePipeline + model as two objects |
 | Experiments (hazard) | `experiments/causal_inference/05_joint_model_top10_zones.py`, `06_joint_model_time_of_day.py` | `pd.get_dummies` before split → train/test column-alignment hazard |
@@ -346,7 +346,8 @@ champion-registry state fields `promote`, `reason`,
 null on a first run with no champion, computed once a champion exists —
 enforced by `scripts/check_e2e_determinism.sh`). Timestamps, registry-assigned URIs, and
 mutable champion state are external-world coupling, not pipeline
-non-determinism.
+non-determinism. Whitelist SSOT: the EXACT/PATTERN table inside
+`scripts/check_e2e_determinism.sh` — the list above only points there.
 
 Known gaps (accepted as-is, no pipeline defect): the MLflow integer-column
 schema hint (`Inferred schema contains integer column(s)…`, moot once Slice 2b

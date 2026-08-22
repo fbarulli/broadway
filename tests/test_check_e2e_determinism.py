@@ -3,7 +3,8 @@
 Synthetic fixtures only (tmp_path trees — no pipelines, no MLflow server):
 the comparator is exercised via subprocess exactly as a developer would run
 it. Same philosophy as tests/test_platform_hygiene.py: the standing bar is
-enforced structurally, not by prose.
+enforced structurally, not by prose. Whitelist SSOT = the script's
+EXACT/PATTERN table; this docstring restates it only as a pointer.
 """
 
 from __future__ import annotations
