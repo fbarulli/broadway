@@ -59,20 +59,18 @@ def _coerce_bool_param(value: object, step: str, param: str) -> bool:
 
 
 def _build_step(step: PreprocessingStepConfig) -> object:
-    required, optional = _STEP_PARAM_SPEC[step.type]
     _validate_step_params(step)
     if step.type == "target_encoding":
-        smoothing = next(iter(required))
+        # literal param name is safe: _validate_step_params guarantees presence
         return TargetEncoding(
             columns=step.columns,
-            smoothing=float(step.params[smoothing]),
+            smoothing=float(step.params["smoothing"]),
         )
     if step.type == "frequency_encoding":
-        normalize = next(iter(optional), None)
-        if normalize is not None and normalize in step.params:
+        if "normalize" in step.params:
             return FrequencyEncoding(
                 columns=step.columns,
-                normalize=_coerce_bool_param(step.params[normalize], step.type, normalize),
+                normalize=_coerce_bool_param(step.params["normalize"], step.type, "normalize"),
             )
         return FrequencyEncoding(columns=step.columns)
     if step.type == "one_hot":
