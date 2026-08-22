@@ -109,6 +109,23 @@ The ceremony matches the task; overhead must not exceed the work.
   never commit; dispatch them after substantial work to audit the changes and
   report findings (they do not self-fix).
 
+### 5a. Contract sizing (non-negotiable)
+
+- **One contract = one independently consumable behavior change.** Every
+  function the contract lands must have a production caller by its commit —
+  tests do not count as consumers; "consumed next contract" is dead code.
+- **Target ≤ ~5 files and ~150 changed lines per contract.** A change that
+  cannot fit must find its consumption seam and split along it; if no seam
+  exists, the design is wrong — shrink the design, not the rule.
+- **Multi-commit contracts**: allowed only when an intermediate state would be
+  dead or broken on `origin`; commits stay single-logical-change and the push
+  is one event at the end.
+- **Bloat scan before dispatch**: every parameter, registry entry, branch, and
+  abstraction in the brief must map to a current requirement. Speculative
+  extensibility ("scaler types as needed later") is cut at brief-writing time.
+- **Interface changes travel with their callers**: changing a signature lands
+  in the same commit as every caller it breaks.
+
 ## 6. Coding style (for sub-agents)
 
 The immutable coding rules live in `AGENT_WORKER_CONTRACT.md` (type hints on
