@@ -68,57 +68,6 @@ platform adopts this pattern; experiments stop being ahead of it.
 
 ## Change list (ordered slices)
 
-### Slice 2 — preprocessing schema + recipe builder (DataSourceRef landed, `6d8bf00`)
-
-LANDED in 2a (`6d8bf00`): `DataSourceRef` required on `ExperimentConfig`
-(`loader` Literal + version-iff-`named_sample` validator + `schema_contract`),
-all four experiment YAMLs bound (canonical ×3, joined for taxi), etl
-step-eligibility dispatch consumes the ref at etl start — git history is
-the record. Full ref-driven resolution in train/predict arrives with Slices
-3–4; the column-cross-check validator is a named gap closed below.
-
-2a enforcement scope — exact, so "fails loud" is never assumed beyond what
-exists:
-
-- **The only loader dispatch in 2a is the etl step-eligibility guard**
-  (`src/broadway/etl/module.py::_assert_data_source_supported`, called before
-  any data is read). An experiment declaring a pre-built loader
-  (`named_sample`/`pinned`) fails etl with
-  `ValueError: etl cannot run for data_source.loader 'named_sample'
-  (supported: canonical, joined)` — the message names the field, the
-  offending value, and the supported set; there is no KeyError or
-  FileNotFoundError from inside a loader. It fires at etl start, not at
-  config-load: `load_config` accepts any loader value, and train/predict do
-  not read the ref until Slices 3–4.
-- **`schema_contract` is required but NOT cross-checked in 2a.** A wrong
-  value (e.g. `schema_contract: raw` on a dataset whose contract is not raw)
-  passes config-load silently — same status as `preprocessing:`, which is
-  still absent from `ExperimentConfig` until 2b. The chosen values (`raw` for
-  test-canonical and taxi-joined) are truthful bindings to the raw-boundary
-  contract (`build_raw_schema`), not enforced invariants — and they were
-  accurate only for 2a's scope (the etl step-eligibility guard reads no
-  columns). They are NOT the final word for 2b's column cross-check: taxi
-  rebases to a `joined` schema module in 2b (decision 6), because the joined
-  loader's true output includes lookup columns the raw contract never lists.
-  The cross-check against the referenced schema module lands in 2b with the
-  recipe builder.
-
-LANDED in 2b+3 (`585a878`, `ec063c4`): `PreprocessingStepConfig` +
-`preprocessing` (empty-list default per this doc), derived
-`src/broadway/schemas/joined.py` via the shared
-`merged_lookup_column_names` extraction (loader + schema, one
-implementation), taxi rebased `raw -> joined`, strict config-load
-cross-check (lookup-derived columns pass `joined`, fail `raw`),
-`recipe.py::build_pipeline` registry, trainer/HPO fitting the whole
-Pipeline with `pre__<step>__<param>` tuning (model-segment-only
-`allowed_params`, boundary in HPO_TRAINING.md), `log_model` with
-`infer_signature(X, y)` + CLOUDPICKLE, provenance `data_source.*`
-logged. Known follow-up: a real `target_encoding` step KeyErrors on
-the trainer path — the feature frame drops the target before fit
-(`utils.py:9-10`) while `TargetEncoding.fit` reads `X[target]`
-(`transformers.py:52`); fix lands as an sklearn-convention `fit(X, y)`
-change before Slice 4.
-
 ### Slice 4 — inference surface
 
 - `pyfunc_wrapper.ModelPyFunc`: keep for previously logged bare-model
@@ -126,7 +75,7 @@ change before Slice 4.
   `mlflow.sklearn.pyfunc` which carries preprocessing inside the Pipeline
   and enforces the logged signature at predict time automatically.
   Mark the wrapper's scope in its docstring.
-- **Retirement is a checked condition, not a vibe** (RESOLVED — decision 3):
+- **Retirement is a checked condition, not a vibe**:
   a manifest check (champion-promotion path or CI script) lists deployed
   champions by logging path — bare-model vs Pipeline+signature. When the
   bare-model list is empty, retirement becomes a mechanical PR.
@@ -136,122 +85,6 @@ change before Slice 4.
   the champion/path listing (asserted structure).
 - Acceptance: full suite green; README + dataflow.md updated in same commit
   (inference section); manifest-check output pasted.
-
-## Decision points — all resolved
-
-1. **RESOLVED — CV implementation**: `sklearn.model_selection.cross_validate`
-   replaces the hand loop. Standard-library mechanism over a hand-maintained
-   loop doing the same job; the `_mean_metrics` decimals contract is a test
-   concern, handled by the parity-test-first sequencing used when the swap
-   landed (`aee531b`). No dual path survived the swap commit.
-2. **RESOLVED — encoder origin**: custom sklearn-compatible wrappers around
-   the existing smoothed math. Correctness/compatibility fork, not an
-   enforcement question: `sklearn.preprocessing.TargetEncoder` silently
-   changes smoothing semantics and drops multi-column keys, violating the
-   "no statistical change" principle at the top of this doc.
-3. **RESOLVED — ModelPyFunc retirement**: keep-until-unused with "unused" as
-   a checked condition — a manifest check listing deployed champions by
-   logging path (bare-model vs Pipeline+signature), wired into Slice 4.
-   Empty list = mechanical retirement PR; nobody has to remember to notice.
-4. **RESOLVED — recipe location**: `configs/experiment/<name>.yaml`.
-   `DataSourceRef` and `preprocessing:` are tightly coupled — a schema
-   contract is meaningless without the loader/version that produced the data.
-   Splitting them across files recreates the "two things that must agree but
-   live apart" problem this doc eliminates elsewhere; co-locating them lets
-   the Slice 2 validator cross-check column lists against the schema
-   contract at config-load time (as conflict-2's resolution promises).
-5. **RESOLVED — column selection philosophy**: name-driven selection,
-   enforced by the schema contract referenced in `DataSourceRef` (not a
-   separate dtype-vs-name debate). The dtype-driven `feature_columns`
-   selector is retired when the last caller switches; until then both exist
-   only inside the transition slices.
-   *Implementation resolution (ratified at Slice-4 close):* option (b) —
-   dtype demoted from **selector** to **assertion**. Eligible columns derive
-   from the experiment's schema contract; numeric-only becomes a fail-loud
-   assertion guarding the passthrough-only case canonical experiments use,
-   naming the offending column ("categorical column X has no preprocessing
-   step and no numeric-selector fallback applies"). Explicit recipe columns
-   bypass the assertion. (a) rejected — making empty preprocessing illegal
-   breaks "absent block = passthrough identity" for zero functional gain;
-   (c) rejected — deferral leaves Decision 5 open in practice forever (same
-   shape as the `fit(X, y)` deferral).
-   *Refined resolution (Contract C — census-verified, read-only):* the
-   numeric-post-engineering assumption does NOT hold for any shipped
-   experiment; the assertion will fire on current configs until each leak is
-   repointed to its single declaration home. Leak census (post-engineering
-   frames, exact pipeline path):
-   - test / `raw`: `feature_3` (object) — declared `object` in
-     `configs/dataset/test.yaml` and stays object post-engineering (the
-     features step keeps all raw columns; include/derived/encodings only
-     add). Affects `baseline`, `engineered`, `hyperopt`.
-   - taxi / `joined`: `pickup_datetime` (datetime64[ns]) and
-     `Borough`/`Zone`/`service_zone` plus their `_lookup` duplicates
-     (object) in the joined frame.
-   Repoint mapping — every leak resolves to exactly one declaration home; no
-   schema-module extension needed:
-   - `engineered_feature_1` (float64, builder `source_copy`) and
-     `feature_3_target_enc` (float64, target-encoding output) →
-     `features.derived`/`features.encodings` → the generic engineered schema
-     (`build_generic_feature_specs`, validated in `features/module.py`) —
-     the only engineered-column declaration mechanism the sklearn path sees.
-   - taxi derived (`pickup_hour`…`same_borough`) and
-     `pickup_location_id_target_enc` → the generic engineered schema. The
-     legacy `project/features.py` `FEATURE_SPECS` is NOT a candidate home:
-     `src` has zero `project.*` imports (the generic path is deliberately
-     legacy-free), and legacy declares `passenger_count` int64 in direct
-     contradiction of the dataset contract float64 — a dtype-correctness
-     failure on its own terms, independent of reachability. The taxi home is
-     settled twice over: reachability + dtype-correctness.
-   Sequenced-after (separate contract, NOT this decision): taxi's generic
-   features step aborts at `same_borough` (`same_group` requires
-   `group_col`/`lookup_col`; taxi.yaml supplies neither and generic defaults
-   are `group`/`group_lookup`). The pointer repoint does NOT unblock taxi.
-   Category-match semantics pinned to observed variance: numeric-category
-   matching over runtime dtypes {int32, int64, float64} — int32 vs int64 is
-   legitimate observed variance (taxi/base). No float32, no nullable
-   Int64/Float64, no bool in any shipped post-engineering frame; the
-   float32→float64 widening example is not census-observed and rests on
-   external authority only — dropped from the justification. Non-numeric
-   context excluded by the assertion: object, datetime64[ns].
-   Acceptance pins: after repoint, the inverse census (numeric runtime
-   columns − schema-module-declared − target) is empty for every shipped
-   experiment; the assertion fires with the exact named-column message for
-   categorical-in-schema-without-step; explicit recipe columns bypass.
-6. **RESOLVED — schema_contract names the loader path's true output shape
-   (2b cross-check)**: the 2b column cross-check validates recipe columns
-   against the schema module named by `data_source.schema_contract`, and
-   that module must describe what the loader path ACTUALLY emits — not the
-   pre-join raw contract. 2a bound both test and taxi to `raw`, which was
-   accurate for 2a's scope (the etl step-eligibility guard reads no
-   columns) but is wrong for the 2b column-level check: the joined loader
-   merges lookup columns the raw contract never lists (`LocationID`,
-   `Borough`, `Zone`, `service_zone`, plus `*_lookup` collisions for taxi),
-   so a strict check against `raw` would reject any recipe referencing
-   them — a false positive baked into the feature's first real use.
-   Resolution (Option A): `schema_contract` values name per-path modules;
-   taxi is rebased from `raw` to a `joined` module in 2b (derived from the
-   raw contract + `lookup_tables` under `load_with_audit`'s merge naming —
-   derived, not hand-maintained), test stays `raw`. The cross-check then
-   enforces recipe columns ⊆ schema-module columns strictly at
-   config-load. Option B (subset-only: columns may exist beyond the
-   schema) was rejected — it cannot distinguish a typo from a real
-   post-join column and undercuts the "name-driven selection enforced
-   against the schema contract" goal this slice exists to deliver.
-   Derivation mechanism (explicit — no drift): `schemas/joined.py` computes
-   the post-join column list by calling the SAME naming logic
-   `load_with_audit` uses — the `_lookup` suffix rule is extracted from
-   `data/loader.py:49-50` into one shared function (e.g.
-   `merged_lookup_column_names(existing, lookup_columns)`), consumed by the
-   loader (its `merged_names` audit dict) and by the schema module
-   (accumulated across `lookup_tables` in config order). Lookup column names
-   are read from the same lookup files' headers the loader reads; a missing
-   lookup file fails loud at config-load. One implementation, two
-   consumers — the rule cannot drift. The alternative — a second copy of
-   the suffix rule inside `schemas/joined.py`, acceptable only with a
-   never-divergence pinning test — is rejected: it recreates the GAP-2
-   `_BUILDER_DTYPES`-vs-builder drift class this doc eliminates. Acceptance
-   pins the derivation: on a synthetic lookup-bearing dataset, the joined
-   schema's column set equals the columns `load_with_audit` actually emits.
 
 ## Test-suite impact
 
@@ -279,8 +112,6 @@ Existing test files that touch migration sites (verified by import grep):
 
 New tests per slice:
 
-- Slice 2: `tests/test_recipe.py` — YAML → Pipeline round-trip, unknown step
-  fails loud, empty block = passthrough identity.
 - Slice 3: extend `tests/test_hpo.py` — preprocessing refits per trial
   (counting-transformer leakage guard); trainer returns Pipeline; logged
   artifact reloads and predicts on raw frame.
@@ -322,8 +153,8 @@ All conflicts live where the custom loaders hand data to the Pipeline.
    `df.select_dtypes(include="number").drop(target)` — non-numeric columns
    vanish silently before `.fit`. Harmless for bare tree models; with a
    name-based `ColumnTransformer` it becomes a KeyError or silent feature
-   loss. Resolution rides on decision 5 above: switch to name-driven
-   selection from config lists in the same slice that introduces
+   loss. Resolution: switch to name-driven selection from config lists in
+   the same slice that introduces
    ColumnTransformer (Slice 2/3), never before both exist.
 3. **Feature-name contract at predict.** Pipelines validate feature names
    fit-vs-predict; the loaders emit different schemas by path (canonical
@@ -401,10 +232,8 @@ mutable champion state are external-world coupling, not pipeline
 non-determinism. Whitelist SSOT: the EXACT/PATTERN table inside
 `scripts/check_e2e_determinism.sh` — the list above only points there.
 
-Known gaps (accepted as-is, no pipeline defect): the MLflow integer-column
-schema hint (`Inferred schema contains integer column(s)…`, moot once Slice 2b
-lands explicit `infer_signature` on logged models) and the MLflow ambiguous
-dataset-source UserWarning are third-party emissions from `mlflow.types` /
-`dataset_source_registry`, not sklearn pipeline issues. The optuna
+Known gaps (accepted as-is, no pipeline defect): the MLflow ambiguous
+dataset-source UserWarning is a third-party emission from `mlflow.types` /
+`dataset_source_registry`, not an sklearn pipeline issue. The optuna
 `ExperimentalWarning: heartbeat_interval` is likewise a deliberate opt-in to a
 used experimental feature — RDB dead-trial recovery depends on the heartbeat.
