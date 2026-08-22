@@ -5,38 +5,9 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from broadway.config.schema import PipelineConfig
-from broadway.schemas import schema_columns
 
-
-def eligible_feature_columns(df: pd.DataFrame, cfg: PipelineConfig) -> list[str]:
-    """Schema-declared feature columns present in the frame, target excluded (Decision 5).
-
-    Eligible = schema_columns(cfg.experiment.data_source.schema_contract,
-    cfg.dataset, features=cfg.experiment.features) ∩ df.columns − {target}, in
-    frame column order. Every eligible column must be numeric unless a
-    preprocessing step claims it — the dtype-driven selector is retired, so a
-    non-numeric unclaimed column fails loud instead of being silently dropped
-    (conflict-2 resolution).
-    """
-    assert cfg.experiment is not None and cfg.dataset is not None
-    schema = schema_columns(
-        cfg.experiment.data_source.schema_contract,
-        cfg.dataset,
-        features=cfg.experiment.features,
-    )
-    claimed = {col for step in cfg.experiment.preprocessing for col in step.columns}
-    eligible = [col for col in df.columns if col in schema and col != cfg.dataset.target]
-    for col in eligible:
-        if col in claimed:
-            continue
-        if not pd.api.types.is_numeric_dtype(df[col]):
-            raise ValueError(
-                f"categorical column '{col}' has no preprocessing step and no "
-                "numeric-selector fallback applies — add a preprocessing step "
-                "claiming it, or repoint the schema contract so it is not eligible"
-            )
-    return eligible
+def feature_columns(df: pd.DataFrame, target: str) -> pd.DataFrame:
+    return df.select_dtypes(include="number").drop(columns=[target], errors="ignore")
 
 
 def require_keys(config: dict, keys: list[str], context: str) -> None:

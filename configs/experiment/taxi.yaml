@@ -1,6 +1,6 @@
 data_source:
   loader: joined
-  schema_contract: engineered
+  schema_contract: joined
 features:
   include:
     - pickup_location_id

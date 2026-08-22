@@ -130,12 +130,7 @@ def build_experiment_config(
         and col not in ignore_columns
         and col not in datetime_columns
     ]
-    categorical_cols = [c for c in feature_cols if report.columns[c].categorical is True]
-    include = [
-        c
-        for c in feature_cols
-        if report.columns[c].datetime_candidate is False and c not in categorical_cols
-    ]
+    include = [c for c in feature_cols if report.columns[c].datetime_candidate is False]
     derived = [
         DerivedFeature(name=f"{c}_{suffix}", func=func, source=c)
         for c in datetime_columns
@@ -145,6 +140,7 @@ def build_experiment_config(
             ("month", "datetime_month"),
         )
     ]
+    categorical_cols = [c for c in feature_cols if report.columns[c].categorical is True]
     encodings = (
         [
             EncodingConfig(type="target", columns=categorical_cols, smoothing=20),
@@ -154,7 +150,7 @@ def build_experiment_config(
         else []
     )
     return ExperimentConfig(
-        data_source=DataSourceRef(loader="canonical", schema_contract="engineered"),
+        data_source=DataSourceRef(loader="canonical", schema_contract="raw"),
         features=FeatureConfig(include=include, exclude=[], derived=derived, encodings=encodings),
         model=ModelConfig(type="linear", params={}),
         split=SplitConfig(type="time" if split_column else "random", validation_size=0.2),

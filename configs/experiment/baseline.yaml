@@ -1,6 +1,6 @@
 data_source:
   loader: canonical
-  schema_contract: engineered
+  schema_contract: raw
 features:
   include:
     - feature_1
