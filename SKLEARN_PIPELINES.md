@@ -165,6 +165,16 @@ change before Slice 4.
    separate dtype-vs-name debate). The dtype-driven `feature_columns`
    selector is retired when the last caller switches; until then both exist
    only inside the transition slices.
+   *Implementation resolution (ratified at Slice-4 close):* option (b) —
+   dtype demoted from **selector** to **assertion**. Eligible columns derive
+   from the experiment's schema contract; numeric-only becomes a fail-loud
+   assertion guarding the passthrough-only case canonical experiments use,
+   naming the offending column ("categorical column X has no preprocessing
+   step and no numeric-selector fallback applies"). Explicit recipe columns
+   bypass the assertion. (a) rejected — making empty preprocessing illegal
+   breaks "absent block = passthrough identity" for zero functional gain;
+   (c) rejected — deferral leaves Decision 5 open in practice forever (same
+   shape as the `fit(X, y)` deferral).
 6. **RESOLVED — schema_contract names the loader path's true output shape
    (2b cross-check)**: the 2b column cross-check validates recipe columns
    against the schema module named by `data_source.schema_contract`, and
