@@ -95,8 +95,13 @@ exists:
   passes config-load silently — same status as `preprocessing:`, which is
   still absent from `ExperimentConfig` until 2b. The chosen values (`raw` for
   test-canonical and taxi-joined) are truthful bindings to the raw-boundary
-  contract (`build_raw_schema`), not enforced invariants; the cross-check
-  against the referenced schema module lands in 2b with the recipe builder.
+  contract (`build_raw_schema`), not enforced invariants — and they were
+  accurate only for 2a's scope (the etl step-eligibility guard reads no
+  columns). They are NOT the final word for 2b's column cross-check: taxi
+  rebases to a `joined` schema module in 2b (decision 6), because the joined
+  loader's true output includes lookup columns the raw contract never lists.
+  The cross-check against the referenced schema module lands in 2b with the
+  recipe builder.
 
 REMAINING in this slice:
 
@@ -107,14 +112,19 @@ REMAINING in this slice:
   engineered-schema builders — reviewable code diffs + explicit version
   tags, NOT serialized JSON snapshots (stored derived state is forbidden by
   `AGENT_WORKER_CONTRACT.md`; pinned artifacts like `ratecode1_sample.json`
-  remain the precedent for deliberate pins).
+  remain the precedent for deliberate pins). The joined loader path gets a
+  derived `schemas/joined.py` (raw contract + lookup columns under
+  `load_with_audit`'s merge naming) and `configs/experiment/taxi.yaml`
+  rebases `schema_contract: raw` → `joined` (decision 6).
 - New `src/broadway/features/recipe.py::build_pipeline(cfg) -> sklearn.pipeline.Pipeline`
   — generic registry of step types (`target_encoding`, `frequency_encoding`,
   `one_hot`, `passthrough`, scaler types as needed later). Unknown type fails
   loud. Column lists are name-driven, enforced against the schema contract
   referenced by `data_source` (closes the cross-check gap named above).
 - Tests: builder round-trip (YAML → Pipeline → get_params), unknown-step
-  failure, empty-block passthrough identity, cross-check validator.
+  failure, empty-block passthrough identity, cross-check validator (recipe
+  columns must exist in the bound schema module — a lookup-derived column
+  recipe passes against `joined` and fails against `raw`, decision 6).
 - Acceptance: full suite green; CI parse-all passes over every experiment
   YAML; `ds-pipeline train --experiment baseline` produces identical metrics
   to pre-change run (evidence: pasted metric lines).
@@ -189,6 +199,26 @@ REMAINING in this slice:
    separate dtype-vs-name debate). The dtype-driven `feature_columns`
    selector is retired when the last caller switches; until then both exist
    only inside the transition slices.
+6. **RESOLVED — schema_contract names the loader path's true output shape
+   (2b cross-check)**: the 2b column cross-check validates recipe columns
+   against the schema module named by `data_source.schema_contract`, and
+   that module must describe what the loader path ACTUALLY emits — not the
+   pre-join raw contract. 2a bound both test and taxi to `raw`, which was
+   accurate for 2a's scope (the etl step-eligibility guard reads no
+   columns) but is wrong for the 2b column-level check: the joined loader
+   merges lookup columns the raw contract never lists (`LocationID`,
+   `Borough`, `Zone`, `service_zone`, plus `*_lookup` collisions for taxi),
+   so a strict check against `raw` would reject any recipe referencing
+   them — a false positive baked into the feature's first real use.
+   Resolution (Option A): `schema_contract` values name per-path modules;
+   taxi is rebased from `raw` to a `joined` module in 2b (derived from the
+   raw contract + `lookup_tables` under `load_with_audit`'s merge naming —
+   derived, not hand-maintained), test stays `raw`. The cross-check then
+   enforces recipe columns ⊆ schema-module columns strictly at
+   config-load. Option B (subset-only: columns may exist beyond the
+   schema) was rejected — it cannot distinguish a typo from a real
+   post-join column and undercuts the "name-driven selection enforced
+   against the schema contract" goal this slice exists to deliver.
 
 ## Test-suite impact
 
