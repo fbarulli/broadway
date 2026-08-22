@@ -334,3 +334,11 @@ champion-registry state fields `promote`, `reason`,
 (`artifacts/evaluation/metrics.json`). Timestamps, registry-assigned URIs, and
 mutable champion state are external-world coupling, not pipeline
 non-determinism.
+
+Known gaps (accepted as-is, no pipeline defect): the MLflow integer-column
+schema hint (`Inferred schema contains integer column(s)…`, moot once Slice 2b
+lands explicit `infer_signature` on logged models) and the MLflow ambiguous
+dataset-source UserWarning are third-party emissions from `mlflow.types` /
+`dataset_source_registry`, not sklearn pipeline issues. The optuna
+`ExperimentalWarning: heartbeat_interval` is likewise a deliberate opt-in to a
+used experimental feature — RDB dead-trial recovery depends on the heartbeat.
