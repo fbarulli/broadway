@@ -307,6 +307,10 @@ All conflicts live where the custom loaders hand data to the Pipeline.
    yield Arrow-backed `str` dtype; some sklearn selector paths expect
    `object`. Mitigation: explicit dtype normalization at the loader boundary
    (single cast site in `read_sample`), covered by a boundary test.
+9. **Storytelling/CV disjointness.** walkthrough/timeline/reporting steps
+   compute their own statistics with zero imports of `broadway.evaluate`
+   (sole production caller: `evaluate/module.py`), verified 2026-08-22 —
+   pinned by the `tests/test_platform_hygiene.py` import guard.
 
 ## Non-goals
 
