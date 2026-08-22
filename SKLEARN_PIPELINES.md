@@ -68,17 +68,19 @@ platform adopts this pattern; experiments stop being ahead of it.
 
 ## Change list (ordered slices)
 
-### Slice 2 — config schema, pipeline builder, DataSourceRef
+### Slice 2 — preprocessing schema + recipe builder (DataSourceRef landed, `6d8bf00`)
+
+LANDED in 2a (`6d8bf00`): `DataSourceRef` required on `ExperimentConfig`
+(`loader` Literal + version-iff-`named_sample` validator + `schema_contract`),
+all four experiment YAMLs bound (canonical ×3, joined for taxi), etl
+step-eligibility dispatch consumes the ref at config/etl load — git history is
+the record. Full ref-driven resolution in train/predict arrives with Slices
+3–4; the column-cross-check validator is a named gap closed below.
+
+REMAINING in this slice:
 
 - `src/broadway/config/schema.py`: `PreprocessingStepConfig` (type, columns,
   params) + `ExperimentConfig.preprocessing: list[PreprocessingStepConfig] = []`.
-- **`ExperimentConfig.data_source: DataSourceRef` — required, no default.**
-  `DataSourceRef(loader, version, schema_contract)`; `version` required when
-  `loader == "named_sample"` (Pydantic validator). This is a deliberate
-  schema break: EVERY existing `configs/experiment/*.yaml` gains a
-  `data_source:` block in this slice (complete list authored just-in-time
-  from the directory; the CI parse-all gate fails the build until all carry
-  it). Loader dispatch resolves through the ref instead of ad-hoc calls.
 - New versioned schema modules under `schemas/` (e.g.
   `schemas/named_sample_v3.py`) reusing `build_raw_schema` /
   engineered-schema builders — reviewable code diffs + explicit version
@@ -89,10 +91,9 @@ platform adopts this pattern; experiments stop being ahead of it.
   — generic registry of step types (`target_encoding`, `frequency_encoding`,
   `one_hot`, `passthrough`, scaler types as needed later). Unknown type fails
   loud. Column lists are name-driven, enforced against the schema contract
-  referenced by `data_source`.
+  referenced by `data_source` (closes the cross-check gap named above).
 - Tests: builder round-trip (YAML → Pipeline → get_params), unknown-step
-  failure, empty-block passthrough identity, `DataSourceRef` validation
-  (missing field fails; `named_sample` without `version` fails).
+  failure, empty-block passthrough identity, cross-check validator.
 - Acceptance: full suite green; CI parse-all passes over every experiment
   YAML; `ds-pipeline train --experiment baseline` produces identical metrics
   to pre-change run (evidence: pasted metric lines).
