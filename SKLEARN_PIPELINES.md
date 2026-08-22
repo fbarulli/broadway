@@ -73,9 +73,30 @@ platform adopts this pattern; experiments stop being ahead of it.
 LANDED in 2a (`6d8bf00`): `DataSourceRef` required on `ExperimentConfig`
 (`loader` Literal + version-iff-`named_sample` validator + `schema_contract`),
 all four experiment YAMLs bound (canonical ×3, joined for taxi), etl
-step-eligibility dispatch consumes the ref at config/etl load — git history is
+step-eligibility dispatch consumes the ref at etl start — git history is
 the record. Full ref-driven resolution in train/predict arrives with Slices
 3–4; the column-cross-check validator is a named gap closed below.
+
+2a enforcement scope — exact, so "fails loud" is never assumed beyond what
+exists:
+
+- **The only loader dispatch in 2a is the etl step-eligibility guard**
+  (`src/broadway/etl/module.py::_assert_data_source_supported`, called before
+  any data is read). An experiment declaring a pre-built loader
+  (`named_sample`/`pinned`) fails etl with
+  `ValueError: etl cannot run for data_source.loader 'named_sample'
+  (supported: canonical, joined)` — the message names the field, the
+  offending value, and the supported set; there is no KeyError or
+  FileNotFoundError from inside a loader. It fires at etl start, not at
+  config-load: `load_config` accepts any loader value, and train/predict do
+  not read the ref until Slices 3–4.
+- **`schema_contract` is required but NOT cross-checked in 2a.** A wrong
+  value (e.g. `schema_contract: raw` on a dataset whose contract is not raw)
+  passes config-load silently — same status as `preprocessing:`, which is
+  still absent from `ExperimentConfig` until 2b. The chosen values (`raw` for
+  test-canonical and taxi-joined) are truthful bindings to the raw-boundary
+  contract (`build_raw_schema`), not enforced invariants; the cross-check
+  against the referenced schema module lands in 2b with the recipe builder.
 
 REMAINING in this slice:
 
