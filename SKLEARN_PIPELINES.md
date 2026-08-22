@@ -170,6 +170,11 @@ platform adopts this pattern; experiments stop being ahead of it.
    remove now with a champion reload migration.
 4. **Where recipes live**: `configs/experiment/<name>.yaml` (recommended —
    recipe travels with the experiment) vs `configs/step/train.yaml`.
+5. **Column selection philosophy at the loader↔sklearn boundary**:
+   name-driven from config lists (recommended — matches ColumnTransformer,
+   dtype checks stay in the Pandera schema) vs the current dtype-driven
+   `feature_columns` (`select_dtypes(include="number")`, silently drops
+   non-numeric). See "Loader ↔ sklearn boundary" below.
 
 ## Test-suite impact
 
@@ -235,6 +240,57 @@ New tests per slice:
    push to `main`/`taxi` only. A feature branch does not ship images.
 5. **Experiment smoke** (`experiments.py verify`) is taxi-ref-gated and stays
    so; it reappears when slices merge back to `taxi`.
+
+## Loader ↔ sklearn boundary — conflicts and mitigations
+
+sklearn loads nothing; it consumes one in-memory DataFrame per fit/transform.
+All conflicts live where the custom loaders hand data to the Pipeline.
+
+1. **Streaming vs in-memory.** `project/data.py::generate_sample_cache`
+   streams 8.6M rows via `pq.ParquetFile.iter_batches` with incremental
+   per-borough sampling; `data/loader.py::read_sample` uses a lazy
+   `pl.scan_parquet`. A Pipeline cannot sit inside the streaming loop.
+   Mitigation: pipeline stays downstream of load; loaders remain the owners
+   of materialization and sampling. Fine for dev/live sample sizes; the
+   `full=True` path keeps its memory assumption — document it, don't hide it.
+2. **Silent dtype-driven column drop.** `utils.feature_columns` =
+   `df.select_dtypes(include="number").drop(target)` — non-numeric columns
+   vanish silently before `.fit`. Harmless for bare tree models; with a
+   name-based `ColumnTransformer` it becomes a KeyError or silent feature
+   loss. Resolution rides on decision 5 above: switch to name-driven
+   selection from config lists in the same slice that introduces
+   ColumnTransformer (Slice 2/3), never before both exist.
+3. **Feature-name contract at predict.** Pipelines validate feature names
+   fit-vs-predict; the loaders emit different schemas by path (canonical
+   parquet, joined cache, named samples `@vN`, pinned `ratecode1_sample`).
+   Mitigation: an explicit rule — a model trains and predicts through the
+   SAME loader path; the recipe's column lists are validated against the
+   loaded frame at fit time (fail loud on mismatch).
+4. **Index alignment.** Lookup joins (`load_with_audit`, `_join_boroughs`)
+   and both target/frequency encoders merge → non-default, possibly
+   non-unique indexes; sklearn transforms are positional. Mitigation: Slice 1
+   transformers apply mappings by key-map (no merge) so row order and index
+   are preserved; the taxi row-count guard stays.
+5. **dtype drift through parquet round-trips.** etl writes `index=False`
+   parquet; re-read can shift datetime units / nullable dtypes. Only the
+   named-sample registry validates schema at load. Mitigation: recipe fit
+   validates declared dtypes against the loaded frame (loud failure), same
+   check the registry already does — reused, not duplicated.
+6. **Double-sampling / split ownership.** Loaders own sampling+seed
+   (`read_sample(seed)`, `DATA_MODE` caches, registry version bumps);
+   sklearn owns resampling too. Mitigation: rule — sampling and splitting
+   stay in `data/splitter.py` / loaders; Pipeline and CV never sample. The
+   Slice 3 leakage-guard test asserts preprocessing refits per fold but
+   never resamples.
+7. **Time-ordering vs CV shuffle.** `evaluate/validation.py::cross_validate`
+   uses `KFold(shuffle=True)` — shuffled folds destroy time structure (the
+   script-10 DW lesson). Mitigation: Slice 5 adds a config-driven `cv` kind
+   (`kfold` vs `time_series_split`) instead of a hardcoded shuffle; time-split
+   experiments route to `TimeSeriesSplit`.
+8. **Polars→pandas edge.** `read_sample` ends `df.to_pandas()`, which can
+   yield Arrow-backed `str` dtype; some sklearn selector paths expect
+   `object`. Mitigation: explicit dtype normalization at the loader boundary
+   (single cast site in `read_sample`), covered by a boundary test.
 
 ## Non-goals
 
