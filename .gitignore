@@ -29,3 +29,4 @@ legend_experiment/
 .coverage
 data/optuna-backup/
 deepseek-harness/
+.mlflow*.db
