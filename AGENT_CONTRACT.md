@@ -111,6 +111,13 @@ The ceremony matches the task; overhead must not exceed the work.
 
 ### 5a. Contract sizing (non-negotiable)
 
+- **Vocabulary — orphan vs dead/bloat**: an *orphan* is unused code kept
+  deliberately for later call — it has a documented extension point, a named
+  future consumer, or config-driven activation, and is test-pinned; orphans
+  are inventory, not findings. *Dead/bloat* is code never utilized within the
+  context of the current changes: superseded by a migration, maintained only
+  by tests, or lacking any documented future consumer. Dead/bloat is deleted
+  in the same contract that made it dead. "Tests are consumers" is false.
 - **One contract = one independently consumable behavior change.** Every
   function the contract lands must have a production caller by its commit —
   tests do not count as consumers; "consumed next contract" is dead code.
