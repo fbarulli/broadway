@@ -143,24 +143,32 @@ platform adopts this pattern; experiments stop being ahead of it.
   artifacts (backward compat); new-path models load through
   `mlflow.sklearn.pyfunc` which carries preprocessing inside the Pipeline
   and enforces the logged signature at predict time automatically.
-  Mark the wrapper's scope in its docstring; retire later once no champion
-  needs it (decision recorded, not silent).
+  Mark the wrapper's scope in its docstring.
+- **Retirement is a checked condition, not a vibe** (RESOLVED — decision 3):
+  a manifest check (champion-promotion path or CI script) lists deployed
+  champions by logging path — bare-model vs Pipeline+signature. When the
+  bare-model list is empty, retirement becomes a mechanical PR.
 - `evaluate/module.py` consumes transformed feature parquets — unchanged.
 - Tests: champion predict path on raw input frame; signature mismatch at
-  predict fails loud (wrong column set / wrong dtype).
+  predict fails loud (wrong column set / wrong dtype); manifest check returns
+  the champion/path listing (asserted structure).
 - Acceptance: full suite green; README + dataflow.md updated in same commit
-  (inference section).
+  (inference section); manifest-check output pasted.
 
 ### Slice 5 — cross-validation correctness
 
 - `src/broadway/evaluate/validation.py::cross_validate`: accept any estimator
-  (model or Pipeline), keep the KFold loop but `clone(estimator)` so
-  preprocessing refits per fold — or replace the loop with
-  `sklearn.model_selection.cross_validate` (equivalent output dict; prefer
-  whichever keeps `_mean_metrics` contract). Decision point below.
+  (model or Pipeline); replace the hand loop with
+  `sklearn.model_selection.cross_validate` (RESOLVED — decision 1).
+  Sequencing: write the seeded score-parity test FIRST, confirm
+  `cross_validate` output matches `_mean_metrics` to required decimal
+  precision, then delete the loop in the same commit. No dual path, no
+  "keep just in case" — if precision differs it is an aggregation-order/ddof
+  artifact fixed inside the `_mean_metrics` wrapper.
 - Tests: fold-independence with a counting transformer (each fold sees fresh
-  fit), score parity with previous implementation on a fixed seed.
-- Acceptance: full suite green.
+  fit), seeded score parity written before the swap.
+- Acceptance: full suite green; hand loop absent from `validation.py`
+  (grep evidence pasted).
 
 ### Slice 6 — taxi binding
 
@@ -186,20 +194,29 @@ platform adopts this pattern; experiments stop being ahead of it.
 - Acceptance: ruff + touched scripts rerun (experiments tier — pytest does
   not collect `experiments/`); pasted script output.
 
-## Decision points (user calls, not silent)
+## Decision points — all resolved
 
-1. **CV implementation**: hand loop with whole-pipeline clone (small diff,
-   keeps `_mean_metrics` decimals contract) vs
-   `sklearn.model_selection.cross_validate` (stdlib-correct, replaces ~15
-   lines). Recommendation: `cross_validate`.
-2. **Encoder origin**: custom sklearn-compatible wrappers around the existing
-   smoothed math (recommended — preserves exact formulas and multi-column
-   keys) vs adopting `sklearn.preprocessing.TargetEncoder` (different
-   smoothing semantics, single-column; would change numbers).
-3. **ModelPyFunc retirement timing**: keep-until-unused (recommended) vs
-   remove now with a champion reload migration.
-4. **Where recipes live**: `configs/experiment/<name>.yaml` (recommended —
-   recipe travels with the experiment) vs `configs/step/train.yaml`.
+1. **RESOLVED — CV implementation**: `sklearn.model_selection.cross_validate`
+   replaces the hand loop. Standard-library mechanism over a hand-maintained
+   loop doing the same job; the `_mean_metrics` decimals contract is a test
+   concern, handled by the parity-test-first sequencing in Slice 5. No dual
+   path survives the swap commit.
+2. **RESOLVED — encoder origin**: custom sklearn-compatible wrappers around
+   the existing smoothed math. Correctness/compatibility fork, not an
+   enforcement question: `sklearn.preprocessing.TargetEncoder` silently
+   changes smoothing semantics and drops multi-column keys, violating the
+   "no statistical change" principle at the top of this doc.
+3. **RESOLVED — ModelPyFunc retirement**: keep-until-unused with "unused" as
+   a checked condition — a manifest check listing deployed champions by
+   logging path (bare-model vs Pipeline+signature), wired into Slice 4.
+   Empty list = mechanical retirement PR; nobody has to remember to notice.
+4. **RESOLVED — recipe location**: `configs/experiment/<name>.yaml`.
+   `DataSourceRef` and `preprocessing:` are tightly coupled — a schema
+   contract is meaningless without the loader/version that produced the data.
+   Splitting them across files recreates the "two things that must agree but
+   live apart" problem this doc eliminates elsewhere; co-locating them lets
+   the Slice 2 validator cross-check column lists against the schema
+   contract at config-load time (as conflict-2's resolution promises).
 5. **RESOLVED — column selection philosophy**: name-driven selection,
    enforced by the schema contract referenced in `DataSourceRef` (not a
    separate dtype-vs-name debate). The dtype-driven `feature_columns`
