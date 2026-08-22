@@ -140,6 +140,7 @@ def run(cfg: PipelineConfig) -> None:
         y_train.to_numpy(),
         cfg.train.cv_folds,
         cfg.experiment.random_state,
+        cfg.train.cv_kind,
     )
     residuals = residual_summary(y_true, y_pred)
 

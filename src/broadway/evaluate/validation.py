@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 from sklearn.base import BaseEstimator
-from sklearn.model_selection import KFold
+from sklearn.model_selection import BaseCrossValidator, KFold, TimeSeriesSplit
 from sklearn.model_selection import cross_validate as sklearn_cross_validate
 
 _SCORING: dict[str, str] = {
@@ -25,17 +25,28 @@ _NEGATED_METRICS: frozenset[str] = frozenset(
 )
 
 
+def _make_cv(cv_kind: str, cv_folds: int, random_state: int) -> BaseCrossValidator:
+    if cv_kind == "time_series_split":
+        # TimeSeriesSplit is deterministic by construction; random_state
+        # is intentionally unused here.
+        return TimeSeriesSplit(n_splits=cv_folds)
+    if cv_kind == "kfold":
+        return KFold(n_splits=cv_folds, shuffle=True, random_state=random_state)
+    raise ValueError(f"unknown cv_kind: {cv_kind!r}")
+
+
 def cross_validate(
     model: BaseEstimator,
     X: np.ndarray,
     y: np.ndarray,
     cv_folds: int,
     random_state: int,
+    cv_kind: str,
     decimals: int = 4,
 ) -> dict[str, float]:
     if not np.all(np.isfinite(y)):
         raise ValueError("y contains NaN or infinite values")
-    cv = KFold(n_splits=cv_folds, shuffle=True, random_state=random_state)
+    cv = _make_cv(cv_kind, cv_folds, random_state)
     scores = sklearn_cross_validate(model, X, y, cv=cv, scoring=_SCORING)
     return _mean_metrics(scores, decimals)
 

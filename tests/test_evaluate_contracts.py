@@ -148,7 +148,7 @@ def test_cross_validate_returns_finite_metrics() -> None:
     X = rng.normal(size=(60, 3))
     coef = np.array([1.5, -2.0, 0.5])
     y = X @ coef + rng.normal(scale=0.1, size=60)
-    metrics = cross_validate(LinearRegression(), X, y, cv_folds=5, random_state=0)
+    metrics = cross_validate(LinearRegression(), X, y, cv_folds=5, random_state=0, cv_kind="kfold")
     assert set(metrics) == {
         "mae", "rmse", "r2", "mape", "max_error", "median_ae", "explained_var"}
     assert all(np.isfinite(value) for value in metrics.values())
@@ -221,6 +221,7 @@ def _make_config(tmp_path: Path) -> PipelineConfig:
         random_state=42,
         n_jobs=1,
         cv_folds=2,
+        cv_kind="kfold",
         model_file="model.pkl",
         n_estimators=10,
         learning_rate=0.05,

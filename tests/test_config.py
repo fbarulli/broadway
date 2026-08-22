@@ -15,6 +15,7 @@ from broadway.config.schema import (
     ModelConfig,
     ModelHPOSpec,
     SplitConfig,
+    TrainStep,
 )
 
 
@@ -49,6 +50,48 @@ def stats_cfg():
 def test_load_train_config(train_cfg) -> None:
     assert train_cfg.model_file
     assert train_cfg.random_state
+
+
+def _train_step_kwargs(**overrides: object) -> dict[str, object]:
+    kwargs: dict[str, object] = {
+        "random_state": 42,
+        "n_jobs": -1,
+        "cv_folds": 5,
+        "cv_kind": "kfold",
+        "model_file": "model.pkl",
+        "n_estimators": 500,
+        "learning_rate": 0.05,
+        "num_leaves": 63,
+        "subsample": 0.8,
+        "colsample_bytree": 0.8,
+        "quantile_tail": 0.9,
+        "output_dir": "artifacts/training",
+        "output_file": "training_result.json",
+    }
+    kwargs.update(overrides)
+    return kwargs
+
+
+def test_train_step_cv_kind_required() -> None:
+    kwargs = _train_step_kwargs()
+    del kwargs["cv_kind"]
+    with pytest.raises(ValidationError):
+        TrainStep(**kwargs)
+
+
+def test_train_step_cv_kind_invalid_raises() -> None:
+    with pytest.raises(ValidationError):
+        TrainStep(**_train_step_kwargs(cv_kind="bogus"))
+
+
+def test_train_step_cv_kind_time_series_split_parses() -> None:
+    step = TrainStep(**_train_step_kwargs(cv_kind="time_series_split"))
+    assert step.cv_kind == "time_series_split"
+
+
+def test_train_step_cv_kind_kfold_parses() -> None:
+    step = TrainStep(**_train_step_kwargs(cv_kind="kfold"))
+    assert step.cv_kind == "kfold"
 
 
 def test_load_evaluate_config(evaluate_cfg) -> None:

@@ -150,6 +150,7 @@ def _make_config(tmp_path: Path) -> PipelineConfig:
         random_state=42,
         n_jobs=1,
         cv_folds=2,
+        cv_kind="kfold",
         model_file="model.pkl",
         n_estimators=10,
         learning_rate=0.05,

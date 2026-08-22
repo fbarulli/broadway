@@ -212,6 +212,7 @@ class TrainStep(BaseModel):
     random_state: int
     n_jobs: int
     cv_folds: int
+    cv_kind: Literal["kfold", "time_series_split"]
     model_file: str
     n_estimators: int
     learning_rate: float
