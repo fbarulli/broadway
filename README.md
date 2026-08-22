@@ -15,6 +15,7 @@ byte-identical — see [§7 Branch parity](#7-branch-parity--main-vs-taxi).
 ```bash
 uv sync --extra dev        # install deps incl. dev toolchain (ruff/mypy/pytest-cov); add --extra spark only for genuinely large datasets
 docker compose up -d       # mlflow + postgres (optional; training logs runs + artifacts here)
+uv run mlflow server --backend-store-uri sqlite:///$(pwd)/.mlflow.db --artifacts-destination file://$(pwd)/mlruns   # no-docker local MLflow server (MLflow 3.x; listens on :5000; mlruns/ is gitignored)
 ```
 
 ## Quick start (taxi)
