@@ -28,7 +28,7 @@ from broadway.lineage.records import write_record
 from broadway.training.contracts import TrainingResult
 from broadway.training.mlflow_utils import get_champion, promote_candidate, setup_mlflow
 from broadway.training.trainer import build_model_pipeline
-from broadway.utils import feature_columns
+from broadway.utils import eligible_feature_columns
 
 logger = logging.getLogger(__name__)
 
@@ -46,16 +46,16 @@ def _load_val_features(cfg: PipelineConfig) -> tuple[pd.DataFrame, pd.Series]:
             f"validation features not found: {val_path} — evaluate requires a held-out set"
         )
     val_df = pd.read_parquet(val_path)
-    target = cfg.dataset.target
-    return feature_columns(val_df, target), val_df[target]
+    assert cfg.dataset is not None
+    return eligible_feature_columns(val_df, cfg), val_df[cfg.dataset.target]
 
 
 def _load_train_features(cfg: PipelineConfig) -> tuple[pd.DataFrame, pd.Series]:
     assert cfg.etl is not None and cfg.dataset is not None
     out_dir = _processed_dir(cfg)
     train_df = pd.read_parquet(out_dir / cfg.etl.train_features_file)
-    target = cfg.dataset.target
-    return feature_columns(train_df, target), train_df[target]
+    assert cfg.dataset is not None
+    return eligible_feature_columns(train_df, cfg), train_df[cfg.dataset.target]
 
 
 def _load_training_result(cfg: PipelineConfig) -> TrainingResult:

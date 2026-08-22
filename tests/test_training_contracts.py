@@ -124,7 +124,7 @@ def test_build_model_pipeline_applies_pre_params(tmp_path: Path) -> None:
 def test_target_encoding_recipe_end_to_end_fits_and_predicts(tmp_path: Path) -> None:
     """C1 end-to-end: a target_encoding recipe composes through
     build_model_pipeline, fits with the target passed as the ``y`` argument
-    (never read out of X — utils.feature_columns drops the target before
+    (never read out of X — eligible_feature_columns drops the target before
     fit), and the fitted pipeline predicts on a fresh frame."""
     cfg = _make_config(tmp_path)
     experiment = cfg.experiment.model_copy(

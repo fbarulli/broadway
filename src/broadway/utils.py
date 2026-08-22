@@ -5,9 +5,41 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from broadway.config.schema import PipelineConfig
+from broadway.schemas import schema_columns
 
-def feature_columns(df: pd.DataFrame, target: str) -> pd.DataFrame:
-    return df.select_dtypes(include="number").drop(columns=[target], errors="ignore")
+# Decision 5 pin: numeric-category matching over the OBSERVED runtime dtypes
+# ({int32, int64, float64}); object and datetime64 are excluded by the assertion.
+_NUMERIC_CATEGORY_DTYPES = frozenset({"int32", "int64", "float64"})
+
+
+def eligible_feature_columns(df: pd.DataFrame, cfg: PipelineConfig) -> pd.DataFrame:
+    """Eligible model-input columns: declared feature surface ∩ frame − target.
+
+    The declared surface comes from ``data_source.schema_contract`` (for
+    ``engineered``, resolved through the features config). A categorical
+    eligible column not claimed by a preprocessing step fails loud, naming the
+    column (Decision 5 — dtype-driven selection is retired). Frame column
+    order is preserved, NOT sorted.
+    """
+    if cfg.experiment is None or cfg.dataset is None:
+        raise ValueError("eligible_feature_columns requires experiment and dataset config")
+    declared = schema_columns(
+        cfg.experiment.data_source.schema_contract,
+        cfg.dataset,
+        features=cfg.experiment.features,
+    )
+    claimed = {col for step in cfg.experiment.preprocessing for col in step.columns}
+    eligible = [name for name in df.columns if name in declared and name != cfg.dataset.target]
+    for name in eligible:
+        if name in claimed or str(df[name].dtype) in _NUMERIC_CATEGORY_DTYPES:
+            continue
+        raise ValueError(
+            f"categorical column '{name}' has no preprocessing step and no "
+            "numeric-selector fallback applies — add a preprocessing step claiming "
+            "it, or repoint the schema contract so it is not eligible"
+        )
+    return df[eligible]
 
 
 def require_keys(config: dict, keys: list[str], context: str) -> None:

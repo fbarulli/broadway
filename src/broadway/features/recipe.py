@@ -126,7 +126,11 @@ def validate_preprocessing_columns(cfg: PipelineConfig) -> None:
             "the remainder passthrough leaks raw categorical columns). Use one_hot "
             "alone, or move the other steps into a separate recipe."
         )
-    bound = schema_columns(cfg.experiment.data_source.schema_contract, cfg.dataset)
+    bound = schema_columns(
+        cfg.experiment.data_source.schema_contract,
+        cfg.dataset,
+        features=cfg.experiment.features,
+    )
     for step in cfg.experiment.preprocessing:
         missing = sorted(c for c in step.columns if c not in bound)
         if missing:
