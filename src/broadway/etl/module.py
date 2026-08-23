@@ -8,6 +8,7 @@ import re
 from pathlib import Path
 
 from broadway.cleaning.models import StructuralCleanResult
+from broadway.cleaning.structural import CoercionAuditReport, CoercionRecord
 from broadway.config.schema import PipelineConfig
 from broadway.contracts.pandera import build_raw_schema
 from broadway.contracts.selectors import datetime_columns, numeric_columns
@@ -77,12 +78,14 @@ def run(cfg: PipelineConfig) -> None:
             reasons.append(f"CI sampling: -{n_before - len(df)} rows")
 
     numeric_map = {col: dataset.columns[col].dtype for col in numeric_columns(dataset)}
+    coercions: list[CoercionRecord] = []
     df, clean_reasons, parse_failures, observed_missing = canonicalize(
         df,
         target=dataset.target,
         datetime_columns=datetime_columns(dataset),
         numeric_columns=numeric_map,
         missing_encodings=cfg.etl.missing_encodings,
+        coercions=coercions,
     )
     reasons.extend(clean_reasons)
 
@@ -139,6 +142,18 @@ def run(cfg: PipelineConfig) -> None:
         if (records_dir() / f"{ingest_id.replace(':', '_')}.json").exists()
         else [node_id("dataset", dataset.name)]
     )
+    if coercions:
+        coercion_audit_path = out_dir / f"{dataset.name}_coercion_audit.json"
+        coercion_audit_path.write_text(
+            CoercionAuditReport(coercions=coercions).model_dump_json(indent=2),
+            encoding="utf-8",
+        )
+        write_record(
+            node_id("coercion", dataset.name),
+            "coercion",
+            str(coercion_audit_path),
+            upstream,
+        )
     if join_audits:
         join_audit_path = out_dir / f"{dataset.name}_join_audit.json"
         join_audit_path.write_text(

@@ -8,6 +8,7 @@ from broadway.config.schema import DatasetContract, FeatureConfig, PipelineConfi
 from broadway.contracts.pandera import pandera_dtype
 from broadway.features.builders import builder_dtype
 from broadway.features.schema import FeatureSpec
+from broadway.schemas.joined import joined_schema_columns
 
 
 def build_generic_feature_specs(contract: DatasetContract, features: FeatureConfig) -> dict[str, FeatureSpec]:
@@ -87,9 +88,41 @@ def validate_target_dtype(cfg: PipelineConfig, df: pd.DataFrame) -> None:
         )
 
 
+def _assert_no_extra_columns(cfg: PipelineConfig, df: pd.DataFrame) -> None:
+    """Reject columns outside the declared engineered surface (FIX_4 G2).
+
+    The engineered feature files legitimately carry the full canonical frame —
+    contract columns (including the target and non-eligible columns) plus the
+    joined loader's lookup-derived columns — alongside the declared feature
+    specs, so blanket ``strict=True`` on ``engineered_schema_for`` would reject
+    conformant flows (the mlflow/sample surfaces are separate boundaries). This
+    explicit guard instead rejects only columns outside the declared surface:
+    contract columns ∪ joined-lookup columns ∪ feature specs.
+    """
+    assert cfg.dataset is not None and cfg.experiment is not None
+    declared = (
+        set(cfg.dataset.columns)
+        | set(joined_schema_columns(cfg.dataset))
+        | set(build_generic_feature_specs(cfg.dataset, cfg.experiment.features))
+    )
+    extra = sorted(set(df.columns) - declared)
+    if extra:
+        raise SchemaError(
+            schema=engineered_schema_for(cfg),
+            data=df,
+            message=(
+                "engineered feature frame contains unexpected column(s): "
+                + ", ".join(extra)
+            ),
+            failure_cases=extra,
+            check="column_subset",
+        )
+
+
 def validate_engineered_frame(cfg: PipelineConfig, df: pd.DataFrame) -> None:
     """Validate a read engineered feature frame against the ordered schema,
-    then the explicit target-dtype hook. Any mismatch raises SchemaError.
+    then the extra-column guard, then the explicit target-dtype hook. Any
+    mismatch raises SchemaError.
 
     Pandera raises the aggregate ``SchemaErrors`` for column-order violations;
     the read contract requires ``SchemaError`` for every mismatch class.
@@ -103,4 +136,5 @@ def validate_engineered_frame(cfg: PipelineConfig, df: pd.DataFrame) -> None:
             data=df,
             message=f"engineered feature frame violates the ordered schema: {exc}",
         ) from exc
+    _assert_no_extra_columns(cfg, df)
     validate_target_dtype(cfg, df)

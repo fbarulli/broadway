@@ -10,6 +10,7 @@ import pandas as pd
 
 from broadway.cleaning.models import ParseFailure
 from broadway.cleaning.structural import (
+    CoercionRecord,
     parse_datetime,
     parse_numeric,
     standardize_missing,
@@ -36,6 +37,7 @@ def canonicalize(
     datetime_columns: list[str],
     missing_encodings: list[str],
     numeric_columns: dict[str, str] | None = None,
+    coercions: list[CoercionRecord] | None = None,
 ) -> tuple[pd.DataFrame, list[str], list[ParseFailure], dict[str, list[str]]]:
     numeric_columns = numeric_columns or {}
     reasons: list[str] = []
@@ -62,7 +64,7 @@ def canonicalize(
 
     for col, target_dtype in numeric_columns.items():
         if col in df.columns:
-            df[col], failure = parse_numeric(df[col], col, target_dtype)
+            df[col], failure = parse_numeric(df[col], col, target_dtype, coercions)
             if failure:
                 parse_failures.append(failure)
 

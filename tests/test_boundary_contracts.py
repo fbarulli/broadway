@@ -13,19 +13,25 @@ guard the case turns XPASS and the suite goes red, forcing the xfail to be
 converted into a real assertion. Every xfail reason names the boundary and the
 suggested future contract.
 
-Tripwire ledger (current): 8 strict-xfail tripwires, of which 6 are now
-converted into real assertions by the read-side engineered contract (CONTRACT
-H) — the 4 engineered-read dtype flips on B3/B4 plus the column-reorder and
-target-dtype gaps — and 2 remain xfail: the raw→canonical int/float coercion
-mask (G1) and the extra-column strictness gap (G2).
+Tripwire ledger (current): 8 strict-xfail tripwires, 8 converted, 0 remaining.
+The 4 engineered-read dtype flips on B3/B4, the column-reorder, and the
+target-dtype gaps were converted by the read-side engineered contract (CONTRACT
+H). The raw→canonical int/float coercion mask (G1) is closed by evidence-tagged
+coercion (FIX_4, Option E): ``parse_numeric`` records every astype-back-to-
+declared event — {column, declared dtype, arriving dtype, rows affected} — into
+the run's audit channel instead of silently masking it. The extra-column gap
+(G2) is closed by the joined-loader unique-label guard (SchemaError at the
+merge point) plus the engineered read-path extra-column guard.
 
 Boundary map (writer → reader; who declares / produces / validates today):
 
-  B1 raw source -> etl canonical   (etl/module.py:95)  declares: dataset YAML
+  B1 raw source → etl canonical   (etl/module.py:95)  declares: dataset YAML
       via build_raw_schema; produces: external -> loader READERS[] ->
-      canonicalize coercion; validates: build_raw_schema AFTER coercion
-      (contracts step is dtype-blind by design).  loud: NaN / object /
-      non-coercible flips; silent: coercible int<->float, extra column, reorder.
+      canonicalize coercion; validates: build_raw_schema AFTER coercion.
+      loud: NaN / object / non-coercible flips, and coercible int<->float
+      flips — the latter are now recorded as coercion evidence instead of
+      being masked (FIX_4 G1 / Option E, astype-back events surface via etl).
+      silent: none.
   B2 etl split -> features         (features/module.py:25,41)  validates:
       engineered schema on features OUTPUT (included columns only).
   B3 train_features -> training    (training/module.py:42-51)  validates:
@@ -54,11 +60,13 @@ import broadway.evaluate.module as evaluate_module
 import broadway.samples.generate as sample_generate
 import broadway.samples.loader as sample_loader
 import broadway.training.module as training_module
+from broadway.cleaning.structural import CoercionRecord
 from broadway.config.loader import load_config
-from broadway.config.schema import ColumnRole, DatasetContract
+from broadway.config.schema import ColumnRole, ColumnSchema, DatasetContract, LookupSpec, TaskType
 from broadway.contracts.pandera import build_raw_schema
 from broadway.contracts.selectors import datetime_columns, numeric_columns
 from broadway.data.cleaner import canonicalize
+from broadway.data.loader import load_with_audit
 from broadway.features.generic import build_generic_feature_specs
 from broadway.features.module import _load_split
 from broadway.features.pipeline import FeaturePipeline
@@ -362,60 +370,55 @@ def test_named_sample_boundary_rejects_source_dtype_mutation(
 
 
 # --------------------------------------------------------------------------- #
-# REMAINING GAP FINDINGS — no loud failure exists today for these two;
-# strict-xfail tripwires track them so the day a guard lands, the suite turns
-# red (XPASS) instead of silently absorbing the drift. The column-reorder and
-# target-dtype gaps were closed by the read-side engineered contract
-# (engineered_schema_for + validate_target_dtype on the training/evaluate
-# feature reads) and run below as real assertions. See CONTRACT_G report for
-# the full gap table.
+# FORMER GAP FINDINGS — closed by FIX_4 and now real passing assertions.
+# G1 (raw→canonical int/float coercion mask): Option E makes the astype-back
+# evidence-tagged, so the flip produces a recorded, visible coercion event
+# instead of silence. G2 (extra-column strictness): the joined loader now
+# raises SchemaError on duplicate labels at the merge point, and the
+# engineered read path rejects columns outside the declared surface. The
+# column-reorder and target-dtype gaps were closed earlier by the read-side
+# engineered contract and run below as real assertions. See CONTRACT_G report
+# for the original gap table and FIX_4 for the closures.
 # --------------------------------------------------------------------------- #
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "GAP raw->canonical: parse_numeric (cleaning/structural.py:39) coerces a "
-        "whole-number int64->float64 flip back to int64 before build_raw_schema "
-        "validates, so the drift is masked. Future contract: validate the raw "
-        "loaded frame against build_raw_schema BEFORE canonicalize coercion."
-    ),
-)
 def test_gap_raw_boundary_int_float_coercion_mask() -> None:
+    """G1 converted (FIX_4 Option E): the flip is no longer masked — it is
+    recorded evidence. Exercises the exact canonicalize call the pipeline
+    performs (etl/module.py) with the evidence collector, then asserts the
+    SPECIFIC record contents ({column, int64 declared, float64 arriving, rows
+    affected}) — not merely that some coercion record exists."""
     cfg = load_config("etl", dataset="test", experiment="baseline")
     ds = cfg.dataset
     frame = _contract_frame(ds)
     flipped = next(iter(_int64_feature_cols(frame, ds)))
     frame[flipped] = frame[flipped].astype("float64")  # whole numbers, no NaN
 
-    def thunk() -> None:
-        cleaned, *_ = canonicalize(
-            frame,
-            ds.target,
-            datetime_columns(ds),
-            cfg.etl.missing_encodings,
-            {col: ds.columns[col].dtype for col in numeric_columns(ds)},
-        )
-        build_raw_schema(ds).validate(cleaned)
-
-    _assert_loud(
-        "raw source -> canonical",
-        f"{flipped} int64 -> float64 (whole numbers, coercion mask)",
-        (SchemaError,),
-        thunk,
+    coercions: list[CoercionRecord] = []
+    cleaned, *_ = canonicalize(
+        frame,
+        ds.target,
+        datetime_columns(ds),
+        cfg.etl.missing_encodings,
+        {col: ds.columns[col].dtype for col in numeric_columns(ds)},
+        coercions=coercions,
     )
 
+    # the repair still happens exactly as before: post-coercion validation
+    # passes on the restored dtype (zero behavior change to outputs)
+    build_raw_schema(ds).validate(cleaned)
+    assert str(cleaned[flipped].dtype) == ds.columns[flipped].dtype
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "GAP features->training: pandera schemas are non-strict (extra columns "
-        "allowed), so the joined-loader collision class (re-merged frame with a "
-        "duplicate/extra column) survives the read guard. Future contract: strict "
-        "engineered schema + unique-column-name check at the loader merge."
-    ),
-)
+    # anti-vacuous: the evidence record names the exact column and dtype pair
+    record = next(r for r in coercions if r.column == flipped)
+    assert record.declared_dtype == "int64"
+    assert record.arriving_dtype == "float64"
+    assert record.rows_affected == len(frame)
+
+
 def test_gap_engineered_boundary_extra_column(tmp_path: Path) -> None:
+    """G2 converted (FIX_4): the engineered read path rejects columns outside
+    the declared surface (contract ∪ joined-lookup ∪ feature specs)."""
     cfg = load_config("train", dataset="test", experiment="baseline", analysis="test")
     cfg = cfg.model_copy(
         update={"environment": cfg.environment.model_copy(update={"data_dir": str(tmp_path)})}
@@ -432,6 +435,96 @@ def test_gap_engineered_boundary_extra_column(tmp_path: Path) -> None:
         (SchemaError,),
         lambda: training_module._load_features(cfg),
     )
+
+
+def test_joined_loader_rejects_pre_existing_lookup_suffix_collision(
+    tmp_path: Path,
+) -> None:
+    """NEW tripwire (FIX_4 G2): the 2026-08-23 incident shape at the joined-
+    loader boundary — raw frame carries BOTH ``Borough`` and ``Borough_lookup``
+    while the lookup contributes ``Borough`` (renamed to ``Borough_lookup`` by
+    the merge) — must raise ``SchemaError`` from the loader, not the accidental
+    deep failure the duplicate-label frame tripped inside ``audit_lookup_values``
+    (measured pre-fix: ``ValueError: cannot reindex on an axis with duplicate
+    labels`` on this exact shape)."""
+    cfg = load_config("etl", dataset="taxi", experiment="taxi")
+    ds = cfg.dataset
+    frame = _contract_frame(ds)
+    frame["pickup_datetime"] = pd.to_datetime("2024-01-01")  # contract datetime
+    frame["Borough"] = "x"
+    frame["Borough_lookup"] = "y"  # pre-existing _lookup column — incident shape
+    raw_path = tmp_path / "incident_raw.csv"
+    frame.to_csv(raw_path, index=False)
+
+    lookup_path = tmp_path / "zones.csv"
+    pd.DataFrame(
+        {
+            "LocationID": list(range(6)),
+            "Borough": ["A"] * 6,
+            "Zone": ["Z1"] * 6,
+            "service_zone": ["S1"] * 6,
+        }
+    ).to_csv(lookup_path, index=False)
+
+    ds = ds.model_copy(
+        update={
+            "path": str(raw_path),
+            "lookup_tables": {
+                "pickup_location_id": LookupSpec(path=str(lookup_path), key="LocationID")
+            },
+        }
+    )
+
+    _assert_loud(
+        "joined loader -> raw ingest",
+        "pre-existing 'Borough_lookup' collides with lookup 'Borough' renamed by the merge",
+        (SchemaError,),
+        lambda: load_with_audit(ds),
+    )
+
+
+def test_joined_loader_duplicate_label_error_names_all_collisions(
+    tmp_path: Path,
+) -> None:
+    """NEW tripwire (FIX_4 G2): TWO distinct lookup columns colliding in the
+    SAME merge — the SchemaError message must name ALL duplicated labels, not
+    just the first found."""
+    raw_path = tmp_path / "raw.csv"
+    pd.DataFrame(
+        {
+            "area": [1, 2, 3],
+            "price": [10, 20, 30],
+            "X": [1, 2, 3],
+            "X_lookup": ["a", "b", "c"],
+            "Y": [1, 2, 3],
+            "Y_lookup": ["d", "e", "f"],
+        }
+    ).to_csv(raw_path, index=False)
+
+    lookup_path = tmp_path / "lookup.csv"
+    pd.DataFrame({"LocationID": [1, 2, 3], "X": [4, 5, 6], "Y": [7, 8, 9]}).to_csv(
+        lookup_path, index=False
+    )
+
+    ds = DatasetContract(
+        name="collision",
+        path=str(raw_path),
+        target="price",
+        task=TaskType.REGRESSION,
+        datetime_column=None,
+        columns={
+            "area": ColumnSchema(dtype="int64", null_count=0, role=ColumnRole.FEATURE),
+            "price": ColumnSchema(dtype="int64", null_count=0, role=ColumnRole.TARGET),
+        },
+        lookup_tables={"area": LookupSpec(path=str(lookup_path), key="LocationID")},
+    )
+
+    with pytest.raises(SchemaError) as exc_info:
+        load_with_audit(ds)
+    message = str(exc_info.value)
+    assert "duplicate" in message
+    assert "X_lookup" in message
+    assert "Y_lookup" in message
 
 
 def test_gap_engineered_boundary_column_reorder(tmp_path: Path) -> None:
