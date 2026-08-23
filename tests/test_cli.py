@@ -10,11 +10,14 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 def _run(*args: str, **kwargs: object) -> subprocess.CompletedProcess[str]:
+    # timeout=150: a nested `uv run` must fail fast, never hang the suite
+    # (uv editable-rebuild probe stall incident 2026-08-23).
     return subprocess.run(
         ["uv", "run", "ds-pipeline", *args],
         capture_output=True,
         text=True,
         check=False,
+        timeout=150,
         **kwargs,
     )
 

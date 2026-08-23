@@ -62,6 +62,7 @@ def _run(*dirs: Path) -> subprocess.CompletedProcess[str]:
         capture_output=True,
         text=True,
         check=False,
+        timeout=150,  # fail fast instead of hanging on a uv probe stall (2026-08-23)
     )
 
 
