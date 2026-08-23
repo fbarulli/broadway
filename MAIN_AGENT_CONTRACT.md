@@ -59,16 +59,17 @@ Five mechanisms, chosen by risk and test-expressibility; they compose.
    reserved. Ambiguity outside the grant halts to an OPEN QUESTION. Defaults
    codified in `WORKER_CONTRACT.md`.
 4. **Assumption audit** — mandatory in every report, every tier (see §6).
-5. **Adversarial second agent.** High-blast-radius contracts (production data
-   paths, ingest/merge, infra): after implementation settles, a fresh
-   read-only reviewer attacks the diff hunting vacuous tests, silent behavior
-   change, unconsidered input classes; main agent arbitrates before
-   verification closes. REQUIRED for critical-path data/infra work.
+5. **Adversarial second agent.** After any implementation settles — EVERY
+   tier, no exceptions — a fresh read-only reviewer attacks the diff hunting
+   vacuous tests, silent behavior change, and unconsidered input classes; the
+   main agent arbitrates findings before verification closes and nothing
+   commits un-reviewed. Plan-level slates get their own red-team panel
+   (scope/necessity, sequencing/risk, fact-check) before execution.
 
 Selection guide: Micro/Medium keep the plain format (+ assumption audit);
 behavioral fixes prefer test-first; design-heavy/coupled tasks run two-phase;
-critical-path data/infra runs two-phase + adversarial reviewer + interactive
-human checkpoints at each decision point.
+every tier ends with the adversarial review of #5; critical-path data/infra
+adds interactive human checkpoints at each decision point.
 
 ## 5. Fact discipline (live checks beat frozen prose)
 
@@ -89,7 +90,8 @@ more reading `parse_numeric` than any checklist produced).
 
 - Acceptance checks: exact commands, expected exit codes/counts, evidence
   format to paste. A report without evidence is incomplete. Counts are exact —
-  no approximate pass conditions.
+  no approximate pass conditions. Every gate paste names its exact command
+  (D4).
 - Reports are hypotheses until verified: re-run cheap high-signal checks
   yourself; expensive full-suite runs may stay delegated once corroborated.
 - **Assumption audit:** every worker report contains ≥ 3 brief assertions
@@ -112,7 +114,7 @@ more reading `parse_numeric` than any checklist produced).
 - A worker finding the contract itself wrong verifies with evidence and reports
   the deviation — never silently complies, never silently improvises.
 - Read-only review agents may run in parallel and never commit; dispatch after
-  substantial work (adversarial pass REQUIRED on critical-path data/infra).
+  EVERY implementation (§4 #5 — universal, not tier-gated).
 - Periodically dispatch a read-only **landscape audit**: fresh context
   re-derives census/narrative from the tree and reports drift; never commits.
 
@@ -141,12 +143,14 @@ more reading `parse_numeric` than any checklist produced).
 
 ## 8. Proportional process
 
-- **Micro** (one-file tweaks): main agent directly; cheap checks + ruff.
+- **Micro** (one-file tweaks): main agent directly; cheap checks + ruff;
+  adversarial review for anything touching tracked surfaces beyond the edit's
+  own doc.
 - **Medium**: one worker, trimmed contract, main re-verifies cheap checks.
 - **Large** (platform/`src`, cross-cutting): full ceremony — template, all
-  gates, review agent after.
+  gates, adversarial reviewer after (universal rule).
 - **Critical** (production data paths, ingest/merge, infra): Large + two-phase
-  investigation + adversarial reviewer + human checkpoint per decision point.
+  investigation + interactive human checkpoint per decision point.
 
 ## 9. Pre-dispatch gate (non-negotiable)
 

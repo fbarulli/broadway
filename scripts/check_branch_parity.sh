@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
 # Branch parity gate — keep main and taxi's SHARED surface in lockstep.
 #
-# The repo has two branches with a deliberate split:
-#   * taxi  — working branch: platform + the NYC taxi demo (taxi configs,
-#             experiments/, project/, scratch docs, generated reports/).
-#   * main  — public platform branch: NO taxi content (synthetic demo only).
+# The repo has a deliberate split:
+#   * sklearn — the only active development line (MAIN_AGENT_CONTRACT.md §2);
+#             taxi fast-forwards to it after each green push; main is frozen
+#             until declared main-day.
 #
 # src/, tests/, demo/, scripts/, the synthetic-demo configs, and the deployment
-# files (k8s/, docker/, .github/) are meant to be IDENTICAL on both branches.
-# This script fails loudly the moment they drift — including deletions and
-# content changes — so a change made on one branch cannot silently diverge.
+# files (k8s/, docker/, .github/workflows/) are meant to be IDENTICAL on both
+# branches. This script fails loudly the moment they drift — including
+# deletions and content changes — so a change made on one branch cannot
+# silently diverge.
 #
 # Usage:
 #   scripts/check_branch_parity.sh          # check main vs taxi (current repo)

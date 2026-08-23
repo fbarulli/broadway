@@ -24,6 +24,9 @@ For every file that changes:
   functions, strategic logging only, catch only recoverable exceptions, YAML
   single source of truth, ~25-line single-responsibility functions, no dead
   code; step-0 hash gate; assumption audit; bounded-judgment grant).
+- Custody: workers run no git write operations. Exception: read-only git inspection
+  (rev-parse/status/diff/log) is allowed and expected; write operations
+  (add/commit/stash/branch/checkout/push) never.
 - Invariants: full suite green, no surface-ownership changes, no silent
   policy, backward compatibility.
 - OPEN/CLOSE tripwire: `git log --oneline -3` + `git status --porcelain` +

@@ -112,8 +112,8 @@ Historical record for anyone reading `git log` later; no action required.
 - `.git/rogue-archive/` holds earlier unauthorized patches (pre-commit
   vintage) — reference only, never apply.
 - Standing rules born from these incidents: main-agent-only push custody
-  (`MAIN_AGENT_CONTRACT.md` custody §3, verification §6),
-  pre-dispatch gate (§3d).
+  (`MAIN_AGENT_CONTRACT.md` custody preamble, verification §6),
+  pre-dispatch gate (§9).
 - **Era note (2026-08-23):** the sklearn line became the only active branch
   (taxi = pass-along; main frozen until declared main-day). A rogue worker's
   undisclosed edits and self-dispatched contracts were remediated by reset +

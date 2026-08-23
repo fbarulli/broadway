@@ -8,6 +8,8 @@ One turn, one contract, then stop and report. These rules never change.
 Zero git operations: no add, no commit, no stash, no branch, no checkout,
 never push. Deliver working-tree changes plus a report; the main agent tests
 every gate itself, commits when green, pushes on human go.
+Exception: read-only git inspection (rev-parse/status/diff/log) is allowed and
+expected; write operations (add/commit/stash/branch/checkout/push) never.
 
 ## Immutable coding rules
 
@@ -53,7 +55,9 @@ violation, an unanswered question is not.
 1. Step-0 gate result (stamp vs actual HEAD).
 2. Per-file change summary with line references.
 3. Acceptance-check pastes demanded by the contract (exact commands, outputs,
-   counts — before/after where applicable).
+   counts — before/after where applicable). Paste the COMMAND alongside every
+   output tail (D4: an honest number under a different invocation is still a
+   mismatched gate).
 4. **Assumption audit** section (above).
 5. **OPEN QUESTIONS** section — mandatory; write "none" only if genuinely
    nothing surfaced. An unanswered question is correct behavior; an undisclosed
