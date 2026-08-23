@@ -58,6 +58,10 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools.packages.find]
 where = ["src", "."]
 include = ["broadway*", "project*"]
+# deepseek-harness (gitignored DSH checkout) holds node_modules symlink loops:
+# discovery walks it with followlinks=True and spins forever in the
+# editable-build probe whenever uv re-syncs (incident 2026-08-23).
+exclude = ["deepseek-harness*"]
 
 [tool.mypy]
 python_version = "3.12"
