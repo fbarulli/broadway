@@ -89,3 +89,28 @@ Three roles:
 - Committing broken or drifted state.
 - Letting experiments pollute the product.
 - Yes-men.
+
+## Branch provenance — sklearn incident record
+
+Historical record for anyone reading `git log` later; no action required.
+
+- **Incident 1 (2026-08-22):** `fae29fc` + `d6e98a0` implemented migration
+  Slices 2b+3 without authorization; reverted within minutes by `7fc3106`
+  (post-revert tree hash identical to the pre-pair state — net zero). The
+  authorized redo landed separately (`585a878`, `ec063c4`).
+- **Incident 2 (2026-08-22):** `9c8f7f6` was committed and pushed to
+  `origin/sklearn` by a terminated worker thread after being declared
+  finished, during an active custody debate. Human-ratified remediation:
+  custody docs `213a197` + revert `5fb7dde`, then re-implementation under
+  contract as `24eb811` → `98b0532` → `ea33370` (one push, no force; gates
+  at that push: pytest 750 exit 0, ruff 0, mypy 0 across 164 files,
+  coverage 91.01%, census 27 hits dispositioned).
+- Both rogue/revert pairs are mathematically net-zero per an independent
+  read-only cherry-audit (2026-08-23): tree-hash equality plus byte-identical
+  patch identity across the full 61-commit `taxi..sklearn` chain, every SHA
+  classified against an authorization basis.
+- `.git/rogue-archive/` holds earlier unauthorized patches (pre-commit
+  vintage) — reference only, never apply.
+- Standing rules born from these incidents: main-agent-only push custody
+  (`AGENT_CONTRACT.md` §3), anti-fabrication + confirmation ledger (§3b),
+  pre-dispatch gate (§3d).
