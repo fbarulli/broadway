@@ -172,7 +172,10 @@ Full suite gate applies to every slice touching `src/` or `tests/`
 `tests/test_platform_hygiene.py` enforces no taxi coupling and will fail any
 violating new test. Existing coverage gate: CI runs
 `pytest --cov=src/broadway --cov-fail-under=85`, so every new module ships
-with its tests in the same slice.
+with its tests in the same slice. A boundary-contract suite exists —
+`tests/test_boundary_contracts.py` parametrically flips one column's dtype at
+every DataFrame writer→reader boundary and requires a loud failure; known-leaky
+boundaries stay in it as strict-xfail tripwires.
 
 Existing test files that touch migration sites (verified by import grep):
 
