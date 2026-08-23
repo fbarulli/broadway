@@ -10,7 +10,7 @@ Update freely; remove entries when done (git history is the record).
   hypothesis tests on the taxi data vs. tutorial continuation. Do not start
   until the specific direction is given.
 
-Standing rules live in `HANDOFF.md` / `AGENT_WORKER_CONTRACT.md` (config
+Standing rules live in `HANDOFF.md` / `WORKER_CONTRACT.md` (config
 files only, no env, no hardcoded values, data-agnostic `src/`, tests with
 every src change, fail loud, one logical change per commit).
 

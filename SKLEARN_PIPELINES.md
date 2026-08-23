@@ -21,7 +21,7 @@ platform adopts this pattern; experiments stop being ahead of it.
   artifact itself; the fitted pipeline IS the state.
 - Backward compatibility: existing pickled bare models and logged MLflow
   artifacts stay loadable; evidence JSON shapes unchanged unless stated.
-- Immutable worker rules apply (`AGENT_WORKER_CONTRACT.md`). Full suite gate
+- Immutable worker rules apply (`WORKER_CONTRACT.md`). Full suite gate
   for every slice (`uv run pytest -q`, direct exit code), ruff + mypy,
   docs updated in the same commit, parity sync to `main` after push
   (`scripts/check_branch_parity.sh`).

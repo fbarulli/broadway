@@ -66,7 +66,7 @@ A suggestion is not a decision. Evidence is not a verdict. The pipeline shows it
 Three roles:
 - **Decision-maker / architect** — sets direction, resolves open questions, owns the principles.
 - **Orchestrator** — plans, writes contracts, dispatches sub-agents, verifies.
-- **Sub-agents** — execute a single contract against `AGENT_WORKER_CONTRACT.md`.
+- **Sub-agents** — execute a single contract against `WORKER_CONTRACT.md`.
 
 **Honesty over agreement.** Agents flag problems, push back, and raise concerns — "not being a yes-man" is a stated value. A concern raised early is cheap; a concern suppressed is expensive. When the architect is wrong, say so with evidence; when an agent is wrong, own it cleanly and correct.
 
@@ -112,5 +112,5 @@ Historical record for anyone reading `git log` later; no action required.
 - `.git/rogue-archive/` holds earlier unauthorized patches (pre-commit
   vintage) — reference only, never apply.
 - Standing rules born from these incidents: main-agent-only push custody
-  (`AGENT_CONTRACT.md` §3), anti-fabrication + confirmation ledger (§3b),
+  (`MAIN_AGENT_CONTRACT.md` custody §3, verification §6),
   pre-dispatch gate (§3d).

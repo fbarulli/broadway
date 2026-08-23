@@ -1,25 +1,28 @@
-# AGENT_WORKER_CONTRACT.md — immutable worker rules
+# WORKER_CONTRACT.md — immutable subagent rules
 
-These rules never change. Apply them to every change, every time.
+Audience: every dispatched subagent (implementer, investigator, reviewer).
+One turn, one contract, then stop and report. These rules never change.
+
+## Custody
+
+Zero git operations: no add, no commit, no stash, no branch, no checkout,
+never push. Deliver working-tree changes plus a report; the main agent tests
+every gate itself, commits when green, pushes on human go.
+
+## Immutable coding rules
 
 - No hardcoded values.
-- ALWAYS present decisions to the user; NEVER decide unilaterally.
+- ALWAYS present decisions; NEVER decide unilaterally (see grant below).
 - Type hints on all public functions.
 - Strategic logging only (stage boundaries, results, errors; never inside loops).
 - Catch exceptions only when recoverable; let everything else bubble up.
 - YAML = single source of truth: no `get(key, default)`, no hardcoded values.
 - ~25-line functions; single responsibility; no dead/noise code.
-- Derive, don't maintain: never write state that can be computed at render
-  time (no caches, snapshots, or derived-status files) — compute from the
-  tree/records instead. The platform derives; it does not store derived state.
+- Derive, don't maintain: never store state that can be computed from the
+  tree/records at render time. The platform derives; it does not store
+  derived state.
 
-## Custody (supersedes any earlier commit-locally language)
-
-Workers run **zero git operations**: no add, no commit, no stash, no branch,
-no checkout, never push. Deliver working-tree changes plus a report; the main
-agent tests every gate itself, commits when green, pushes on human go.
-
-## Live fact-checking duty (added 2026-08-23)
+## Live fact-checking duty
 
 Facts stated in a brief are hypotheses conditioned on the tree it was written
 against — re-derive, don't trust:
@@ -29,7 +32,7 @@ against — re-derive, don't trust:
   before reading or acting on anything else in the brief.
 - **Re-verify ≥ 3 assertions** from the brief against live code before
   implementing; paste the commands + outputs into your report.
-- **Assumption audit (mandatory report section):** list those three
+- **Assumption audit (mandatory report section):** those three
   re-verifications PLUS at least one thing you checked that the brief never
   mentioned — a surprise, a neighboring hazard, an input class nobody named.
   "none" is almost never the honest answer.
@@ -45,3 +48,13 @@ surface, or anything a failing acceptance check depends on. Ambiguity outside
 the grant → OPEN QUESTION in the report; an undisclosed decision is a
 violation, an unanswered question is not.
 
+## Report format (every dispatch)
+
+1. Step-0 gate result (stamp vs actual HEAD).
+2. Per-file change summary with line references.
+3. Acceptance-check pastes demanded by the contract (exact commands, outputs,
+   counts — before/after where applicable).
+4. **Assumption audit** section (above).
+5. **OPEN QUESTIONS** section — mandatory; write "none" only if genuinely
+   nothing surfaced. An unanswered question is correct behavior; an undisclosed
+   decision is a violation.
