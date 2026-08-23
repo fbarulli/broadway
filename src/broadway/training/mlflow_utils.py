@@ -10,6 +10,7 @@ from typing import Any
 
 import mlflow
 import pandas as pd
+from mlflow.data.dataset_source_registry import get_registered_sources
 from mlflow.models import ModelSignature
 
 logger = logging.getLogger(__name__)
@@ -33,6 +34,12 @@ class ChampionArtifact:
     reason: str = ""
 
 _MLFLOW_FILE_STORE_ENV = "MLFLOW_ALLOW_FILE_STORE"
+
+# MLflow 3.15.1 registers LocalArtifactDatasetSource twice under the same
+# name, so resolving any local path string warns "interpreted in multiple
+# ways". We bypass resolve() by handing from_pandas an already-built
+# DatasetSource; this is the registry class name it must be looked up by.
+_LOCAL_ARTIFACT_SOURCE_NAME = "LocalArtifactDatasetSource"
 
 # Connection-refusal markers inside MLflow's wrapped error message. MLflow's
 # HTTP store wraps the underlying requests/urllib3 connection failure into a
@@ -94,7 +101,34 @@ def log_dataset(dataset_id: str, source_path: str, context: str = "train") -> No
     if not path.exists():
         logger.warning("dataset source not found, skipping lineage: %s", source_path)
         return
-    dataset = mlflow.data.from_pandas(pd.read_parquet(path), source=str(path))  # type: ignore[attr-defined]
+    df = pd.read_parquet(path)
+    # The duplicate-registration warning is bypassed by handing from_pandas an
+    # already-built DatasetSource. Integer columns in the recorded dataset
+    # schema warn as well and are re-declared float64 — not because they may
+    # carry missing values (the dtype trace proves the opposite: every int
+    # column is null-free by construction), but because this record is lineage
+    # metadata with no enforcement semantics: float64 is lossless there and
+    # avoids the hint at its second emission site without any suppression.
+    # This affects only the dataset lineage record — not the model artifact.
+    # mlflow's stub types registry items as the base DatasetSource while the
+    # registry returns concrete classes; Any bridges the stub.
+    sources: Any = get_registered_sources()
+    try:
+        local_source = next(
+            cls for cls in sources if cls.__name__ == _LOCAL_ARTIFACT_SOURCE_NAME
+        )
+    except StopIteration:
+        raise RuntimeError(
+            f"MLflow no longer registers {_LOCAL_ARTIFACT_SOURCE_NAME} — "
+            "update log_dataset to the current local-source class"
+        ) from None
+    # If mlflow ever registers two classes under this same name again, next()
+    # silently takes the first — accepted risk, because the name is only a
+    # disambiguation hint for an already-built source and any same-named local
+    # source resolves identically; revisit if mlflow's registry grows distinct
+    # classes sharing a name.
+    df = df.astype({col: "float64" for col in df.select_dtypes("integer").columns})
+    dataset = mlflow.data.from_pandas(df, source=local_source(str(path)))  # type: ignore[attr-defined]
     mlflow.log_input(dataset, context=context)
 
 
@@ -108,7 +142,7 @@ def log_model(model: Any, artifact_path: str, signature: ModelSignature | None =
     """
     info = mlflow.sklearn.log_model(
         model,
-        artifact_path,
+        name=artifact_path,  # mlflow 3.15 deprecates artifact_path in favor of name
         signature=signature,
         serialization_format=mlflow.sklearn.SERIALIZATION_FORMAT_CLOUDPICKLE,
     )

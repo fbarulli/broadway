@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import warnings
 from pathlib import Path
 
 import mlflow
@@ -123,7 +124,24 @@ def run(cfg: PipelineConfig) -> None:
             if improvement is not None:
                 mlflow.log_metric("baseline_improvement", improvement)
                 logger.info(f"train: improvement over {baseline_result.strategy} baseline = {improvement:.1%}")
-        signature = infer_signature(X_train, y_train)
+        # Every integer column reaching the signature is null-free by enforced
+        # pipeline construction: ETL keeps an int dtype only for null-free
+        # numeric columns (parse_numeric, and build_raw_schema rejects a
+        # float-with-NaN column against an int declaration); the datetime
+        # builders crash on nulls (astype(int)); the boolean-derived builders
+        # (is_weekend, same_group, ...) coerce nulls to 0. Declaring them
+        # float64 instead would break pyfunc schema enforcement for the
+        # pipeline's own int64 inputs, so the int signature is the accurate
+        # contract — hence the hint is a false alarm for this matrix, and the
+        # suppression is scoped (module mlflow.types.utils, message
+        # prefix-anchored) so it cannot swallow unrelated warnings.
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                message=r"Hint: Inferred schema contains integer column",
+                module=r"mlflow\.types\.utils",
+            )
+            signature = infer_signature(X_train, y_train)
         artifact_path = log_model(model, "model", signature=signature)
 
     result = result.model_copy(update={"artifact_path": artifact_path})
