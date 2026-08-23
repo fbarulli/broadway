@@ -45,7 +45,10 @@ def _assert_data_source_supported(cfg: PipelineConfig) -> None:
     etl for it fails loud instead of silently re-ingesting.
     """
     if cfg.experiment is None:
-        return
+        raise ValueError(
+            "etl requires an experiment binding: without one its output "
+            "would overwrite the raw input path declared by dataset.path"
+        )
     loader = cfg.experiment.data_source.loader
     if loader not in _RAW_INGEST_LOADERS:
         raise ValueError(

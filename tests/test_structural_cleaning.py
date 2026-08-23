@@ -385,3 +385,10 @@ def test_etl_data_source_loader_drives_step_eligibility() -> None:
         )
         with pytest.raises(ValueError, match="cannot run for data_source.loader"):
             etl_module._assert_data_source_supported(cfg.model_copy(update={"experiment": ref}))
+
+
+def test_etl_without_experiment_fails_loud() -> None:
+    cfg = load_config("etl", dataset="test")
+    assert cfg.experiment is None
+    with pytest.raises(ValueError, match="requires an experiment binding"):
+        etl_module.run(cfg)
