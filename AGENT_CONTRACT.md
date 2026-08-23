@@ -74,6 +74,10 @@ Development happens on `taxi`; the `main` split already happened, don't redo it.
 - **Anti-fabrication (ratified 2026-08-22):** worker reports claiming
   coordinator dialogue are unverified by default; ratification flows only
   human → main → brief.
+- **Confirmation ledger (ratified 2026-08-23):** every human-gated action
+  (push, merge, revert, out-of-routine dispatch) records who authorized it,
+  when, and via which channel, in the governing brief BEFORE execution. An
+  action without a ledger entry is treated as unratified.
 - **Deviation-scan:** report language like "refined/deliberate/adjusted" not
   present in the ratified spec = unratified decision → halt and report.
 - **Provenance-check:** audit the branch tip with `git log` alongside
@@ -113,6 +117,36 @@ The ceremony matches the task; overhead must not exceed the work.
 - **Large** (platform/`src` changes, new subsystems, cross-cutting refactors):
   full ceremony — `CONTRACT_TEMPLATE.md`, all gates, read-only review agent
   after.
+
+## 3d. Pre-dispatch gate (non-negotiable, ratified 2026-08-23)
+
+Nothing launches until all seven gates are green; the dispatcher records the
+checklist result in the governing brief before dispatch.
+
+1. **Decisions consolidated** — every open question has an explicit human
+   answer. No dispatch on partial ratification; refinements arriving
+   mid-flight queue for the next pass. Corrections for contract errors are
+   the exception: delivered as a numbered amendment through the SAME agent
+   thread, never silently.
+2. **Brief frozen first** — written to its file and versioned (v1/v2…),
+   byte-consistent with what was shown to the human; the dispatch references
+   the file, not chat memory.
+3. **Single-writer window declared** — one named owner per surface per
+   phase. The main agent touches nothing under a live worker until it
+   settles; post-settlement fixes go through the worker or are announced
+   before the main agent acts. Concurrent amend/rebase of one branch by two
+   writers is prohibited (2026-08-23 amend race).
+4. **Contract self-containment check** — complete edit list, complete
+   regenerated-artifact list, acceptance checks with evidence formats, halt
+   conditions, commit/push boundary, verified against the just-committed
+   tree (`CONTRACT_TEMPLATE.md`).
+5. **Dispatch plan stated** — which agents, worker vs read-only,
+   foreground/background, settle condition, who processes the result.
+6. **Registry discipline** — agent ids logged; each report processed exactly
+   once (duplicate deliveries acknowledged, not re-worked).
+7. **Post-settle protocol** — main agent independently re-verifies the cheap
+   high-signal checks itself, then presents evidence and the next decision
+   to the human; push/merge only after that.
 
 ## 4. Decisions
 
