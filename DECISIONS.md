@@ -70,3 +70,14 @@ FIX_3 `ca8c123` → FIX_4 `79ac26c` → governance `3ea88d1`/`c34710c`/`be34c30`
   trusts the handed model object — HC3_SE *and* CI_low/CI_high mislabel
   nonrobust fits whenever callers don't pre-fit cov_type="HC3". Fix derives HC3
   independently of input fit; landmine test added (plain-fit input ⇒ HC3 ≠ OLS).
+- **D15 proof-carrying wrapper layer REJECTED**: scoping agent mapped all nine
+  affected findings (T-bug-1, F1, F8/F11/F14/F16, T-bug-4, F4/F19) to
+  equal-safety direct fixes inside the existing idiom — pydantic parse
+  validation, pandera schemas derived from DatasetContract/LookupSpec,
+  config-threaded thresholds with required params (runners.py precedent).
+  mypy IS CI-enforced but only sees type structure, not construction-site
+  invariants, so wrappers would add a drift-prone second declaration surface
+  (contra D5/D6) and nothing else. Tier 3 fixes are written against the
+  existing machinery; new sub-finding adopted: stats/module.py silently skips
+  empty groups — min_rows_for_sampling exists in config but is unenforced at
+  the stats entry point.
