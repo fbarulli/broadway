@@ -1,4 +1,4 @@
-"""Shared paths, constants, and loader for causal_inference experiments.
+"""Shared paths, constants, and loader for more_modeling experiments.
 
 The sample is declared once in ``configs/sample/fare_prediction_1m.yaml``
 (seed/size/columns/filters/schema). Steps only consume the name — the sample

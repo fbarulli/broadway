@@ -1,4 +1,4 @@
-# causal_inference
+# more_modeling
 
 Purely statistical experiments on the named fare_prediction_1m sample.
 
@@ -8,4 +8,4 @@ Questions:
 2. Confidence interval for each feature-target correlation.
 3. Confidence interval for each feature effect/regression coefficient.
 
-Outputs live in: experiments/results/causal_inference/
+Outputs live in: experiments/results/more_modeling/
