@@ -1,10 +1,8 @@
 # SKLEARN_PIPELINES.md — migration plan: sklearn Pipelines throughout
 
 Goal: one composable, cloneable, loggable preprocessing+model object per
-experiment path. Today the platform has **zero** `sklearn.pipeline.Pipeline`
-usage in `src/broadway/`; preprocessing is hand-rolled in two custom
-`FeaturePipeline` classes and free functions, models are fit bare, and MLflow
-logs the bare model — so preprocessing does not travel with the artifact.
+experiment path. This document records the migration's decisions and
+standing criteria; the intro below is historical intent, not current state.
 
 Reference pattern already in-repo: `experiments/mlflow/_common.py::make_pipeline`
 (`ColumnTransformer` passthrough/one-hot + model) and `_pca_pipeline`. The
@@ -30,9 +28,9 @@ platform adopts this pattern; experiments stop being ahead of it.
 
 | Site | File | Current state |
 |---|---|---|
-| Trainer | `src/broadway/training/trainer.py::train` | fits bare registry model |
-| HPO | `src/broadway/training/hpo.py` (`make_objective`) | fits bare model per trial |
-| Model log/serve | `src/broadway/training/mlflow_utils.py::log_model`; `src/broadway/training/models/pyfunc_wrapper.py::ModelPyFunc` | logs/pickles bare model; caller must re-apply FeaturePipeline manually at inference |
+| Trainer | `src/broadway/training/trainer.py::train` | composes an sklearn `Pipeline` (preprocessing + model) |
+| HPO | `src/broadway/training/hpo.py` (`make_objective`) | composes an sklearn `Pipeline` (preprocessing + model) per trial |
+| Model log/serve | `src/broadway/training/mlflow_utils.py::log_model`; `src/broadway/training/models/pyfunc_wrapper.py::ModelPyFunc` | logs artifacts as Pipelines with explicit signature; `ModelPyFunc` stays the backward-compat loader for previously logged bare-model artifacts |
 | CV | `src/broadway/evaluate/validation.py::cross_validate` | manual KFold loop, `clone(model)` only — preprocessing outside folds would leak |
 | Platform features | `src/broadway/features/pipeline.py::FeaturePipeline` | fits/transforms sklearn `TargetEncoding` / `FrequencyEncoding` transformers (`features/transformers.py`), output value-pinned in tests |
 | Taxi binding | `project/ml_pipeline.py::FeaturePipeline` | deterministic features + merge-based target/frequency encodings + row-count guard |

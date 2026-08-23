@@ -183,9 +183,7 @@ broadway/
     cleaning/               # deterministic structural cleaning (representation only, no domain cleaning)
       models.py             # ParseFailure / StructuralCleanResult (typed evidence)
       structural.py         # standardize_missing / parse_datetime / parse_numeric
-    etl/                    # ingest (raw → processed) + config-driven etl pipeline step
-      process.py            # process_data(dataset): yellow_tripdata_*.parquet → training_data.parquet (contract-driven ingest step)
-      process_config.py     # reads configs/project/taxi.yaml + configs/step/etl.yaml
+    etl/                    # config-driven etl pipeline step
       module.py             # etl step: load_with_audit → canonicalize → validate → split → join/lookup_value lineage
     stats/                  # pandas/numpy stats library (no Spark)
       base.py               # stratified_sample
@@ -270,6 +268,9 @@ broadway/
       timeline.py           # render_timeline(...) -> reports/timeline.md (status table + per-step details)
       audit.py              # ds-pipeline audit: typed renderers -> reports/audit/{index,profile,transform,join,lookup_values}.md
   project/
+    etl/
+      process.py            # process_data(dataset): yellow_tripdata_*.parquet → training_data.parquet (contract-driven ingest step)
+      process_config.py     # reads configs/project/taxi.yaml + configs/step/etl.yaml
     features.py             # FEATURE_SPECS registry → ENGINEERED_FEATURES/types/schema
     ml_pipeline.py          # FeaturePipeline (taxi orchestration)
     basic.py, boroughs.py   # taxi datetime features + zone join
@@ -318,7 +319,7 @@ broadway/
 | `time_series.plot_acf(resid, ...)` | `plot_acf` | `src/broadway/stats/time_series.py` |
 | `baseline.train_lgbm(X, y, ...)` | `train_lgbm` | `src/broadway/stats/baseline.py` |
 | `baseline.evaluate(model, ...)` | `evaluate` | `src/broadway/stats/baseline.py` |
-| `etl.process.process_data(dataset)` | `process_data` | `src/broadway/etl/process.py` |
+| `etl.process.process_data(dataset)` | `process_data` | `project/etl/process.py` |
 | `reports.describe.render(summary)` | `render` | `src/broadway/reports/describe.py` |
 | `reports.describe.headline(summary)` | `headline` | `src/broadway/reports/describe.py` |
 | `reports.index.render_index(question, stats_dir)` | `render_index` | `src/broadway/reports/index.py` |
@@ -350,7 +351,7 @@ through ingest and the etl step:
 data/raw/yellow_tripdata_*.parquet
         │  ingest (process_data: Polars scan → CI-gated sample → clean → contract-validate → save)
         ▼
-data/processed/training_data.parquet     (~8.5M rows, 9 cols)
+data/processed/training_data.parquet
         │  etl (load_with_audit → canonicalize → validate → split)
         ├──▶ data/processed/<name>_join_audit.json           (JoinAudit)
         ├──▶ data/processed/<name>_lookup_value_audit.json   (LookupValueAudit)
@@ -443,13 +444,12 @@ artifact, and provenance.
 
 - The raw schema is generated at runtime from `DatasetContract.columns` — one `pa.Column` per contract entry (the raw 7 columns, not join-derived `pickup_borough`/`LocationID`). Dtypes are checked strictly (`coerce=False`); `null_count` is observed, not an invariant, so nullability is left at Pandera's default.
 - Role-based column selection is `broadway/contracts/selectors.py` (`feature_columns`, `datetime_columns`, `target_columns`) — pure functions over the contract, no hardcoded names.
-- Engineered features are defined ONCE in `project/features.py::FEATURE_SPECS`; `ENGINEERED_FEATURES`, `ENGINEERED_FEATURE_TYPES`, and `ENGINEERED_SCHEMA` are all derived from that registry (no parallel hand-maintained list).
-- Enforcement points: `read_training_data()` validates the raw frame via `build_raw_schema`; `FeaturePipeline.transform()` validates against `ENGINEERED_SCHEMA`.
+- Engineered-feature definitions: see `SKLEARN_PIPELINES.md` Decision 5 — the generic config-driven path is the SSOT; `FEATURE_SPECS` is demoted legacy.
 - `DatasetContract` is the accepted schema (authored/authoritative); `DatasetProfile` / `ColumnProfile` describe observed facts computed at discover time. `identifier_score` is purely descriptive — discover only logs a recommendation, it never mutates roles or the contract.
 - `DatasetContract` carries no `row_count` — observed counts live in `DatasetProfile` (discover) and `TransformAudit` (etl lineage). Datetime dtypes are normalized to canonical `datetime64` (`schema.py::normalize_dtype`).
 - Lookup ingestion reads lookups with `keep_default_na=False` plus a per-lookup `na_values` policy, so nulls are attributable to the authored config. `JoinAudit` measures key completeness, while `LookupValueAudit` measures matched-value quality and records the `na_values` evidence.
 - `broadway/data/loader.py::read_sample(dataset, sample, seed, columns, *, full)` is a seeded random draw of the dataset's raw parquet (lazy scan → optional column pruning → sample) — a fast experiment path that is NOT `DATA_MODE`-aware; the caller supplies `seed`. `project/data.py::read_training_sample` wraps it with the taxi `_contract` and `RANDOM_STATE`.
-- Experiment layout: scripts live under `experiments/<category>/<name>/`, outputs under the gitignored `experiments/results/<category>/<name>/`. Root-level `experiment_*.py` / `*_experiment/` dirs predating this convention are grandfathered (forward-only).
+- Experiment layout: scripts live under `experiments/<category>/<name>/`; `experiments/results/` CSV outputs are tracked (`.gitignore` negates `!experiments/results/**/*.csv`), non-CSV outputs stay ignored. Root-level `experiment_*.py` / `*_experiment/` dirs predating this convention are grandfathered (forward-only).
 
 ## Mode enforcement
 
