@@ -54,3 +54,19 @@ FIX_3 `ca8c123` → FIX_4 `79ac26c` → governance `3ea88d1`/`c34710c`/`be34c30`
 
 *Authorized for publication by the human operator via GUI session,
 2026-08-23 ("push the D1-D10 ... if its easier push on sklearn").*
+
+## D11–D13 — slate v5 rulings (ratified post-ADV-trio)
+- **D11 Tier-4 dead-code doctrine**: stub modules consolidate into INVENTORY.md
+  (name / one-line intent / why unbuilt) then delete stubs + dead fields in ONE
+  commit. Test-only exports and dead EnvironmentConfig fields: straight delete,
+  no inventory entry.
+- **D12 decision-moment leakage**: ENFORCE gating; drop dropoff_location_id from
+  the shipped taxi experiment surface. A contract layer silently overridden by
+  config teaches the wrong lesson; amend-the-contract is rejected absent a real
+  use-case change.
+- **D13 tier order**: Tier1 confirmed bugs → Tier2 config coherence (absorbs
+  B1/B2) → Tier3 data-gate hardening → Tier4 (post-D11) → Tier5 bulk.
+- **D14 T-bug-1 scope expansion (user spot-check)**: estimation_table() blindly
+  trusts the handed model object — HC3_SE *and* CI_low/CI_high mislabel
+  nonrobust fits whenever callers don't pre-fit cov_type="HC3". Fix derives HC3
+  independently of input fit; landmine test added (plain-fit input ⇒ HC3 ≠ OLS).
