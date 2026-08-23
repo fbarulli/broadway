@@ -37,7 +37,7 @@ platform adopts this pattern; experiments stop being ahead of it.
 | Platform features | `src/broadway/features/pipeline.py::FeaturePipeline` | fits/transforms sklearn `TargetEncoding` / `FrequencyEncoding` transformers (`features/transformers.py`), output value-pinned in tests |
 | Taxi binding | `project/ml_pipeline.py::FeaturePipeline` | deterministic features + merge-based target/frequency encodings + row-count guard |
 | Script consumer | `project/scripts/12_lgbm_baseline.py` | carries FeaturePipeline + model as two objects |
-| Experiments (hazard) | `experiments/causal_inference/05_joint_model_top10_zones.py`, `06_joint_model_time_of_day.py` | `pd.get_dummies` before split → train/test column-alignment hazard |
+| Experiments (hazard) | `experiments/more_modeling/05_joint_model_top10_zones.py`, `06_joint_model_time_of_day.py` | `pd.get_dummies` before split → train/test column-alignment hazard |
 | Experiments (correct) | `experiments/mlflow/_common.py` | Pipeline + ColumnTransformer — the reference |
 
 ## Target design
