@@ -6,8 +6,8 @@
 #             experiments/, project/, scratch docs, generated reports/).
 #   * main  — public platform branch: NO taxi content (synthetic demo only).
 #
-# src/, tests/, demo/, the synthetic-demo configs, and the deployment files
-# (k8s/, docker/, .github/) are meant to be IDENTICAL on both branches.
+# src/, tests/, demo/, scripts/, the synthetic-demo configs, and the deployment
+# files (k8s/, docker/, .github/) are meant to be IDENTICAL on both branches.
 # This script fails loudly the moment they drift — including deletions and
 # content changes — so a change made on one branch cannot silently diverge.
 #
@@ -54,7 +54,7 @@ SHARED=(
   .gitignore
   .dockerignore
   README.md
-  scripts/check_branch_parity.sh
+  scripts/
 )
 
 check() {
