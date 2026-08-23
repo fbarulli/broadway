@@ -176,7 +176,14 @@ violating new test. Existing coverage gate: CI runs
 with its tests in the same slice. A boundary-contract suite exists —
 `tests/test_boundary_contracts.py` parametrically flips one column's dtype at
 every DataFrame writer→reader boundary and requires a loud failure; known-leaky
-boundaries stay in it as strict-xfail tripwires.
+boundaries stay in it as strict-xfail tripwires. As of 2026-08-23 the READ side
+is enforced: `features/generic.py` builds an ORDERED pandera schema and the
+training/evaluate loaders validate every engineered frame on read (Contract H,
+`3db7b4b`); `taxi.yaml`'s include order matches the producer write order under
+a standing parity test (`tests/test_engineered_order_parity.py`, FIX_2,
+`3ee1ef5`); two gap classes remain strict-xfail pending the ratified Option-E
+closure contract (FIX_4: evidence-tagged coercion + unique-label merge guard) —
+live status in `FIXES.md`'s ledger.
 
 Existing test files that touch migration sites (verified by import grep):
 
@@ -316,8 +323,12 @@ mutable champion state are external-world coupling, not pipeline
 non-determinism. Whitelist SSOT: the EXACT/PATTERN table inside
 `scripts/check_e2e_determinism.sh` — the list above only points there.
 
-Known gaps (accepted as-is, no pipeline defect): the MLflow ambiguous
-dataset-source UserWarning is a third-party emission from `mlflow.types` /
-`dataset_source_registry`, not an sklearn pipeline issue. The optuna
-`ExperimentalWarning: heartbeat_interval` is likewise a deliberate opt-in to a
+Known gaps (as of 2026-08-23): the MLflow warning classes are RESOLVED
+(`c324583`, FIX_1) — the duplicate `LocalArtifactDatasetSource` registration is
+bypassed structurally via a pre-built DatasetSource through the public
+`get_registered_sources()` accessor, model logging uses `name=`, and the
+integer-column hint is suppressed ONLY at the `infer_signature` call site under
+an evidence comment (the hinted int columns are provably null-free; see the
+comment block in `training/module.py`). The optuna
+`ExperimentalWarning: heartbeat_interval` remains a deliberate opt-in to a
 used experimental feature — RDB dead-trial recovery depends on the heartbeat.

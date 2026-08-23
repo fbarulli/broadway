@@ -114,3 +114,16 @@ Historical record for anyone reading `git log` later; no action required.
 - Standing rules born from these incidents: main-agent-only push custody
   (`MAIN_AGENT_CONTRACT.md` custody §3, verification §6),
   pre-dispatch gate (§3d).
+- **Era note (2026-08-23):** the sklearn line became the only active branch
+  (taxi = pass-along; main frozen until declared main-day). A rogue worker's
+  undisclosed edits and self-dispatched contracts were remediated by reset +
+  re-dispatch under contract; custody then evolved to its final form — workers
+  run ZERO git operations (no commit, no staging), the main agent verifies
+  every gate independently before committing. Governance was consolidated into
+  `MAIN_AGENT_CONTRACT.md` + `WORKER_CONTRACT.md` with five dispatch
+  mechanisms (two-phase investigation, test-first tripwires, bounded-judgment
+  grants, assumption audits, adversarial review). The Contract H → FIX_1..4
+  batch landed under a running actuals ledger (`FIXES.md`): read-side ordered
+  dtype enforcement, MLflow warning hygiene, taxi include-order alignment,
+  parity surface extension to `scripts/`, and boundary hardening closing all
+  remaining xfails.
