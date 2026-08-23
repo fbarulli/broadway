@@ -13,6 +13,12 @@ guard the case turns XPASS and the suite goes red, forcing the xfail to be
 converted into a real assertion. Every xfail reason names the boundary and the
 suggested future contract.
 
+Tripwire ledger (current): 8 strict-xfail tripwires, of which 6 are now
+converted into real assertions by the read-side engineered contract (CONTRACT
+H) — the 4 engineered-read dtype flips on B3/B4 plus the column-reorder and
+target-dtype gaps — and 2 remain xfail: the raw→canonical int/float coercion
+mask (G1) and the extra-column strictness gap (G2).
+
 Boundary map (writer → reader; who declares / produces / validates today):
 
   B1 raw source -> etl canonical   (etl/module.py:95)  declares: dataset YAML
@@ -227,15 +233,6 @@ def test_split_to_features_boundary_rejects_dtype_mutation(tmp_path: Path) -> No
             training_module._load_features,
             0,
             id="train_features_feature_1",
-            marks=pytest.mark.xfail(
-                strict=True,
-                reason=(
-                    "GAP engineered-read: training._load_features does not validate "
-                    "dtype on read at the ratified base (24e12a6); the flip survives "
-                    "silently. Future contract: enforce engineered schema on read "
-                    "(draft exists in reflog 27b2570)."
-                ),
-            ),
         ),
         pytest.param(
             "features -> training (train_features read guard)",
@@ -244,15 +241,6 @@ def test_split_to_features_boundary_rejects_dtype_mutation(tmp_path: Path) -> No
             training_module._load_features,
             1,
             id="train_features_feature_2",
-            marks=pytest.mark.xfail(
-                strict=True,
-                reason=(
-                    "GAP engineered-read: training._load_features does not validate "
-                    "dtype on read at the ratified base (24e12a6); the flip survives "
-                    "silently. Future contract: enforce engineered schema on read "
-                    "(draft exists in reflog 27b2570)."
-                ),
-            ),
         ),
         pytest.param(
             "features -> evaluate (val_features read guard)",
@@ -261,15 +249,6 @@ def test_split_to_features_boundary_rejects_dtype_mutation(tmp_path: Path) -> No
             evaluate_module._load_val_features,
             0,
             id="val_features_feature_1",
-            marks=pytest.mark.xfail(
-                strict=True,
-                reason=(
-                    "GAP engineered-read: evaluate._load_val_features does not "
-                    "validate dtype on read at the ratified base (24e12a6); the flip "
-                    "survives silently. Future contract: enforce engineered schema "
-                    "on read (draft exists in reflog 27b2570)."
-                ),
-            ),
         ),
         pytest.param(
             "features -> evaluate (val_features read guard)",
@@ -278,15 +257,6 @@ def test_split_to_features_boundary_rejects_dtype_mutation(tmp_path: Path) -> No
             evaluate_module._load_val_features,
             1,
             id="val_features_feature_2",
-            marks=pytest.mark.xfail(
-                strict=True,
-                reason=(
-                    "GAP engineered-read: evaluate._load_val_features does not "
-                    "validate dtype on read at the ratified base (24e12a6); the flip "
-                    "survives silently. Future contract: enforce engineered schema "
-                    "on read (draft exists in reflog 27b2570)."
-                ),
-            ),
         ),
     ],
 )
@@ -392,9 +362,13 @@ def test_named_sample_boundary_rejects_source_dtype_mutation(
 
 
 # --------------------------------------------------------------------------- #
-# GAP FINDINGS — no loud failure exists today; strict-xfail tripwires track
-# them so the day a guard lands, the suite turns red (XPASS) instead of
-# silently absorbing the drift. See CONTRACT_G report for the full gap table.
+# REMAINING GAP FINDINGS — no loud failure exists today for these two;
+# strict-xfail tripwires track them so the day a guard lands, the suite turns
+# red (XPASS) instead of silently absorbing the drift. The column-reorder and
+# target-dtype gaps were closed by the read-side engineered contract
+# (engineered_schema_for + validate_target_dtype on the training/evaluate
+# feature reads) and run below as real assertions. See CONTRACT_G report for
+# the full gap table.
 # --------------------------------------------------------------------------- #
 
 
@@ -460,15 +434,6 @@ def test_gap_engineered_boundary_extra_column(tmp_path: Path) -> None:
     )
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "GAP features->training: pandera schemas are unordered, and "
-        "eligible_feature_columns preserves frame order, so a train/val column "
-        "REORDER silently remaps features at predict. Future contract: ordered "
-        "engineered schema (ordered=True) across train and val reads."
-    ),
-)
 def test_gap_engineered_boundary_column_reorder(tmp_path: Path) -> None:
     cfg = load_config("train", dataset="test", experiment="baseline", analysis="test")
     cfg = cfg.model_copy(
@@ -489,15 +454,6 @@ def test_gap_engineered_boundary_column_reorder(tmp_path: Path) -> None:
     )
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "GAP features->training: the engineered schema covers only feature "
-        "columns — a target dtype drift (declared int64, emitted float64) reaches "
-        "the model surface silent. Future contract: validate the target column's "
-        "declared dtype at the training/evaluate feature reads."
-    ),
-)
 def test_gap_target_dtype_flip_through_training(tmp_path: Path) -> None:
     cfg = load_config("train", dataset="test", experiment="baseline", analysis="test")
     cfg = cfg.model_copy(

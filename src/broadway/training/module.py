@@ -15,6 +15,7 @@ from broadway.baseline.module import load_persisted
 from broadway.config.schema import PipelineConfig
 from broadway.data.splitter import split
 from broadway.evaluate.metrics import compute_metrics
+from broadway.features.generic import validate_engineered_frame
 from broadway.lineage.ids import node_id
 from broadway.lineage.records import write_record
 from broadway.training.hpo import run_hpo
@@ -40,6 +41,12 @@ def _load_features(cfg: PipelineConfig) -> tuple[pd.DataFrame, pd.DataFrame | No
     train_df = pd.read_parquet(out_dir / cfg.etl.train_features_file)
     val_path = out_dir / cfg.etl.val_features_file
     val_df = pd.read_parquet(val_path) if val_path.exists() else None
+    # Re-enforce the engineered-feature contract on read (same SSOT the
+    # features step writes with): a dtype, column-order, or target-dtype drift
+    # in the persisted file must fail loud here, not surface mid-training.
+    validate_engineered_frame(cfg, train_df)
+    if val_df is not None:
+        validate_engineered_frame(cfg, val_df)
     return train_df, val_df
 
 

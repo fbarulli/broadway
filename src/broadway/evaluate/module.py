@@ -23,6 +23,7 @@ from broadway.evaluate.contracts import BaselineComparison, EvaluationResult
 from broadway.evaluate.metrics import compute_metrics
 from broadway.evaluate.promotion import should_promote
 from broadway.evaluate.validation import cross_validate, residual_summary
+from broadway.features.generic import validate_engineered_frame
 from broadway.lineage.ids import node_id
 from broadway.lineage.records import write_record
 from broadway.training.contracts import TrainingResult
@@ -46,6 +47,7 @@ def _load_val_features(cfg: PipelineConfig) -> tuple[pd.DataFrame, pd.Series]:
             f"validation features not found: {val_path} — evaluate requires a held-out set"
         )
     val_df = pd.read_parquet(val_path)
+    validate_engineered_frame(cfg, val_df)
     assert cfg.dataset is not None
     return eligible_feature_columns(val_df, cfg), val_df[cfg.dataset.target]
 
@@ -54,6 +56,7 @@ def _load_train_features(cfg: PipelineConfig) -> tuple[pd.DataFrame, pd.Series]:
     assert cfg.etl is not None and cfg.dataset is not None
     out_dir = _processed_dir(cfg)
     train_df = pd.read_parquet(out_dir / cfg.etl.train_features_file)
+    validate_engineered_frame(cfg, train_df)
     assert cfg.dataset is not None
     return eligible_feature_columns(train_df, cfg), train_df[cfg.dataset.target]
 
