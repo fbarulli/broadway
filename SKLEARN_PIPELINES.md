@@ -164,6 +164,7 @@ Acceptance pins: after repoint, the inverse census (numeric runtime columns
 − schema-module-declared − target) is empty for every shipped experiment;
 the assertion fires with the exact named-column message for
 categorical-in-schema-without-step; explicit recipe columns bypass.
+Parity contract (FIX_2): an experiment's `features.include` order must equal the features-step producer write order — enforced by `tests/test_engineered_order_parity.py` (the config aligns to the producer; never the reverse).
 
 ## Test-suite impact
 

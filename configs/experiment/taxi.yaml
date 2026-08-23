@@ -3,10 +3,10 @@ data_source:
   schema_contract: engineered
 features:
   include:
-    - pickup_location_id
     - dropoff_location_id
-    - trip_distance
     - passenger_count
+    - pickup_location_id
+    - trip_distance
   exclude: []
   derived:
     - name: pickup_hour
