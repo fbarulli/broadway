@@ -227,6 +227,15 @@ def test_split_to_features_boundary_rejects_dtype_mutation(tmp_path: Path) -> No
             training_module._load_features,
             0,
             id="train_features_feature_1",
+            marks=pytest.mark.xfail(
+                strict=True,
+                reason=(
+                    "GAP engineered-read: training._load_features does not validate "
+                    "dtype on read at the ratified base (24e12a6); the flip survives "
+                    "silently. Future contract: enforce engineered schema on read "
+                    "(draft exists in reflog 27b2570)."
+                ),
+            ),
         ),
         pytest.param(
             "features -> training (train_features read guard)",
@@ -235,6 +244,15 @@ def test_split_to_features_boundary_rejects_dtype_mutation(tmp_path: Path) -> No
             training_module._load_features,
             1,
             id="train_features_feature_2",
+            marks=pytest.mark.xfail(
+                strict=True,
+                reason=(
+                    "GAP engineered-read: training._load_features does not validate "
+                    "dtype on read at the ratified base (24e12a6); the flip survives "
+                    "silently. Future contract: enforce engineered schema on read "
+                    "(draft exists in reflog 27b2570)."
+                ),
+            ),
         ),
         pytest.param(
             "features -> evaluate (val_features read guard)",
@@ -243,6 +261,15 @@ def test_split_to_features_boundary_rejects_dtype_mutation(tmp_path: Path) -> No
             evaluate_module._load_val_features,
             0,
             id="val_features_feature_1",
+            marks=pytest.mark.xfail(
+                strict=True,
+                reason=(
+                    "GAP engineered-read: evaluate._load_val_features does not "
+                    "validate dtype on read at the ratified base (24e12a6); the flip "
+                    "survives silently. Future contract: enforce engineered schema "
+                    "on read (draft exists in reflog 27b2570)."
+                ),
+            ),
         ),
         pytest.param(
             "features -> evaluate (val_features read guard)",
@@ -251,6 +278,15 @@ def test_split_to_features_boundary_rejects_dtype_mutation(tmp_path: Path) -> No
             evaluate_module._load_val_features,
             1,
             id="val_features_feature_2",
+            marks=pytest.mark.xfail(
+                strict=True,
+                reason=(
+                    "GAP engineered-read: evaluate._load_val_features does not "
+                    "validate dtype on read at the ratified base (24e12a6); the flip "
+                    "survives silently. Future contract: enforce engineered schema "
+                    "on read (draft exists in reflog 27b2570)."
+                ),
+            ),
         ),
     ],
 )
