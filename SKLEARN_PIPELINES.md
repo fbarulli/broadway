@@ -301,7 +301,8 @@ identical across identical invocations — all metric values, `cv_metrics`
 values, and params. Only volatile-by-design fields, compared by name, are
 excluded from byte-equality: `trace.created_at`
 (`artifacts/baseline/baseline.json`); the MLflow-generated `artifact_path`
-`models:/m-<id>` (`artifacts/training/training_result.json`); the
+`models:/m-<id>` and the wall-clock `train_time_seconds` (training duration;
+machine-dependent by nature) (`artifacts/training/training_result.json`); the
 champion-registry state fields `promote`, `reason`,
 `comparison.metrics.*.{champion,delta,delta_pct}`, `warnings`
 (`artifacts/evaluation/metrics.json`; the delta pair is champion-derived —

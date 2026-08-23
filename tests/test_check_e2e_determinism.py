@@ -153,3 +153,35 @@ def test_missing_counterpart_file_is_reported(tmp_path: Path) -> None:
     result = _run(run1, run2)
     assert result.returncode == 1
     assert "training/training_result.json: missing counterpart" in result.stdout
+
+
+def test_train_time_seconds_whitelisted(tmp_path: Path) -> None:
+    run1 = tmp_path / "run1"
+    run2 = tmp_path / "run2"
+    _write_tree(
+        run1,
+        {
+            "evaluation/metrics.json": _BASE,
+            "training/training_result.json": {
+                "model_type": "linear",
+                "params": {"alpha": 1.0},
+                "train_time_seconds": 156.0,
+                "artifact_path": "models:/m-one",
+            },
+        },
+    )
+    _write_tree(
+        run2,
+        {
+            "evaluation/metrics.json": _BASE,
+            "training/training_result.json": {
+                "model_type": "linear",
+                "params": {"alpha": 1.0},
+                "train_time_seconds": 161.0,
+                "artifact_path": "models:/m-one",
+            },
+        },
+    )
+    result = _run(run1, run2)
+    assert result.returncode == 0
+    assert "DETERMINISM OK" in result.stdout

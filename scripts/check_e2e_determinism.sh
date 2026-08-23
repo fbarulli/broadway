@@ -9,7 +9,7 @@
 # Core mode walks both artifact trees and compares every JSON pair after
 # canonical normalization (parsed and re-dumped with sorted keys). Only the
 # volatile-by-design fields named in the doc are excluded from equality:
-#   trace.created_at  artifact_path  promote  reason  warnings
+#   trace.created_at  artifact_path  train_time_seconds  promote  reason  warnings
 #   comparison.metrics.<metric>.{champion,delta,delta_pct}
 # (delta/delta_pct are champion-derived state — identical invocations against
 # a stale champion differ in them by design; verified live via --run.)
@@ -42,7 +42,7 @@ import sys
 # criteria"): timestamps, MLflow-assigned URIs, champion-registry state.
 # delta/delta_pct join champion: they are derived from the mutable champion,
 # so identical invocations against different registry state differ in them.
-EXACT = {"trace.created_at", "artifact_path", "promote", "reason", "warnings"}
+EXACT = {"trace.created_at", "artifact_path", "train_time_seconds", "promote", "reason", "warnings"}
 PATTERN = re.compile(r"comparison\.metrics\.[^.]*\.(champion|delta|delta_pct)")
 
 
