@@ -2,7 +2,10 @@
 
 This is the one file that defines how the main agent and its sub-agents operate.
 Ask your questions in output, alongside the rest of your observations. always ask questions if you have them.
-Always commit all changes after every change.
+**Custody (supersedes all earlier worker-commit language, ratified 2026-08-23):**
+workers never commit and never stage — they deliver working-tree changes plus a
+report; the main agent runs every gate itself, commits only when all are green,
+and pushes (per-push human go unless the human authorized the batch).
 
 ## 1. What Broadway is
 
@@ -14,11 +17,13 @@ Working directory: `/home/opc/ONE/broad-way`.
 
 ## 2. Branches
 
-- **`taxi`** — active dev/demo branch. **ALL code work happens here.**
-- **`main`** — public-facing platform branch (README + BROADWAY.md only, no scratch).
+- **`sklearn`** — the project home and the ONLY active line. All code work
+  happens here (supersedes the earlier taxi-first rule, ratified 2026-08-23).
+- **`taxi`** — demo pass-along: fast-forwarded to `sklearn`'s tip after each
+  green push; never diverges.
+- **`main`** — frozen until the human declares main-day. Sync then uses the
+  parity checker (`scripts/check_branch_parity.sh`) with its full surface.
 - **`broadway`** — stale/legacy. Do not touch.
-
-Development happens on `taxi`; the `main` split already happened, don't redo it.
 
 ## 3. Delegation (non-negotiable)
 - **ALWAYS present decisions to the user; NEVER decide unilaterally.**
@@ -27,12 +32,13 @@ Development happens on `taxi`; the `main` split already happened, don't redo it.
   (file cleanup/moves, `.gitignore` edits, doc edits).
 - The main agent only: **plans**, writes precise agent contracts, dispatches the
   right number of agents, and **surfaces decisions** to the user.
-- Agents (Task tool, `subagent_type="general"`) implement, run the full suite,
-  fix failures, then **commit locally** — workers NEVER push to origin. Only
-  the main agent pushes, after independently verifying the worker's gate
-  evidence (exit codes, counts, `git status`, `git log`, empty
-  `git diff --cached`). Ratified by the human 2026-08-22 after the
-  unauthorized `9c8f7f6` push by a terminated worker thread.
+- Agents (Task tool, `subagent_type="general"`) implement and REPORT — they run
+  **no git operations whatsoever** (no add, no commit, no stash, no branch,
+  never push). The main agent independently verifies the gate evidence (exit
+  codes, counts, `git status`, `git log`, empty `git diff --cached`), commits
+  only when all green, then pushes. Ratified 2026-08-22 after the unauthorized
+  `9c8f7f6` push by a terminated worker thread; worker-commit language
+  elsewhere in history is superseded.
 - Break work into small, single-purpose agent tasks with SHORT instructions (no
   long monolithic contracts). Every agent instruction must carry the immutable
   worker rules from `AGENT_WORKER_CONTRACT.md` (or a hard reference to it).
@@ -61,6 +67,64 @@ Development happens on `taxi`; the `main` split already happened, don't redo it.
   shared evidence/config/renderer contracts, no symbol-renaming refactor.
 - When a deferred item is completed and verified, **remove** it from the queue;
   git history is the record — no inline `DONE` markers.
+
+### 3a-1. Fact discipline (live checks beat frozen prose)
+
+Prose facts are snapshots that go stale the moment the tree moves. The
+2026-08-23 FIX-brief cycle proved it: hand-derived measurements were
+unrepresentative (a "verified" pass on two typed artifacts hid that genuine CSV
+sources fail three ways), and a reviewer caught more by reading `parse_numeric`
+than any checklist produced. Therefore:
+
+- **A brief's stated facts are hypotheses until re-derived at run time.**
+  Contracts prefer *executable checks whose output is pasted* over *stated
+  measurements*. Where a measurement must be cited, label it historical and
+  pair it with the live command that re-derives it.
+- **Step-0 hash gate (mandatory, every dispatch):** the worker's first action is
+  `git rev-parse --short HEAD` against the dispatch stamp written by the main
+  agent. Mismatch → STOP before reading any further fact — every fact in a
+  brief is conditioned on the exact tree it was verified against.
+- **Running ledger:** when a batch of contracts chains (each landing changes
+  the next one's baseline), the governing index file carries an actuals-only
+  ledger; any actual ≠ projected halts the queue until reconciled.
+- Worker reports must include an **assumption audit**: at least three brief
+  assertions re-verified against live code with commands + outputs, and at
+  least one thing checked that the brief never mentioned. A report without this
+  section is incomplete.
+
+### 3a-2. Dispatch architectures — pick per task
+
+Five mechanisms, chosen by risk and test-expressibility; they compose.
+
+1. **Two-phase (investigate → implement).** For anything design-heavy or with
+   hidden coupling: Phase A is a read-only investigator answering pointed,
+   written questions against live code AT DISPATCH TIME, producing a dated fact
+   sheet; Phase B's implementer brief cites that sheet instead of frozen prose.
+   Collapses staleness to minutes and removes hand-derivation burden from the
+   main agent. The human reviews the short fact sheet, not a long brief.
+2. **Test-first (the suite as spec).** When a fix can be expressed as a failing
+   test, land the tripwire FIRST as its own tiny contract; the implementation
+   contract then reduces to "make these tests pass, touch nothing else." The
+   strict-xfail boundary suite already works this way (tripwires forced
+   Contract H). Prefer this over edit lists wherever a tripwire can be written.
+3. **Bounded-judgment grants.** Replaces blanket zero-judgment where risk
+   allows: the contract enumerates judgment DOMAINS the worker MAY exercise
+   (internal naming, decomposition within size limits, fixture mechanics,
+   comment wording) plus the acceptance properties that must hold. Scope,
+   behavior/policy, public surfaces, schema/config semantics, and other owners'
+   surfaces stay reserved. Ambiguity outside the grant still halts to an OPEN
+   QUESTION. Default grants are codified in `AGENT_WORKER_CONTRACT.md`.
+4. **Assumption audit** — mandatory in every report, every tier (see 3a-1).
+5. **Adversarial second agent.** For high-blast-radius contracts (production
+   data paths, ingest/merge logic, auth/infra): after implementation settles, a
+   fresh read-only reviewer attacks the diff hunting for vacuous tests, silent
+   behavior change, and unconsidered input classes; the main agent arbitrates
+   findings before verification closes.
+
+Selection guide: **Micro/Medium** tasks keep the plain format (+ assumption
+audit); **behavioral fixes** prefer test-first; **design-heavy or coupled**
+tasks run two-phase; **critical-path data/infra** runs two-phase + adversarial
+reviewer + interactive human checkpoints at each decision point.
 
 ## 3b. Verification (evidence, not claims)
 
@@ -95,7 +159,9 @@ Development happens on `taxi`; the `main` split already happened, don't redo it.
   evidence and report the deviation — never silently comply with a broken spec,
   never silently improvise.
 - After substantial or risky work, dispatch a read-only review agent
-  (`subagent_type="explore"`) to audit the change and report findings.
+  (`subagent_type="explore"`) to audit the change and report findings — for
+  critical-path data/infra contracts this adversarial pass is REQUIRED, not
+  optional (§3a-2 #5).
 - Every contract follows `CONTRACT_TEMPLATE.md` — the skeleton is mandatory
   (task, complete edit list, constraints, acceptance checks with evidence
   format, commit/push). A contract the worker has to interpret is incomplete.
@@ -258,4 +324,4 @@ cd /home/opc/ONE/broad-way && uv run pytest -q
   `report`, `lineage`, `profile`, `discover`, `init`, ...).
 - `uv run python -m project.scripts.NN_name` — taxi analysis scripts.
 - Agents: Task tool, `subagent_type="general"`, contract per tier (§3c);
-  commit locally, never push — main agent verifies, then pushes.
+  workers run no git operations at all — main agent verifies, commits, pushes.
