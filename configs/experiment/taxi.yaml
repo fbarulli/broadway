@@ -30,6 +30,9 @@ features:
     - name: same_borough
       func: same_group
       source: pickup_location_id
+  builder_params:
+    group_col: Borough
+    lookup_col: Borough_lookup
   encodings:
     - type: target
       columns:

@@ -8,6 +8,7 @@ from pydantic import ValidationError
 
 from broadway.config.loader import load_config
 from broadway.config.schema import (
+    BuilderParams,
     DataSourceRef,
     ExperimentConfig,
     FeatureConfig,
@@ -335,3 +336,41 @@ def test_preprocessing_step_extra_fields_forbidden() -> None:
             preprocessing=[{"type": "one_hot", "columns": ["rooms"], "extra": 1}],
             **_experiment_kwargs(),
         )
+
+
+def test_experiment_builder_params_round_trip_from_yaml() -> None:
+    raw = yaml.safe_load(
+        """
+        data_source:
+          loader: canonical
+          schema_contract: raw
+        features:
+          include: [rooms]
+          exclude: []
+          derived: []
+          encodings: []
+          builder_params:
+            group_col: Borough
+            lookup_col: Borough_lookup
+        model:
+          type: linear
+          params: {}
+        split:
+          type: random
+          validation_size: 0.2
+        random_state: 42
+        target_metric: rmse
+        """
+    )
+    config = ExperimentConfig(**raw)
+    assert config.features.builder_params == BuilderParams(
+        group_col="Borough", lookup_col="Borough_lookup"
+    )
+
+
+def test_feature_config_builder_params_absent_is_none() -> None:
+    config = ExperimentConfig(
+        data_source=DataSourceRef(loader="canonical", schema_contract="raw"),
+        **_experiment_kwargs(),
+    )
+    assert config.features.builder_params is None

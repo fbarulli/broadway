@@ -144,10 +144,15 @@ schema-module extension needed:
   contradiction of the dataset contract float64 — a dtype-correctness
   failure on its own terms, independent of reachability. The taxi home is
   settled twice over: reachability + dtype-correctness.
-Sequenced-after (separate contract, NOT this decision): taxi's generic
-features step aborts at `same_borough` (`same_group` requires
-`group_col`/`lookup_col`; taxi.yaml supplies neither and generic defaults
-are `group`/`group_lookup`). The pointer repoint does NOT unblock taxi.
+Resolved (CONTRACT S): multi-input builder inputs are config-declared —
+`FeatureConfig.builder_params` (`group_col`, `lookup_col`) forwards to
+`build_derived`, whose signature stays the single source of the generic
+defaults (`group`/`group_lookup`). Taxi declares
+`group_col: Borough` / `lookup_col: Borough_lookup` against the joined
+frame, so `same_borough` executes. `same_group` output is int64 (vs legacy
+int8) — a deliberate re-baseline; sentinel semantics are inherited
+unchanged (observed evidence, not normalized): `NaN==NaN -> 0`,
+`"Unknown"=="Unknown" -> 1`.
 Category-match semantics pinned to observed variance: numeric-category
 matching over runtime dtypes {int32, int64, float64} — int32 vs int64 is
 legitimate observed variance (taxi/base). No float32, no nullable

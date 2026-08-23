@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Any
 
 import pandas as pd
 
@@ -32,7 +33,19 @@ class FeaturePipeline:
 
     def transform(self, df: pd.DataFrame, cfg: FeatureConfig, target: str, freq_fill: float) -> pd.DataFrame:
         result = df.copy()
-        result = build_derived(result, cfg.derived, target, extra_builders=load_custom_builders(cfg.builder_module))
+        builder_kwargs: dict[str, Any] = {}
+        if cfg.builder_params is not None:
+            builder_kwargs = {
+                "group_col": cfg.builder_params.group_col,
+                "lookup_col": cfg.builder_params.lookup_col,
+            }
+        result = build_derived(
+            result,
+            cfg.derived,
+            target,
+            extra_builders=load_custom_builders(cfg.builder_module),
+            **builder_kwargs,
+        )
         for encoder in self._freq_encoders:
             result = encoder.transform(result, fill=freq_fill)
         for encoder in self._target_encoders:

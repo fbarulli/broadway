@@ -335,7 +335,7 @@ uv run pytest              # library (synthetic) + data layer (real .head(1000)/
 ```
 configs/
   dataset/<name>.yaml      # per-dataset schema (columns, dtypes, target, task)
-  experiment/<name>.yaml   # features, model, split, metric
+  experiment/<name>.yaml   # features (+ optional builder_params), model, split, metric
   environment/<name>.yaml  # development / staging / production
   step/<step>.yaml         # per-step knobs + stats/train/features SSOT
   flow/<mode>.yaml         # mode-specific step lists (prediction/hypothesis/causal)

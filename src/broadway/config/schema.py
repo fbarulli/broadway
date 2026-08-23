@@ -91,12 +91,20 @@ class EncodingConfig(BaseModel):
     smoothing: int | None
 
 
+class BuilderParams(BaseModel):
+    """Declared inputs for multi-input builders (e.g. ``same_group``).
+    Absent block -> builders keep their generic-column defaults."""
+    group_col: str
+    lookup_col: str
+
+
 class FeatureConfig(BaseModel):
     include: list[str]
     exclude: list[str]
     derived: list[DerivedFeature]
     encodings: list[EncodingConfig]
     builder_module: str | None = None
+    builder_params: BuilderParams | None = None
 
 
 class ModelConfig(BaseModel):
