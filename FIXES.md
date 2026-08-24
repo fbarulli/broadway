@@ -146,3 +146,16 @@ era updates · `019a9da` DECISIONS.md sheet · `8e7d51a` G0a doc pruning.
   adversarial reading missed. Remediation: probes codified in checklist;
   risk-tiering decision routed through full pipeline with timing telemetry
   condition.
+
+## Incident log: main-agent pushed on RED
+- **2026-08-24**: GOVERNANCE-D20 commit pushed while `run_local_ci.sh
+  --static` printed RED. Root cause: the TIERREV-1 worker's untracked
+  in-progress files (tier_classifier.py, test_governance_probes.py) sat in
+  the shared worktree during my gate run — ruff scans the TREE, not the
+  commit. Verified post-hoc: all 3 errors in non-HEAD files; pushed diff =
+  4 prose files; remote tip green. Breach is procedural, not material:
+  the rule is local-green-before-push, no exception for "looks foreign".
+  Remediation pending CUSTODY-1 isolation; interim discipline: on any RED,
+  reconcile `git show --name-only HEAD` against error locations BEFORE
+  deciding; if failures belong to another lane's WIP, WAIT for that lane
+  or scope-gate explicitly — and record which.

@@ -54,6 +54,10 @@ post-commit tree).
   only. (Historic trap: `_common.py`/`_setup.py` once routed ≥25 imports;
   both deleted in b15f66e era. Verify import-site volume before citing.)
 - Full pytest+cov needs ~150s > 120s cap: use background-run + poll pattern.
+- Gate runs see the WHOLE worktree including other lanes' uncommitted WIP:
+  attribute every RED to its owner (`git show --name-only HEAD` vs error
+  locations) before acting; NEVER push on red even when the failure looks
+  foreign — reconcile, wait, or scope-gate, then record which.
 - Concurrent lanes DO edit shared files mid-flight: re-read targets
   immediately before editing; declare tree-state in every report.
 
