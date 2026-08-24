@@ -112,10 +112,10 @@ view_local() {
   VIEW_PG_PORT=${VIEW_PG_PORT:-15433}
   VIEW_PG_USER=${VIEW_PG_USER:-view}
   VIEW_PG_PASSWORD=${VIEW_PG_PASSWORD:-view}
-  [ -f "$OPTUNA_DUMP" ] && [ -f "$MLFLOW_DUMP" ] || {
+  if ! [ -f "$OPTUNA_DUMP" ] || ! [ -f "$MLFLOW_DUMP" ]; then
     echo "[lifecycle] no snapshot in $BACKUP_DIR" >&2
     exit 1
-  }
+  fi
   docker rm -f "$PG_NAME" >/dev/null 2>&1 || true
   docker run -d --rm --name "$PG_NAME" \
     -e POSTGRES_USER="$VIEW_PG_USER" -e POSTGRES_PASSWORD="$VIEW_PG_PASSWORD" -e POSTGRES_DB=mlflow \
