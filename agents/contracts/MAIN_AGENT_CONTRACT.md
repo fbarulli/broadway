@@ -248,7 +248,7 @@ verification.
 Immutable coding rules: `WORKER_CONTRACT.md`. Plots use seaborn unless stated.
 Docs updated in the SAME commit as any change (`README.md` current at ALL
 times: test counts, commands, paths; `dataflow.md`, `src/broadway/stats/API.md`,
-`tests/README.md`). Scratch docs are never touched (`01.md`, `TODO_*.md`,
+`tests/README.md`). Scratch docs are never touched (`01.md`, `agents/notes/TODO_*.md`,
 `GOALS.md`, `LEARN.md`, `trust.md`, `synth.md`, `SENIOR.md`, `project.md`,
 `FEEDBACK.md`, `DATA_VALIDATION.md`, `GENERAL_TODO.md`, `project/STATS.md`).
 `HANDOFF.md` is maintained on explicit user request.

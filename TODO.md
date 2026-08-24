@@ -1,6 +1,6 @@
 # TODO — current state / next / deferred
 
-Ephemeral task tracker. `HANDOFF.md` is timeless; this file holds "what's next."
+Ephemeral task tracker. `agents/ledger/HANDOFF.md` is timeless; this file holds "what's next."
 Update freely; remove entries when done (git history is the record).
 
 ## Current
@@ -10,7 +10,7 @@ Update freely; remove entries when done (git history is the record).
   hypothesis tests on the taxi data vs. tutorial continuation. Do not start
   until the specific direction is given.
 
-Standing rules live in `HANDOFF.md` / `WORKER_CONTRACT.md` (config
+Standing rules live in `agents/ledger/HANDOFF.md` / `agents/contracts/WORKER_CONTRACT.md` (config
 files only, no env, no hardcoded values, data-agnostic `src/`, tests with
 every src change, fail loud, one logical change per commit).
 
