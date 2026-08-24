@@ -169,8 +169,8 @@ Parity contract (FIX_2): an experiment's `features.include` order must equal the
 Full suite gate applies to every slice touching `src/` or `tests/`
 (`uv run pytest -q`, direct exit code). Platform tests stay synthetic-only —
 `tests/test_platform_hygiene.py` enforces no taxi coupling and will fail any
-violating new test. Existing coverage gate: CI runs
-`pytest --cov=src/broadway --cov-fail-under=85`, so every new module ships
+violating new test. Existing coverage gate: owned by
+`scripts/run_local_ci.sh` (`--cov-fail-under=95`, D17/D17c), so every new module ships
 with its tests in the same slice. A boundary-contract suite exists —
 `tests/test_boundary_contracts.py` parametrically flips one column's dtype at
 every DataFrame writer→reader boundary and requires a loud failure; known-leaky
