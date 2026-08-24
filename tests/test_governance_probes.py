@@ -258,7 +258,7 @@ def probe_hex_tokens(
     event_spans = {m.span("eid") for m in EVENT_LINE.finditer(text)}
     for match in HEX8.finditer(text):
         token = match.group(0)
-        if match.span() in exempt_spans:
+        if any(s <= match.start() and match.end() <= e for s, e in exempt_spans):
             continue
         if match.span() in event_spans:
             if token not in registry:

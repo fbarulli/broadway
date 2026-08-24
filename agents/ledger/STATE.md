@@ -20,7 +20,7 @@ if it contradicts git, GIT WINS.
 |---|---|---|
 | `b983b5a5` | Senior decision-pipeline close | delivered (3 rulings) |
 | TIERREV-1 worker | Batch A: classifier + probes + Tier trailers | dispatched |
-| `81abc1fe` `299ae05a` `91bfb004` | Test-effectiveness panel | delivered; findings queued for senior synthesis |
+| panel agents `81abc1fe` `299ae05a` `91bfb004` | Test-effectiveness panel (adversarial reviewer trio) | delivered; findings queued for senior synthesis |
 
 ## Lane telemetry schema
 Stage-split timing columns per dispatched lane (TIERREV-1, D19 P1 telemetry
@@ -56,8 +56,12 @@ post-commit tree).
 - Full pytest+cov needs ~150s > 120s cap: use background-run + poll pattern.
 - USER-MVP traceability pilot LIVE: AUTHORIZATION LEDGER = issue #3,
   VERDICT LOG = issue #4 (both conversation-locked; owner-writes via gh api).
-  Genesis events b16fb9ca/#3-c5398091966 and 493e21ce/#4-c5398092241;
-  backfills 3afcd9b1(D19) 7595cb13(D20) 555b6fb8(D21) e1f7cc62(custody-baseline).
+  Genesis events: #3-comment 5398091966 (authorization) and #4-comment
+  5398092241 (amendment); backfills: #4-comments 5398092508 (D19
+  ratification), 5398092820 (D20 verdict), 5398093134 (D21 verdict),
+  #3-comment 5398093447 (custody-baseline authorization). Canonical
+  event-ids live ONLY in the ## EVENTS registry below — never repeat them
+  as bare hex in prose (probe C scans this file).
   Citation rule + resolution procedure now in MAIN_AGENT_CONTRACT.md.
 - Phantom-channel incident: adversary 35266af4 (CI-proposal attack —
   contract work itself excellent) post-completion emitted three
@@ -88,16 +92,17 @@ asymmetry doc · dependency-warning sweep · audit.py/qq.py render branches.
 ## EVENTS
 
 Resolution registry for EVENT-line event-ids (third namespace — see the
-citation rule in MAIN_AGENT_CONTRACT.md). An `EVENT: issues/<n>#issuecomment-
-<m> event-id <8hex>` line is valid iff a row exists here; role vocabulary is
-no escape in this namespace. Superseded rows may outlive their EVENT lines.
+citation rule in MAIN_AGENT_CONTRACT.md). A FULL-LINE `EVENT: issues/<n>#
+issuecomment-<m> event-id <8hex>` line is valid iff a UNIQUE row exists here;
+role vocabulary is no escape in this namespace, and duplicate event-id rows
+are a probe violation. Superseded rows may outlive their EVENT lines.
 Created_at values verified via gh api at pilot close.
 
 | event-id | issue | comment-id | created_at | type | supersedes |
 |---|---|---|---|---|---|
-| b16fb9ca | 3 | 5398091966 | 2026-08-24T16:19:07Z | authorization | - |
-| e1f7cc62 | 3 | 5398093447 | 2026-08-24T16:19:14Z | authorization | - |
-| 493e21ce | 4 | 5398092241 | 2026-08-24T16:19:08Z | amendment | - |
-| 3afcd9b1 | 4 | 5398092508 | 2026-08-24T16:19:09Z | ratification | - |
-| 7595cb13 | 4 | 5398092820 | 2026-08-24T16:19:11Z | verdict | - |
-| 555b6fb8 | 4 | 5398093134 | 2026-08-24T16:19:13Z | verdict | - |
+| b16fb9ca | issues/3#issuecomment-5398091966 | 5398091966 | 2026-08-24T16:19:07Z | authorization | - |
+| e1f7cc62 | issues/3#issuecomment-5398093447 | 5398093447 | 2026-08-24T16:19:14Z | authorization | - |
+| 493e21ce | issues/4#issuecomment-5398092241 | 5398092241 | 2026-08-24T16:19:08Z | amendment | - |
+| 3afcd9b1 | issues/4#issuecomment-5398092508 | 5398092508 | 2026-08-24T16:19:09Z | ratification | - |
+| 7595cb13 | issues/4#issuecomment-5398092820 | 5398092820 | 2026-08-24T16:19:11Z | verdict | - |
+| 555b6fb8 | issues/4#issuecomment-5398093134 | 5398093134 | 2026-08-24T16:19:13Z | verdict | - |
