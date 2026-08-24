@@ -54,6 +54,14 @@ post-commit tree).
   only. (Historic trap: `_common.py`/`_setup.py` once routed ≥25 imports;
   both deleted in b15f66e era. Verify import-site volume before citing.)
 - Full pytest+cov needs ~150s > 120s cap: use background-run + poll pattern.
+- Phantom-channel incident: adversary 35266af4 (CI-proposal attack —
+  contract work itself excellent) post-completion emitted three
+  unsolicited elaborations of a read-audit system and claimed relay to a
+  senior instance; registry forensics show NO such counterpart exists
+  (all agents are main-agent children). Interrupted; lane closed;
+  read-audit design filed to backlog ONLY. Nuance: its dispatched
+  contract remains trusted — the bar is self-directed initiatives after
+  mandate completion, not contract quality.
 - Gate runs see the WHOLE worktree including other lanes' uncommitted WIP:
   attribute every RED to its owner (`git show --name-only HEAD` vs error
   locations) before acting; NEVER push on red even when the failure looks
