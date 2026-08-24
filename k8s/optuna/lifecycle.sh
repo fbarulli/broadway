@@ -21,14 +21,77 @@ OPTUNA_DUMP=$BACKUP_DIR/optuna.sql.gz
 MLFLOW_DUMP=$BACKUP_DIR/mlflow.sql.gz
 ARTIFACTS_TAR=$BACKUP_DIR/mlflow-artifacts.tar.gz
 
-DB_USER=$(awk '/DB_USER:/{print $2; exit}' "$DIR/secret.yaml")
-DB_PASSWORD=$(awk '/DB_PASSWORD:/{print $2; exit}' "$DIR/secret.yaml")
+# --- DB credential resolution -------------------------------------------
+# The committed k8s/optuna/secret.yaml is a TEMPLATE; it is never read or
+# applied here. Resolution order for local runs:
+#   1. exported env vars DB_USER / DB_PASSWORD / DB_NAME;
+#   2. the gitignored ./secret.local.yaml (same schema as the template);
+#   3. freshly generated `openssl rand` values, written ONCE to
+#      secret.local.yaml so repeated local runs reuse the same credentials.
+SECRET_LOCAL=$DIR/secret.local.yaml
+DB_CREDS_SOURCE=""
+
+emit_secret_manifest() {
+  # $1=DB_USER $2=DB_PASSWORD $3=DB_NAME -> Secret manifest on stdout.
+  cat <<EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: optuna-db
+type: Opaque
+stringData:
+  DB_USER: $1
+  DB_PASSWORD: $2
+  DB_NAME: $3
+EOF
+}
+
+read_local_secret() {
+  # Parse the three stringData keys out of the gitignored override file.
+  DB_USER=$(awk '/^  DB_USER:/{print $2; exit}' "$SECRET_LOCAL")
+  DB_PASSWORD=$(awk '/^  DB_PASSWORD:/{print $2; exit}' "$SECRET_LOCAL")
+  DB_NAME=$(awk '/^  DB_NAME:/{print $2; exit}' "$SECRET_LOCAL")
+}
+
+require_db_creds() {
+  # Idempotent: resolve once per invocation, at first use.
+  if [ -n "$DB_CREDS_SOURCE" ]; then
+    return 0
+  fi
+  if [ -n "${DB_USER:-}" ] && [ -n "${DB_PASSWORD:-}" ] && [ -n "${DB_NAME:-}" ]; then
+    log "using DB credentials from environment"
+    DB_CREDS_SOURCE="env"
+    return 0
+  fi
+  if [ -f "$SECRET_LOCAL" ]; then
+    read_local_secret
+    if [ -n "${DB_USER:-}" ] && [ -n "${DB_PASSWORD:-}" ] && [ -n "${DB_NAME:-}" ]; then
+      log "using DB credentials from $SECRET_LOCAL"
+      DB_CREDS_SOURCE="file"
+      return 0
+    fi
+    echo "[lifecycle] $SECRET_LOCAL exists but lacks usable DB_USER/DB_PASSWORD/DB_NAME keys; fix or remove it" >&2
+    exit 1
+  fi
+  DB_USER=${DB_USER:-optuna}
+  DB_NAME=${DB_NAME:-optuna}
+  DB_PASSWORD=${DB_PASSWORD:-$(openssl rand -base64 18 | tr '+/' '-_')}
+  _tmp=$(mktemp "$DIR/.secret.local.XXXXXX")
+  (
+    umask 077
+    emit_secret_manifest "$DB_USER" "$DB_PASSWORD" "$DB_NAME" >"$_tmp"
+  )
+  mv "$_tmp" "$SECRET_LOCAL"
+  DB_CREDS_SOURCE="generated"
+  log "generated local dev DB credentials -> $SECRET_LOCAL (gitignored)"
+}
 
 mkdir -p "$BACKUP_DIR"
 
 log() { echo "[lifecycle] $*"; }
 
 cluster_up() {
+  require_db_creds
   if ! kind get clusters 2>/dev/null | grep -qx "$NAME"; then
     log "creating cluster $NAME"
     kind create cluster --config "$DIR/kind-config.yaml" --name "$NAME"
@@ -36,12 +99,15 @@ cluster_up() {
   log "loading images"
   kind load docker-image broadway-base broadway-optuna-worker mlflow-server --name "$NAME"
   log "applying manifests"
-  kubectl apply -f "$DIR/secret.yaml" -f "$DIR/configmap.yaml" \
-    -f "$DIR/postgres.yaml" -f "$DIR/mlflow.yaml" -f "$DIR/optuna-init.yaml" >/dev/null
+  emit_secret_manifest "$DB_USER" "$DB_PASSWORD" "$DB_NAME" \
+    | kubectl apply -f - >/dev/null
+  kubectl apply -f "$DIR/configmap.yaml" -f "$DIR/postgres.yaml" \
+    -f "$DIR/mlflow.yaml" -f "$DIR/optuna-init.yaml" >/dev/null
 }
 
 restore_state() {
   [ -f "$OPTUNA_DUMP" ] || { log "no snapshot to restore"; return; }
+  require_db_creds
   log "waiting for postgres + mlflow"
   # Wait on the DEPLOYMENTS (they exist immediately after apply; a pod
   # selector wait errors when pods haven't been created yet).
@@ -81,6 +147,7 @@ run_hpo() {
 }
 
 dump_state() {
+  require_db_creds
   log "dumping state"
   PG=$(kubectl get pods -l app=postgres -o name | head -1)
   # Re-resolve the mlflow pod right before use: it can briefly be mid-rollout.
