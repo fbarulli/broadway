@@ -36,7 +36,7 @@ BACKTICKED_PATH = re.compile(r"`([^\s`]+)\.(py|sh|md|ya?ml|toml|txt|json|env|cfg
 HEX8 = re.compile(r"\b[0-9a-f]{8}\b")
 SEP_ROW = re.compile(r"^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)+\|?\s*$")
 HISTORICAL_MARKERS = ("deleted", "historic", "b15f66e", "once")
-ROLE_VOCABULARY = re.compile(r"agent|adversar|reviewer|synthesis", re.IGNORECASE)
+ROLE_VOCABULARY = re.compile(r"agent|adversar|reviewer|synthesis|senior", re.IGNORECASE)
 COV_FLAG = re.compile(r"--cov-fail-under\s*[=:]\s*(\d+)")
 PERCENT = re.compile(r"(\d+)\s*%")
 
@@ -251,16 +251,16 @@ def test_probe_b_red_phantom_path_in_contract(tmp_path: Path) -> None:
 
 
 def test_probe_c_red_unattributed_8hex_token(tmp_path: Path) -> None:
-    def append_mystery(lines: list[str]) -> list[str]:
-        return lines + ["", "Mystery reference cafe1234 ends here.", ""]
-
-    seeded = _seeded_copy(tmp_path, "agents/ledger/DECISIONS.md", append_mystery)
+    # Hermetic seed: a live-ledger append would sit near real role words
+    # (vocab window is ±80 chars), letting an unknown token pass via
+    # neighboring declarations. Minimal string keeps the negative case pure.
+    seeded_text = "Mystery reference cafe1234 ends here."
 
     def everything_except_seed(token: str) -> bool:
         return token != "cafe1234"  # deterministic stub resolver, no git dependence
 
     with pytest.raises(AssertionError, match="declared agent-ID namespace"):
-        probe_hex_tokens(seeded, everything_except_seed, source="seeded-DECISIONS")
+        probe_hex_tokens(seeded_text, everything_except_seed, source="seeded-DECISIONS")
 
 
 def test_probe_d_red_stale_floor_quote(tmp_path: Path) -> None:
