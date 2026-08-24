@@ -12,11 +12,5 @@ def datetime_columns(contract: DatasetContract) -> list[str]:
     ]
 
 
-def target_columns(contract: DatasetContract) -> list[str]:
-    return [
-        name for name, col in contract.columns.items() if col.role == ColumnRole.TARGET
-    ]
-
-
 def numeric_columns(contract: DatasetContract) -> list[str]:
     return [name for name, col in contract.columns.items() if is_numeric_dtype(col.dtype)]

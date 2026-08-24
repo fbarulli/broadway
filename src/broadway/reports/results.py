@@ -77,10 +77,6 @@ def humanize_summary(summary: dict, step_id: str = "") -> list[str]:
     return lines
 
 
-def is_figure_ref(ref: str) -> bool:
-    return ref.endswith((".png", ".jpg", ".jpeg", ".svg"))
-
-
 def attrition_line(summary: dict) -> str:
     n_used = summary.get("n_used")
     n_total = summary.get("n_total")
