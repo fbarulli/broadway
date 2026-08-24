@@ -88,3 +88,8 @@ era updates · `019a9da` DECISIONS.md sheet · `8e7d51a` G0a doc pruning.
   named-requirement substrings replace returncode!=2 no-op assertions;
   discriminator (argparse exit 2) empirically proven by reviewer.
   Success-path fixture stack deferred to backlog annex.
+| T-BUG-1 | estimation_table derives HC3 by construction (`d056164`):
+  internal get_robustcov_results("HC3") re-fit, TypeError fail-loud,
+  self-referential assertion killed, landmine test revert-execution
+  proven by reviewer. Riders: idempotency pin (minor), defensive
+  np.asarray note. TIER 1 COMPLETE.
