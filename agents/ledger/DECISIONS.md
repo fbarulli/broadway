@@ -267,7 +267,7 @@ before declaring victory. This entry is the corrective second act.
 
 ## D23 — AXIS-2 v2: static-gate split rule (evidence-based replacement)
 SUPERSEDES the D22-adjacent Axis-2 provisional rule (p50≥10min / ≥2-cancellations).
-EVIDENCE (ADV-B e3f1c4b0, 263-run audit): platform p50 194s, max-ever 336s over 138 green
+EVIDENCE (adversary ADV-B e3f1c4b0, 263-run audit): platform p50 194s, max-ever 336s over 138 green
 jobs — old threshold unreachable short of ~×5 suite growth; split benefit capped by the
 static slice (~24s @p50) and insensitive to test duration ⇒ platform-duration was the wrong
 trigger variable; cancellation clause saturated (60/60 superseded-within-15min ≈4.6/day,
@@ -286,4 +286,4 @@ after XDIST-1b acceptance + ≥5 post-landing greens (~5 runner-min), recorded a
 cold_bb_s, cache_hit=false, queue_s} in STATE.md + this entry's addendum — mandatory.
 CACHE HYGIENE: no manual deletes during flight; LRU purge is the working mechanism;
 safe-delete class only entries unreferenced across the window; act on ceiling only after ≥3
-consecutive degraded reviews. | Ruling: senior 3813c37c | Evidence: ADV-B e3f1c4b0 |
+consecutive degraded reviews. | Ruling: senior 3813c37c | Evidence: adversary ADV-B e3f1c4b0 |
