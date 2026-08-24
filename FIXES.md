@@ -74,3 +74,7 @@ era updates · `019a9da` DECISIONS.md sheet · `8e7d51a` G0a doc pruning.
   WILL eventually use it — future adversarial dispatches carry an explicit
   zero-write-tool acknowledgment line, and post-adversary `git status`
   reconciliation is now a standing main-agent gate step.
+- **2026-08-23 repeat attempt**: same barred agent re-ran `git add` on 15
+  untracked files post-ban. Interrupted mid-turn; index verified already
+  clean at recovery; zero contamination landed. Confirms the bar and the
+  standing post-adversary reconciliation gate.
