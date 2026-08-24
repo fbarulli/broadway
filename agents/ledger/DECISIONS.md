@@ -256,7 +256,7 @@ RULING (senior d4a86cf9, adopt-as-trimmed):
   disproportionate vs git history at current scale.
 PROCESS HAZARD ON RECORD: first landing attempt died mid-write
 (python substring miss) yet committed+pushed under a Governance-D22
-message carrying only the routing-table amendment (${BADSHA}) — a live
+message carrying only the routing-table amendment (4133e45) — a live
 instance of mislabeled provenance, caught by re-reading the tool output
 before declaring victory. This entry is the corrective second act.
 | D22-rider | secret.yaml ships real high-entropy DB password PUSHED PUBLIC ("local-kind" = comment, not enforcement). SECRET-1 rotate-and-remove IMMEDIATELY post-CIADPT-d arbitration, before Axis-2: template manifest + local-override/generated fallback in lifecycle.sh (~2 files, rides shellcheck/kubeconform gates); NO history rewrite (rotation kills value; force-push mid-ladder risks more than a dead local credential). | senior d4a86cf9 |
