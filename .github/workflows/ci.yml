@@ -31,26 +31,14 @@ jobs:
       - name: Install
         run: uv sync --all-extras --frozen
 
-      # Branch parity: era-aware shared-surface custody (src/tests/demo +
-      # synthetic-demo configs + k8s/docker/.github/pyproject + scripts/ +
-      # .github/parity-era.env). The checker self-gates by the COMMITTED era
-      # declaration (.github/parity-era.env): dev = frozen-main custody +
-      # pass-along guards; main = stock lockstep check/--sync. Fails loudly
-      # on drift, rogue main writes, taxi forks, and era garble.
-      - name: Branch parity (era-aware)
-        run: bash scripts/check_branch_parity.sh
+      # Platform gates — SINGLE SOURCE OF TRUTH: this job runs
+      # scripts/run_local_ci.sh (branch parity era-aware, ruff, mypy,
+      # configs parse, tests+cov≥95%). Edit the gate list in the SCRIPT,
+      # never here — editing YAML alone reopens two-source drift.
+      - name: Platform gates (SSOT)
+        run: bash scripts/run_local_ci.sh
 
-      # Lint the actively maintained surfaces (src, tests, experiments/mlflow,
-      # fare_prediction, the root scripts, the project bindings). The legacy
-      # experiments tree is intentionally excluded (scratch).
-      - name: Lint (ruff)
-        run: >
-          uv run ruff check src tests experiments/mlflow experiments/fare_prediction
-          experiments.py experiments_ui.py project/working.py project/data.py
-
-      - name: Type check (mypy)
-        run: uv run mypy src/broadway
-
+      # CI-only — named in scripts/run_local_ci.sh header.
       # k8s lifecycle + entrypoint scripts must at least be valid shell; the
       # runner ships shellcheck (syntax-level CI — the deployment itself is a
       # manual on-demand run via k8s/optuna/lifecycle.sh).
@@ -61,26 +49,14 @@ jobs:
           command -v shellcheck >/dev/null && shellcheck k8s/optuna/*.sh || \
             echo "shellcheck not available — sh -n passed"
 
+      # CI-only — named in scripts/run_local_ci.sh header.
       # Manifests must be structurally valid Kubernetes (no cluster needed).
       - name: Manifests (kubeconform)
         run: |
           docker run --rm -v "$PWD":/work -w /work ghcr.io/yannh/kubeconform:v0.6.7 \
             -strict -summary -ignore-filename-pattern "kind-config\\.yaml" k8s/optuna/ 2>&1 | tail -3
 
-      # Every REAL experiment config must parse against the config schema —
-      # a config that fails to load breaks the build.
-      - name: Configs (parse every configs/experiment/*.yaml)
-        run: |
-          uv run python -c "
-          from pathlib import Path
-          from broadway.config.loader import load_config
-          paths = sorted(Path('configs/experiment').glob('*.yaml'))
-          assert paths, 'no experiment configs found'
-          for p in paths:
-              load_config('train', dataset='test', experiment=p.stem)
-              print(f'OK {p.stem}')
-          "
-
+      # CI-only — named in scripts/run_local_ci.sh header.
       # Orchestrator dry-run: render the worker Jobs for the HPO spec's models
       # and assert they are valid Kubernetes with the right image/env/args.
       - name: Orchestrator dry-run (render worker jobs)
@@ -93,17 +69,14 @@ jobs:
           docker run --rm -v /tmp/jobs:/work ghcr.io/yannh/kubeconform:v0.6.7 \
             -strict -summary /work/jobs.yaml 2>&1 | tail -1
 
-      - name: Tests + coverage (platform suite)
-        env:
-          MPLCONFIGDIR: ${{ runner.temp }}/mplconfig
-        run: uv run pytest tests/ --cov=src/broadway --cov-report=term-missing --cov-fail-under=85
-
+      # CI-only — named in scripts/run_local_ci.sh header.
       - name: Experiment smoke (taxi branch only — experiments.py)
         if: github.ref == 'refs/heads/taxi' || (github.event_name == 'pull_request' && github.base_ref == 'taxi')
         env:
           MPLCONFIGDIR: ${{ runner.temp }}/mplconfig
         run: uv run python experiments.py verify
 
+  # CI-only — named in scripts/run_local_ci.sh header.
   # Build & Boot — structural determinism of the deployment images WITHOUT a
   # cluster. Catches missing files / broken COPY paths / PYTHONPATH and import
   # failures / parents[] resolution / eager-default traps / config structure.

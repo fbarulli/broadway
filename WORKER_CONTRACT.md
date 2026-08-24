@@ -29,6 +29,15 @@ expected; write operations (add/commit/stash/branch/checkout/push) never.
 Facts stated in a brief are hypotheses conditioned on the tree it was written
 against — re-derive, don't trust:
 
+- **Step-0 context gate:** before anything else, read
+  `agents/ledger/STATE.md` (lanes in flight, hazards, open arbitrations)
+  AND derive landed facts from `git log --oneline -12` + `git status` —
+  STATE.md deliberately does NOT mirror git; where they appear to
+  disagree, git wins. If instructions contradict either — HEAD moved, an
+  assigned file changed hands, a lane believed quiet is active — STOP and
+  report "stale-on-arrival" with the exact contradiction. Never improvise
+  around drift.
+
 - **Step-0 hash gate:** first action of every dispatch is
   `git rev-parse --short HEAD` against the dispatch stamp. Mismatch → STOP
   before reading or acting on anything else in the brief.
@@ -49,6 +58,17 @@ or policy changes, public surface or schema/config semantics, another owner's
 surface, or anything a failing acceptance check depends on. Ambiguity outside
 the grant → OPEN QUESTION in the report; an undisclosed decision is a
 violation, an unanswered question is not.
+
+## Mandatory gates (single vocabulary)
+
+Every contract whose diff touches `src/`, `tests/`, `scripts/`, `configs/`,
+`.github/`, or any CI-lint surface MUST run `bash scripts/run_local_ci.sh`
+(doc-only edits may pass `--static`) and paste the five PASS/FAIL banners in
+its report. pytest-only gate lists are INVALID for code-bearing contracts —
+lint (ruff), types (mypy), config-parse, and the coverage floor live ONLY in
+that script; assembling gates ad hoc is how F401-class residue reached
+remote CI (incident GATE-SSOT, FIXES.md). A full-suite pytest run alone does
+not substitute.
 
 ## Report format (every dispatch)
 

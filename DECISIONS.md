@@ -118,3 +118,24 @@ case-whitelist era validation.
   C5 (branch-name-as-era: spoofable, no main-day act);
   C3 (third long-lived branch: surface bloat, more parity pairs);
   C0 (hardcoded main-day date: unfixable without an edit + redeploy).
+
+## D17 — Gate single-source-of-truth; coverage floor raised to 95% (adversary-panel ruling)
+- **D17a root cause**: the platform gate list lived only as inline ci.yml YAML
+  while contracts assembled verification ad hoc from a one-invariant template.
+  Of nine locally-runnable CI checks, exactly one (parity) was shared fully;
+  pytest ran at wrong scope with no coverage floor. Thirteen contracts of
+  ruff-luck masked the gap until eee33d7's orphaned numpy import went red on
+  remote CI — luck had been mistaken for protection.
+- **D17b SSOT script**: `scripts/run_local_ci.sh` (parity, ruff, mypy,
+  config-parse, pytest+cov≥floor) is the ONLY owner of the shared platform
+  gate list; ci.yml invokes it and retains docker-only checks BY NAME.
+  Editing YAML alone reopens two-source drift (D16d C7); do-nothing was
+  D16d C1. Push authorization: local tiers green AND last CI-on-tip green.
+- **D17c floor**: coverage floor raised 85→95 once the COV-95 campaign lands
+  tests for reachable gaps; unreachable-by-design lines require documented
+  pragma justification or deletion, never silent exclusion.
+- **D17d standing adversaries**: every review mandate now includes
+  static-hygiene, gate-divergence-watch, and coverage-gaming vectors
+  (codified in MAIN_AGENT_CONTRACT.md §6). Facade modules are never
+  autofixed; experiment batches outside CI's lint whitelist carry a recorded
+  44-finding debt batched for Tier-4/5 cleanup.

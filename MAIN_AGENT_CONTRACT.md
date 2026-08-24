@@ -120,6 +120,48 @@ more reading `parse_numeric` than any checklist produced).
   EVERY implementation (§4 #5 — universal, not tier-gated).
 - Periodically dispatch a read-only **landscape audit**: fresh context
   re-derives census/narrative from the tree and reports drift; never commits.
+- **Gate list (single vocabulary):** platform gates are owned ONLY by
+  `scripts/run_local_ci.sh` — the same script ci.yml invokes
+  (anti-D15/D16d-C7). Every Medium+ contract runs
+  `bash scripts/run_local_ci.sh` and pastes the five PASS/FAIL banners before
+  commit; doc-only micro edits may pass `--static`. Docker-only CI checks
+  (shellcheck/kubeconform/orchestrator dry-run/build-and-boot) are named in
+  the script header. A push is authorized only when local tiers are green AND
+  the branch tip's last CI run is green.
+
+- **Standing adversarial vectors (every review mandate carries them):**
+  1. *Static-hygiene* — reviewer runs ruff (`F,E9` error-class + default rules)
+  over the exact diff scope and probes import-graph integrity for moved names;
+  facade re-export modules (`_common.py`/`_setup.py`) are NEVER autofixed —
+  alias-form or `__all__` only.
+  2. *Gate-divergence watch* — any ci.yml change must land through
+  `run_local_ci.sh`; a reviewer greps ci.yml for non-comment gate commands and
+  fails the review if the script is no longer the single owner.
+  3. *Coverage-gaming* — new tests must assert real behavior; a test executing
+  a line without meaningful asserts is rejected; branch-level dead arms
+  (e.g. `n==1 → NaN`) get explicit pins or a documented pragma justification.
+
+- **Two-author test rule:** the implementing worker writes primary behavior
+  tests; a SEPARATE red-team test author receives only the contract spec
+  (never the diff) and contributes edge/adversarial tests against it before
+  merge. New tests may not be WEAK/TAUTOLOGY-class; every new raise site gets
+  a `match=` pin; mutation spot-probes run periodically as a standing audit.
+
+- **Dispatch context rule:** every dispatch (worker, reviewer, adversary,
+  senior) opens with a CONTEXT block — current HEAD SHA, lanes in flight
+  with agent ids, files under other lanes' custody, path to
+  `agents/ledger/STATE.md` — and the receiving agent's step-0 becomes:
+  read STATE.md, echo any contradiction with dispatch instructions, STOP
+  stale-on-arrival instead of improvising. Main agent refreshes STATE.md at
+  every arbitration/push; a dispatch without a CONTEXT block is incomplete.
+
+- **Commit trailer convention** (every main-agent commit, forward-looking):
+  trailing lines `Contract: <id>`, `Gates: <gate verdict + suite tail>`,
+  `Reviewer: <agent-id | none> <verdict>`, `Ledger: FIXES.md`. Gives every
+  agent a queryable contract index via
+  `git log --grep='^Contract:' --format='%h %s'` — the landed-state channel
+  lives in git itself; STATE.md carries only what commits cannot (lanes,
+  custody, hazards, open items).
 
 ## 7. Contract requirements
 
@@ -146,9 +188,8 @@ more reading `parse_numeric` than any checklist produced).
 
 ## 8. Proportional process
 
-- **Micro** (one-file tweaks): main agent directly; cheap checks + ruff;
-  adversarial review for anything touching tracked surfaces beyond the edit's
-  own doc.
+- **Micro** (one-file tweaks): main agent directly; adversarial review for
+  anything touching tracked surfaces beyond the edit's own doc.
 - **Medium**: one worker, trimmed contract, main re-verifies cheap checks.
 - **Large** (platform/`src`, cross-cutting): full ceremony — template, all
   gates, adversarial reviewer after (universal rule).

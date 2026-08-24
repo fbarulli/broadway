@@ -27,8 +27,9 @@ For every file that changes:
 - Custody: workers run no git write operations. Exception: read-only git inspection
   (rev-parse/status/diff/log) is allowed and expected; write operations
   (add/commit/stash/branch/checkout/push) never.
-- Invariants: full suite green, no surface-ownership changes, no silent
-  policy, backward compatibility.
+- Invariants: `bash scripts/run_local_ci.sh` green (parity, ruff, mypy,
+  configs, pytest+cov≥95% — the same gates ci.yml runs via the same script);
+  no surface-ownership changes; no silent policy; backward compatibility.
 - OPEN/CLOSE tripwire: `git log --oneline -3` + `git status --porcelain` +
   `git diff --cached` (must be empty) recorded at dispatch open and close;
   any delta beyond the contracted files → halt-and-report.
