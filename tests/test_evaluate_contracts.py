@@ -6,6 +6,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
+from pandera.errors import SchemaError
 from sklearn.linear_model import LinearRegression
 
 from broadway.analysis.contracts import AnalysisContract, AnalysisMode
@@ -330,3 +331,91 @@ def test_module_run_writes_baseline_comparison(tmp_path: Path, monkeypatch: pyte
     assert evaluation.baseline is not None
     assert evaluation.baseline.metric == "mae"
     assert evaluation.baseline.improvement is not None
+
+
+def test_module_run_cv_failure_promotes_nothing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """T-BUG-2 invariant: a loud failure on NaN-target input leaves promotion
+    state untouched — no promote_candidate call, no persisted evaluation
+    artifact, no champion (nothing promoted when any stage raises). The
+    assertion is stage-agnostic: whether the failure surfaces at read-side
+    validation (SchemaError) or inside cross_validate (ValueError), the
+    outcome must be identical — loud propagation, no promotion."""
+    cfg = _make_config(tmp_path)
+    monkeypatch.setattr(records, "LINEAGE_DIR", tmp_path / "lineage")
+    out_dir = Path(cfg.environment.data_dir) / cfg.environment.processed_subdir
+    out_dir.mkdir(parents=True, exist_ok=True)
+    df = pd.DataFrame(
+        {
+            "rooms": np.arange(1, 41),
+            "area": np.arange(40, 80),
+            "price": np.arange(1, 41) * 100.0,
+        }
+    )
+    df.to_parquet(out_dir / cfg.etl.train_features_file, index=False)
+    df.tail(10).to_parquet(out_dir / cfg.etl.val_features_file, index=False)
+
+    training_module.run(cfg)
+
+    # NaN in the float64 target: today it passes engineered-frame validation
+    # (the dtype still matches) and surfaces inside cross_validate; a future
+    # upstream null-gate would instead raise SchemaError earlier. Either way
+    # the pinned invariant holds: the run fails loud and nothing is promoted.
+    bad = df.copy()
+    bad.loc[5, "price"] = np.nan
+    bad.to_parquet(out_dir / cfg.etl.train_features_file, index=False)
+
+    calls: list[tuple[str, str]] = []
+    monkeypatch.setattr(
+        evaluate_module,
+        "promote_candidate",
+        lambda dataset_name, artifact_path: calls.append((dataset_name, artifact_path)),
+    )
+    result_path = Path(cfg.evaluate.output_dir) / cfg.evaluate.output_file
+
+    with pytest.raises((ValueError, SchemaError)):
+        evaluate_module.run(cfg)
+
+    assert calls == []
+    assert not result_path.exists()
+    assert evaluate_module.get_champion(cfg.dataset.name) is None
+
+
+def test_module_run_promotes_only_after_persistence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """T-BUG-2 happy path: promotion is observable only after the
+    EvaluationResult is persisted — promote_candidate must find the persisted
+    artifact on disk (and a loadable, promote=True result) at call time."""
+    cfg = _make_config(tmp_path)
+    monkeypatch.setattr(records, "LINEAGE_DIR", tmp_path / "lineage")
+    out_dir = Path(cfg.environment.data_dir) / cfg.environment.processed_subdir
+    out_dir.mkdir(parents=True, exist_ok=True)
+    df = pd.DataFrame(
+        {
+            "rooms": np.arange(1, 41),
+            "area": np.arange(40, 80),
+            "price": np.arange(1, 41) * 100.0,
+        }
+    )
+    df.to_parquet(out_dir / cfg.etl.train_features_file, index=False)
+    df.tail(10).to_parquet(out_dir / cfg.etl.val_features_file, index=False)
+
+    result_path = Path(cfg.evaluate.output_dir) / cfg.evaluate.output_file
+    promote_events: list[str] = []
+
+    def recorded_promote(dataset_name: str, artifact_path: str) -> None:
+        promote_events.append("promote")
+        # At promotion time the evaluation artifact must already exist and be
+        # loadable — persistence strictly precedes promotion (T-BUG-2).
+        assert result_path.exists(), "promote_candidate ran before artifact persistence"
+        persisted = EvaluationResult.model_validate_json(result_path.read_text(encoding="utf-8"))
+        assert persisted.promote is True
+
+    monkeypatch.setattr(evaluate_module, "promote_candidate", recorded_promote)
+
+    training_module.run(cfg)
+    evaluate_module.run(cfg)
+
+    assert promote_events == ["promote"]

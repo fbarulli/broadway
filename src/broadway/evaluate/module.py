@@ -118,6 +118,11 @@ def run(cfg: PipelineConfig) -> None:
 
     target_metric = cfg.evaluate.target_metric
     champion_score = champion_metrics[target_metric] if champion_metrics is not None else None
+    # Reading 1 (T-BUG-2): the promotion DECISION keeps the pre-existing
+    # champion-vs-holdout semantics of should_promote — it is made here,
+    # before CV, and CV results are recorded but never gate promotion. The
+    # reorder changes only WHERE promotion EXECUTES: after CV and after the
+    # EvaluationResult is persisted (see the terminal-stage block below).
     promote, reason = should_promote(
         candidate_metrics[target_metric],
         champion_score,
@@ -126,14 +131,6 @@ def run(cfg: PipelineConfig) -> None:
 
     if champion_uri is None:
         warnings.append("no champion model found — candidate compared against none")
-    if promote:
-        dataset_name = cfg.dataset.name
-        artifact_path = result.artifact_path
-        try:
-            assert dataset_name is not None and artifact_path is not None
-            promote_candidate(dataset_name, artifact_path)
-        except mlflow.exceptions.MlflowException as exc:
-            warnings.append(f"promotion skipped — model registry unavailable: {exc}")
 
     X_train, y_train = _load_train_features(cfg)
     # Score the same composed Pipeline shape train/HPO fit (preprocessing +
@@ -172,5 +169,28 @@ def run(cfg: PipelineConfig) -> None:
         str(eval_dir / cfg.evaluate.output_file),
         [node_id("training", cfg.dataset.name)],
     )
+
+    # Promotion is the terminal stage (T-BUG-2): it executes only after CV
+    # and the EvaluationResult are persisted, so a raising stage — NaN or
+    # object-dtype inputs, missing artifacts — can never leave a promoted
+    # model with no evaluation artifact behind. A registry-unavailable
+    # MlflowException stays a soft failure: the skip is logged AND the
+    # already-persisted artifact is re-written with the warning appended, so
+    # the persisted EvaluationResult still carries the promotion-skip signal
+    # (belt and braces; the artifact existed before promotion in any case).
+    if promote:
+        dataset_name = cfg.dataset.name
+        artifact_path = result.artifact_path
+        try:
+            assert dataset_name is not None and artifact_path is not None
+            promote_candidate(dataset_name, artifact_path)
+        except mlflow.exceptions.MlflowException as exc:
+            warning = f"promotion skipped — model registry unavailable: {exc}"
+            warnings.append(warning)
+            logger.warning(warning)
+            (eval_dir / cfg.evaluate.output_file).write_text(
+                evaluation.model_copy(update={"warnings": warnings}).model_dump_json(indent=2),
+                encoding="utf-8",
+            )
 
     logger.info(f"evaluate: {target_metric}={candidate_metrics[target_metric]:.4f}, promote={promote}")
