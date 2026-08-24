@@ -139,6 +139,14 @@ more reading `parse_numeric` than any checklist produced).
 - **OPEN/CLOSE tripwire:** record `git log --oneline -3`,
   `git status --porcelain`, `git diff --cached` at dispatch open and close;
   delta beyond contracted files (+ documented WIP) → halt-and-report.
+- **Ship-path law (2026-08-24, after two push-on-red recurrences):** every
+  push goes through `bash scripts/ship.sh` (full tier gates; exit codes
+  decide; `&&` short-circuit — never newline-chained sequences). Grepping
+  gate OUTPUT for success keywords is not a gate: prose can say GREEN
+  while tests fail. The local pre-push hook re-runs the full tier
+  fail-closed; bypassing requires deliberate `--no-verify`, which is a
+  recorded policy violation. Full tier precedes every push without
+  exception — static/fast scope is for iteration, not for landing.
 - **Termination verification:** a finished/interrupted worker counts as running
   until its registry entry confirms otherwise.
 - A worker finding the contract itself wrong verifies with evidence and reports
