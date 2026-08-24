@@ -19,13 +19,6 @@ in `src/broadway/stats/`.
 
 ---
 
-## base.py
-
-```python
-def stratified_sample(df: pd.DataFrame, group_col: str, frac: float, random_state: int) -> pd.DataFrame
-    # stratified sample preserving per-group proportions; returns reset-index frame
-```
-
 ## guards.py
 
 ```python
