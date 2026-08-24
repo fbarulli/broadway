@@ -82,14 +82,53 @@ def test_estimation_table_returns_four_columns() -> None:
     model = sm.OLS(y, design).fit()
 
     table = estimation_table(model)
+    # Independently computed HC3 reference, not the (nonrobust) fit's own bse.
+    hc3 = model.get_robustcov_results("HC3")
+    hc3_bse = pd.Series(hc3.bse, index=model.model.exog_names)
 
     assert list(table.columns) == ["coef", "HC3_SE", "CI_low", "CI_high"]
     assert set(table.index) == {"const", "x"}
     assert table.loc["x", "coef"] == pytest.approx(model.params["x"])
-    assert table.loc["x", "HC3_SE"] == pytest.approx(model.bse["x"])
+    assert table.loc["x", "HC3_SE"] == pytest.approx(hc3_bse["x"])
     assert (table["HC3_SE"] > 0).all()
     assert (table["CI_low"] < table["coef"]).all()
     assert (table["coef"] < table["CI_high"]).all()
+
+    # Fail-loud: inputs without get_robustcov_results must not silently
+    # fall back to plain (nonrobust) SEs labeled as HC3.
+    class _NoRobustCovariance:
+        pass
+
+    with pytest.raises(TypeError, match="get_robustcov_results"):
+        estimation_table(_NoRobustCovariance())
+
+
+def test_estimation_table_plain_ols_still_yields_hc3_columns() -> None:
+    # Landmine: a plain OLS fit (no cov_type) must NOT have its plain SEs
+    # labeled HC3; estimation_table must produce true HC3 SEs and CIs
+    # regardless of how the input was fitted.
+    rng = np.random.default_rng(7)
+    x = rng.normal(size=60)
+    y = 1.5 * x + rng.normal(scale=1.0, size=60)
+    design = sm.add_constant(pd.DataFrame({"x": x}))
+    plain = sm.OLS(y, design).fit()  # no cov_type: nonrobust fit
+
+    table = estimation_table(plain)
+    hc3 = plain.get_robustcov_results("HC3")
+    hc3_ci = pd.DataFrame(hc3.conf_int(alpha=0.05), index=plain.model.exog_names)
+
+    # HC3 SEs differ from the plain fit's own bse...
+    assert not np.allclose(
+        table["HC3_SE"].to_numpy(), plain.bse.to_numpy(), rtol=0.0, atol=0.0
+    )
+    # ...and match an independently computed HC3 fit exactly.
+    assert table["HC3_SE"].to_numpy() == pytest.approx(hc3.bse)
+    assert table["CI_low"].to_numpy() == pytest.approx(
+        hc3_ci.iloc[:, 0].to_numpy()
+    )
+    assert table["CI_high"].to_numpy() == pytest.approx(
+        hc3_ci.iloc[:, 1].to_numpy()
+    )
 
 
 def test_standardized_coefs_matches_hand_computed_values() -> None:
