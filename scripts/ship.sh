@@ -21,8 +21,6 @@ if ! bash scripts/run_local_ci.sh; then
   exit 1
 fi
 
-for spec in "${REFSPECS[@]}"; do
-  echo "== pushing $REMOTE $spec =="
-  git push "$REMOTE" "$spec"
-done
+echo "== pushing $REMOTE ${REFSPECS[*]} (single invocation -> one hook gate) =="
+git push "$REMOTE" "${REFSPECS[@]}"
 echo "SHIP OK"
