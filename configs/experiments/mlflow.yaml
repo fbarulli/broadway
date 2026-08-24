@@ -40,13 +40,5 @@ hpo:
         min_child_weight: [1, 10]
         reg_alpha: [1e-3, 10]
         gamma: [0.0, 5.0]
-    - name: knn
-      # Numeric-only space (the unified schema is [low, high] pairs); the
-      # categoricals (weights, algorithm) are allowed params for explicit
-      # passes but cannot be expressed in a search space.
-      search_space:
-        n_neighbors: [3, 50]
-        p: [1, 2]
-        leaf_size: [10, 100]
     - name: linear
       search_space: {}

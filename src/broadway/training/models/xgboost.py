@@ -6,4 +6,4 @@ from xgboost import XGBRegressor
 
 
 def create(**params: float | str) -> XGBRegressor:
-    return XGBRegressor(**{k: v for k, v in params.items() if k != "type"})
+    return XGBRegressor(**params)
