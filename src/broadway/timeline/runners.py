@@ -23,6 +23,7 @@ from broadway.reports.results import humanize_float, humanize_pvalue
 from broadway.stats.anova import run_anova, run_kruskal, run_welch
 from broadway.stats.assumptions import check_normality, run_levene
 from broadway.stats.describe import describe, plot_describe_figures
+from broadway.stats.groups import build_declared_groups
 from broadway.stats.post_hoc import games_howell
 from broadway.timeline.evidence import (
     ConclusionEvidence,
@@ -103,10 +104,9 @@ def load_frame_and_groups(
         df = pd.read_parquet(path)
     if source_group_column not in df.columns:
         raise ValueError(f"group column '{source_group_column}' not found in data")
-    groups = {
-        g: df[df[source_group_column] == g][cfg.dataset.target].dropna().to_numpy()
-        for g in group_values
-    }
+    groups, _absent_groups = build_declared_groups(
+        df, source_group_column, group_values, cfg.dataset.target
+    )
     attrition = _attrition(df, source_group_column, group_values, cfg.dataset.target)
     return df, group_column, source_group_column, groups, attrition
 

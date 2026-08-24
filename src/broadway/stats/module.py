@@ -15,6 +15,7 @@ from broadway.lineage.ids import node_id
 from broadway.lineage.models import SampleSpec
 from broadway.lineage.records import write_record
 from broadway.stats.anova import run_anova
+from broadway.stats.groups import build_declared_groups
 from broadway.stats.plan import save_plan
 
 logger = logging.getLogger(__name__)
@@ -42,12 +43,12 @@ def run(cfg: PipelineConfig, sample: SampleSpec | None = None) -> None:
         group_col = sample.column_mapping.get(analysis.hypothesis.group_column, analysis.hypothesis.group_column)
     if group_col not in df.columns:
         raise ValueError(f"group column '{group_col}' not found in data")
-    groups: dict[str, np.ndarray] = {
-        g: df[df[group_col] == g][cfg.dataset.target].dropna().to_numpy()
-        for g in analysis.hypothesis.group_values
-        if not df[df[group_col] == g].empty
-    }
-    plan = run_anova(groups)
+    groups, absent_groups = build_declared_groups(
+        df, group_col, analysis.hypothesis.group_values, cfg.dataset.target
+    )
+    if absent_groups:
+        raise ValueError(f"declared groups absent from data: {absent_groups}")
+    plan = run_anova(groups, small_group_threshold=cfg.stats.min_rows_for_sampling)
     plan = plan.model_copy(
         update={
             "analysis_goal": analysis.goal,

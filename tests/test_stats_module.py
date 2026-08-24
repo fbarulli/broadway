@@ -129,3 +129,86 @@ def test_stats_run_with_sample_column_mapping(
     plan = json.loads(plan_path.read_text())
     assert plan.get("sample_name") == "test_diagnostic"
     assert plan.get("sample_role") == "diagnostic"
+
+
+def test_stats_run_absent_declared_group_fails_loud(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Declared [A, B, C] with C absent from data must raise the standard
+    named ValueError and write no plan (pre-fix: silent k-1 ANOVA plan)."""
+    cfg = _stats_cfg(tmp_path)
+    hypothesis = cfg.analysis.hypothesis.model_copy(
+        update={"group_values": ["A", "B", "C"]}
+    )
+    cfg = cfg.model_copy(
+        update={"analysis": cfg.analysis.model_copy(update={"hypothesis": hypothesis})}
+    )
+    group_col = cfg.analysis.hypothesis.group_column
+    rng = np.random.default_rng(42)
+    df = pd.DataFrame(
+        {
+            group_col: ["A"] * 6 + ["B"] * 6,
+            cfg.dataset.target: np.concatenate(
+                [rng.normal(10.0, 2.0, 6), rng.normal(14.0, 2.0, 6)]
+            ),
+        }
+    )
+    data_path = tmp_path / "missing_c.parquet"
+    df.to_parquet(data_path, index=False)
+    monkeypatch.setattr(module, "canonical_path", lambda dataset, environment: data_path)
+    monkeypatch.setattr(records, "LINEAGE_DIR", tmp_path / "lineage")
+
+    with pytest.raises(ValueError, match="declared groups absent"):
+        module.run(cfg, None)
+    assert not (tmp_path / cfg.stats.output_file).exists()
+
+
+def test_stats_run_small_group_threshold_binds_to_config(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """any_small_group binds to cfg.stats.min_rows_for_sampling, not the
+    library-default 30 hardcoded at the run_anova call site pre-fix: n=5 per
+    group is 'small' under the default floor (10000 >= n), not small once the
+    configured floor drops below n."""
+    default_cfg = _stats_cfg(tmp_path)
+    rng = np.random.default_rng(42)
+    df = pd.DataFrame(
+        {
+            default_cfg.analysis.hypothesis.group_column: ["A"] * 5 + ["B"] * 5,
+            default_cfg.dataset.target: np.concatenate(
+                [rng.normal(10.0, 2.0, 5), rng.normal(15.0, 2.0, 5)]
+            ),
+        }
+    )
+    data_path = tmp_path / "five_per_group.parquet"
+    df.to_parquet(data_path, index=False)
+    monkeypatch.setattr(module, "canonical_path", lambda dataset, environment: data_path)
+    monkeypatch.setattr(records, "LINEAGE_DIR", tmp_path / "lineage")
+
+    assert default_cfg.stats.min_rows_for_sampling >= 10
+    module.run(default_cfg, None)
+    plan_default = json.loads((tmp_path / default_cfg.stats.output_file).read_text())
+    assert plan_default["threshold_context"]["any_small_group"] is True
+
+    relaxed_stats = default_cfg.stats.model_copy(update={"min_rows_for_sampling": 3})
+    relaxed_cfg = default_cfg.model_copy(update={"stats": relaxed_stats})
+    module.run(relaxed_cfg, None)
+    plan_relaxed = json.loads((tmp_path / relaxed_cfg.stats.output_file).read_text())
+    assert plan_relaxed["threshold_context"]["any_small_group"] is False
+
+
+def test_baseline_hypothesis_absent_declared_group_raises() -> None:
+    """Cross-surface vocabulary pin (baseline/hypothesis.py): one declared group
+    absent raises the same standard ValueError (pre-fix: silent continue);
+    total absence keeps its dedicated 'no groups present' raise. Kept beside
+    the other declared-group tripwires; exercises broadway.baseline.hypothesis."""
+    from broadway.baseline import hypothesis
+
+    df = pd.DataFrame(
+        {"g": ["a", "a", "a", "b", "b", "b"], "t": [10.0] * 3 + [20.0] * 3}
+    )
+    with pytest.raises(ValueError, match="declared groups absent"):
+        hypothesis.run(df, "t", "g", ["a", "b", "c"])
+
+    with pytest.raises(ValueError, match="no groups present"):
+        hypothesis.run(df, "t", "g", ["x", "y"])

@@ -17,6 +17,7 @@ from broadway.config.schema import PipelineConfig
 from broadway.lineage.ids import node_id
 from broadway.lineage.models import SampleRole, SampleSpec
 from broadway.lineage.records import write_record
+from broadway.stats.groups import build_declared_groups
 
 logger = logging.getLogger(__name__)
 
@@ -46,16 +47,17 @@ class GroupSummary(BaseModel):
 
 def describe(df: pd.DataFrame, group_column: str, source_group_column: str, group_values: list[str], target: str, source_path: str, sample_name: str, sample_role: SampleRole) -> GroupSummary:
     total_n = len(df)
+    arrays, absent = build_declared_groups(df, source_group_column, group_values, target)
     groups: dict[str, GroupStat] = {}
-    absent: list[str] = []
-    for g in group_values:
-        vals = df[df[source_group_column] == g][target].dropna()
-        n = len(vals)
+    for g, vals in arrays.items():
+        n = int(vals.size)
         if n == 0:
-            absent.append(g)
             groups[g] = GroupStat(n=0, mean=None, std=None)
         else:
-            groups[g] = GroupStat(n=n, mean=float(vals.mean()), std=float(vals.std()))
+            # pandas Series.std() yields NaN silently for n=1; match it so the
+            # ndarray switch does not emit numpy ddof RuntimeWarnings.
+            std = float(vals.std(ddof=1)) if n > 1 else float("nan")
+            groups[g] = GroupStat(n=n, mean=float(vals.mean()), std=std)
     present_n = [s.n for s in groups.values() if s.n > 0]
     imbalance_ratio = (max(present_n) / min(present_n)) if len(present_n) >= 2 else 0.0
     proportions = {g: (s.n / total_n if total_n else 0.0) for g, s in groups.items()}
@@ -102,7 +104,8 @@ def plot_describe_figures(
     summary: GroupSummary,
     out_path: Path,
 ) -> None:
-    data = [df[df[source_group_column] == g][target].dropna().to_numpy() for g in group_values]
+    arrays, _absent = build_declared_groups(df, source_group_column, group_values, target)
+    data = list(arrays.values())
     labels = [f"{g} (n={len(v)})" for g, v in zip(group_values, data)]
     names = list(summary.groups.keys())
     sizes = [summary.groups[g].n for g in names]
