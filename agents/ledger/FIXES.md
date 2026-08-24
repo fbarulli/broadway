@@ -167,9 +167,11 @@ era updates · `019a9da` DECISIONS.md sheet · `8e7d51a` G0a doc pruning.
   tree-local checker) never landed despite being ruled — CI-on-main ran
   the legacy checker silently all day. Root cause: arbitration drift
   between ruling text and implemented diff during a multi-contract
-  session. Closed same-hour via PARITYFIX contract (worker 38113cad):
-  inline constants + F1b pin guard + negative tests through the real
-  gate body. Lesson: rulings need a post-landing conformance check
+  session. Closed same-hour via the PARITYFIX contract (worker ID
+  unrecoverable from ledger records — this row originally cited hex
+  38113cad, which resolves to no revision and no registered agent;
+  corrected after CI probe C flagged it): inline constants + F1b pin
+  guard + negative tests through the real gate body. Lesson: rulings need a post-landing conformance check
   against their own acceptance lines — added to arbitration checklist.
 
 ## Incident log: novel-blob layer false-positive (disjoint histories)
