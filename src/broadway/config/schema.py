@@ -76,7 +76,6 @@ class EnvironmentConfig(BaseModel):
     api_replicas_min: int
     api_replicas_max: int
     api_hpa_cpu_threshold: int
-    monitoring_schedule: str
 
 
 class DerivedFeature(BaseModel):

@@ -35,7 +35,6 @@ def _env(tmp_path: Path, chunk_size: int = 8) -> EnvironmentConfig:
         api_replicas_min=1,
         api_replicas_max=2,
         api_hpa_cpu_threshold=70,
-        monitoring_schedule="*/5 * * * *",
     )
 
 

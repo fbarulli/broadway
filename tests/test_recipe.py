@@ -229,7 +229,6 @@ def _write_config_tree(tmp_path: Path, preprocessing: list[dict[str, object]]) -
         "api_replicas_min": 1,
         "api_replicas_max": 3,
         "api_hpa_cpu_threshold": 80,
-        "monitoring_schedule": "0 * * * *",
     }
     dataset = {
         "name": "syn",

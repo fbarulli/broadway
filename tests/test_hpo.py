@@ -66,7 +66,6 @@ def _pipeline_config(
         api_replicas_min=1,
         api_replicas_max=3,
         api_hpa_cpu_threshold=80,
-        monitoring_schedule="0 * * * *",
     )
     dataset = DatasetContract(
         name="synthetic",
