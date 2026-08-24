@@ -111,6 +111,14 @@ source "$ENV_FILE"
 : "${PARITY_ERA:?PARITY_ERA not set in $ENV_FILE}"
 : "${PARITY_TRACK_BRANCH:?PARITY_TRACK_BRANCH not set in $ENV_FILE}"
 : "${PARITY_MAIN_ANCHOR:?PARITY_MAIN_ANCHOR not set in $ENV_FILE}"
+# ALLOWLIST may be legitimately empty, but the KEY must exist (uniform
+# missing/garbled ⇒ loud). NOTE: ${arr+x} tests element [0] and misreads
+# an empty declared array as unset — declare -p is the correct existence
+# test for arrays.
+declare -p PARITY_ALLOWLIST >/dev/null 2>&1 || {
+  echo "FATAL: PARITY_ALLOWLIST not set in $ENV_FILE (use PARITY_ALLOWLIST=() for none)" >&2
+  exit 1
+}
 # Anchor shape + resolution (D16 rider): a garbled pin must fail as CONFIG
 # ERROR here, not later as a misleading ROGUE MAIN WRITE from the diff guard.
 [[ "$PARITY_MAIN_ANCHOR" =~ ^[0-9a-f]{40}$ ]] || {
@@ -162,7 +170,7 @@ custody() {
             }' | sort -u) \
     <( git rev-list --objects "origin/$PARITY_TRACK_BRANCH" | cut -d' ' -f1 | sort -u))
   if [[ -n "$novel" ]]; then
-    echo "ROGUE MAIN WRITE: novel blob(s) on frozen main absent from the origin/taxi universe:" >&2
+    echo "ROGUE MAIN WRITE: novel blob(s) on frozen main absent from the origin/$PARITY_TRACK_BRANCH universe:" >&2
     printf '%s\n' "$novel" | head -10 >&2
     exit 1
   fi

@@ -103,6 +103,24 @@ def test_estimation_table_returns_four_columns() -> None:
         estimation_table(_NoRobustCovariance())
 
 
+def test_estimation_table_already_hc3_input_is_idempotent() -> None:
+    # Rider pin (T-BUG-1 review F2): an already-HC3 fit must come back with
+    # its own SEs/CIs — re-derivation is bitwise-idempotent, never a second
+    # covariance flavor.
+    rng = np.random.default_rng(11)
+    x = rng.normal(size=60)
+    y = 1.5 * x + rng.normal(scale=1.0, size=60)
+    design = sm.add_constant(pd.DataFrame({"x": x}))
+    fit = sm.OLS(y, design).fit(cov_type="HC3")
+
+    table = estimation_table(fit)
+
+    np.testing.assert_array_equal(table["HC3_SE"].to_numpy(), fit.bse)
+    ci = pd.DataFrame(fit.conf_int(alpha=0.05), index=fit.model.exog_names)
+    np.testing.assert_array_equal(table["CI_low"].to_numpy(), ci[0].to_numpy())
+    np.testing.assert_array_equal(table["CI_high"].to_numpy(), ci[1].to_numpy())
+
+
 def test_estimation_table_plain_ols_still_yields_hc3_columns() -> None:
     # Landmine: a plain OLS fit (no cov_type) must NOT have its plain SEs
     # labeled HC3; estimation_table must produce true HC3 SEs and CIs

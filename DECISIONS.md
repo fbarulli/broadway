@@ -105,7 +105,7 @@ case-whitelist era validation.
   verified 0-novel/261 blobs ~95ms.
 - **D16c main-day playbook** — human ratifies; main agent flips
   `PARITY_ERA=dev` → `main` in ONE commit citing this ruling; stock loop
-  resumes verbatim; revert = `git revert` of the flip. The SAME commit also moves `PARITY_MAIN_ANCHOR` to the post-sync main tip.
+  resumes verbatim; revert = `git revert` of the flip. The SAME commit also moves `PARITY_MAIN_ANCHOR` to the post-sync main tip. Run `--sync` from a checkout holding LOCAL `main` and `taxi` branches — the stock `sync_to_main` checks out local refs, not remote-tracking ones.
 - **D16d rejected candidates** — C7 (dual vocabularies: two sources of era
   truth drift apart); C6 (os.environ gating: CI sets no env vars, hole
   re-opens); C2 (per-worker flags: the invariant is suspended, not false —
