@@ -212,9 +212,9 @@ New tests per slice:
 1. **Branch triggers** — `on.push.branches` and `on.pull_request.branches`
    gain `sklearn` so the branch gets CI from the first push. Without this the
    branch runs ungated.
-2. **Coverage gate** (`--cov-fail-under=85`) — unchanged command; new modules
-   (`features/recipe.py`, versioned `schemas/`) must land with tests to
-   hold 85%.
+2. **Coverage gate** — now owned by `scripts/run_local_ci.sh`
+   (`--cov-fail-under=95`, D17/D17c); new modules must land with tests to
+   hold 95%.
 3. **Parity job** — unchanged: it diffs `origin/main` vs `origin/taxi`
    regardless of the branch CI runs on, and keeps passing while `sklearn`
    work is unmerged. NOTE: `.github/` is on the parity shared-surface list,

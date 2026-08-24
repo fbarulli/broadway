@@ -132,7 +132,9 @@ more reading `parse_numeric` than any checklist produced).
 - **Standing adversarial vectors (every review mandate carries them):**
   1. *Static-hygiene* — reviewer runs ruff (`F,E9` error-class + default rules)
   over the exact diff scope and probes import-graph integrity for moved names;
-  facade re-export modules (`_common.py`/`_setup.py`) are NEVER autofixed —
+  re-export/facade modules are NEVER autofixed wholesale (none exist at
+  HEAD since the b15f66e-era cleanup deleted `_common.py`/`_setup.py`; if
+  any reappear, verify live import sites BEFORE assuming volume) —
   alias-form or `__all__` only.
   2. *Gate-divergence watch* — any ci.yml change must land through
   `run_local_ci.sh`; a reviewer greps ci.yml for non-comment gate commands and

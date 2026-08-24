@@ -134,3 +134,15 @@ era updates · `019a9da` DECISIONS.md sheet · `8e7d51a` G0a doc pruning.
   zero gaming found by review. Riders: project/tests gate blind spot,
   line-only-coverage branch arms watchlist, audit.py/qq.py render
   branches optional follow-up.
+
+## Incident log: silent review bypass under load
+- **2026-08-24**: `7c03347` (monitoring-fiction deletion, 18 files incl.
+  test edits) shipped `Reviewer: none` under pipeline pressure — de facto
+  ungoverned tiering. User ratification covered SCOPE, not REVIEW DEPTH.
+  Lesson (adversary d377a291): the demonstrated bottleneck is silent
+  bypass, not serialization. Also caught same hour: two stale-doctrine
+  instances (facade mandate naming deleted files; SKLEARN_PIPELINES.md
+  documenting the dead 85% floor) — mechanical ~1s probes catch what full
+  adversarial reading missed. Remediation: probes codified in checklist;
+  risk-tiering decision routed through full pipeline with timing telemetry
+  condition.

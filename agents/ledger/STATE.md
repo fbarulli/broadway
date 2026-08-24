@@ -37,8 +37,9 @@ post-commit tree).
   use workspace-hidden dirs for multi-call scratch, delete before finishing.
 - NEVER stage/index anything unless your contract says the exact `git add`
   lines; two prior agents were barred for rogue staging/deletion (FIXES.md).
-- Facade modules `_common.py`/`_setup.py`: NEVER autofix their F401s —
-  alias-form or `__all__` only (≥25 live import sites route through them).
+- Re-export/facade F401s: NEVER autofix wholesale — alias-form or `__all__`
+  only. (Historic trap: `_common.py`/`_setup.py` once routed ≥25 imports;
+  both deleted in b15f66e era. Verify import-site volume before citing.)
 - Full pytest+cov needs ~150s > 120s cap: use background-run + poll pattern.
 - Concurrent lanes DO edit shared files mid-flight: re-read targets
   immediately before editing; declare tree-state in every report.
