@@ -264,3 +264,26 @@ instance of mislabeled provenance, caught by re-reading the tool output
 before declaring victory. This entry is the corrective second act.
 | D22-rider | secret.yaml ships real high-entropy DB password PUSHED PUBLIC ("local-kind" = comment, not enforcement). SECRET-1 rotate-and-remove IMMEDIATELY post-CIADPT-d arbitration, before Axis-2: template manifest + local-override/generated fallback in lifecycle.sh (~2 files, rides shellcheck/kubeconform gates); NO history rewrite (rotation kills value; force-push mid-ladder risks more than a dead local credential). | senior d4a86cf9 |
   AMENDMENT (USER-MVP pilot, human-ratified): TRIGGER "citation tooling ← first gh citation attempt" FIRED early by sovereign approval of the ledger pilot; gh-URL citations UN-DEFERRED solely for events on locked fbarulli/broadway ledger issues under merged conditions (conversation lock + resolution-time actor check + sha8-of-content ids); all other deferrals unchanged.
+
+## D23 — AXIS-2 v2: static-gate split rule (evidence-based replacement)
+SUPERSEDES the D22-adjacent Axis-2 provisional rule (p50≥10min / ≥2-cancellations).
+EVIDENCE (ADV-B e3f1c4b0, 263-run audit): platform p50 194s, max-ever 336s over 138 green
+jobs — old threshold unreachable short of ~×5 suite growth; split benefit capped by the
+static slice (~24s @p50) and insensitive to test duration ⇒ platform-duration was the wrong
+trigger variable; cancellation clause saturated (60/60 superseded-within-15min ≈4.6/day,
+zero signal); warm-bias proven (cold b&b sample size ZERO post-CIADPT-c; cache pool at
+10.42 GB vs 10 GB ceiling).
+RULE (verbatim, ADV-B text + senior clauses): Measure weekly from Actions API over rolling
+20-green sklearn runs. Cancelled runs excluded from all timing statistics, logged separately
+(ref, superseding sha, lag) — never a trigger. Track M1=static-gates s, M2=pytest+cov s,
+M3=duplication-overhead s (median runner+checkout+sync prefix), M4=b&b s on cache-miss runs.
+Split static gates into their own job only when, for two consecutive weekly reviews, BOTH:
+(i) M1 > M3+60; (ii) platform p90>360s AND job queue p50<60s. Otherwise keep monolith.
+Re-evaluate immediately on XDIST-1b landing or ≥30s static-gate growth.
+SENIOR CLAUSES: recorder = senior agent, rows into STATE.md telemetry; cold-sample floor n≥3
+before cold figures may drive split decisions; COLDPROBE-1 = one-byte src push on sklearn tip
+after XDIST-1b acceptance + ≥5 post-landing greens (~5 runner-min), recorded as {push sha8,
+cold_bb_s, cache_hit=false, queue_s} in STATE.md + this entry's addendum — mandatory.
+CACHE HYGIENE: no manual deletes during flight; LRU purge is the working mechanism;
+safe-delete class only entries unreferenced across the window; act on ceiling only after ≥3
+consecutive degraded reviews. | Ruling: senior 3813c37c | Evidence: ADV-B e3f1c4b0 |
