@@ -116,48 +116,81 @@ jobs:
   # failures / parents[] resolution / eager-default traps / config structure.
   # Runtime semantics (kind cluster + workers + dump/restore) stay a manual,
   # on-demand `lifecycle.sh train` — this gate never runs training.
-  # Images are cached as a gzipped `docker save` tarball via actions/cache:
-  # the base image's slow uv-sync layers persist across runs when
-  # pyproject/lock don't change. (buildx's container driver can't chain FROM
-  # across separate builds — verified empirically — so plain `docker build`
-  # is kept; the tarball is keyed on the lockfile so cache hits only happen
-  # when nothing that affects the base image changed.)
+  #
+  # ONLY broadway-base is cached: GitHub cache entries are immutable, so a
+  # same-key save/restore of all three images would permanently restore a
+  # stale worker/mlflow snapshot. The cache key hashes EVERYTHING
+  # Dockerfile.base bakes in — deps AND code (src/**, project/**): keyed on
+  # pyproject/lock/base-Dockerfile alone, a src-only change would hit the
+  # cache and restore an OLD-code base; workers inherit it, boot tests pass
+  # on stale platform code, and CD stamps the new sha — a silently
+  # mislabeled-provenance ship.
+  #
+  # Worker/mlflow are unconditional rebuilds tagged github.sha: they are thin
+  # COPY layers over the base, so per-run rebuild cost is small, and the
+  # exact tested sha-tagged images are what later consumers must expect.
   build-and-boot:
     name: Build & Boot (docker images — no cluster)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
 
-      # Restore previously saved images so the chained FROM resolves instantly
-      # and unchanged base layers skip rebuilding.
-      - name: Restore cached images
-        id: restore
+      # Restore previously saved base image so the chained FROM resolves
+      # instantly and unchanged dep/code layers skip rebuilding.
+      - name: Restore base image
+        id: base-cache
         uses: actions/cache@v4
         with:
-          path: /tmp/images.tar.gz
-          key: broadway-images-${{ hashFiles('pyproject.toml', 'uv.lock', 'k8s/optuna/Dockerfile.base') }}
+          path: ${{ runner.temp }}/broadway-base.tar.gz
+          key: broadway-base-${{ hashFiles('pyproject.toml', 'uv.lock', 'k8s/optuna/Dockerfile.base', 'src/**', 'project/**') }}
 
-      - name: Load cached images
-        if: steps.restore.outputs.cache-hit == 'true'
-        run: docker load < /tmp/images.tar.gz
+      - name: Load cached base image
+        if: steps.base-cache.outputs.cache-hit == 'true'
+        run: |
+          gzip -dc "${RUNNER_TEMP}/broadway-base.tar.gz" | docker load
+
+          # Sanity: fail fast rather than building FROM a missing/partial base.
+          docker image inspect broadway-base:latest >/dev/null
 
       - name: Build base image
+        if: steps.base-cache.outputs.cache-hit != 'true'
         # Tag :latest so worker/mlflow `FROM broadway-base:latest` resolves
         # locally on a cold cache (docker pulls from the registry otherwise).
-        run: docker build -f k8s/optuna/Dockerfile.base -t broadway-base:latest .
+        run: |
+          docker build \
+            -f k8s/optuna/Dockerfile.base \
+            -t broadway-base:latest \
+            .
 
+      - name: Save base image for future runs
+        if: steps.base-cache.outputs.cache-hit != 'true'
+        run: |
+          docker save broadway-base:latest | gzip -1 > "${RUNNER_TEMP}/broadway-base.tar.gz"
+
+      # Thin COPY-only layers over the base — rebuilt unconditionally so they
+      # always carry this exact commit's code under an immutable sha tag.
       - name: Build worker image
-        run: docker build -f k8s/optuna/Dockerfile.worker -t broadway-optuna-worker:test .
+        run: |
+          docker build \
+            -f k8s/optuna/Dockerfile.worker \
+            -t broadway-optuna-worker:${{ github.sha }} \
+            .
 
       - name: Build mlflow image
-        run: docker build -f k8s/optuna/Dockerfile.mlflow -t mlflow-server:test .
+        run: |
+          docker build \
+            -f k8s/optuna/Dockerfile.mlflow \
+            -t mlflow-server:${{ github.sha }} \
+            .
 
       # Imports _common -> project.working (working.yaml), resolves
       # HPO_CONFIG_PATH via parents[] at the mirrored pod path, parses the HPO
       # spec and builds CLI choices. Catches the layout/import bug class.
       - name: Boot — worker imports + CLI
-        run: docker run --rm broadway-optuna-worker:test python /app/experiments/mlflow/03_optuna_worker.py --help
+        run: docker run --rm broadway-optuna-worker:${{ github.sha }} python /app/experiments/mlflow/03_optuna_worker.py --help
 
       # Config-load simulation with the committed fixture: verifies the
       # configmap structure + the HPO spec both parse inside the pod layout.
@@ -165,7 +198,7 @@ jobs:
       # python -c string needs.
       - name: Boot — config-load simulation
         run: |
-          docker run --rm -v "$PWD/.github/ci-fixtures/k8s-config.yaml:/etc/broadway/config.yaml" broadway-optuna-worker:test python -c "
+          docker run --rm -v "$PWD/.github/ci-fixtures/k8s-config.yaml:/etc/broadway/config.yaml" broadway-optuna-worker:${{ github.sha }} python -c "
           import yaml
           from pathlib import Path
           from broadway.config.schema import HPOConfig
@@ -176,17 +209,7 @@ jobs:
           print('config load OK — models:', [m.name for m in hpo.models])"
 
       - name: Boot — mlflow image health
-        run: docker run --rm --entrypoint python mlflow-server:test -c "import mlflow; print('mlflow', mlflow.__version__)"
-
-      # Persist the built images to the Actions cache for the next run.
-      - name: Save cached images
-        run: docker save broadway-base:latest broadway-optuna-worker:test mlflow-server:test | gzip > /tmp/images.tar.gz
-
-      - name: Cache images
-        uses: actions/cache@v4
-        with:
-          path: /tmp/images.tar.gz
-          key: broadway-images-${{ hashFiles('pyproject.toml', 'uv.lock', 'k8s/optuna/Dockerfile.base') }}
+        run: docker run --rm --entrypoint python mlflow-server:${{ github.sha }} -c "import mlflow; print('mlflow', mlflow.__version__)"
 
   # CD — push the verified images to GHCR on push to main/taxi ONLY (never on
   # PRs). lifecycle.sh consumes the built tag via OPTUNA_WORKER_IMAGE.
