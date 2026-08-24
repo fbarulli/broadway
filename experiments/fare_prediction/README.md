@@ -26,7 +26,10 @@ Split: train on earlier dates, validate/test on later dates
 
 
 
-All analysis policy lives in `config.yaml` (no hardcoded values, no env vars).
+Sample policy lives in `configs/sample/fare_prediction_1m.yaml`
+(seed/size/columns/filters/schema), consumed by name via `broadway.samples`;
+feature and leakage policy (`SAFE_FEATURES`, `TEMPORAL_FEATURES`) is declared
+once in `_common.py`.
 
 Step scripts follow the `NN_name.py` convention used by the
 `experiments/univariate/fare_amount_trip_distance` series.

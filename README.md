@@ -322,7 +322,7 @@ DATA_MODE=live uv run python -m project.scripts.12_lgbm_baseline
 ## 4. Tests
 
 ```bash
-uv run pytest              # library (synthetic) + data layer (real .head(1000)/cache); test count enforced in CI on every push
+uv run pytest              # library (synthetic) + data layer (real .head(1000)/cache); no count gate — enforcement is the ≥95% coverage floor on src/broadway via scripts/run_local_ci.sh (D17b SSOT) plus governance probes
 ```
 
 ---

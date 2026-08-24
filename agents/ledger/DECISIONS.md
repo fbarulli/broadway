@@ -287,3 +287,17 @@ cold_bb_s, cache_hit=false, queue_s} in STATE.md + this entry's addendum — man
 CACHE HYGIENE: no manual deletes during flight; LRU purge is the working mechanism;
 safe-delete class only entries unreferenced across the window; act on ceiling only after ≥3
 consecutive degraded reviews. | Ruling: senior 3813c37c | Evidence: adversary ADV-B e3f1c4b0 |
+
+## D24 — TAXI-SYNC B: single reconciliation pass to taxi after FIX-WAVE-1 (human-ratified)
+HUMAN QUESTION: why did the sweeps land only on sklearn? RECORD: sklearn is the sole active line
+(MAIN_AGENT_CONTRACT §2 branch model; README pointer; D16/F1b parity gate anchors origin/sklearn;
+main=demo contents, taxi=legacy data-smoke line). Human ratified propagation afterward.
+RULE: exactly ONE reconciliation pass carries this session's landed commits (SWEEP-MICRO 619f069,
+SWEEP-KNN 953c727, SWEEP-SAMPLER d53f7b9, plus DOCS-TRUTH and FIX-WAVE-1 as they stand when it
+runs) onto branch taxi via cherry-pick. No incremental per-batch syncs.
+CONSTRAINTS: execute only when zero worker contracts are in flight (worktree quiescent); taxi-side
+gate = full `scripts/run_local_ci.sh` GREEN before push, shipped with ship.sh semantics using
+refspec `taxi:taxi`; sklearn parity expectations unchanged. If conflicts exceed mechanical
+resolution, STOP and re-present options instead of force-merging.
+Rationale: one gate cost instead of two; D-register rulings may still reshape taxi-relevant
+surfaces. | Ruling: human, this session | Executor: main agent only |

@@ -97,8 +97,7 @@ input contract.
 
 Name-driven selection, enforced by the schema contract referenced in
 `DataSourceRef` (not a separate dtype-vs-name debate). The dtype-driven
-`feature_columns` selector is retired when the last caller switches; until
-then both exist only inside the transition slices.
+`feature_columns` selector is retired; no callers remain in `src/`, so both exist only inside historical transition slices.
 
 *Implementation resolution (ratified at Slice-4 close, refined by the
 Contract C census):* option (b) — dtype demoted from **selector** to
@@ -237,13 +236,14 @@ All conflicts live where the custom loaders hand data to the Pipeline.
    Mitigation: pipeline stays downstream of load; loaders remain the owners
    of materialization and sampling. Fine for dev/live sample sizes; the
    `full=True` path keeps its memory assumption — document it, don't hide it.
-2. **Silent dtype-driven column drop.** `utils.feature_columns` =
-   `df.select_dtypes(include="number").drop(target)` — non-numeric columns
-   vanish silently before `.fit`. Harmless for bare tree models; with a
-   name-based `ColumnTransformer` it becomes a KeyError or silent feature
-   loss. Resolution rides on decision 5 above: switch to name-driven
-   selection from config lists in the same slice that introduces
-   ColumnTransformer (Slice 2/3), never before both exist.
+2. **Silent dtype-driven column drop (retired).** The retired
+   `utils.feature_columns` (`df.select_dtypes(include="number").drop(target)`)
+   made non-numeric columns vanish silently before `.fit` — harmless for
+   bare tree models, but a KeyError or silent feature loss under a
+   name-based `ColumnTransformer`. Resolved per decision 5 above: selection
+   is name-driven from the schema contract/config lists, so this silent-drop
+   failure mode no longer exists; numeric-only survives only as the
+   fail-loud eligibility assertion.
 3. **Feature-name contract at predict.** Pipelines validate feature names
    fit-vs-predict; the loaders emit different schemas by path (canonical
    parquet, joined cache, named samples `@vN`, pinned `ratecode1_sample`).

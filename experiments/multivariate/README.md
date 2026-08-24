@@ -1,8 +1,10 @@
 # Multivariate experiment — categorical breakdown, geography premiums, ML baselines
 
-All analysis policy lives in `config.yaml` (no hardcoded values, no env vars).
-The dataset loader is owned by the univariate experiment's `_common.py`
-(single source of truth); the zone lookup is owned by `project.data`.
+All analysis policy lives in `configs/experiments/multivariate.yaml` (no
+hardcoded values, no env vars), loaded and key-checked by `load_config()` in
+`_setup.py`. The dataset loader is owned by `project.working`
+(`configs/experiments/working.yaml`, single source of truth); the zone lookup
+is owned by `project.data`.
 
 ## Steps
 
@@ -32,7 +34,7 @@ C adds outer-borough error weighting.
   moves the metrics — penalties don't fix the fare physics.
 
 Metrics are evidence (`baseline_lightgbm.json`); roles/verdicts are analyst
-interpretation (`config.yaml → model_verdicts`).
+interpretation (`model_verdicts` in `configs/experiments/multivariate.yaml`).
 
 ## Run order
 

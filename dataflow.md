@@ -173,7 +173,7 @@ broadway/
       module.py             # init(): writes configs/{dataset,analysis,experiment} + profile sidecar
     contracts/              # contract-generated schema + role selectors
       pandera.py            # build_raw_schema(contract) -> pa.DataFrameSchema (generated)
-      selectors.py          # feature/datetime/target column selectors over DatasetContract
+      selectors.py          # datetime/numeric column selectors over DatasetContract
     data/                   # data layer: format detection, joins, canonicalization, splits
       loader.py             # load() / load_with_audit(): csv/parquet/excel → left-join lookups + audits
       join_audit.py         # JoinAudit / audit_join(): key-match completeness
@@ -186,7 +186,6 @@ broadway/
     etl/                    # config-driven etl pipeline step
       module.py             # etl step: load_with_audit → canonicalize → validate → split → join/lookup_value lineage
     stats/                  # pandas/numpy stats library (no Spark)
-      base.py               # stratified_sample
       plan.py               # AnalysisPlan (Pydantic model) + save/load
       effect_size.py        # eta², omega², epsilon_squared, Cohen's d, Hedges' g, group_imbalance
       assumptions.py        # Levene, skew/kurtosis/Shapiro
@@ -285,7 +284,7 @@ broadway/
   configs/flow/stats_sequence.yaml  # ordered stats-step list for reports/index.md (StatsSequence)
   configs/sample/<name>.yaml  # SampleSpec for `stats --sample`; named samples declare version/source/seed/size/columns/filters/schema
   configs/analysis/<name>.yaml  # authored analytical intent (AnalysisContract)
-  tests/                    # test_base.py, test_anova.py, ... (pytest)
+  tests/                    # test_anova.py, test_effect_size.py, ... (pytest)
 ```
 
 ## Module → function → file
@@ -443,7 +442,7 @@ artifact, and provenance.
 | Python interfaces | type hints | throughout |
 
 - The raw schema is generated at runtime from `DatasetContract.columns` — one `pa.Column` per contract entry (the raw 7 columns, not join-derived `pickup_borough`/`LocationID`). Dtypes are checked strictly (`coerce=False`); `null_count` is observed, not an invariant, so nullability is left at Pandera's default.
-- Role-based column selection is `broadway/contracts/selectors.py` (`feature_columns`, `datetime_columns`, `target_columns`) — pure functions over the contract, no hardcoded names.
+- Role-based column selection is `broadway/contracts/selectors.py` (`datetime_columns`, `numeric_columns`) — pure functions over the contract, no hardcoded names.
 - Engineered-feature definitions: see `SKLEARN_PIPELINES.md` Decision 5 — the generic config-driven path is the SSOT; `FEATURE_SPECS` is demoted legacy.
 - `DatasetContract` is the accepted schema (authored/authoritative); `DatasetProfile` / `ColumnProfile` describe observed facts computed at discover time. `identifier_score` is purely descriptive — discover only logs a recommendation, it never mutates roles or the contract.
 - `DatasetContract` carries no `row_count` — observed counts live in `DatasetProfile` (discover) and `TransformAudit` (etl lineage). Datetime dtypes are normalized to canonical `datetime64` (`schema.py::normalize_dtype`).
