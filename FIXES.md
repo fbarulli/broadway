@@ -115,3 +115,22 @@ era updates · `019a9da` DECISIONS.md sheet · `8e7d51a` G0a doc pruning.
   rename class); floor-kwarg semantic tension (sampling floor drives
   small-group flag); CLI-vs-pipeline sample asymmetry undocumented.
   TIER 1 NOW GENUINELY COMPLETE — all five slate contracts landed.
+
+## Incident log: GATE-SSOT
+- **2026-08-24**: T-BUG-4 (`eee33d7`) orphaned `import numpy as np` in
+  stats/module.py — its last consumer was the comprehension the refactor
+  deleted. Local gates (pytest+parity only) could not see lint; remote CI
+  caught it on next sklearn push. Root cause: platform gate list lived
+  solely as inline ci.yml YAML; contracts assembled verification ad hoc.
+  Resolution: D17 — `scripts/run_local_ci.sh` becomes sole owner of shared
+  platform gates, invoked by ci.yml; ruff/mypy/configs/coverage-floor join
+  the mandatory local gate set. History probe: exactly one latent CI-red
+  shipped past in 14 contracts — luck, not protection.
+| GATE-SSOT | run_local_ci.sh SSOT gates + ci.yml delegation + F401 fix
+  + governance codification (`e9fce2d`). Honest RED→GREEN proven; reviewer
+  fix-first(3) applied. D17 recorded.
+| COV-95 | coverage campaign 85→95% floor (`9f50574`): +49 tests
+  across 3 new files + 4 extensions; 95.31% measured on gated scope;
+  zero gaming found by review. Riders: project/tests gate blind spot,
+  line-only-coverage branch arms watchlist, audit.py/qq.py render
+  branches optional follow-up.
