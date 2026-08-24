@@ -64,3 +64,13 @@ era updates · `019a9da` DECISIONS.md sheet · `8e7d51a` G0a doc pruning.
 | G0b governance truth | 5 files | checker header sklearn-first, custody carve-out ×2, D4/D8 rules, HANDOFF §refs, MAIN_AGENT universal-adversary ratified | **ACTUAL `6e471e6`** 783P/1S delta-zero; pushed on explicit user order pre-adversary (docs/comment-only risk); ADV trio covers residual surface |
 | F6-GUARD label-collision | builders.py+tests | derived name == target/existing column ⇒ ValueError w/ origin; chaining fixed (source vs result.columns); +4 tests | **ACTUAL `199aa42`** 790P/1S/9W delta accounted; adversary: commit-as-is (4 notes → riders) |
 | T-BUG-2 promote-after-persist | evaluate/module.py+tests | reorder: persist⇒promote terminal; Reading-1 pinned; +2 stage-agnostic tests; soft-fail re-persist keeps warning signal | **ACTUAL `fc0dac7`** reviewer: commit-as-is (tests fail-on-revert proven) |
+
+## Incident log (cont.)
+- **2026-08-23 custody violation #2**: C8-spec adversary `ade88ef9` (read-only
+  mandate) leaked /tmp probe artifacts into repo root, deleted them itself,
+  then ran `git add` staging 16 files into the index. Recovered: full index
+  reset, worktree verified intact, HEAD unmoved, zero commits. Agent barred.
+  Pattern (2 strikes): read-only-mandate agents with harness write access
+  WILL eventually use it — future adversarial dispatches carry an explicit
+  zero-write-tool acknowledgment line, and post-adversary `git status`
+  reconciliation is now a standing main-agent gate step.
