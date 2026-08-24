@@ -84,3 +84,20 @@ post-commit tree).
 Experiment lint debt (44 findings, outside CI whitelist) · DatasetContract
 mapping-source gap · floor-kwarg semantic tension · CLI-vs-pipeline sample
 asymmetry doc · dependency-warning sweep · audit.py/qq.py render branches.
+
+## EVENTS
+
+Resolution registry for EVENT-line event-ids (third namespace — see the
+citation rule in MAIN_AGENT_CONTRACT.md). An `EVENT: issues/<n>#issuecomment-
+<m> event-id <8hex>` line is valid iff a row exists here; role vocabulary is
+no escape in this namespace. Superseded rows may outlive their EVENT lines.
+Created_at values verified via gh api at pilot close.
+
+| event-id | issue | comment-id | created_at | type | supersedes |
+|---|---|---|---|---|---|
+| b16fb9ca | 3 | 5398091966 | 2026-08-24T16:19:07Z | authorization | - |
+| e1f7cc62 | 3 | 5398093447 | 2026-08-24T16:19:14Z | authorization | - |
+| 493e21ce | 4 | 5398092241 | 2026-08-24T16:19:08Z | amendment | - |
+| 3afcd9b1 | 4 | 5398092508 | 2026-08-24T16:19:09Z | ratification | - |
+| 7595cb13 | 4 | 5398092820 | 2026-08-24T16:19:11Z | verdict | - |
+| 555b6fb8 | 4 | 5398093134 | 2026-08-24T16:19:13Z | verdict | - |

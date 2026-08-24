@@ -12,6 +12,9 @@ backticked-path tokens are whitespace-free and resolve literally, by wildcard
 glob, or by basename anywhere in the pruned tree; historical lines (containing
 deleted/historic/b15f66e/once) are exempt; the declared agent-ID namespace
 matches role vocabulary agent/adversar*/reviewer/synthesis within 80 chars.
+USER-MVP pilot event-ids are a THIRD namespace (F4′): an ``EVENT:`` line's
+8-hex event-id is valid only via a ``## EVENTS`` resolution row in STATE.md —
+role vocabulary grants NO escape inside that grammar.
 """
 
 from __future__ import annotations
@@ -34,6 +37,10 @@ ROOT = Path(__file__).resolve().parents[1]
 
 BACKTICKED_PATH = re.compile(r"`([^\s`]+)\.(py|sh|md|ya?ml|toml|txt|json|env|cfg|ini)`")
 HEX8 = re.compile(r"\b[0-9a-f]{8}\b")
+EVENT_LINE = re.compile(
+    r"^EVENT:\s*issues/(?P<issue>\d+)#issuecomment-(?P<comment>\d+)\s+event-id\s+(?P<eid>[0-9a-f]{8})",
+    re.MULTILINE,
+)
 SEP_ROW = re.compile(r"^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)+\|?\s*$")
 HISTORICAL_MARKERS = ("deleted", "historic", "b15f66e", "once")
 ROLE_VOCABULARY = re.compile(r"agent|adversar|reviewer|synthesis|senior", re.IGNORECASE)
@@ -139,16 +146,54 @@ def _git_resolves(token: str) -> bool:
     return proc.returncode == 0
 
 
+def _parse_event_registry(state_text: str) -> frozenset[str]:
+    """8-hex event-ids holding a resolution row under STATE.md's ## EVENTS."""
+    ids: set[str] = set()
+    in_events = False
+    for line in state_text.splitlines():
+        if line.startswith("#"):
+            in_events = line.strip() == "## EVENTS"
+            continue
+        if not in_events or not line.lstrip().startswith("|"):
+            continue
+        first_cell = line.strip().strip("|").split("|")[0].strip()
+        if HEX8.fullmatch(first_cell):
+            ids.add(first_cell)
+    return frozenset(ids)
+
+
+@cache
+def _registered_event_ids() -> frozenset[str]:
+    return _parse_event_registry((ROOT / "agents/ledger/STATE.md").read_text(encoding="utf-8"))
+
+
 def probe_hex_tokens(
     text: str,
     resolver: Callable[[str], bool],
     *,
     window: int = 80,
     source: str = "<text>",
+    event_registry: frozenset[str] | None = None,
 ) -> None:
-    """Every 8-hex token resolves as a revision or is a declared agent ID."""
+    """Every 8-hex token resolves as a revision or is a declared agent ID.
+
+    F4′ third namespace: an occurrence introduced by an
+    ``EVENT: issues/<n>#issuecomment-<m> event-id <8hex>`` line never resolves
+    via git and role vocabulary grants NO escape — it is valid only when listed
+    in ``event_registry`` (the STATE.md ``## EVENTS`` resolution table).
+    """
+    registry = event_registry if event_registry is not None else frozenset()
+    event_spans = {m.span("eid") for m in EVENT_LINE.finditer(text)}
     for match in HEX8.finditer(text):
         token = match.group(0)
+        if match.span() in event_spans:
+            if token not in registry:
+                raise AssertionError(
+                    f"{source}: unregistered event-id {token} — EVENT-line tokens need a "
+                    f"resolution row in the STATE.md ## EVENTS registry (role vocabulary "
+                    f"is no escape in this namespace)"
+                )
+            continue
         if resolver(token):
             continue
         lo, hi = max(0, match.start() - window), min(len(text), match.end() + window)
@@ -199,8 +244,14 @@ def test_probe_b_live_contract_paths_resolve() -> None:
 
 
 def test_probe_c_live_8hex_tokens_declared_or_resolvable() -> None:
+    events = _registered_event_ids()
     for name in ["agents/ledger/FIXES.md", "agents/ledger/DECISIONS.md"]:
-        probe_hex_tokens((ROOT / name).read_text(encoding="utf-8"), _git_resolves, source=name)
+        probe_hex_tokens(
+            (ROOT / name).read_text(encoding="utf-8"),
+            _git_resolves,
+            source=name,
+            event_registry=events,
+        )
 
 
 def test_probe_d_live_floor_quotes_match_gate_script() -> None:
@@ -261,6 +312,47 @@ def test_probe_c_red_unattributed_8hex_token(tmp_path: Path) -> None:
 
     with pytest.raises(AssertionError, match="declared agent-ID namespace"):
         probe_hex_tokens(seeded_text, everything_except_seed, source="seeded-DECISIONS")
+
+
+_FORGED_EVENT_LINE = "EVENT: issues/4#issuecomment-12345678 event-id deadbeef (backfill)."
+
+
+def _append_forged_event(lines: list[str]) -> list[str]:
+    lines += [
+        "",
+        "Ruled by the senior reviewer agent synthesis panel:",
+        _FORGED_EVENT_LINE,
+    ]
+    return lines
+
+
+def test_probe_c_red_unregistered_event_id_amid_role_vocab(tmp_path: Path) -> None:
+    # F4′ bypass attempt: an EVENT-line token fabricated amid role vocabulary.
+    # The ±80-char vocab window is NO escape in this namespace — only a
+    # ## EVENTS resolution row in STATE.md legitimizes the token.
+    seeded = _seeded_copy(tmp_path, "agents/ledger/DECISIONS.md", _append_forged_event)
+    at = seeded.index("deadbeef")
+    assert ROLE_VOCABULARY.search(seeded[max(0, at - 80):at])  # vocab window IS lit
+    with pytest.raises(AssertionError, match="unregistered event-id"):
+        probe_hex_tokens(
+            seeded, _git_resolves, source="seeded-DECISIONS",
+            event_registry=_registered_event_ids(),
+        )
+
+
+def test_probe_c_green_registered_event_id_via_events_registry(tmp_path: Path) -> None:
+    # Same seed as the RED twin; registering the event-id flips it GREEN —
+    # proving registry membership, not vocabulary proximity, is the gate.
+    seeded = _seeded_copy(tmp_path, "agents/ledger/DECISIONS.md", _append_forged_event)
+    synthetic_state = (
+        "## EVENTS\n"
+        "| event-id | issue | comment-id | created_at | type | supersedes |\n"
+        "|---|---|---|---|---|---|\n"
+        "| deadbeef | 4 | 12345678 | 2026-08-24T16:19:00Z | amendment | - |\n"
+    )
+    assert _parse_event_registry(synthetic_state) == {"deadbeef"}  # parser round-trip
+    registry = _registered_event_ids() | {"deadbeef"}  # live rows + the new one
+    probe_hex_tokens(seeded, _git_resolves, source="seeded-DECISIONS", event_registry=registry)
 
 
 def test_probe_d_red_stale_floor_quote(tmp_path: Path) -> None:
