@@ -18,8 +18,21 @@ if it contradicts git, GIT WINS.
 ## Active lanes (in flight NOW)
 | Agent | Contract | State |
 |---|---|---|
-| `2a7161cb` | Senior process-improvement synthesis | running |
+| `b983b5a5` | Senior decision-pipeline close | delivered (3 rulings) |
+| TIERREV-1 worker | Batch A: classifier + probes + Tier trailers | dispatched |
 | `81abc1fe` `299ae05a` `91bfb004` | Test-effectiveness panel | delivered; findings queued for senior synthesis |
+
+## Lane telemetry schema
+Stage-split timing columns per dispatched lane (TIERREV-1, D19 P1 telemetry
+condition). Schema ONLY — the main agent populates values at
+dispatch/arbitration; no rows exist yet, none are fabricated here.
+| Column | Meaning |
+|---|---|
+| `lane_id` | dispatched agent id (8-hex) or worker label |
+| `contract_id` | dispatch contract label (e.g. TIERREV-1) |
+| `classify_ts` | ISO-8601 UTC instant the change set was risk-tiered via `scripts/tier_classifier.py` |
+| `dispatch_ts` | ISO-8601 UTC instant the worker launched |
+| `verdict_ts` | ISO-8601 UTC instant the arbitration verdict landed |
 
 Landed since last refresh: e9fce2d (D17 GATE-SSOT), 9f50574 (COV-95 +49 tests,
 floor 95 bound in script), ff595b4 (ledger). Suite tail NOW: 827P/1S gated

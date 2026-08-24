@@ -150,3 +150,62 @@ Standing rulings reviewers cite directly; novel cases escalate by default.
 - New branch-level dead arm ⇒ pin-or-pragma with justification comment.
 - Coverage-gaming (line-execution without meaningful assert) ⇒ reject.
 - Custody deviation of ANY kind ⇒ STOP, log incident, bar pending review.
+
+## D19 — Custody amendment + decision-pipeline adoptions (human-ratified)
+Full pipeline ran: 3 investigators + 3 adversaries + senior synthesis
+(b983b5a5). Rulings: P1 risk-tiered review ADOPTED as amended (TIERREV-1);
+P2 custody isolation ADOPTED as three-tier architecture (CUSTODY-1) — naive
+uniform worktrees REJECTED after demonstrated shared-store destruction
+(gc --prune=now from a "read-only" worktree dropped objects 7853→5); P3
+xdist ADOPTED as amended with blocking uv-0.5.x lock-parse precondition
+(XDIST-1, real speedup ~2×).
+**Authority grant (this ruling):** the custody line "workers run no git
+operations at all" is AMENDED to permit harness-WRAPPED git writes inside
+ephemeral detached worktrees for the trusted-executor tier ONLY; main agent
+retains sole commit-to-shared-refs/push custody. Mitigations binding this
+grant: wrapper operation ALLOWLIST (gc/reflog-expire/update-ref/tag-delete/
+foreign-prune structurally unreachable), 2-week private-clone quarantine
+for executors before any wrapped worktree is issued, mechanical integrity
+probe at every arbitration (git count-objects + reflog depth +
+PARITY_MAIN_ANCHOR blob census vs pinned baselines, alarm-on-drift).
+
+## D20 — Micro-contract decomposition (human-directed rethink)
+Motivated live: a 4-deliverable worker ran >15 min on 1/N visible progress.
+Long single-worker contexts are hallucination + context-exhaustion risk;
+fat contracts also hide the parallelism the pipeline could exploit.
+
+### Size classes (hard caps; LARGE exists only as a plan, never a dispatch)
+- **MICRO**: ≤2 files OR ≤30 changed lines, ONE deliverable, ≤10 min expected,
+  no investigation needed beyond main-agent scoping.
+- **MEDIUM**: ≤4 files AND ≤150 changed lines AND ≤3 deliverables, ≤25 min.
+- **LARGE**: anything larger ⇒ MUST decompose into MEDIUMs before dispatch.
+
+### Two-phase mandate (INVESTIGATE ≠ EXECUTE)
+- **INVESTIGATE contracts** are read-only: deliver an exact FACT SHEET
+  (current behavior, line numbers, edge inventory, proposed-diff sketch).
+  No production changes ever. ≤10 min each.
+- **EXECUTE contracts** consume the fact sheet VERBATIM — pasted INTO the
+  dispatch prompt, never re-derived from memory. They touch only files the
+  sheet names and implement exactly the sketched diff. Reality contradicting
+  the sheet ⇒ stale-on-arrival STOP (existing gate).
+- MICRO contracts may fold both phases into main-agent scoping when the
+  surface is already known.
+- Anti-fabrication binding: an EXECUTE worker may not assert any fact absent
+  from its sheet; evidence pastes mandatory per deliverable.
+
+### Sequential vs parallel delegation
+- PARALLEL-ELIGIBLE only when ALL hold: (a) zero file-custody intersection,
+  (b) no producer/consumer dependency between outputs, (c) combined tree
+  state remains fully describable in STATE.md's lanes table.
+- SEQUENTIAL whenever: shared files, data flow between outputs, gate or
+  lock dependencies, or ordering is load-bearing.
+- DEFAULT WHEN UNSURE: sequential (single-writer discipline).
+
+### Context bounding
+- Dispatch prompts are self-contained by construction (no conversation
+  inheritance); investigation results cross to executors as pasted text,
+  not memory.
+- Heartbeat rule (>20 min dispatches) applies FROM LAUNCH, not after the
+  first silence; two missed/stale beats ⇒ interrupt-and-reconcile.
+- Worker context is bounded by scope caps above; a worker approaching its
+  cap reports partial delivery rather than improvising onward.

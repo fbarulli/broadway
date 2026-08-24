@@ -159,11 +159,13 @@ more reading `parse_numeric` than any checklist produced).
 
 - **Commit trailer convention** (every main-agent commit, forward-looking):
   trailing lines `Contract: <id>`, `Gates: <gate verdict + suite tail>`,
-  `Reviewer: <agent-id | none> <verdict>`, `Ledger: FIXES.md`. Gives every
-  agent a queryable contract index via
+  `Reviewer: <agent-id | none> <verdict>`, `Tier: FULL|CHECKLIST`,
+  `Ledger: FIXES.md`. Gives every agent a queryable contract index via
   `git log --grep='^Contract:' --format='%h %s'` — the landed-state channel
   lives in git itself; STATE.md carries only what commits cannot (lanes,
-  custody, hazards, open items).
+  custody, hazards, open items). `Tier:` FULL|CHECKLIST — computed by MAIN
+  AGENT ONLY via `scripts/tier_classifier.py` at staging time; never
+  worker-declared; unknown/mixed ⇒ FULL.
 
 - **Session-close rule:** no ratified state survives a session boundary
   unlanded — session close means `git status` reconciled against STATE.md's
@@ -177,6 +179,11 @@ more reading `parse_numeric` than any checklist produced).
 - **Scratch siting:** agent scratch NEVER lives at repo root — `mktemp -d`
   outside the repo, deleted before report. Root dot-dirs are hygiene-test
   failures.
+- **Decomposition (D20):** every dispatch is MICRO or MEDIUM sized; LARGE
+  plans decompose first. INVESTIGATE and EXECUTE are separate contracts;
+  executors consume pasted fact sheets verbatim and may assert nothing
+  absent from them. Parallel lanes require custody-disjoint +
+  output-independent; default sequential.
 
 ## 7. Contract requirements
 

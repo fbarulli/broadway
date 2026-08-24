@@ -1,5 +1,14 @@
 # CONTRACT_TEMPLATE.md — mandatory dispatch skeleton
 
+## Sizing (D20 — hard caps)
+MICRO ≤2 files / ≤30 lines / 1 deliverable · MEDIUM ≤4 files / ≤150 lines /
+≤3 deliverables / ≤25 min · anything larger DECOMPOSES into MEDIUMs before
+dispatch. INVESTIGATE (read-only fact sheet) is a separate contract from
+EXECUTE (consumes the sheet verbatim, pasted into the prompt). Parallel only
+when custody-disjoint AND output-independent; default sequential. Heartbeats
+from launch on >20-min dispatches.
+
+
 Every agent contract fills this skeleton before dispatch (MAIN_AGENT_CONTRACT.md
 §7). A contract the worker has to interpret is incomplete — it must
 EXECUTE, not explore.
