@@ -97,3 +97,7 @@ era updates · `019a9da` DECISIONS.md sheet · `8e7d51a` G0a doc pruning.
   threading, required params across 5 caller files) remains, gated on
   user ratification of its v5.1 rescope. Landed today: F6, T-BUG-2,
   T-BUG-1, T-BUG-3, D16-PARITY, user docs.
+| RIDERS | D16/T-BUG-1 review follow-ups (`28d8328`): truthful custody-alarm
+  wording, ALLOWLIST presence guard (declare -p — the ${arr+x} array trap
+  caught by my own gate before landing), already-HC3 idempotency pin,
+  main-day local-branch note. Suite 791P/1S/9W.
