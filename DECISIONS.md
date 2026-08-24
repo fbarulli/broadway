@@ -81,3 +81,40 @@ FIX_3 `ca8c123` → FIX_4 `79ac26c` → governance `3ea88d1`/`c34710c`/`be34c30`
   existing machinery; new sub-finding adopted: stats/module.py silently skips
   empty groups — min_rows_for_sampling exists in config but is unenforced at
   the stats entry point.
+
+## D16 — era-aware branch parity (senior ruling: design C8, adversary-amended)
+
+Adversarial amendments ratified into D16b: (F1a) era file added to SHARED so
+main-day --sync delivers it; (F1b-residual) pushes TO main execute main's
+legacy checker until main-day — a frozen-line push is itself the violation,
+so legacy red is correct there; (F2-revised) custody anchors on
+PARITY_MAIN_ANCHOR (seeded at the frozen tip, updated ONLY in the same commit
+as any ratified main-day sync/flip-back) + blob-provenance; merge-base
+anchoring rejected — 21/24 SHARED entries legitimately diverge between
+merge-base 7758d1a and the sanctioned main tip; (F3) pytest gates on the
+committed era file, never os.environ; (F4) GITHUB_REF_NAME-first branch
+detection with HEAD/empty handling; (F5) guarded allowlist expansion +
+case-whitelist era validation.
+
+- **D16a single era vocabulary** — `.github/parity-era.env` is the only era
+  declaration (`PARITY_ERA=dev|main`); the `PARITY_MAIN_DAY` os.environ
+  dialect is deleted everywhere.
+- **D16b dev-era semantics** — sklearn ⇒ taxi may lag, never fork;
+  taxi ⇒ fast-forward byte-equality required; every event runs custody
+  (anchor drift guard + blob provenance) incl. ROGUE MAIN WRITE;
+  verified 0-novel/261 blobs ~95ms.
+- **D16c main-day playbook** — human ratifies; main agent flips
+  `PARITY_ERA=dev` → `main` in ONE commit citing this ruling; stock loop
+  resumes verbatim; revert = `git revert` of the flip. The SAME commit also moves `PARITY_MAIN_ANCHOR` to the post-sync main tip.
+- **D16d rejected candidates** — C7 (dual vocabularies: two sources of era
+  truth drift apart); C6 (os.environ gating: CI sets no env vars, hole
+  re-opens); C2 (per-worker flags: the invariant is suspended, not false —
+  a per-worker suppression flag deletes the red and buys silence);
+  C1 (do-nothing: same trade — the known hole stays open, and removing or
+  ignoring the failing gate buys silence rather than conceding the
+  invariant is suspended, not false); C4 (timestamp eras: kills the
+  legitimate lag window — every sklearn push would sit in a forbidden/red
+  interval until a clock crosses the declared instant, garble included);
+  C5 (branch-name-as-era: spoofable, no main-day act);
+  C3 (third long-lived branch: surface bloat, more parity pairs);
+  C0 (hardcoded main-day date: unfixable without an edit + redeploy).

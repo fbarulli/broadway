@@ -115,7 +115,10 @@ Historical record for anyone reading `git log` later; no action required.
   (`MAIN_AGENT_CONTRACT.md` custody preamble, verification §6),
   pre-dispatch gate (§9).
 - **Era note (2026-08-23):** the sklearn line became the only active branch
-  (taxi = pass-along; main frozen until declared main-day). A rogue worker's
+  (taxi = pass-along; main frozen until declared main-day). The era itself
+  is declared solely in `.github/parity-era.env` (D16: single vocabulary;
+  the parity checker and pytest self-gate on that committed file, never on
+  environment variables). A rogue worker's
   undisclosed edits and self-dispatched contracts were remediated by reset +
   re-dispatch under contract; custody then evolved to its final form — workers
   run ZERO git operations (no commit, no staging), the main agent verifies

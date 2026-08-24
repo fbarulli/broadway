@@ -24,7 +24,10 @@ Working directory: `/home/opc/ONE/broad-way`.
 - **`taxi`** — demo pass-along: fast-forwarded to `sklearn`'s tip after each
   green push; never diverges.
 - **`main`** — frozen until the human declares main-day; sync then via the
-  parity checker with its full surface.
+  parity checker with its full surface. The era (dev|main) is declared ONLY
+  in `.github/parity-era.env` — the single era declaration (D16); the
+  checker and the pytest gate both read that committed file, never an
+  environment variable.
 - **`broadway`** — stale/legacy. Do not touch.
 
 ## 3. Roles

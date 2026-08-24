@@ -12,11 +12,18 @@
 # deletions and content changes — so a change made on one branch cannot
 # silently diverge.
 #
-# Usage:
-#   scripts/check_branch_parity.sh          # check main vs taxi (current repo)
-#   scripts/check_branch_parity.sh --sync   # copy taxi's shared surface onto main
+# ERA-AWARE (D16): behaviour is gated by the committed era file
+# .github/parity-era.env — the single era declaration. PARITY_ERA=dev means
+# sklearn is the active line and main is frozen (every event runs frozen-main
+# custody, then branch-aware pass-along guards); PARITY_ERA=main is lockstep
+# day (stock check / --sync). There is no environment-variable dialect.
 #
-# Exit codes: 0 = in sync, 1 = drift detected (check), 2 = usage error.
+# Usage:
+#   scripts/check_branch_parity.sh          # era-aware parity check
+#   scripts/check_branch_parity.sh --sync   # main-day only: copy the track
+#                                           # branch's shared surface onto main
+#
+# Exit codes: 0 = in sync, 1 = drift / custody violation, 2 = usage error.
 
 set -euo pipefail
 
@@ -56,6 +63,7 @@ SHARED=(
   .dockerignore
   README.md
   scripts/
+  .github/parity-era.env
 )
 
 check() {
@@ -92,8 +100,119 @@ sync_to_main() {
   echo "SYNCED taxi -> main for shared surface. Review, run gates, commit, push."
 }
 
-if [[ "$MODE" == "sync" ]]; then
-  sync_to_main
-else
-  check
+# --- Era declaration (D16a: single vocabulary — no environment dialect) -----
+ENV_FILE=".github/parity-era.env"
+[[ -r "$ENV_FILE" ]] || {
+  echo "FATAL: $ENV_FILE missing/unreadable — era unknown, refusing to guess" >&2
+  exit 1
+}
+# shellcheck disable=SC1090
+source "$ENV_FILE"
+: "${PARITY_ERA:?PARITY_ERA not set in $ENV_FILE}"
+: "${PARITY_TRACK_BRANCH:?PARITY_TRACK_BRANCH not set in $ENV_FILE}"
+: "${PARITY_MAIN_ANCHOR:?PARITY_MAIN_ANCHOR not set in $ENV_FILE}"
+# Anchor shape + resolution (D16 rider): a garbled pin must fail as CONFIG
+# ERROR here, not later as a misleading ROGUE MAIN WRITE from the diff guard.
+[[ "$PARITY_MAIN_ANCHOR" =~ ^[0-9a-f]{40}$ ]] || {
+  echo "FATAL: PARITY_MAIN_ANCHOR must be a full 40-hex sha (got '$PARITY_MAIN_ANCHOR')" >&2
+  exit 1
+}
+git cat-file -e "$PARITY_MAIN_ANCHOR^{commit}" 2>/dev/null || {
+  echo "FATAL: PARITY_MAIN_ANCHOR $PARITY_MAIN_ANCHOR does not resolve to a commit (stale pin? re-anchor at the next ratified main-day flip-back)" >&2
+  exit 1
+}
+case "$PARITY_ERA" in
+  dev|main) ;;
+  *) echo "FATAL: unknown PARITY_ERA '$PARITY_ERA'" >&2; exit 1 ;;
+esac
+
+custody() {
+  # Frozen-main custody (D16b/F2-revised) — two independent alarms, tens of
+  # ms total.
+  #
+  # (1) Anchor drift guard: diff main against PARITY_MAIN_ANCHOR — the last
+  #     ratified state of frozen main (seeded at the frozen tip; updated ONLY
+  #     in the same commit as a ratified main-day sync/flip-back). Catches
+  #     adds/deletes/mods/smuggling; self-diff at seed is zero by
+  #     construction, and a stale pin can only false-red loudly AFTER an
+  #     unanchored ratified change — the safe failure direction.
+  #     (Merge-base anchoring rejected: 21/24 SHARED entries legitimately
+  #     diverge between merge-base 7758d1a and the sanctioned main tip.)
+  if ! git diff --exit-code --quiet "$PARITY_MAIN_ANCHOR" origin/main -- "${SHARED[@]}"; then
+    echo "ROGUE MAIN WRITE: frozen main changed since anchor $PARITY_MAIN_ANCHOR (adds/deletes/mods)" >&2
+    exit 1
+  fi
+  #
+  # (2) Blob provenance: every blob on main's tip under SHARED must already
+  #     exist somewhere in taxi's object universe (comm -23 = in main, not in
+  #     universe). Allowlisted paths are skipped. Secondary layer — catches
+  #     novel-content adds; the anchor diff above catches deletions/mods.
+  local novel
+  novel=$(comm -23 \
+    <(git ls-tree -r origin/main -- "${SHARED[@]}" \
+        | awk -F'\t' -v allow="${PARITY_ALLOWLIST[*]:-}" '
+            {
+              split($1, meta, " ")
+              path = $2
+              skipped = 0
+              n = split(allow, A, " ")
+              for (i = 1; i <= n; i++)
+                if (A[i] != "" && index(path, A[i]) == 1) { skipped = 1; break }
+              if (!skipped) print meta[3]
+            }' | sort -u) \
+    <( git rev-list --objects "origin/$PARITY_TRACK_BRANCH" | cut -d' ' -f1 | sort -u))
+  if [[ -n "$novel" ]]; then
+    echo "ROGUE MAIN WRITE: novel blob(s) on frozen main absent from the origin/taxi universe:" >&2
+    printf '%s\n' "$novel" | head -10 >&2
+    exit 1
+  fi
+}
+
+# --- Dispatch -----------------------------------------------------------------
+branch="${GITHUB_REF_NAME:-$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")}"
+if [[ -z "$branch" || "$branch" == "HEAD" ]]; then
+  branch=""   # detached HEAD / unnamed ref — handled explicitly (F4)
 fi
+
+case "$PARITY_ERA" in
+  main)
+    # Lockstep day: stock behaviour, verbatim.
+    if [[ "$MODE" == "sync" ]]; then
+      sync_to_main
+    else
+      check
+    fi
+    ;;
+  dev)
+    if [[ "$MODE" == "sync" ]]; then
+      echo "REFUSED: --sync is a main-day act (era=$PARITY_ERA per $ENV_FILE) — nothing was modified" >&2
+      exit 1
+    fi
+    custody   # every event, every branch: frozen-main custody first
+    # Branch-aware pass-along (F4: GITHUB_REF_NAME-first).
+    if [[ -z "$branch" || "$branch" == "main" ]]; then
+      :  # dead case, explicit: empty / main / PR-merge refs — custody-only
+    elif [[ "$branch" == "taxi" ]]; then
+      # Pushing TO taxi requires the fast-forward to already be complete.
+      if ! git diff --exit-code --quiet "origin/$PARITY_TRACK_BRANCH" origin/taxi -- "${SHARED[@]}"; then
+        echo "TAXI DRIFT: origin/taxi is not byte-identical to origin/$PARITY_TRACK_BRANCH on the shared surface — complete the fast-forward before pushing to taxi" >&2
+        exit 1
+      fi
+    elif [[ "$branch" == "$PARITY_TRACK_BRANCH" ]]; then
+      # Pushing TO the track branch: taxi may lag, never fork.
+      if ! git merge-base --is-ancestor origin/taxi "origin/$branch"; then
+        echo "FORK: origin/taxi is not an ancestor of origin/$branch — taxi may lag, never fork" >&2
+        exit 1
+      fi
+    else
+      :  # any other named ref — custody-only
+    fi
+    ;;
+esac
+
+echo "PARITY OK (era=$PARITY_ERA branch=$branch)"
+
+# KNOWN RESIDUAL (D16, deliberately NOT fixed here): pushes TO main execute
+# main's own checked-out legacy script until main-day delivers this file via
+# --sync; a push to frozen main is itself the violation, so legacy red there
+# is a correct alarm — noted in D16.
