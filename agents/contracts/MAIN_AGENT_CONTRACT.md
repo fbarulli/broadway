@@ -25,8 +25,9 @@ Working directory: `/home/opc/ONE/broad-way`.
   green push; never diverges.
 - **`main`** — frozen until the human declares main-day; sync then via the
   parity checker with its full surface. The era (dev|main) is declared ONLY
-  in `.github/parity-era.env` — the single era declaration (D16); the
-  checker and the pytest gate both read that committed file, never an
+  inline in `scripts/check_branch_parity.sh` — the single era declaration
+  (D16; relocated inline by D21); the
+  checker and the pytest gate both read that declaration, never an
   environment variable.
 - **`broadway`** — stale/legacy. Do not touch.
 

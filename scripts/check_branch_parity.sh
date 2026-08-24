@@ -12,8 +12,9 @@
 # deletions and content changes — so a change made on one branch cannot
 # silently diverge.
 #
-# ERA-AWARE (D16): behaviour is gated by the committed era file
-# .github/parity-era.env — the single era declaration. PARITY_ERA=dev means
+# ERA-AWARE (D16): behaviour is gated by the era declaration, INLINED below
+# (D21 relocated it from .github/parity-era.env — see "Era declaration").
+# PARITY_ERA=dev means
 # sklearn is the active line and main is frozen (every event runs frozen-main
 # custody, then branch-aware pass-along guards); PARITY_ERA=main is lockstep
 # day (stock check / --sync). There is no environment-variable dialect.
@@ -63,7 +64,6 @@ SHARED=(
   .dockerignore
   README.md
   scripts/
-  .github/parity-era.env
 )
 
 check() {
@@ -100,27 +100,22 @@ sync_to_main() {
   echo "SYNCED taxi -> main for shared surface. Review, run gates, commit, push."
 }
 
-# --- Era declaration (D16a: single vocabulary — no environment dialect) -----
-ENV_FILE=".github/parity-era.env"
-[[ -r "$ENV_FILE" ]] || {
-  echo "FATAL: $ENV_FILE missing/unreadable — era unknown, refusing to guess" >&2
-  exit 1
-}
-# shellcheck disable=SC1090
-source "$ENV_FILE"
-: "${PARITY_ERA:?PARITY_ERA not set in $ENV_FILE}"
-: "${PARITY_TRACK_BRANCH:?PARITY_TRACK_BRANCH not set in $ENV_FILE}"
-: "${PARITY_MAIN_ANCHOR:?PARITY_MAIN_ANCHOR not set in $ENV_FILE}"
-# ALLOWLIST may be legitimately empty, but the KEY must exist (uniform
-# missing/garbled ⇒ loud). NOTE: ${arr+x} tests element [0] and misreads
-# an empty declared array as unset — declare -p is the correct existence
-# test for arrays.
-declare -p PARITY_ALLOWLIST >/dev/null 2>&1 || {
-  echo "FATAL: PARITY_ALLOWLIST not set in $ENV_FILE (use PARITY_ALLOWLIST=() for none)" >&2
-  exit 1
-}
-# Anchor shape + resolution (D16 rider): a garbled pin must fail as CONFIG
-# ERROR here, not later as a misleading ROGUE MAIN WRITE from the diff guard.
+# --- Era declaration INLINE (D21: no separate env file, zero SHARED lines) ---
+# D21 relocated the former .github/parity-era.env verbatim into this script:
+# exactly one era vocabulary (D16a), and editing these four lines below IS
+# the main-day flip act (D16c). NOTE for scripts/run_local_ci.sh's F1b guard:
+# the `^PARITY_ERA=` line is the staleness marker — a track ref whose checker
+# lacks it predates D16/D21 and must not gate CI.
+PARITY_ERA=dev                 # dev: sklearn active, main frozen | main: lockstep day
+PARITY_TRACK_BRANCH=sklearn    # active development line during dev era
+PARITY_ALLOWLIST=()            # SHARED paths exempt from custody; extend only by cited ruling
+PARITY_MAIN_ANCHOR=18607091ddbb2602ad4475341ad377bafee5ec4b  # last ratified state of frozen main
+
+# Preserved validations (D16 rider). The old ENV_FILE readability test,
+# `source`, ${VAR:?} trio, and declare -p existence check are DEAD here —
+# constants cannot be unset or missing; only shape/resolution remain.
+# Anchor shape + resolution: a garbled pin must fail as CONFIG ERROR here,
+# not later as a misleading ROGUE MAIN WRITE from the diff guard.
 [[ "$PARITY_MAIN_ANCHOR" =~ ^[0-9a-f]{40}$ ]] || {
   echo "FATAL: PARITY_MAIN_ANCHOR must be a full 40-hex sha (got '$PARITY_MAIN_ANCHOR')" >&2
   exit 1
@@ -193,7 +188,7 @@ case "$PARITY_ERA" in
     ;;
   dev)
     if [[ "$MODE" == "sync" ]]; then
-      echo "REFUSED: --sync is a main-day act (era=$PARITY_ERA per $ENV_FILE) — nothing was modified" >&2
+      echo "REFUSED: --sync is a main-day act (era=$PARITY_ERA declared inline per D21) — nothing was modified" >&2
       exit 1
     fi
     custody   # every event, every branch: frozen-main custody first

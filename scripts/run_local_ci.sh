@@ -23,7 +23,24 @@ run() {  # run <name> <cmd...>: loud banner, tail on fail, aggregate, stop never
   else echo "FAIL $1 — tail:"; tail -15 "$log"; fail=1; fi
   rm -f "$log"
 }
-run parity  bash scripts/check_branch_parity.sh
+# F1b guard (D21): the parity gate must NOT trust the tree-local checker —
+# a checkout of main (or any stale ref) carries the PRE-D16 legacy script.
+# Pin the checker to refs/remotes/origin/sklearn and reject it unless it
+# carries the post-D16/D21 inline era declaration (`^PARITY_ERA=` marker).
+gate_parity() {
+  local dest rc
+  dest=$(mktemp "${TMPDIR:-/tmp}/f1b_parity.XXXXXX")
+  git show refs/remotes/origin/sklearn:scripts/check_branch_parity.sh >"$dest" 2>/dev/null || {
+    echo "FAIL parity (F1b): origin/sklearn unavailable — cannot pin checker"; return 1;
+  }
+  grep -q '^PARITY_ERA=' "$dest" || {
+    echo "FAIL parity (F1b): legacy pre-D16 checker on track ref"; rm -f "$dest"; return 1;
+  }
+  bash "$dest"; rc=$?
+  rm -f "$dest"
+  return "$rc"
+}
+run parity gate_parity
 run ruff    uv run ruff check src tests experiments/mlflow experiments/fare_prediction \
             experiments.py experiments_ui.py project/working.py project/data.py
 run mypy    uv run mypy src/broadway

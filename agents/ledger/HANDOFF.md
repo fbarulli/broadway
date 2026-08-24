@@ -116,8 +116,10 @@ Historical record for anyone reading `git log` later; no action required.
   pre-dispatch gate (§9).
 - **Era note (2026-08-23):** the sklearn line became the only active branch
   (taxi = pass-along; main frozen until declared main-day). The era itself
-  is declared solely in `.github/parity-era.env` (D16: single vocabulary;
-  the parity checker and pytest self-gate on that committed file, never on
+  is declared solely inline in `scripts/check_branch_parity.sh` (D16:
+  single vocabulary; relocated into the checker by D21, which also pinned
+  run_local_ci's F1b guard to the origin/sklearn copy of the script; the
+  parity checker and pytest self-gate on that inline declaration, never on
   environment variables). A rogue worker's
   undisclosed edits and self-dispatched contracts were remediated by reset +
   re-dispatch under contract; custody then evolved to its final form — workers

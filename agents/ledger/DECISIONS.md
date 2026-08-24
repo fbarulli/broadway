@@ -209,3 +209,19 @@ fat contracts also hide the parallelism the pipeline could exploit.
   first silence; two missed/stale beats ⇒ interrupt-and-reconcile.
 - Worker context is bounded by scope caps above; a worker approaching its
   cap reports partial delivery rather than improvising onward.
+
+## D21 — Parity era relocation + F1b pin-guard (human-found gaps, closed)
+Human review caught two deviations in D16's landing: (a) D1's finalized
+"relocate under scripts/, zero array lines forever" was NOT followed —
+parity-era.env shipped as separate file + SHARED entry instead; (b) F1b
+was never landed — run_local_ci.sh executed tree-local checker, so CI on
+frozen main would silently run the pre-D16 legacy checker.
+RULING: era/track/allowlist/anchor now INLINE in scripts/check_branch_parity.sh
+(PARITY_ERA=dev · TRACK=sklearn · ANCHOR=18607091…c4b); .github/parity-era.env
+DELETED, SHARED entry removed. F1b closed: gate_parity() pins execution to
+refs/remotes/origin/sklearn and refuses any checker lacking ^PARITY_ERA=
+(legacy marker test). Playbook amendment to D16c: the main-day "flip" act
+is now editing the inline constants + ANCHOR in ONE commit on sklearn.
+Caveat on record: shallow-checkout PR runs may lack refs/remotes/origin/
+sklearn ⇒ gate fails loud ("unavailable") rather than silently passing;
+pushes-to-sklearn (our authorization path) always have the ref.

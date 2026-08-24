@@ -159,3 +159,15 @@ era updates · `019a9da` DECISIONS.md sheet · `8e7d51a` G0a doc pruning.
   reconcile `git show --name-only HEAD` against error locations BEFORE
   deciding; if failures belong to another lane's WIP, WAIT for that lane
   or scope-gate explicitly — and record which.
+
+## Incident log: D16 landing deviated from finalized D1 design
+- **2026-08-24**: Human review found D16-PARITY shipped .github/
+  parity-era.env as SHARED entry where D1 had finalized inline-under-
+  scripts ("zero array lines forever"), and F1b (pin-guard against stale
+  tree-local checker) never landed despite being ruled — CI-on-main ran
+  the legacy checker silently all day. Root cause: arbitration drift
+  between ruling text and implemented diff during a multi-contract
+  session. Closed same-hour via PARITYFIX contract (worker 38113cad):
+  inline constants + F1b pin guard + negative tests through the real
+  gate body. Lesson: rulings need a post-landing conformance check
+  against their own acceptance lines — added to arbitration checklist.
