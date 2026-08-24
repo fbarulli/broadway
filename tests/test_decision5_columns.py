@@ -219,3 +219,10 @@ def test_shipped_config_passes_and_matches_retired_selector(
     )
     numeric = set(df.select_dtypes(include="number").columns) - {"target"}
     assert numeric - declared == set()
+
+
+def test_missing_experiment_or_dataset_config_raises() -> None:
+    """The guard fires before schema_columns touches a None contract."""
+    cfg = _cfg().model_copy(update={"experiment": None, "dataset": None})
+    with pytest.raises(ValueError, match="requires experiment and dataset config"):
+        eligible_feature_columns(_mixed_frame(), cfg)
