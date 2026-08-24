@@ -78,3 +78,9 @@ era updates · `019a9da` DECISIONS.md sheet · `8e7d51a` G0a doc pruning.
   untracked files post-ban. Interrupted mid-turn; index verified already
   clean at recovery; zero contamination landed. Confirms the bar and the
   standing post-adversary reconciliation gate.
+| D16-PARITY | era-aware custody gate lands (`2076e88`): single-vocabulary
+  `.github/parity-era.env` (era/track/allowlist/anchor), checker era-dispatch
+  + two-layer custody, pytest committed-file gating, PARITY_MAIN_DAY dialect
+  deleted. Reviewer: commit-as-is after ~25 adversarial scenarios. Riders
+  carried: custody-alarm wording (says "taxi universe", scans track),
+  ALLOWLIST `:?` presence guard, sync_to_main local-branch fragility note.
