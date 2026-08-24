@@ -150,6 +150,16 @@ custody() {
   #     exist somewhere in taxi's object universe (comm -23 = in main, not in
   #     universe). Allowlisted paths are skipped. Secondary layer — catches
   #     novel-content adds; the anchor diff above catches deletions/mods.
+  # D21 rider: main and track lines are DISJOINT histories (no common
+  # ancestor since the dev-era reset), so the universe below can never
+  # contain main's blob versions — the check would false-positive on all
+  # shared files forever. Its value is catching POST-FREEZE writes to
+  # main; when main sits exactly at the anchor, the freeze-intact
+  # shortcut above makes this layer unreachable-by-definition. Run it
+  # ONLY when main moved off the anchor (then any novel blob IS rogue).
+  if [[ "$(git rev-parse --verify origin/main)" == "$PARITY_MAIN_ANCHOR" ]]; then
+    return 0
+  fi
   local novel
   novel=$(comm -23 \
     <(git ls-tree -r origin/main -- "${SHARED[@]}" \

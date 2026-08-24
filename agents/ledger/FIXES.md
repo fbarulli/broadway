@@ -171,3 +171,17 @@ era updates · `019a9da` DECISIONS.md sheet · `8e7d51a` G0a doc pruning.
   inline constants + F1b pin guard + negative tests through the real
   gate body. Lesson: rulings need a post-landing conformance check
   against their own acceptance lines — added to arbitration checklist.
+
+## Incident log: novel-blob layer false-positive (disjoint histories)
+- **2026-08-24**: Post-D21 push, gate_parity's pinned execution surfaced
+  ROGUE MAIN WRITE on all 69 shared-path blobs. Forensics: main and
+  sklearn have DISJOINT histories (no common ancestor since the dev-era
+  reset; main is a truncated 2-commit line at anchor). The universe check
+  (`main blobs ⊆ sklearn reachable set`) is unsatisfiable under that
+  topology — false positive by construction, not a real rogue write
+  (origin/main == anchor exactly; rev-count 0 ⇒ freeze intact).
+  Anomaly on record: worker's pre-push proof reported PARITY OK with the
+  same refs+code; unexplained, noted rather than buried.
+  Fix: freeze-intact shortcut — novel-blob layer runs ONLY when main has
+  moved off the anchor (the only case where it can carry signal); the
+  anchor-diff layer above still catches add/del/mod at any other time.
