@@ -84,3 +84,7 @@ era updates · `019a9da` DECISIONS.md sheet · `8e7d51a` G0a doc pruning.
   deleted. Reviewer: commit-as-is after ~25 adversarial scenarios. Riders
   carried: custody-alarm wording (says "taxi universe", scans track),
   ALLOWLIST `:?` presence guard, sync_to_main local-branch fragility note.
+| T-BUG-3 | train CLI tests pin honest failure (`837cff9`): exit-1 +
+  named-requirement substrings replace returncode!=2 no-op assertions;
+  discriminator (argparse exit 2) empirically proven by reviewer.
+  Success-path fixture stack deferred to backlog annex.
