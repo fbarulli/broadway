@@ -96,7 +96,10 @@ citation rule in MAIN_AGENT_CONTRACT.md). A FULL-LINE `EVENT: issues/<n>#
 issuecomment-<m> event-id <8hex>` line is valid iff a UNIQUE row exists here;
 role vocabulary is no escape in this namespace, and duplicate event-id rows
 are a probe violation. Superseded rows may outlive their EVENT lines.
-Created_at values verified via gh api at pilot close.
+Created_at values verified via gh api at pilot close. Provenance: all six
+rows are pilot backfills entered via owner gh-api writes (two genesis
+events, D19-D21 backfills, custody-baseline); each row's `type` keeps its
+per-event ruling class, one unique row per legacy narrative id.
 
 | event-id | issue | comment-id | created_at | type | supersedes |
 |---|---|---|---|---|---|

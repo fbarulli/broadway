@@ -40,13 +40,15 @@ from tier_classifier import CHECKLIST, FULL, classify
 ROOT = Path(__file__).resolve().parents[1]
 
 BACKTICKED_PATH = re.compile(r"`([^\s`]+)\.(py|sh|md|ya?ml|toml|txt|json|env|cfg|ini)`")
-HEX8 = re.compile(r"\b[0-9a-f]{8}\b")
-EVENT_LINE = re.compile(
-    r"^EVENT:\s*issues/(?P<issue>\d+)#issuecomment-(?P<comment>\d+)\s+event-id\s*(?P<eid>[0-9a-f]{8})\s*$",
-    re.MULTILINE,
-)
-# FULL-LINE anchor (senior 3813c37c ratification): a line belongs to the
-# event-id namespace ONLY when nothing but whitespace follows the token.
+HEX8 = re.compile(r"\b[0-9a-f]{8}\b")  # known lookalike, OUT OF SCOPE: reports/audit/* carries decimal join-counts with accidental hex shape (e.g. 17091666) — reports/ is outside probe-C scan scope by design
+# Canonical EVENT-line grammar (senior 3813c37c, full-line anchored,
+# no-trailing-newline form): <hex8> expands to the named group (?P<eid>...)
+# so span extraction shares these exact bytes. Kept on ONE source line so
+# the byte-contiguity pin below is meaningful.
+EVENT_GRAMMAR_CANONICAL = r"^EVENT:\s*issues/(?P<issue>\d+)#issuecomment-(?P<comment>\d+)\s+event-id\s*(?P<eid>[0-9a-f]{8})\s*$"
+EVENT_LINE = re.compile(EVENT_GRAMMAR_CANONICAL, re.MULTILINE)
+# A line belongs to the event-id namespace ONLY when nothing but whitespace
+# follows the token.
 EVENTS_HEADER = ("event-id", "issue", "comment-id", "created_at", "type", "supersedes")
 REGISTRY_ROW_SHAPE = re.compile(
     r"^\s*\|\s*(?P<eid>[0-9a-f]{8})\s*\|\s*issues/(?P<issue>\d+)#issuecomment-(?P<cid>\d+)\s*\|"
@@ -462,6 +464,15 @@ def test_probe_c_red_duplicate_event_registry_row() -> None:
     )
     with pytest.raises(AssertionError, match="duplicate event-id deadbeef"):
         probe_event_registry_schema(duplicated_state, source="seeded-STATE")
+
+
+def test_probe_c_event_grammar_canonical_bytes_pinned() -> None:
+    # 8428b3e lesson: ruled wording and detector must not drift. The compiled
+    # EVENT_LINE pattern IS the senior's canonical grammar bytes, and those
+    # bytes appear verbatim in this module's source (no silent retyping).
+    assert EVENT_LINE.pattern == EVENT_GRAMMAR_CANONICAL
+    module_source = Path(__file__).read_text(encoding="utf-8")
+    assert EVENT_GRAMMAR_CANONICAL in module_source
 
 
 def test_probe_d_red_stale_floor_quote(tmp_path: Path) -> None:
