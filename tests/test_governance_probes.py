@@ -12,9 +12,13 @@ backticked-path tokens are whitespace-free and resolve literally, by wildcard
 glob, or by basename anywhere in the pruned tree; historical lines (containing
 deleted/historic/b15f66e/once) are exempt; the declared agent-ID namespace
 matches role vocabulary agent/adversar*/reviewer/synthesis within 80 chars.
-USER-MVP pilot event-ids are a THIRD namespace (F4′): an ``EVENT:`` line's
-8-hex event-id is valid only via a ``## EVENTS`` resolution row in STATE.md —
-role vocabulary grants NO escape inside that grammar.
+USER-MVP pilot event-ids are a THIRD namespace (F4′, senior 3813c37c): a
+FULL-LINE ``EVENT: issues/<n>#issuecomment-<m> event-id <8hex>`` line's token
+is valid only via a UNIQUE row in STATE.md's normative ``## EVENTS`` table —
+role vocabulary grants NO escape inside that grammar. Probe C scans FIXES,
+DECISIONS and STATE; inside STATE.md only shape-matched registry rows between
+the ``## EVENTS`` heading and the next ``##`` heading are exempt (section-
+scoped); every other hex-bearing line stays in scan.
 """
 
 from __future__ import annotations
@@ -38,8 +42,15 @@ ROOT = Path(__file__).resolve().parents[1]
 BACKTICKED_PATH = re.compile(r"`([^\s`]+)\.(py|sh|md|ya?ml|toml|txt|json|env|cfg|ini)`")
 HEX8 = re.compile(r"\b[0-9a-f]{8}\b")
 EVENT_LINE = re.compile(
-    r"^EVENT:\s*issues/(?P<issue>\d+)#issuecomment-(?P<comment>\d+)\s+event-id\s+(?P<eid>[0-9a-f]{8})",
+    r"^EVENT:\s*issues/(?P<issue>\d+)#issuecomment-(?P<comment>\d+)\s+event-id\s*(?P<eid>[0-9a-f]{8})\s*$",
     re.MULTILINE,
+)
+# FULL-LINE anchor (senior 3813c37c ratification): a line belongs to the
+# event-id namespace ONLY when nothing but whitespace follows the token.
+EVENTS_HEADER = ("event-id", "issue", "comment-id", "created_at", "type", "supersedes")
+REGISTRY_ROW_SHAPE = re.compile(
+    r"^\s*\|\s*(?P<eid>[0-9a-f]{8})\s*\|\s*issues/(?P<issue>\d+)#issuecomment-(?P<cid>\d+)\s*\|"
+    r"\s*(?P=cid)\s*\|\s*\d{4}-\d{2}-\d{2}T[\d:.+Z-]+\s*\|\s*\w+\s*\|\s*(?:-|[0-9a-f]{8})\s*\|\s*$"
 )
 SEP_ROW = re.compile(r"^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)+\|?\s*$")
 HISTORICAL_MARKERS = ("deleted", "historic", "b15f66e", "once")
@@ -167,6 +178,62 @@ def _registered_event_ids() -> frozenset[str]:
     return _parse_event_registry((ROOT / "agents/ledger/STATE.md").read_text(encoding="utf-8"))
 
 
+def probe_event_registry_schema(state_text: str, source: str = "<state>") -> None:
+    """Normative ## EVENTS table: exact header, hex8 ids, UNIQUE event-ids."""
+    seen: dict[str, int] = {}
+    in_events = False
+    header_seen = False
+    for no, line in enumerate(state_text.splitlines(), 1):
+        if line.startswith("#"):
+            in_events = line.strip() == "## EVENTS"
+            continue
+        if not in_events or not line.lstrip().startswith("|") or SEP_ROW.match(line):
+            continue
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if not header_seen:
+            if tuple(cells) != EVENTS_HEADER:
+                raise AssertionError(
+                    f"{source}:{no}: ## EVENTS header declares {cells} but the normative "
+                    f"schema is {list(EVENTS_HEADER)}"
+                )
+            header_seen = True
+            continue
+        if len(cells) != len(EVENTS_HEADER):
+            raise AssertionError(
+                f"{source}:{no}: registry row has {len(cells)} cells, schema owns {len(EVENTS_HEADER)}"
+            )
+        eid = cells[0]
+        if not HEX8.fullmatch(eid):
+            raise AssertionError(f"{source}:{no}: registry event-id {eid!r} is not 8-hex")
+        if eid in seen:
+            raise AssertionError(
+                f"{source}:{no}: duplicate event-id {eid} in ## EVENTS registry "
+                f"(first registered at line {seen[eid]})"
+            )
+        seen[eid] = no
+
+
+def _events_table_row_spans(state_text: str) -> frozenset[tuple[int, int]]:
+    """Char spans of registry-SHAPE rows strictly inside STATE.md's ## EVENTS.
+
+    Section-scoped exemption (senior ruling c): only lines between the
+    ``## EVENTS`` heading and the next ``##`` heading that match the normative
+    row shape are exempt from 8-hex scanning; all other hex-bearing STATE.md
+    lines stay in scan.
+    """
+    spans: set[tuple[int, int]] = set()
+    in_events = False
+    offset = 0
+    for line in state_text.splitlines(keepends=True):
+        stripped = line.rstrip("\n")
+        if stripped.startswith("#"):
+            in_events = stripped.strip() == "## EVENTS"
+        elif in_events and REGISTRY_ROW_SHAPE.match(stripped):
+            spans.add((offset, offset + len(line)))
+        offset += len(line)
+    return frozenset(spans)
+
+
 def probe_hex_tokens(
     text: str,
     resolver: Callable[[str], bool],
@@ -174,18 +241,25 @@ def probe_hex_tokens(
     window: int = 80,
     source: str = "<text>",
     event_registry: frozenset[str] | None = None,
+    exempt_spans: frozenset[tuple[int, int]] = frozenset(),
 ) -> None:
     """Every 8-hex token resolves as a revision or is a declared agent ID.
 
-    F4′ third namespace: an occurrence introduced by an
+    F4′ third namespace: an occurrence introduced by a FULL-LINE
     ``EVENT: issues/<n>#issuecomment-<m> event-id <8hex>`` line never resolves
     via git and role vocabulary grants NO escape — it is valid only when listed
     in ``event_registry`` (the STATE.md ``## EVENTS`` resolution table).
+
+    ``exempt_spans`` (section-scoped STATE.md exemption): occurrences whose
+    span lies inside one are skipped outright — used for registry rows between
+    the ``## EVENTS`` heading and the next ``##`` heading.
     """
     registry = event_registry if event_registry is not None else frozenset()
     event_spans = {m.span("eid") for m in EVENT_LINE.finditer(text)}
     for match in HEX8.finditer(text):
         token = match.group(0)
+        if match.span() in exempt_spans:
+            continue
         if match.span() in event_spans:
             if token not in registry:
                 raise AssertionError(
@@ -252,6 +326,20 @@ def test_probe_c_live_8hex_tokens_declared_or_resolvable() -> None:
             source=name,
             event_registry=events,
         )
+    # Senior ruling c: STATE.md joins the scan. Its ## EVENTS registry rows
+    # are exempt SECTION-SCOPED (shape-matched, heading-bounded); every other
+    # hex-bearing line stays in scan; the registry itself must satisfy the
+    # normative schema with unique event-ids.
+    state = "agents/ledger/STATE.md"
+    state_text = (ROOT / state).read_text(encoding="utf-8")
+    probe_event_registry_schema(state_text, source=state)
+    probe_hex_tokens(
+        state_text,
+        _git_resolves,
+        source=state,
+        event_registry=events,
+        exempt_spans=_events_table_row_spans(state_text),
+    )
 
 
 def test_probe_d_live_floor_quotes_match_gate_script() -> None:
@@ -314,7 +402,7 @@ def test_probe_c_red_unattributed_8hex_token(tmp_path: Path) -> None:
         probe_hex_tokens(seeded_text, everything_except_seed, source="seeded-DECISIONS")
 
 
-_FORGED_EVENT_LINE = "EVENT: issues/4#issuecomment-12345678 event-id deadbeef (backfill)."
+_FORGED_EVENT_LINE = "EVENT: issues/4#issuecomment-12345678 event-id deadbeef"
 
 
 def _append_forged_event(lines: list[str]) -> list[str]:
@@ -348,11 +436,32 @@ def test_probe_c_green_registered_event_id_via_events_registry(tmp_path: Path) -
         "## EVENTS\n"
         "| event-id | issue | comment-id | created_at | type | supersedes |\n"
         "|---|---|---|---|---|---|\n"
-        "| deadbeef | 4 | 12345678 | 2026-08-24T16:19:00Z | amendment | - |\n"
+        "| deadbeef | issues/4#issuecomment-12345678 | 12345678 "
+        "| 2026-08-24T16:19:00Z | amendment | - |\n"
     )
     assert _parse_event_registry(synthetic_state) == {"deadbeef"}  # parser round-trip
     registry = _registered_event_ids() | {"deadbeef"}  # live rows + the new one
     probe_hex_tokens(seeded, _git_resolves, source="seeded-DECISIONS", event_registry=registry)
+
+
+def test_probe_c_red_duplicate_event_registry_row() -> None:
+    # Normative-schema uniqueness constraint: the same hex8 registered twice
+    # in ## EVENTS is RED even though each row individually is well-formed.
+    duplicated_state = (
+        "# STATE\n"
+        "## EVENTS\n"
+        "| event-id | issue | comment-id | created_at | type | supersedes |\n"
+        "|---|---|---|---|---|---|\n"
+        "| deadbeef | issues/4#issuecomment-12345678 | 12345678 "
+        "| 2026-08-24T16:19:00Z | amendment | - |\n"
+        "| cafe1234 | issues/3#issuecomment-5398091966 | 5398091966 "
+        "| 2026-08-24T16:19:07Z | authorization | - |\n"
+        "| deadbeef | issues/4#issuecomment-99999999 | 99999999 "
+        "| 2026-08-24T16:20:00Z | verdict | - |\n"
+        "## Next Section\n"
+    )
+    with pytest.raises(AssertionError, match="duplicate event-id deadbeef"):
+        probe_event_registry_schema(duplicated_state, source="seeded-STATE")
 
 
 def test_probe_d_red_stale_floor_quote(tmp_path: Path) -> None:

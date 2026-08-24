@@ -113,9 +113,9 @@ more reading `parse_numeric` than any checklist produced).
   `gh api repos/fbarulli/broadway/issues/comments/<id>` and require (a) parent issue is a
   designated ledger issue (#3 AUTHORIZATION LEDGER, #4 VERDICT LOG) AND `.locked == true`;
   (b) `.user.login == "fbarulli"` at resolution time; (c) recomputed event-id == header
-  event-id (first 8 hex of sha256 over the body with every `event-id:`/`recorded-time:` line
-  deleted and all remaining bytes preserved exactly — no added, removed, or altered trailing
-  newline); (d) `status: active` and type matching the claimed kind.
+  event-id (first 8 hex of sha256 over the comment body after deleting every
+  `event-id:`/`recorded-time:` line and joining remaining lines with `\n`, with NO trailing
+  newline appended); (d) `status: active` and type matching the claimed kind.
   Record the resolution (event-id, comment id, created_at) into STATE.md/DECISIONS.md BEFORE
   relying on the claim. Historical events carry `backfill: true` with distinct event-time and
   recorded-time. Ledger comments are immutable by POLICY: corrections are NEW comments with
