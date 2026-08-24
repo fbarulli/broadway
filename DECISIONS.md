@@ -139,3 +139,14 @@ case-whitelist era validation.
   (codified in MAIN_AGENT_CONTRACT.md §6). Facade modules are never
   autofixed; experiment batches outside CI's lint whitelist carry a recorded
   44-finding debt batched for Tier-4/5 cleanup.
+
+## D18 — Arbitration verdict-class table (scaling the serial stage)
+Standing rulings reviewers cite directly; novel cases escalate by default.
+- Vacuous/tautology test ⇒ reject-and-fix (test author rewrites with
+  falsifiable assertion).
+- Missing `match=` pin on a new raise site ⇒ rider (batch at Tier-5).
+- Doc-drift vs shipped behavior ⇒ commit-as-is-with-rider (fix folds into
+  next governance touch).
+- New branch-level dead arm ⇒ pin-or-pragma with justification comment.
+- Coverage-gaming (line-execution without meaningful assert) ⇒ reject.
+- Custody deviation of ANY kind ⇒ STOP, log incident, bar pending review.

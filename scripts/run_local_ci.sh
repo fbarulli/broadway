@@ -7,7 +7,14 @@
 # runs on taxi only. Usage: run_local_ci.sh [--static]; exit 0 green / 1 red.
 set -euo pipefail
 cd "$(dirname "$0")/.."
-STATIC=0; [[ "${1:-}" == "--static" ]] && STATIC=1   # doc-only micro edits
+STATIC=0; TIER="full"
+case "${1:-}" in
+  --static) STATIC=1 ;;                       # doc-only micro edits
+  --tier=fast) TIER="fast" ;;                  # parity+ruff+mypy+configs (<30s)
+  --tier=full|"") TIER="full" ;;               # everything incl. pytest+cov>=95
+  *) echo "usage: run_local_ci.sh [--static|--tier=fast|--tier=full]" >&2; exit 2 ;;
+esac
+FAST_BANNERS="FAST-GREEN"; FULL_BANNERS="LOCAL-CI GREEN"   # distinct vocabularies
 export MPLCONFIGDIR="${MPLCONFIGDIR:-${TMPDIR:-/tmp}/broadway-mpl}"; mkdir -p "$MPLCONFIGDIR"
 fail=0
 run() {  # run <name> <cmd...>: loud banner, tail on fail, aggregate, stop never
@@ -25,9 +32,13 @@ from pathlib import Path
 from broadway.config.loader import load_config
 ps = sorted(Path('configs/experiment').glob('*.yaml')); assert ps, 'no configs'
 [load_config('train', dataset='test', experiment=p.stem) or print(f'OK {p.stem}') for p in ps]"
-if [[ $STATIC -eq 0 ]]; then
+if [[ $STATIC -eq 0 && $TIER == "full" ]]; then
   run pytest uv run pytest tests/ --cov=src/broadway --cov-report=term-missing \
              --cov-fail-under=95
 fi
-[[ $fail -eq 0 ]] && echo "LOCAL-CI GREEN" || echo "LOCAL-CI RED — fix above before commit/push"
+if [[ $fail -eq 0 ]]; then
+  [[ $TIER == "fast" ]] && echo "FAST-GREEN (tiers: parity/ruff/mypy/configs)" || echo "LOCAL-CI GREEN"
+else
+  echo "LOCAL-CI RED — fix above before commit/push"
+fi
 exit "$fail"

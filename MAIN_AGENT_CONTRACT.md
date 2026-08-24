@@ -163,6 +163,19 @@ more reading `parse_numeric` than any checklist produced).
   lives in git itself; STATE.md carries only what commits cannot (lanes,
   custody, hazards, open items).
 
+- **Session-close rule:** no ratified state survives a session boundary
+  unlanded — session close means `git status` reconciled against STATE.md's
+  uncommitted-content section being empty or explicitly waived.
+- **Heartbeat rule:** any dispatch expected >20 min carries mandatory
+  heartbeats (current step + fresh tool-output tail); two missed/stale
+  heartbeats ⇒ interrupt-and-reconcile. Exempts Micro contracts.
+- **Ledger folding:** no standalone `Ledger:` commits except at batch
+  boundaries — contract actuals fold into the contract commit body;
+  FIXES.md rows update at batch close.
+- **Scratch siting:** agent scratch NEVER lives at repo root — `mktemp -d`
+  outside the repo, deleted before report. Root dot-dirs are hygiene-test
+  failures.
+
 ## 7. Contract requirements
 
 - Follow `CONTRACT_TEMPLATE.md` — skeleton mandatory. A contract the worker
