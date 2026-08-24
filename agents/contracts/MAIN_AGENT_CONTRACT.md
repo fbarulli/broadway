@@ -105,6 +105,31 @@ more reading `parse_numeric` than any checklist produced).
   unverified by default; ratification flows human → main → brief.
 - **Confirmation ledger (2026-08-23):** every human-gated action records who
   authorized it, when, via which channel, BEFORE execution.
+- **Authorization-citation rule (USER-MVP pilot; sovereign-approved; amends the D22 deferral):**
+  Any claim that a human authorized, ratified, dispatched, accepted, rejected, or overruled
+  something is NON-AUTHORITATIVE unless it cites a GitHub issue-comment URL
+  (`…/issues/<n>#issuecomment-<id>`) in fbarulli/broadway whose body carries a valid event
+  header. A bare issue URL does not cite. Validity is RESOLVED, never presumed: fetch
+  `gh api repos/fbarulli/broadway/issues/comments/<id>` and require (a) parent issue is a
+  designated ledger issue (#3 AUTHORIZATION LEDGER, #4 VERDICT LOG) AND `.locked == true`;
+  (b) `.user.login == "fbarulli"` at resolution time; (c) recomputed event-id == header
+  event-id (first 8 hex of sha256 over the body with any `event-id:`/`recorded-time:` line
+  deleted, one trailing newline); (d) `status: active` and type matching the claimed kind.
+  Record the resolution (event-id, comment id, created_at) into STATE.md/DECISIONS.md BEFORE
+  relying on the claim. Historical events carry `backfill: true` with distinct event-time and
+  recorded-time. Ledger comments are immutable by POLICY: corrections are NEW comments with
+  `supersedes:`; an edited comment fails (c) and voids itself. GitHub unreachable ⇒ affected
+  claims remain non-authoritative until resolved; the tree remains the governing substrate
+  (GIT-WINS unchanged). Absence of citation bars AUTHORITY, not action: work proceeds only
+  where standing written rules already authorize it.
+- **Citation-resolution procedure (arbitration checklist addition):** when someone cites X#Y:
+  (1) Parse ref — must be `fbarulli/broadway/issues/<n>#issuecomment-<m>`; bare issue link →
+  INVALID. (2) Fetch `gh api …/issues/comments/<m>` (+ `/issues/<n>` for lock/title).
+  (3) Check: title prefix ∈ {AUTHORIZATION LEDGER, VERDICT LOG}; `.locked==true`;
+  `.user.login=="fbarulli"`; header parses; recomputed sha8 == `event-id`; `status: active`;
+  type matches claim kind. (4) Any failure → verdict INVALID; log a fabrication-suspect event
+  citing the bad URL; claim non-authoritative. (5) Pass → write resolution row (event-id +
+  comment id + created_at + sha8) into the tree; cite THAT tree row onward.
 - **Deviation-scan:** "refined/deliberate/adjusted" language absent from the
   ratified spec = unratified decision → halt and report.
 - **Provenance-check:** `git log` alongside `git status`; `checkout --`

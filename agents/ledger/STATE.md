@@ -54,6 +54,11 @@ post-commit tree).
   only. (Historic trap: `_common.py`/`_setup.py` once routed ≥25 imports;
   both deleted in b15f66e era. Verify import-site volume before citing.)
 - Full pytest+cov needs ~150s > 120s cap: use background-run + poll pattern.
+- USER-MVP traceability pilot LIVE: AUTHORIZATION LEDGER = issue #3,
+  VERDICT LOG = issue #4 (both conversation-locked; owner-writes via gh api).
+  Genesis events b16fb9ca/#3-c5398091966 and 493e21ce/#4-c5398092241;
+  backfills 3afcd9b1(D19) 7595cb13(D20) 555b6fb8(D21) e1f7cc62(custody-baseline).
+  Citation rule + resolution procedure now in MAIN_AGENT_CONTRACT.md.
 - Phantom-channel incident: adversary 35266af4 (CI-proposal attack —
   contract work itself excellent) post-completion emitted three
   unsolicited elaborations of a read-audit system and claimed relay to a

@@ -152,6 +152,7 @@ Standing rulings reviewers cite directly; novel cases escalate by default.
 - Custody deviation of ANY kind ⇒ STOP, log incident, bar pending review.
 
 ## D19 — Custody amendment + decision-pipeline adoptions (human-ratified)
+EVENT: issues/4#issuecomment-5398092508 event-id 3afcd9b1 (backfill).
 Full pipeline ran: 3 investigators + 3 adversaries + senior synthesis
 (b983b5a5). Rulings: P1 risk-tiered review ADOPTED as amended (TIERREV-1);
 P2 custody isolation ADOPTED as three-tier architecture (CUSTODY-1) — naive
@@ -170,6 +171,7 @@ probe at every arbitration (git count-objects + reflog depth +
 PARITY_MAIN_ANCHOR blob census vs pinned baselines, alarm-on-drift).
 
 ## D20 — Micro-contract decomposition (human-directed rethink)
+EVENT: issues/4#issuecomment-5398092820 event-id 7595cb13 (backfill).
 Motivated live: a 4-deliverable worker ran >15 min on 1/N visible progress.
 Long single-worker contexts are hallucination + context-exhaustion risk;
 fat contracts also hide the parallelism the pipeline could exploit.
@@ -211,6 +213,7 @@ fat contracts also hide the parallelism the pipeline could exploit.
   cap reports partial delivery rather than improvising onward.
 
 ## D21 — Parity era relocation + F1b pin-guard (human-found gaps, closed)
+EVENT: issues/4#issuecomment-5398093134 event-id 555b6fb8 (backfill).
 Human review caught two deviations in D16's landing: (a) D1's finalized
 "relocate under scripts/, zero array lines forever" was NOT followed —
 parity-era.env shipped as separate file + SHARED entry instead; (b) F1b
@@ -260,3 +263,4 @@ message carrying only the routing-table amendment (4133e45) — a live
 instance of mislabeled provenance, caught by re-reading the tool output
 before declaring victory. This entry is the corrective second act.
 | D22-rider | secret.yaml ships real high-entropy DB password PUSHED PUBLIC ("local-kind" = comment, not enforcement). SECRET-1 rotate-and-remove IMMEDIATELY post-CIADPT-d arbitration, before Axis-2: template manifest + local-override/generated fallback in lifecycle.sh (~2 files, rides shellcheck/kubeconform gates); NO history rewrite (rotation kills value; force-push mid-ladder risks more than a dead local credential). | senior d4a86cf9 |
+  AMENDMENT (USER-MVP pilot, human-ratified): TRIGGER "citation tooling ← first gh citation attempt" FIRED early by sovereign approval of the ledger pilot; gh-URL citations UN-DEFERRED solely for events on locked fbarulli/broadway ledger issues under merged conditions (conversation lock + resolution-time actor check + sha8-of-content ids); all other deferrals unchanged.
