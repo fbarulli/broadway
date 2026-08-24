@@ -212,3 +212,53 @@ def test_baseline_hypothesis_absent_declared_group_raises() -> None:
 
     with pytest.raises(ValueError, match="no groups present"):
         hypothesis.run(df, "t", "g", ["x", "y"])
+
+
+# --- stats step guard rails -------------------------------------------------
+
+
+def test_stats_requires_dataset_and_stats_config(tmp_path: Path) -> None:
+    cfg = _stats_cfg(tmp_path)
+    no_dataset = cfg.model_copy(update={"dataset": None})
+    with pytest.raises(ValueError, match="stats step requires dataset and stats config"):
+        module.run(no_dataset)
+    no_stats = cfg.model_copy(update={"stats": None})
+    with pytest.raises(ValueError, match="stats step requires dataset and stats config"):
+        module.run(no_stats)
+
+
+def test_stats_hypothesis_block_required(tmp_path: Path) -> None:
+    """model_copy bypasses the contract validator, so a mutated config can
+    reach the step with hypothesis mode but no hypothesis block — the step
+    must still refuse loudly instead of crashing on None.group_column."""
+    cfg = _stats_cfg(tmp_path)
+    broken = cfg.model_copy(
+        update={"analysis": cfg.analysis.model_copy(update={"hypothesis": None})}
+    )
+    with pytest.raises(ValueError, match="requires a 'hypothesis' block"):
+        module.run(broken)
+
+
+def test_stats_missing_sample_raises(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    cfg = _stats_cfg(tmp_path)
+    sample = SampleSpec(
+        name="test_diagnostic", role="diagnostic",
+        path=str(tmp_path / "gone_sample.parquet"),
+    )
+    with pytest.raises(FileNotFoundError, match="sample dataset not found"):
+        module.run(cfg, sample)
+
+
+def test_stats_group_column_not_in_data_raises(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    cfg = _stats_cfg(tmp_path)
+    target_col = cfg.dataset.target
+    data_path = tmp_path / "target_only.parquet"
+    pd.DataFrame({target_col: [1.0, 2.0, 3.0, 4.0]}).to_parquet(data_path, index=False)
+    monkeypatch.setattr(module, "canonical_path", lambda dataset, environment: data_path)
+    group_col = cfg.analysis.hypothesis.group_column
+    with pytest.raises(ValueError, match=f"group column '{group_col}' not found in data"):
+        module.run(cfg)
