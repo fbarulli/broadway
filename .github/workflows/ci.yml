@@ -51,31 +51,57 @@ jobs:
       # runner ships shellcheck (syntax-level CI — the deployment itself is a
       # manual on-demand run via k8s/optuna/lifecycle.sh).
       - name: Shell scripts (sh -n + shellcheck)
+        shell: bash
         run: |
-          set -e
-          for f in k8s/optuna/*.sh; do sh -n "$f"; done
-          command -v shellcheck >/dev/null && shellcheck k8s/optuna/*.sh || \
-            echo "shellcheck not available — sh -n passed"
+          set -euo pipefail
+          for f in k8s/optuna/*.sh; do
+            sh -n "$f"
+          done
+
+          # Don't silently weaken CI if shellcheck disappears from the runner.
+          shellcheck k8s/optuna/*.sh
+
+      # CI-only — named in scripts/run_local_ci.sh header.
+      # Pull once; reuse the exact kubeconform image in later checks.
+      - name: Pull kubeconform
+        run: docker pull ghcr.io/yannh/kubeconform:v0.6.7
 
       # CI-only — named in scripts/run_local_ci.sh header.
       # Manifests must be structurally valid Kubernetes (no cluster needed).
       - name: Manifests (kubeconform)
         run: |
-          docker run --rm -v "$PWD":/work -w /work ghcr.io/yannh/kubeconform:v0.6.7 \
-            -strict -summary -ignore-filename-pattern "kind-config\\.yaml" k8s/optuna/ 2>&1 | tail -3
+          docker run --rm \
+            -v "$PWD:/work" \
+            -w /work \
+            ghcr.io/yannh/kubeconform:v0.6.7 \
+            -strict \
+            -summary \
+            -ignore-filename-pattern "kind-config\\.yaml" \
+            k8s/optuna/
 
       # CI-only — named in scripts/run_local_ci.sh header.
       # Orchestrator dry-run: render the worker Jobs for the HPO spec's models
       # and assert they are valid Kubernetes with the right image/env/args.
       - name: Orchestrator dry-run (render worker jobs)
         run: |
-          mkdir -p /tmp/jobs
-          uv run python k8s/optuna/render_worker_jobs.py --image broadway-optuna-worker:ci > /tmp/jobs/jobs.yaml
-          grep -q "broadway-optuna-worker:ci" /tmp/jobs/jobs.yaml
-          grep -q "BROADWAY_MLFLOW_CONFIG" /tmp/jobs/jobs.yaml
-          grep -q -- "--model" /tmp/jobs/jobs.yaml
-          docker run --rm -v /tmp/jobs:/work ghcr.io/yannh/kubeconform:v0.6.7 \
-            -strict -summary /work/jobs.yaml 2>&1 | tail -1
+          set -euo pipefail
+
+          mkdir -p "${RUNNER_TEMP}/jobs"
+
+          uv run python k8s/optuna/render_worker_jobs.py \
+            --image broadway-optuna-worker:ci \
+            > "${RUNNER_TEMP}/jobs/jobs.yaml"
+
+          grep -q "broadway-optuna-worker:ci" "${RUNNER_TEMP}/jobs/jobs.yaml"
+          grep -q "BROADWAY_MLFLOW_CONFIG" "${RUNNER_TEMP}/jobs/jobs.yaml"
+          grep -q -- "--model" "${RUNNER_TEMP}/jobs/jobs.yaml"
+
+          docker run --rm \
+            -v "${RUNNER_TEMP}/jobs:/work" \
+            ghcr.io/yannh/kubeconform:v0.6.7 \
+            -strict \
+            -summary \
+            /work/jobs.yaml
 
       # CI-only — named in scripts/run_local_ci.sh header.
       - name: Experiment smoke (taxi branch only — experiments.py)
