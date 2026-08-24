@@ -20,7 +20,7 @@ fail=0
 run() {  # run <name> <cmd...>: loud banner, tail on fail, aggregate, stop never
   local log; log="$(mktemp)"; echo "== $1"
   if "${@:2}" >"$log" 2>&1; then echo "PASS $1"
-  else echo "FAIL $1 — tail:"; tail -15 "$log"; fail=1; fi
+  else echo "FAIL $1 — tail:"; tail -40 "$log"; fail=1; fi
   rm -f "$log"
 }
 # F1b guard (D21): the parity gate must NOT trust the tree-local checker —
@@ -50,8 +50,8 @@ from broadway.config.loader import load_config
 ps = sorted(Path('configs/experiment').glob('*.yaml')); assert ps, 'no configs'
 [load_config('train', dataset='test', experiment=p.stem) or print(f'OK {p.stem}') for p in ps]"
 if [[ $STATIC -eq 0 && $TIER == "full" ]]; then
-  run pytest uv run pytest tests/ --cov=src/broadway --cov-report=term-missing \
-             --cov-fail-under=95
+  run pytest uv run pytest tests/ -n 4 --dist worksteal \
+             --cov=src/broadway --cov-report=term-missing --cov-fail-under=95
 fi
 if [[ $fail -eq 0 ]]; then
   [[ $TIER == "fast" ]] && echo "FAST-GREEN (tiers: parity/ruff/mypy/configs)" || echo "LOCAL-CI GREEN"
