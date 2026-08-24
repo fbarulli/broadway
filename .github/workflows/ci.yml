@@ -211,40 +211,93 @@ jobs:
       - name: Boot — mlflow image health
         run: docker run --rm --entrypoint python mlflow-server:${{ github.sha }} -c "import mlflow; print('mlflow', mlflow.__version__)"
 
-  # CD — push the verified images to GHCR on push to main/taxi ONLY (never on
-  # PRs). lifecycle.sh consumes the built tag via OPTUNA_WORKER_IMAGE.
+      # Protected refs ONLY: package the exact sha-tagged images that just
+      # passed boot tests, so cd publishes bit-for-bit what was verified —
+      # zero rebuilds downstream. sklearn/PR runs deploy nothing.
+      - name: Package verified deployment images
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/taxi')
+        run: |
+          docker save \
+            broadway-optuna-worker:${{ github.sha }} \
+            mlflow-server:${{ github.sha }} \
+            -o "${{ runner.temp }}/verified-images.tar"
+
+      # compression-level: 0 — Docker layers arrive compressed; don't pay CPU
+      # to recompress them.
+      - name: Upload verified images
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/taxi')
+        uses: actions/upload-artifact@v4
+        with:
+          name: verified-images-${{ github.sha }}
+          path: ${{ runner.temp }}/verified-images.tar
+          compression-level: 0
+          retention-days: 1
+          if-no-files-found: error
+
+  # CD — publish to GHCR the EXACT images build-and-boot just tested, on push
+  # to main/taxi ONLY (never PRs; sklearn deploys nothing). No checkout, no
+  # rebuilds: the job downloads the artifact packaged above and re-tags it, so
+  # what ships is bit-for-bit what passed every gate. lifecycle.sh consumes
+  # the pushed tag via OPTUNA_WORKER_IMAGE.
+  #
+  # Tag law: push to main ⇒ worker/mlflow get their commit-sha tag AND
+  # :latest; push to taxi ⇒ the sha tag AND :taxi. broadway-base stays
+  # CI-private (internal FROM parent, not a deployable surface).
   cd:
     name: CD (push images to GHCR)
-    needs: build-and-boot
+    needs: [platform, build-and-boot]
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/taxi')
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
+
+    # Serialize deploys per ref: overlapping runs must never interleave
+    # :latest / :taxi layer pushes into a torn mutable tag.
+    concurrency:
+      group: cd-${{ github.ref }}
+      cancel-in-progress: false
+
     permissions:
       contents: read
       packages: write
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Download verified images
+        uses: actions/download-artifact@v4
+        with:
+          name: verified-images-${{ github.sha }}
+          path: ${{ runner.temp }}
+
+      - name: Load verified images
+        run: |
+          docker load -i "${{ runner.temp }}/verified-images.tar"
 
       - name: Log in to GHCR
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Chained local builds (plain docker build — the proven pattern), then
-      # tag + push each with the commit sha and :latest.
-      - name: Build images
+      # sha tag always; :latest only from main; :taxi only from taxi.
+      - name: Push verified images to GHCR
+        shell: bash
         run: |
-          docker build -f k8s/optuna/Dockerfile.base -t broadway-base:latest .
-          docker build -f k8s/optuna/Dockerfile.worker -t broadway-optuna-worker:latest .
-          docker build -f k8s/optuna/Dockerfile.mlflow -t mlflow-server:latest .
+          set -euo pipefail
 
-      - name: Push to GHCR
-        run: |
-          for img in broadway-base broadway-optuna-worker mlflow-server; do
-            docker tag "$img:latest" "ghcr.io/${{ github.repository }}/$img:${{ github.sha }}"
-            docker tag "$img:latest" "ghcr.io/${{ github.repository }}/$img:latest"
-            docker push "ghcr.io/${{ github.repository }}/$img:${{ github.sha }}"
-            docker push "ghcr.io/${{ github.repository }}/$img:latest"
+          ref="${{ github.ref }}"
+          registry="ghcr.io/${{ github.repository }}"
+
+          for img in broadway-optuna-worker mlflow-server; do
+            docker tag "$img:${{ github.sha }}" "$registry/$img:${{ github.sha }}"
+            docker push "$registry/$img:${{ github.sha }}"
+
+            if [ "$ref" = "refs/heads/main" ]; then
+              docker tag "$img:${{ github.sha }}" "$registry/$img:latest"
+              docker push "$registry/$img:latest"
+            fi
+
+            if [ "$ref" = "refs/heads/taxi" ]; then
+              docker tag "$img:${{ github.sha }}" "$registry/$img:taxi"
+              docker push "$registry/$img:taxi"
+            fi
           done
