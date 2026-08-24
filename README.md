@@ -3,9 +3,9 @@
 Generalized ML experimentation platform. Two surfaces: a pipeline CLI
 (`ds-pipeline`) and a set of numbered analysis scripts for the taxi dataset
 (`project/scripts/`). Full architecture map in `dataflow.md`; status
-snapshot in `HANDOFF.md`.
+snapshot in `agents/ledger/HANDOFF.md`.
 
-Branch model lives in `MAIN_AGENT_CONTRACT.md` §2 — `sklearn` is the only active development line; `taxi` is a fast-forward pass-along; `main` is frozen until declared main-day.
+Branch model lives in `agents/contracts/MAIN_AGENT_CONTRACT.md` §2 — `sklearn` is the only active development line; `taxi` is a fast-forward pass-along; `main` is frozen until declared main-day.
 
 ## Install
 
@@ -378,7 +378,7 @@ Typed step outputs follow `artifacts/<step>/` and reports follow
 | Concern | Location |
 |---------|----------|
 | Architecture map | `dataflow.md` |
-| Status / what works | `HANDOFF.md` |
+| Status / what works | `agents/ledger/HANDOFF.md` |
 | Stats library (agnostic) | `src/broadway/stats/` (+ `API.md` contract) |
 | Decision + lineage graph | `src/broadway/lineage/` (records/graph/mermaid/state) |
 | Dataset loaders + constants | `project/data.py` |
@@ -398,7 +398,7 @@ Typed step outputs follow `artifacts/<step>/` and reports follow
 
 ## 7. Branch parity — main vs taxi
 
-Branch model and parity workflow live in `MAIN_AGENT_CONTRACT.md` §§2/12.
+Branch model and parity workflow live in `agents/contracts/MAIN_AGENT_CONTRACT.md` §§2/12.
 
 | Branch | Role | Contents |
 |--------|------|----------|

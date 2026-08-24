@@ -184,8 +184,8 @@ def probe_coverage_floor(docs: dict[str, str], ci_script_text: str) -> None:
 # --------------------------------------------------------------------------- #
 # LIVE probes — green at HEAD is the gate.
 # --------------------------------------------------------------------------- #
-LEDGERS = ["FIXES.md", "DECISIONS.md", "agents/ledger/STATE.md"]
-CONTRACT_DOCS = ["MAIN_AGENT_CONTRACT.md", "WORKER_CONTRACT.md", "CONTRACT_TEMPLATE.md"]
+LEDGERS = ["agents/ledger/FIXES.md", "agents/ledger/DECISIONS.md", "agents/ledger/STATE.md"]
+CONTRACT_DOCS = ["agents/contracts/MAIN_AGENT_CONTRACT.md", "agents/contracts/WORKER_CONTRACT.md", "agents/contracts/CONTRACT_TEMPLATE.md"]
 
 
 def test_probe_a_live_ledger_tables_wellformed() -> None:
@@ -199,7 +199,7 @@ def test_probe_b_live_contract_paths_resolve() -> None:
 
 
 def test_probe_c_live_8hex_tokens_declared_or_resolvable() -> None:
-    for name in ["FIXES.md", "DECISIONS.md"]:
+    for name in ["agents/ledger/FIXES.md", "agents/ledger/DECISIONS.md"]:
         probe_hex_tokens((ROOT / name).read_text(encoding="utf-8"), _git_resolves, source=name)
 
 
@@ -223,7 +223,7 @@ def test_probe_a_red_body_row_loses_pipe(tmp_path: Path) -> None:
         lines[sep + 1] = lines[sep + 1].rsplit("|", 1)[0]
         return lines
 
-    seeded = _seeded_copy(tmp_path, "FIXES.md", steal_pipe)
+    seeded = _seeded_copy(tmp_path, "agents/ledger/FIXES.md", steal_pipe)
     with pytest.raises(AssertionError, match="header declares"):
         probe_ledger_tables(seeded, source="seeded-FIXES")
 
@@ -245,7 +245,7 @@ def test_probe_b_red_phantom_path_in_contract(tmp_path: Path) -> None:
         lines[hit] = lines[hit].replace("`dataflow.md`", "`dataflow_phantom.md`")
         return lines
 
-    seeded = _seeded_copy(tmp_path, "MAIN_AGENT_CONTRACT.md", rename_dataflow)
+    seeded = _seeded_copy(tmp_path, "agents/contracts/MAIN_AGENT_CONTRACT.md", rename_dataflow)
     with pytest.raises(AssertionError, match="does not resolve in-tree"):
         probe_backticked_paths(seeded, ROOT, source="seeded-MAC")
 
@@ -254,7 +254,7 @@ def test_probe_c_red_unattributed_8hex_token(tmp_path: Path) -> None:
     def append_mystery(lines: list[str]) -> list[str]:
         return lines + ["", "Mystery reference cafe1234 ends here.", ""]
 
-    seeded = _seeded_copy(tmp_path, "DECISIONS.md", append_mystery)
+    seeded = _seeded_copy(tmp_path, "agents/ledger/DECISIONS.md", append_mystery)
 
     def everything_except_seed(token: str) -> bool:
         return token != "cafe1234"  # deterministic stub resolver, no git dependence

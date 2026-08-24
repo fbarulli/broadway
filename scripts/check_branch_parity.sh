@@ -2,7 +2,7 @@
 # Branch parity gate — keep main and taxi's SHARED surface in lockstep.
 #
 # The repo has a deliberate split:
-#   * sklearn — the only active development line (MAIN_AGENT_CONTRACT.md §2);
+#   * sklearn — the only active development line (agents/contracts/MAIN_AGENT_CONTRACT.md §2);
 #             taxi fast-forwards to it after each green push; main is frozen
 #             until declared main-day.
 #

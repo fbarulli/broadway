@@ -1,7 +1,7 @@
 """Platform test hygiene — project-layer coupling is FORBIDDEN in the
 platform suite.
 
-Standing rule (HANDOFF.md): every platform test runs on **generated data
+Standing rule (agents/ledger/HANDOFF.md): every platform test runs on **generated data
 only** and never references project-level data or configs. This guard
 fails loudly the moment a platform test regresses:
 
