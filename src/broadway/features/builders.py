@@ -100,6 +100,16 @@ def build_derived(df: pd.DataFrame, features: list[DerivedFeature], target: str,
                   group_col: str = "group",
                   lookup_col: str = "group_lookup",
                   hour_window: list[int] | None = None) -> pd.DataFrame:
+    """Append ``features`` as new columns on a copy of ``df``.
+
+    Collision contract (loud fail): every ``feat.name`` must declare a NEW
+    column — it may never equal the dataset ``target`` nor any column already
+    present in the result frame (input data or a previously built derived
+    feature). Violations raise ``ValueError`` naming the collision and the
+    offending name. Chaining stays allowed: a later feature may consume an
+    *earlier* derived column as its ``source``, because sources resolve
+    against the accumulating result frame, not the raw input.
+    """
     _window = hour_window if hour_window is not None else [7, 8, 9, 17, 18, 19]
     builder_kwargs = {"group_col": group_col, "lookup_col": lookup_col, "hour_window": _window}
     registry = dict(BUILDERS)
@@ -107,9 +117,30 @@ def build_derived(df: pd.DataFrame, features: list[DerivedFeature], target: str,
         registry.update(extra_builders)
     result = df.copy()
     for feat in features:
+        # A derived feature may never silently overwrite an existing column,
+        # least of all the training target.
+        if feat.name == target:
+            raise ValueError(
+                f"derived feature '{feat.name}' collides with the dataset target "
+                f"'{target}': a derived feature may never overwrite the training "
+                f"target — derived names must declare NEW columns; rename '{feat.name}'"
+            )
+        if feat.name in result.columns:
+            origin = (
+                "input data column" if feat.name in df.columns
+                else "previously built derived feature"
+            )
+            raise ValueError(
+                f"derived feature '{feat.name}' collides with existing column "
+                f"'{feat.name}' ({origin}): a derived feature may never overwrite "
+                f"an existing column — derived names must be unique and declare NEW "
+                f"columns; rename '{feat.name}'"
+            )
         if feat.func not in registry:
             raise ValueError(f"unknown builder function '{feat.func}' for derived feature '{feat.name}'")
-        if feat.source not in df.columns:
+        # Sources resolve against the accumulating result frame: consuming an
+        # EARLIER derived feature's output is legitimate chaining and allowed.
+        if feat.source not in result.columns:
             raise ValueError(f"derived feature '{feat.name}' references missing source column '{feat.source}'")
         result[feat.name] = registry[feat.func](result, feat.source, **builder_kwargs)
     return result
