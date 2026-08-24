@@ -93,3 +93,7 @@ era updates · `019a9da` DECISIONS.md sheet · `8e7d51a` G0a doc pruning.
   self-referential assertion killed, landmine test revert-execution
   proven by reviewer. Riders: idempotency pin (minor), defensive
   np.asarray note. TIER 1 COMPLETE.
+  CORRECTION: Tier 1 is NOT fully complete — T-bug-4 (walkthrough-owner
+  threading, required params across 5 caller files) remains, gated on
+  user ratification of its v5.1 rescope. Landed today: F6, T-BUG-2,
+  T-BUG-1, T-BUG-3, D16-PARITY, user docs.
