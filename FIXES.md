@@ -101,3 +101,17 @@ era updates · `019a9da` DECISIONS.md sheet · `8e7d51a` G0a doc pruning.
   wording, ALLOWLIST presence guard (declare -p — the ${arr+x} array trap
   caught by my own gate before landing), already-HC3 idempotency pin,
   main-day local-branch note. Suite 791P/1S/9W.
+| T-BUG-4 | one declared-group constructor, floor enforced, silence
+  deleted (`eee33d7`): groups.py builder consolidates four duplicated
+  constructors; stats entry + baseline raise standard named ValueError
+  on partial absence (was: silent k-1 ANOVA / silent skip);
+  min_rows_for_sampling binds at entry via small_group_threshold
+  (was dead config). Triple revert-execution proof (worker, reviewer,
+  re-review after tree consolidation). Riders/backlog: baseline
+  duplicate-declared len-vs-distinct wobble (degenerate config, still
+  loud); plot_describe_figures redundant builder pass; dedup behavior
+  undocumented in docstring; DatasetContract lacks mapping source
+  (baseline path uses logical names against canonical load — latent
+  rename class); floor-kwarg semantic tension (sampling floor drives
+  small-group flag); CLI-vs-pipeline sample asymmetry undocumented.
+  TIER 1 NOW GENUINELY COMPLETE — all five slate contracts landed.
