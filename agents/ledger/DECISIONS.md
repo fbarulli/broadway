@@ -225,3 +225,38 @@ is now editing the inline constants + ANCHOR in ONE commit on sklearn.
 Caveat on record: shallow-checkout PR runs may lack refs/remotes/origin/
 sklearn ⇒ gate fails loud ("unavailable") rather than silently passing;
 pushes-to-sklearn (our authorization path) always have the ref.
+
+## D22 — gh-comms-as-event-store rejected; doctrine set + SECRET-1 rider
+MOTIVATION: phantom-relay incident (agent claimed "message e5e41a7a
+accepted by senior"; registry forensics showed no such counterpart) plus
+human question "can gh comms be the sole traceability storage?".
+ADVERSARY af2289bb inverted the proposal: repo is PUBLIC; ledgers carry
+gate mechanics + bar reasons; unlocked public issues are stranger-
+writable ⇒ mandatory gh-URL citations would TRAIN agents to trust
+planted comments (worst-case: audit trail launders fabrication).
+RULING (senior d4a86cf9, adopt-as-trimmed):
+- In-repo git-anchored authority AFFIRMED: commit hashes are the tamper
+  chain at single-writer scale; events derive from git + trailers +
+  this ledger per STATE.md GIT-WINS.
+- Three-class publication rule for NEW prose rows only:
+  PUBLIC→contract IDs/verdict classes/SHAs/suite tails/outcomes;
+  LOCAL→agent IDs/bar reasons/custody forensics/gate internals/
+  dialogue/pending rows; REDACT-ALWAYS→hostnames, credential-shaped
+  strings, detection-window phrasing. Enforced as prose discipline now,
+  gate later only on first RED near-miss.
+- DOCTRINE: no gate ever requires github.com online.
+- CITATION VALIDITY: coordinator-dialogue claims must resolve to
+  main-agent registry records or in-repo artifacts; unresolved = void
+  (fabrication-class). gh-URL form deferred until locked issues AND
+  sha-anchored citations both exist.
+- TRIGGER-GATED DEFERRALS: events.ndjson ← second writer or >50
+  events/day; gh mirror ← first non-cloning consumer; classification
+  gate ← first near-miss; citation tooling ← first gh citation attempt.
+- MACHINERY (sha256-chains, ULIDs, pending buffers) REJECTED:
+  disproportionate vs git history at current scale.
+PROCESS HAZARD ON RECORD: first landing attempt died mid-write
+(python substring miss) yet committed+pushed under a Governance-D22
+message carrying only the routing-table amendment (${BADSHA}) — a live
+instance of mislabeled provenance, caught by re-reading the tool output
+before declaring victory. This entry is the corrective second act.
+| D22-rider | secret.yaml ships real high-entropy DB password PUSHED PUBLIC ("local-kind" = comment, not enforcement). SECRET-1 rotate-and-remove IMMEDIATELY post-CIADPT-d arbitration, before Axis-2: template manifest + local-override/generated fallback in lifecycle.sh (~2 files, rides shellcheck/kubeconform gates); NO history rewrite (rotation kills value; force-push mid-ladder risks more than a dead local credential). | senior d4a86cf9 |
