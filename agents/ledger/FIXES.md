@@ -171,7 +171,7 @@ era updates · `019a9da` DECISIONS.md sheet · `8e7d51a` G0a doc pruning.
   unrecoverable from ledger records — this row originally cited an
   unverifiable hex ID, flagged by CI probe C in production): inline
   constants + F1b pin guard + negative tests through the real gate
-  body. Lesson: rulings need a post-landing conformance check need a post-landing conformance check
+  body. Lesson: rulings need a post-landing conformance check
   against their own acceptance lines — added to arbitration checklist.
 
 ## Incident log: novel-blob layer false-positive (disjoint histories)
