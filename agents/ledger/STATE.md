@@ -9,10 +9,10 @@
 ship.sh): the ETL ingest-audit batch, dead-code deletions, custody laws,
 stats test-hardening, trust-D11 deletion, and the governance ledger batch all
 landed as one logical change each (fc2f32a · 294a27f · bf599f9 · fc85f05 ·
-4cab4e1 · 00db1c1). Board rows R1/R2/R4 superseded to `landed`
-(store-then-hash, byte-verified — see ## EVENTS for the three new
-supersede event-ids). R3 (foreign more_modeling batch) remains active pending
-human ruling; scratch agents/notes/SENIOR.md remains untracked by design.
+4cab4e1 · 00db1c1 · 229ba2d · 0d30eb2). Board rows R1/R2/R3/R4 superseded to
+`landed` (store-then-hash, byte-verified — see ## EVENTS for the four new
+supersede event-ids). Working tree fully clean; scratch agents/notes/SENIOR.md
+now tracked as the relocated inference taxonomy (R4).
 
 2026-08-24 arbitration stage: all five senior verdict reports persisted
 VERBATIM under agents/ledger/arbitration/2026-08-24/{A..E}-verdicts.md and
@@ -37,9 +37,10 @@ if it contradicts git, GIT WINS.
 Pending-change inventory is mirrored on the CHANGE BOARD (issue #5, locked):
 rows R1–R5 covered the uncommitted ETL batch, ingest-surface tests, the
 foreign experiments batch, the SENIOR/board governance landing, and the
-event-id recomputation anomaly; R1/R2/R4 are now LANDED (superseded 2026-08-25
-— see the three new ## EVENTS rows); R3 (foreign more_modeling) remains active
-pending a human ruling; rows R6–R11 (2026-08-24T21:0xZ) carry the
+event-id recomputation anomaly; R1/R2/R3/R4 are now LANDED (superseded
+2026-08-25 — see the four new ## EVENTS rows); the more_modeling 16-22 batch
+landed per human ruling (RGC-1..8 ratification follow-ups stay open); rows
+R6–R11 (2026-08-24T21:0xZ) carry the
 five verification-lane verdicts — tripwire gaps, SECRET-1 open,
 determinism silence list, deployment mismatches, D23 recorder absent —
 plus the proactive register awaiting one ratification packet. Full fact
@@ -162,3 +163,4 @@ narrative id.
 | 0aef1131 | issues/5#issuecomment-5407855643 | 5407855643 | 2026-08-25T08:50:59Z | board-row | bb8c548b |
 | b0df65f1 | issues/5#issuecomment-5407856241 | 5407856241 | 2026-08-25T08:51:03Z | board-row | e277f63a |
 | a886ae68 | issues/5#issuecomment-5407856844 | 5407856844 | 2026-08-25T08:51:06Z | board-row | 392fa146 |
+| 3ca96ffd | issues/5#issuecomment-5408050227 | 5408050227 | 2026-08-25T09:05:32Z | board-row | ebf1c913 |
