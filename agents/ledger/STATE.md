@@ -5,14 +5,17 @@
 > instructions. Stale on arrival = STOP-and-report, never improvise.
 
 ## Last refreshed
-2026-08-25, after the arbitration-cycle landing (tip `00db1c1`, pushed via
-ship.sh): the ETL ingest-audit batch, dead-code deletions, custody laws,
-stats test-hardening, trust-D11 deletion, and the governance ledger batch all
-landed as one logical change each (fc2f32a · 294a27f · bf599f9 · fc85f05 ·
-4cab4e1 · 00db1c1 · 229ba2d · 0d30eb2). Board rows R1/R2/R3/R4 superseded to
-`landed` (store-then-hash, byte-verified — see ## EVENTS for the four new
-supersede event-ids). Working tree fully clean; scratch agents/notes/SENIOR.md
-now tracked as the relocated inference taxonomy (R4).
+2026-08-25 (second refresh), during the ten-ruling governance batch: the
+human ruled on ten pending decisions; seven read-only investigator/verifier
+lanes derived the facts; three worker lanes landed the registry banner/meta
+truth fixes, ledger ratification rows D27–D31, and the shellcheck parity
+gate + SC2015 locus repair. The stamp-semantics WIP trio landed first as its
+own commit. ## TELEMETRY created this refresh (COLDPROBE-1 tracking;
+precondition UNMET at 2/5 greens — probe HELD). Board untouched this cycle
+(in-tree-only disposition for #10 per human ruling).
+
+Previous refresh 2026-08-25 (first): arbitration-cycle landing (tip
+`00db1c1`)…
 
 2026-08-24 arbitration stage: all five senior verdict reports persisted
 VERBATIM under agents/ledger/arbitration/2026-08-24/{A..E}-verdicts.md and
@@ -32,7 +35,7 @@ if it contradicts git, GIT WINS.
 ## Active lanes (in flight NOW)
 | Agent | Contract | State |
 |---|---|---|
-| (none) | Prior-session DG-MAP-1..4 cartography lanes LAPSED with that session — no fact sheets landed in-tree; treat as NOT in flight; redispatch under fresh contracts if wanted. Senior synthesis queued behind them is void until then. | - |
+| (none) | This cycle's lanes DELIVERED (W1 ledger / W2 registry / W3 code+policy, plus seven read-only investigator-verifier lanes); next scheduled lane: REGISTRY-AUDIT sweep per D31, first opportunity after this landing. Prior-session DG-MAP-1..4 cartography lanes remain LAPSED — treat as NOT in flight; senior synthesis queued behind them stays void. | - |
 
 Pending-change inventory is mirrored on the CHANGE BOARD (issue #5, locked):
 rows R1–R5 covered the uncommitted ETL batch, ingest-surface tests, the
@@ -41,8 +44,9 @@ event-id recomputation anomaly; R1/R2/R3/R4 are now LANDED (superseded
 2026-08-25 — see the four new ## EVENTS rows); the more_modeling 16-22 batch
 landed per human ruling (RGC-1..8 ratification follow-ups stay open); rows
 R6–R11 (2026-08-24T21:0xZ) carry the
-five verification-lane verdicts — tripwire gaps, SECRET-1 open,
-determinism silence list, deployment mismatches, D23 recorder absent —
+five verification-lane verdicts — tripwire gaps, SECRET-1 (since superseded
+VOID by a superseding board transition), determinism silence list,
+deployment mismatches, D23 recorder absent —
 plus the proactive register awaiting one ratification packet. Full fact
 sheets live in agents/ledger/factsheets/2026-08-24-*.md; every row carries
 a `root:` line per the ROOT-CAUSE MANDATE (MAIN_AGENT_CONTRACT §14).
@@ -50,13 +54,19 @@ a `root:` line per the ROOT-CAUSE MANDATE (MAIN_AGENT_CONTRACT §14).
 Prior lanes (senior close b983b5a5, TIERREV-1, test-effectiveness panel)
 are delivered; their outcomes live in git history and FIXES.md, not here.
 
-Suite tail expectations are unchanged from the previous refresh (827P/1S
-gated scope, 846P/1S root scope); no gates were re-run at this refresh —
-re-derive at step-0 if your contract needs them.
+Suite tail expectations RE-BASELINED 2026-08-25 (DECISIONS.md D28): ROOT
+scope measured `1059 passed, 1 skipped, 11 warnings` at c4f3018
+(`UV_CACHE_DIR=$PWD/.uv-cache MPLCONFIGDIR=$PWD/.mplconfig uv run pytest -q`,
+exit 0, 118.70s). CI/tests-scope: re-derive at step-0 if your contract needs
+it. Exemption law (D28): failures recorded before 2026-08-25 don't count;
+warnings never count (per-path pins only, D4); trailing text doesn't count.
 
 ## Uncommitted worktree content (do NOT duplicate or revert)
 Untracked batch owned by a prior human-directed session, present at this
-refresh — every lane treats it as read-only context:
+refresh — every lane treats it as read-only context (DELIBERATELY untracked:
+the "landed" wording above refers to the R3 BOARD-paperwork mirror, NOT git
+tracking of these files; end-state classification awaits the RGC follow-up
+rulings):
 experiments/more_modeling/{16..22}_*.py (7 scripts) and
 experiments/results/more_modeling/*.csv (7 result CSVs).
 
@@ -99,6 +109,18 @@ experiments/results/more_modeling/*.csv (7 result CSVs).
   incl. commit 8e7d51a) shares NO history with sklearn (root 0561e93) —
   its stamps are archived history, never current branch state; evidence
   citation via git show remains valid while the tag exists.
+- gh api LIST endpoints default to page size 30: enumerating ledger-issue
+  comments WITHOUT --paginate silently drops the newest rows (the 34-comment
+  board reads as 30) — bit the 2026-08-25 landscape audit; always paginate.
+- Local/remote shellcheck parity CLOSED 2026-08-25: the shell-scripts gate
+  now runs inside scripts/run_local_ci.sh on every tier (incl. --static);
+  root cause + two escaped reds recorded as SHELLCHECK-PARITY-1 (FIXES.md).
+- Off-thread phantom citations (an event-id-style hex token, a "#5/#8/#9"
+  bundle numbering, and a purported teardown-verifier agent id) resolve to
+  NOTHING canonical — foreign injections matching the adversary-phantom
+  precedent; full token list + disposition in FIXES.md
+  LIVEPROBE-FALSEALARM-1; treat any off-tree register claiming canonical
+  status as void per D22.
 
 ## Open arbitrations (awaiting main-agent ruling)
 - Dead-code candidates: baseline/module.py:72 (KEEP ruled);
@@ -110,6 +132,51 @@ experiments/results/more_modeling/*.csv (7 result CSVs).
 Experiment lint debt (44 findings, outside CI whitelist) · DatasetContract
 mapping-source gap · floor-kwarg semantic tension · CLI-vs-pipeline sample
 asymmetry doc · dependency-warning sweep · audit.py/qq.py render branches.
+
+Added 2026-08-25 (ten-ruling cycle): REGISTRY-AUDIT sweeps per D31 (owner:
+fresh read-only agent; triggers: every governance-file-touching landing, any
+accuracy dispute, standing weekly sweep — the ruling-#9 calendar entry) ·
+gates.yaml stale-row re-stamp micro-contract (:163/:242/:602 verified stale
+at HEAD; :3007 stays until the HPO bool contract) · registry dupe-scan
+exit-3 findings (pre-existing; --dedupe-proposals mode) ·
+MAIN_AGENT_CONTRACT ~30KB-cap remediation (30,928 B; relocate Stamp-semantics
+bullet to WORKER_CONTRACT or appendix file) · consolidation-slate.md:134
+superseding footnote (dead "local-only, credential-bearing" wording) · HPO
+bool-param contract (GATE-HPO-82 three-layer defect reproduced live
+2026-08-25) · decision packets awaiting routing: the three active
+verification-lane board rows (teeth thresholds, determinism silences,
+deployment wiring + CI scope), RGC end-state, qq-demo __main__, GHCR
+version-cap executor, dead fragment-citation dangle policy.
+
+## TELEMETRY
+
+Created 2026-08-25 (human ruling #6: results-tracking must exist BEFORE the
+cold probe fires). Mandated landing surface per D23 +
+factsheets/2026-08-24-perf-baseline.md. Remote conclusions come from the
+GitHub Actions API; each mirrored row cites the query class that surfaced it.
+
+### COLDPROBE-1 — spec (DECISIONS.md D23 :283-286)
+One-byte src push on sklearn tip, fired ONLY after BOTH hold: (i) XDIST-1b
+accepted [LANDED b7086b0, 2026-08-24T17:17:26Z]; (ii) >=5 post-landing GREEN
+Actions runs on branch sklearn (LITERAL bar; currently 2/5 — no window-reset
+rule was ever ruled). Per firing record {push sha8, cold_bb_s,
+cache_hit=false, queue_s} here + a D23 addendum note. Machinery does NOT
+exist in-tree yet (~5 runner-min; Actions-API wall-time read).
+
+### Rolling green-run window (append one row per pushed tip)
+| date | tip sha8 | remote conclusion | counts toward >=5 |
+|---|---|---|---|
+| 2026-08-24 | 7c5ca95 | success | yes (1/5) |
+| 2026-08-24 | d53f7b9 | success | yes (2/5) |
+| 2026-08-25 | e5a9382 | failure (test_gate_registry 4F; locally green same tree — cause under observation, watch next push) | no |
+| 2026-08-25 | 00db1c1 | failure | no |
+| 2026-08-25 | 64abc58 | failure | no |
+| 2026-08-25 | 0d30eb2 | failure | no |
+| 2026-08-25 | c4f3018 | failure (shellcheck SC2015 teardown.sh:24 — repaired in-tree this cycle) | no |
+
+STATUS: **UNMET — 2/5 greens → probe HELD.** The next three green tips
+satisfy the literal bar; re-derive before firing:
+`gh api 'repos/fbarulli/broadway/actions/runs?branch=sklearn&per_page=30' --jq '[.workflow_runs[] | select(.created_at > "2026-08-24T17:17:26Z" and .conclusion == "success")] | length'`
 
 ## EVENTS
 
