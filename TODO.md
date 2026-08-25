@@ -62,6 +62,6 @@ every src change, fail loud, one logical change per commit).
   `ratecode1_sample.parquet` + `ratecode1_sample.json` are pinned);
   `diagnostics_experiment/` + `legend_experiment/` are gitignored references.
 - Test gate: full `pytest` only when `src/`/`configs/`/`project/`/`tests/`
-  change (currently 516 passed, 0 failed).
+  change; live counts: DECISIONS.md D28.
 - `uv` needs `UV_CACHE_DIR` inside the workspace (sandbox); matplotlib needs
   `MPLCONFIGDIR` (`.mplconfig/`).

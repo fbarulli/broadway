@@ -1,5 +1,7 @@
 # G0B.md — governance truth + evidence-format rule (+ arbitration riders)
 
+> **SUPERSEDED — COMPLETED DISPATCH 2026-08-23 @ 8e7d51a [pre-rewrite lineage; completion 6e471e6, see FIXES.md actuals]. Step-0 stamp historic — DO NOT EXECUTE.**
+
 Version 1, frozen 2026-08-23. Ratified under DECISIONS.md D1/D2/D8; carries
 G0A-arbitration rider OQ2 and the D8 worker-evidence rule. Worker: one turn,
 working-tree changes + report only, ZERO git operations.

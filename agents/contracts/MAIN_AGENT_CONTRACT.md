@@ -481,6 +481,8 @@ gate blocks — the tree registry (GIT-WINS) remains authoritative.
 - Staleness is loud by design: deleted owners, renamed symbols,
   vanished pins, and broken id references fail the registry test.
   Silence is a bug in the test, report it like one.
+- Recurring accuracy audit owner + cadence and the events-log tamper lock are ratified in
+  `DECISIONS.md` D31; every `STATE.md` ## EVENTS edit cites its authorizing event-id in the same commit.
 
 ### Row format — surface & data-gate rows
 

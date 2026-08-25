@@ -352,3 +352,51 @@ retains session-level veto and receives the full verdict ledger as briefing. Ite
 packets are still undelivered (FX-A/FX-B second halves) are ruled provisionally from compliance
 addenda + banked summaries and flagged PROVISIONAL pending those packets. Event-id:
 EVT-D26-SENIORDELEGATE. | Ruling: human, this session |
+
+## D27 — PIN-LINEAGE ARCHIVAL: tier-1-complete / 8e7d51a are archived history
+Tag tier-1-complete (rooted at 6be4ff7, incl. commit 8e7d51a) shares NO history with sklearn
+(root 0561e93): its stamps are ARCHIVED HISTORY, never current branch state. The tag is
+PUBLISHED on origin (H-infra DRIFT #4 correction; custody defers to GATE-INFRA-141 creation-time
+law) and NO retirement is performed. Evidence citation remains valid via `git show 8e7d51a:<path>`
+while the tag exists. No credential rationale attaches (HC-1 VOID per
+arbitration/2026-08-24/00-resolutions.md). Cross-references: the STATE.md standing-hazard bullet
+("Orphaned pre-rewrite lineage") and the SUPERSEDED header now on agents/contracts/G0B.md.
+| Ruling: human, this session |
+
+## D28 — SUITE RE-BASELINE 2026-08-25 + COUNT EXEMPTION RULES
+A real measured run REPLACES all prior courtesy tails: command `UV_CACHE_DIR=$PWD/.uv-cache MPLCONFIGDIR=$PWD/.mplconfig uv run pytest -q` at HEAD c4f3018 → `1059 passed, 1 skipped,
+11 warnings in 118.70s`, exit 0 (root scope).
+EXEMPTION RULES (the human's three, verbatim intent): (1) failures recorded before 2026-08-25 do
+not count against the current baseline; (2) warnings do not count — reaffirms D4: suite-total
+warning counts are never gated, per-path pins only; (3) trailing text does not count — tail
+matching pins exact pass/skip/fail counts, never surrounding prose.
+Superseded figures: 846P/1S root scope, 827P/1S gated scope, stale TODO "516 passed"; STATE.md
+suite-tail lines were refreshed in the same landing cycle. | Ruling: human, this session |
+
+## D29 — CACHE-CEILING FALSE ALARM CLOSED (10.42 GB)
+The 10.42 GB reading in D23 EVIDENCE (this file ~:274-275, "cache pool at 10.42 GB vs 10 GB
+ceiling") was GitHub's SHARED Actions cache pool, NOT the local cache; the local uv cache is
+confirmed nowhere near full. Alarm closed as false — do-not-re-raise.
+DISTINCTION from the ≈10.39 GiB packet-H GitHub-side census encoded in GATE-INFRA-143
+(gates.yaml ~:3770ff): that row records CI-side cache LAW and stays untouched by this ruling.
+| Ruling: human, this session |
+
+## D30 — F4′ RATIFIED (paperwork record of already-landed work)
+F4′ = third event-id namespace ruling (senior authority 3813c37c): USER-MVP pilot event-ids are
+valid iff a UNIQUE row exists in STATE.md ## EVENTS; role vocabulary grants no escape inside the
+full-line EVENT grammar. Work ALREADY LANDED via linear single-parent commits 75cfe21 → 35c619f →
+21e17cd → ed250be → b7086b0 → 38f649a (2026-08-24T16:57Z–17:18Z; both endpoints merge-base
+--is-ancestor of sklearn, exit 0). This row is the ratification RECORD only — no code change.
+Measured registry size at ratification: 40 data rows in ## EVENTS (a cited "41 rows" counted the
+table's pipe-header row). Enforcement probes live in tests/test_governance_probes.py
+(:15-18, :44-47, :250, :421). | Ruling: human, this session |
+
+## D31 — REGISTRY-AUDIT DUTY + EVENTS-LOG TAMPER LOCK (three-part ruling)
+(1) NAMED OWNER: a fresh read-only REGISTRY-AUDIT agent dispatched by the main agent on a fixed
+cadence. TRIGGERS: every governance-file-touching landing, any registry-accuracy dispute, plus
+one standing weekly sweep. METHOD: agents/tools/render_gates.py query/blast-radius modes,
+cross-checking gates.yaml rows against the live tree; zero writes, drift reported to the main
+agent. (2) TAMPER LOCK (lands with this governance-file touch per the ruling): any commit that
+edits STATE.md ## EVENTS must reference its authorizing event-id within the same commit (message
+body or adjacent same-commit row). (3) Board-mirroring proposal REJECTED — do not build.
+| Ruling: human, this session |

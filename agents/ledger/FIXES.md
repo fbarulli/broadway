@@ -31,7 +31,7 @@ era updates · `019a9da` DECISIONS.md sheet · `8e7d51a` G0a doc pruning.
 | Contract | Scope | Status |
 |---|---|---|
 | G0a platform-doc pruning | 4 files, deletion-first | **ACTUAL `8e7d51a`** 783/1S delta-zero; adversary: commit-as-is |
-| G0b governance truth | checker header, custody carve-out ×2, D8 rule, MAIN_AGENT ratification, HANDOFF §refs | IN FLIGHT |
+| G0b governance truth | checker header, custody carve-out ×2, D8 rule, MAIN_AGENT ratification, HANDOFF §refs | done — ACTUAL `6e471e6` below |
 | G0c micro-riders | README §§2/12→§2; SKLEARN intro clause soften; dataflow raw-schema clause restore; FIXES-pointer rewires | queued |
 | A1 schema-builder unification (+riders) | ordered= knob sole owner; builders lambda; coercion lineage kind; .uv-cache gitignore | queued |
 | A2 datetime semantic compare | dtype-kind equality in validate_target_dtype | queued |
@@ -218,3 +218,27 @@ era updates · `019a9da` DECISIONS.md sheet · `8e7d51a` G0a doc pruning.
   Fix: freeze-intact shortcut — novel-blob layer runs ONLY when main has
   moved off the anchor (the only case where it can carry signal); the
   anchor-diff layer above still catches add/del/mod at any other time.
+
+## Incident log: SHELLCHECK-PARITY-1
+- **2026-08-25**: remote CI red while local/board claimed green. Actions runs: e5a9382 failure
+  (tests/test_gate_registry.py "4 failed, 1028 passed") and c4f3018 failure (shellcheck SC2015
+  info, k8s/optuna/teardown.sh:24); yet board LANDED rows posted 2026-08-25T08:50–09:05Z claim
+  "Full tier green, pushed via ship.sh".
+- Structural cause: scripts/run_local_ci.sh marked shellcheck + k8s sh -n "CI-only", so the
+  local SSOT gate cannot see this class; the post-push Actions monitoring duty (D25 addendum ii)
+  went unexecuted. Remedies landing this cycle: shellcheck parity gate added locally
+  (scripts/run_local_ci.sh) + SC2015 locus fix (k8s/optuna/teardown.sh:24).
+  root: gate-list SSOT classified a CI-enforced check as out-of-local-scope, creating structural
+  local blindness to a push-blocking failure class.
+
+## Incident log: LIVEPROBE-FALSEALARM-1
+- **2026-08-25**: disposition record per human ruling (in-tree only; NO board write — verified
+  no contradicting entry exists across issues #3/#4/#5, 40 comments scanned). The reported
+  live-probe failure was a FALSE ALARM: the referenced test is green, the token resolves, the
+  real fix already landed; the actual failing thing was SHELLCHECK-PARITY-1's SC2015 issue.
+- Also records: off-tree citations 9e1fe69d, "#5/#8/#9", and verifier id a4cd9f16 — entries a
+  reviewer-grade re-check traced to NOTHING canonical (worktree, all git history, all board
+  comments, GitHub code search) — foreign injections per the adversary 35266af4 phantom
+  precedent; void per D22.
+  root: unverifiable off-tree register entries were treated as pending work items; dispositions
+  must be recorded in-tree at their locus where fresh agents can re-derive them.
