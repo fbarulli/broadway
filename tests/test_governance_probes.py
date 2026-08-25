@@ -1223,7 +1223,7 @@ def test_probe_i_uv_cache_ban_live_and_falsifiable() -> None:
 RUN_LOCAL_CI_INVOCATION = "bash scripts/run_local_ci.sh"
 TOKEN_FLOOR = frozenset({
     "kubeconform", "docker", "python", "sh", "shellcheck", "uv", "tar", "ls",
-    "echo", "git", "mkdir", "cp", "sed", "grep",
+    "echo", "git", "mkdir", "cp", "sed", "grep", "bash",
 })
 # Snapshot @eb9ea18 (2026-08-25, review 2026-10-01): every first token
 # observable in today's run: blocks beyond TOKEN_FLOOR — control-flow words,

@@ -90,7 +90,7 @@ ps = sorted(Path('configs/experiment').glob('*.yaml')); assert ps, 'no configs'
 [load_config('train', dataset='test', experiment=p.stem) or print(f'OK {p.stem}') for p in ps]"
 # Gate-divergence law: keep command-identical to ci.yml's 'Shell scripts' step.
 # shellcheck disable=SC2016  # single quotes intended: globs must expand under bash -c
-run shell-scripts bash -c 'for f in k8s/optuna/*.sh scripts/*.sh; do sh -n "$f"; done; shellcheck k8s/optuna/*.sh scripts/*.sh'
+run shell-scripts bash -c 'for f in k8s/optuna/*.sh scripts/*.sh; do bash -n "$f"; done; shellcheck k8s/optuna/*.sh scripts/*.sh'
 if [[ $STATIC -eq 0 && $TIER == "full" ]]; then
   run pytest uv run pytest tests/ -n 4 --dist worksteal \
              --cov=src/broadway --cov-report=term-missing --cov-fail-under=95

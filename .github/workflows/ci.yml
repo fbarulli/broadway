@@ -59,7 +59,7 @@ jobs:
         run: |
           set -euo pipefail
           for f in k8s/optuna/*.sh scripts/*.sh; do
-            sh -n "$f"
+            bash -n "$f"
           done
 
           # Don't silently weaken CI if shellcheck disappears from the runner.
