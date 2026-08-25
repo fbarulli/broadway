@@ -46,7 +46,8 @@ jobs:
       - name: Platform gates (SSOT)
         run: bash scripts/run_local_ci.sh
 
-      # CI-only — named in scripts/run_local_ci.sh header.
+      # Local parity exists since 2026-08-25 (shell-scripts gate inside
+      # scripts/run_local_ci.sh); CI remains the enforcement tier.
       # k8s lifecycle + entrypoint scripts must at least be valid shell; the
       # runner ships shellcheck (syntax-level CI — the deployment itself is a
       # manual on-demand run via k8s/optuna/lifecycle.sh).

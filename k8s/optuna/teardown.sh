@@ -21,8 +21,11 @@ kubectl delete -f "$(dirname "$0")"/secret.yaml 2>/dev/null || true
 kind delete cluster --name broadway 2>/dev/null || true
 
 # --- 2) no stray optuna persistence on the host filesystem --------------
-strays=$(cd "$REPO_ROOT" && find data -maxdepth 3 \
-    \( -name '*.db' -o -iname '*optuna*' -o -name '*.sqlite*' \) 2>/dev/null || true)
+strays=''
+if cd "$REPO_ROOT"; then
+    strays=$(find data -maxdepth 3 \
+        \( -name '*.db' -o -iname '*optuna*' -o -name '*.sqlite*' \) 2>/dev/null || true)
+fi
 if [ -n "$strays" ]; then
     echo "TEARDOWN REFUSED: stray optuna/db artifacts under repo/data:" >&2
     echo "$strays" >&2

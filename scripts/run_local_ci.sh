@@ -2,15 +2,15 @@
 # run_local_ci.sh — SINGLE SOURCE of the platform gate list (D16a pattern).
 # ci.yml invokes THIS script; edit the gate list HERE, never in ci.yml —
 # editing YAML alone reopens two-source drift (D16d rejected C7).
-# CI-only (need docker; live in ci.yml BY NAME): shellcheck + k8s sh -n,
-# kubeconform, orchestrator dry-run, build-and-boot. experiments.py verify
+# CI-only (need docker; live in ci.yml BY NAME): kubeconform,
+# orchestrator dry-run, build-and-boot. experiments.py verify
 # runs on taxi only. Usage: run_local_ci.sh [--static]; exit 0 green / 1 red.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 STATIC=0; TIER="full"
 case "${1:-}" in
   --static) STATIC=1 ;;                       # doc-only micro edits
-  --tier=fast) TIER="fast" ;;                  # parity+ruff+mypy+configs (<30s)
+  --tier=fast) TIER="fast" ;;                  # parity+ruff+mypy+configs+shell-scripts (<30s)
   --tier=full|"") TIER="full" ;;               # everything incl. pytest+cov>=95
   *) echo "usage: run_local_ci.sh [--static|--tier=fast|--tier=full]" >&2; exit 2 ;;
 esac
@@ -49,12 +49,13 @@ from pathlib import Path
 from broadway.config.loader import load_config
 ps = sorted(Path('configs/experiment').glob('*.yaml')); assert ps, 'no configs'
 [load_config('train', dataset='test', experiment=p.stem) or print(f'OK {p.stem}') for p in ps]"
+run shell-scripts bash -c 'for f in k8s/optuna/*.sh; do sh -n "$f"; done; shellcheck k8s/optuna/*.sh'
 if [[ $STATIC -eq 0 && $TIER == "full" ]]; then
   run pytest uv run pytest tests/ -n 4 --dist worksteal \
              --cov=src/broadway --cov-report=term-missing --cov-fail-under=95
 fi
 if [[ $fail -eq 0 ]]; then
-  [[ $TIER == "fast" ]] && echo "FAST-GREEN (tiers: parity/ruff/mypy/configs)" || echo "LOCAL-CI GREEN"
+  [[ $TIER == "fast" ]] && echo "FAST-GREEN (tiers: parity/ruff/mypy/configs/shell-scripts)" || echo "LOCAL-CI GREEN"
 else
   echo "LOCAL-CI RED — fix above before commit/push"
 fi
