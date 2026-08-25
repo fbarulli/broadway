@@ -1,7 +1,6 @@
-# Gate registry SSOT — machine-assembled from agents/ledger/gates/{01..09}-*.md fragments.
-# Do not hand-edit; regenerate via the assembly step and render views with agents/tools/render_gates.py
+# Gate registry SSOT — hand-maintained; the {01..09} gate fragments it consolidated predate git custody.
 meta:
-  head: 5016e93
+  head: b06bdd2
   assembled: '2026-08-24'
   source_fragments:
   - agents/ledger/gates/01-ingest.md
@@ -1719,7 +1718,7 @@ gates:
   - Agg backend setup
   - DiagnosticResult field set
   findings:
-  - 'PURITY + UNPINNED THRESHOLDS — (a) indirect config+IO read inside stats: diagnostics.py:37 calls viz.palette_colors(1) whose default-palette branch (src/broadway/viz.py:32-35) calls load_viz_config() which OPENS configs/step/viz.yaml from disk (src/broadway/config/viz.py:79-83); describe.py:112 has the same reach — the "pure library" thus depends on a config file through a plotting helper. (b) NO PRODUCTION CALLER exists for ANY member of this cluster (repo-wide src/ grep: outlier_mask/winsorize/estimation_table/standardized_coefs/scenario_dollars, fit_ols/fit_robust/bp_jb, durbin_watson_test/plot_acf, train_lgbm/evaluate are referenced ONLY by tests), so their thresholds (threshold, cap_quantile, alpha=0.05, lags, tail_quantile) have no caller pinning AND no config key; train_lgbm additionally pins no seed. Dead-in-src library code with unpinned knobs — flagged per contract, severity low (tests exercise every knob).'
+  - 'PURITY + UNPINNED THRESHOLDS — (a) indirect config+IO read inside stats: diagnostics.py:37 calls viz.palette_colors(1) whose default-palette branch (src/broadway/viz.py:32-35) calls load_viz_config() which OPENS configs/step/viz.yaml from disk (src/broadway/config/viz.py:79-83); describe.py:112 has the same reach — the "pure library" thus depends on a config file through a plotting helper. (b) CORRECTED caller map (supersedes the earlier no-production-caller claim): production callers EXIST for bp_jb (project/scripts/08_ols_residuals_diagnostics.py:45, project/scripts/09_log_target_ols.py:35, project/scripts/11_interaction_ols.py:72), fit_ols (project/scripts/08_ols_residuals_diagnostics.py:82, project/scripts/09_log_target_ols.py:62+70, project/scripts/10_durbin_watson_time.py:41, project/scripts/11_interaction_ols.py:38+45), fit_robust (project/scripts/09_log_target_ols.py:74), durbin_watson_test (project/scripts/10_durbin_watson_time.py:43), plot_acf (project/scripts/10_durbin_watson_time.py:54), train_lgbm (project/scripts/12_lgbm_baseline.py:59), evaluate (project/scripts/12_lgbm_baseline.py:72); genuinely caller-less outside tests: outlier_mask, winsorize, estimation_table, standardized_coefs, scenario_dollars; whether project/scripts counts as a production surface awaits an explicit ruling (agents/ledger/arbitration/2026-08-24/00-resolutions.md §6), so threshold pins remain provisional. Dead-in-src status now applies only to the five caller-less functions above — flagged per contract, severity low (tests exercise every knob).'
 - id: GATE-STATS-49
   phase: stats
   order: 54
