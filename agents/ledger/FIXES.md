@@ -174,6 +174,37 @@ era updates · `019a9da` DECISIONS.md sheet · `8e7d51a` G0a doc pruning.
   body. Lesson: rulings need a post-landing conformance check
   against their own acceptance lines — added to arbitration checklist.
 
+## Incident log: genesis event-ids fail documented recomputation
+- **2026-08-24**: while seeding CHANGE BOARD (#5), recomputed sha8 per the
+  MAIN_AGENT_CONTRACT §6 recipe against the STORED bodies of the two
+  genesis authorization rows posted by the pilot agent on issue #3
+  (comments 5398091966, 5398093447 — registry rows b16fb9ca/e1f7cc62):
+  13 byte variants, including the
+  canonical no-trailing-newline form, produced ZERO matches on BOTH rows.
+  Consistent with ids hashed over pre-posting drafts while GitHub stores
+  normalized bytes. Strict reading voids citations resolving to
+  genesis/backfill rows until re-pinned. Board rows posted after the
+  finding by the main agent use store-then-hash posting (post → fetch →
+  hash → repost + delete draft) and verify byte-exact — agent-posted
+  seeds: bb8c548b e277f63a ebf1c913 392fa146 ae44dbfd, resolution rows
+  appended to STATE.md ## EVENTS. Remediation of the six pilot rows — supersede-
+  and-repin vs recipe amendment — is a HUMAN CALL, filed as anomaly row
+  ae44dbfd on the board; raised by this session's agent, not
+  self-directed beyond the brief.
+
+## Incident log: SECRET-1 ledger claim vs reality (backfilled 2026-08-24)
+- **2026-08-24**: commit `8b73645` message cites "Ledger: FIXES.md" but no
+  such row ever existed here — backfilled from the SECRET-AUDIT lane
+  (agents/ledger/factsheets/2026-08-24-secret-audit.md). State: template +
+  lifecycle.sh generated-fallback landed sklearn-lineage ONLY; the OLD
+  credential sits at HEAD of public origin/main and origin/taxi_work
+  (plus local branches/tag); upstream rotation NOT-EVIDENCED; D22 rider's
+  path "configs/secret.yaml" never existed in any ref — real subject
+  k8s/optuna/secret.yaml.
+  root: remediation treated a branch-local merge as closure — no standing
+  rule required propagation verification across lines or rotation
+  evidence. Closed only when rotation evidence lands (board row supersedes).
+
 ## Incident log: novel-blob layer false-positive (disjoint histories)
 - **2026-08-24**: Post-D21 push, gate_parity's pinned execution surfaced
   ROGUE MAIN WRITE on all 69 shared-path blobs. Forensics: main and

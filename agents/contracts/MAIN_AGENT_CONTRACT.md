@@ -38,6 +38,10 @@ Working directory: `/home/opc/ONE/broad-way`.
 - **Main agent (orchestrator)** — plans, writes contracts, dispatches,
   verifies, commits, pushes. Does NOT implement.
 - **Sub-agents** — execute one contract against `WORKER_CONTRACT.md`.
+- **Senior arbitration stage** — read-only approach reviewer
+  (`agents/contracts/SENIOR.md`): rules on problem→solution pairs
+  (ADOPT/MODIFY/REJECT); verdicts land as rows on the Change Board
+  (§14) and execute later as worker contracts (D26).
 
 The main agent does not decide unilaterally. Weigh tradeoffs → options +
 recommendation → wait. Honesty over agreement: flag problems early; "not being
@@ -111,11 +115,23 @@ more reading `parse_numeric` than any checklist produced).
   (`…/issues/<n>#issuecomment-<id>`) in fbarulli/broadway whose body carries a valid event
   header. A bare issue URL does not cite. Validity is RESOLVED, never presumed: fetch
   `gh api repos/fbarulli/broadway/issues/comments/<id>` and require (a) parent issue is a
-  designated ledger issue (#3 AUTHORIZATION LEDGER, #4 VERDICT LOG) AND `.locked == true`;
+  designated ledger issue (#3 AUTHORIZATION LEDGER, #4 VERDICT LOG,
+  #5 CHANGE BOARD) AND `.locked == true`;
   (b) `.user.login == "fbarulli"` at resolution time; (c) recomputed event-id == header
   event-id (first 8 hex of sha256 over the comment body after deleting every
   `event-id:`/`recorded-time:` line and joining remaining lines with `\n`, with NO trailing
   newline appended); (d) `status: active` and type matching the claimed kind.
+   - **Genesis-id resolution (re-ruled 2026-08-24 on GENESIS-REPRO evidence, 6/6
+     byte-exact):** the six genesis events b16fb9ca, e1f7cc62, 493e21ce, 3afcd9b1,
+     7595cb13, 555b6fb8 DO recompute under (c) — sha256 first-8 over the stored UTF-8
+     body after deleting every `event-id:`/`recorded-time:` line and joining remaining
+     lines with `\n`, EXCLUDING the body's own trailing newline. The previously landed
+     "pre-normalization drafts" grandfather exception is WITHDRAWN: the reported
+     mismatch was a verifier bug that retained the trailing newline. All ledger
+     citations — genesis rows included — resolve by full (c) recomputation with NO
+     exceptions; any body edit still voids per immutability. Reference implementation:
+     `gh api repos/fbarulli/broadway/issues/comments/<id> | jq -j '.body' |
+     sed '/^event-id:/d;/^recorded-time:/d' | sed -z '$s/\n$//' | sha256sum | cut -c1-8`.
   Record the resolution (event-id, comment id, created_at) into STATE.md/DECISIONS.md BEFORE
   relying on the claim. Historical events carry `backfill: true` with distinct event-time and
   recorded-time. Ledger comments are immutable by POLICY: corrections are NEW comments with
@@ -126,7 +142,7 @@ more reading `parse_numeric` than any checklist produced).
 - **Citation-resolution procedure (arbitration checklist addition):** when someone cites X#Y:
   (1) Parse ref — must be `fbarulli/broadway/issues/<n>#issuecomment-<m>`; bare issue link →
   INVALID. (2) Fetch `gh api …/issues/comments/<m>` (+ `/issues/<n>` for lock/title).
-  (3) Check: title prefix ∈ {AUTHORIZATION LEDGER, VERDICT LOG}; `.locked==true`;
+  (3) Check: title prefix ∈ {AUTHORIZATION LEDGER, VERDICT LOG, CHANGE BOARD}; `.locked==true`;
   `.user.login=="fbarulli"`; header parses; recomputed sha8 == `event-id`; `status: active`;
   type matches claim kind. (4) Any failure → verdict INVALID; log a fabrication-suspect event
   citing the bad URL; claim non-authoritative. (5) Pass → write resolution row (event-id +
@@ -308,3 +324,215 @@ times: test counts, commands, paths; `dataflow.md`, `src/broadway/stats/API.md`,
   `uv run python -m project.scripts.NN_name`.
 - Agents: fresh subagents per contract; workers run no git operations at all —
   main agent verifies, commits, pushes.
+
+## 14. Change Board & senior arbitration stage (2026-08-24)
+
+Findable surfaces for approach review and everything currently pending,
+in flight, or undecided.
+
+### Senior arbitration stage
+
+- Contract: `agents/contracts/SENIOR.md` — receives PROBLEM → SOLUTION
+  pairs (findings, proposals, register rows) and rules per pair through
+  three independent kill-questions: correct approach? simpler form?
+  another angle? Verdicts: ADOPT · MODIFY(to:) · REJECT(with:),
+  rationale mandatory; ESCALATE/PROVISIONAL flags per D18/D26.
+- Read-only, zero writes anywhere; step-0 gates as per worker norm.
+  Verdicts execute LATER as standard zero-write worker contracts (D26);
+  the senior never implements.
+
+### Change Board — locked ledger issue #5
+
+- fbarulli/broadway#5 "CHANGE BOARD", conversation-locked, owner
+  gh-api writes only; THIRD designated ledger issue alongside #3/#4 —
+  the §6 citation-validity rule applies to board citations verbatim.
+- One comment = one row = one change ON THE BOARD. Grammar identical
+  to EVENT-lines: `type:` board-row|anomaly; `status:` ∈ {active,
+  landed, dropped}. Transitions are NEW comments carrying
+  `supersedes: <prior event-id>` — comments are never edited (an edit
+  breaks recomputation and voids the row by policy).
+- **Event-id recipe (store-then-hash):** compute the §6 sha8 over the
+  STORED body, never a local draft — GitHub normalizes bytes on store
+  (genesis-row anomaly, FIXES.md 2026-08-24). Procedure: post draft →
+  fetch stored body → compute sha8 → repost with `event-id:` line →
+  delete the draft; verify the survivor recomputes byte-exact.
+- Canonical state stays IN-TREE: every posted row mirrors into
+  STATE.md `## EVENTS` (GIT-WINS; no gate ever requires github.com
+  online, D22 doctrine).
+- Routing: every non-REJECT senior verdict is recorded by the MAIN
+  AGENT as ONE board row; the senior itself posts nothing anywhere.
+  Landing a row's change ends with a superseding comment flipping
+  `status:` to landed/dropped, mirrored in the same touch.
+
+### Accessing the board via gh
+
+Repo `fbarulli/broadway`, board = issue #5, conversation-locked.
+Read-only inspection is allowed and expected at any tier; WRITES are
+owner-only and follow the store-then-hash recipe below — workers,
+seniors, and adversaries never post.
+
+```bash
+# Row index — one line per comment (id · created_at · subject):
+gh api repos/fbarulli/broadway/issues/5/comments --jq \
+  '.[] | [.id, .created_at, (.body | split("\n")[0])] | @tsv'
+
+# Active rows only:
+gh api repos/fbarulli/broadway/issues/5/comments --jq \
+  '.[] | select(.body | test("^status: active", "m")) | .id'
+
+# Full text of ONE row — take <comment-id> from STATE.md ## EVENTS:
+gh api repos/fbarulli/broadway/issues/comments/<comment-id> --jq '.body'
+
+# Issue metadata / lock check:
+gh api repos/fbarulli/broadway/issues/5 --jq '{title, locked, open}'
+
+# Verify an event-id recomputes (D4/D8: paste command WITH output):
+gh api repos/fbarulli/broadway/issues/comments/<id> --jq '.body' > /tmp/b
+python3 - <<'PY'
+import hashlib
+lines=[l for l in open('/tmp/b').read().splitlines()
+       if not l.startswith(('event-id:','recorded-time:'))]
+print(hashlib.sha256('\n'.join(lines).encode()).hexdigest()[:8])
+PY
+```
+
+Cite rows as `issues/5#issuecomment-<id> event-id <sha8>`; resolution
+rows live in STATE.md `## EVENTS`. If github.com is unreachable, no
+gate blocks — the tree registry (GIT-WINS) remains authoritative.
+
+### Reproducibility mandate
+
+- **Mechanism claims reproduce first.** A ledger entry asserting HOW
+  something happened (not just THAT it happened) may not land until
+  the mechanism is demonstrated by re-running it, or is explicitly
+  labeled `UNREPRODUCED` with resolution resting only on what WAS
+  demonstrated. Best-explanation wording is banned for causes.
+- **Every load-bearing row carries `check:`** — one command a fresh
+  agent can run to re-derive the entry's central fact
+  (`check:` + pasted expected tail per D4/D8). A row whose check
+  cannot be written is a narrative, not a record; file it as an
+  observation instead.
+- **Mechanical stages are deterministic.** Registry rendering,
+  event-id computation, parity checks, probes: same input ⇒
+  byte-identical output, pinned by test where cheap. A mechanical
+  stage that cannot be made deterministic is treated as judgment
+  work and gets an evidence trail instead.
+- **Judgment stages cite their facts.** Senior rulings and slates
+  are not reproducible as judgments, but every load-bearing CLAIM
+  inside them cites its file:line plus the command that surfaced it,
+  so the facts re-derive even though the verdict does not.
+- **Dual-plane verification.** This repo contracts TWO test planes:
+  agnostic platform law (`tests/` over src/broadway) and dataset
+  binding (`project/tests/` over project/). A `check:` line or
+  acceptance command covering a surface contracted in BOTH planes
+  MUST run BOTH suites — single-plane verification of a two-plane
+  surface is an incomplete check and the row does not land. Edits to
+  parity-SHARED surfaces additionally require the parity lockstep
+  check on the same commit. Slates name the plane(s) each item
+  touches; the registry's `validated_by` entries already span both
+  trees and are the authoritative map of which plane pins what.
+- **Isolation protocol.** On anomaly, walk the chain backwards
+  through `check:` lines until one fails — that failing step IS the
+  defect locus. Fix or relabel there; never patch downstream of an
+  unreproduced step. Fixes land at the locus or not at all.
+
+### Ledger & artifact hygiene
+
+- Every new file under `agents/**` declares its class at creation:
+  `SSOT` (single source of truth) · `derived` (regenerated from an
+  SSOT) · `cycle-scoped` (belongs to one work cycle, then archives).
+- Derived/rendered artifacts stay under ~50 KB tracked. When they
+  outgrow the budget the fix is regeneration or retirement, never
+  accumulation. Intermediates whose content survives verbatim inside
+  an SSOT are DELETED once the SSOT goes live-green (deletion-first;
+  precedent: GATES.md + gates/*.md fragments retire against
+  gates.yaml).
+- Working ledgers (`STATE.md` `## EVENTS`, `FIXES.md` incident log)
+  hold CURRENT-CYCLE rows only. At cycle close, resolved rows
+  compress into agents/ledger/archive/YYYY-MM.md (date-substituted
+  at creation) behind a pointer line; the working file resets. `DECISIONS.md` is law, not log —
+  exempt from rotation, entries appended, never rewritten.
+- Contract files cap ~30 KB of prose; beyond that, worked examples
+  and recipes move to appendix files beside the contract.
+- Session context-load rule: load DIGEST.md + working ledgers +
+  relevant packet files. Never load a full SSOT dump into context
+  when a digest exists.
+- **Cache & teardown law.** Single sanctioned cache root:
+  `$HOME/.cache/uv`. Repo-local cache directories (uv/mypy/pytest at
+  repo root) are PROHIBITED; teardown scripts must return
+  container/image/volume state to zero; new durable object creators
+  require a registered lifecycle owner before first use.
+
+### Registry maintenance duty
+
+- The machine-readable SSOT for gates/surfaces is
+  agents/ledger/gates.yaml. Any change touching a gated surface MUST
+  edit the owed gate rows in the SAME commit as the code (§14 step 4
+  UPDATE IN PLACE applies to gates.yaml rows, not GATES.md).
+- Same commit runs: python agents/tools/render_gates.py  (regenerate
+  indexes + DIGEST) and the registry verification test. A red
+  registry test blocks landing exactly like any other gate.
+- Before proposing a change, run the blast-radius query for the
+  target path; its output IS the list of rows the change owes.
+- Staleness is loud by design: deleted owners, renamed symbols,
+  vanished pins, and broken id references fail the registry test.
+  Silence is a bug in the test, report it like one.
+
+### Row format — surface & data-gate rows
+
+A board row that REGISTERS a pipeline surface or data gate (as opposed
+to reporting prose) carries the canonical field set, in this order:
+
+```
+- id: <GATE-…-NN>  phase: <canonical-order position>
+  owner: <file:line symbol()>     # single writer-of-record
+  inputs: […]                     # ARTIFACT-*/CFG-* ids consumed
+  outputs: […]                    # ids produced
+  transforms: ["…"]               # one line each
+  touched_by: [lib@version]       # attribution
+  validated_by: [test node ids]   # the pins that hold today
+  if_changed: [downstream gates, artifacts, tests]
+```
+
+Prose rows (incidents, rulings, verdicts, status flips) keep the
+subject + prose form specified above; never mix both formats in one
+comment.
+
+**ROOT-CAUSE MANDATE:** every FINDING line, incident row, and
+adversarial verdict names the ROOT problem on its own `root:` line —
+the deepest cause whose repair would have prevented the CLASS, not
+just this instance (the difference between "pre-push hook missing"
+and "a guard depended on machine-local untracked state"). A fix or
+ruling aimed at the symptom while the root stands is auto-MODIFY at
+senior review; an incident row without its `root:` line is not
+closed, whatever else it cites. Repeat offenders in FIXES.md
+(push-on-red ×2, custody violations ×3) exist precisely because this
+was never required.
+
+### Gate registry & digest rendering
+
+- **Registry SSOT:** the gate registry (in-tree under `agents/ledger/`,
+  created by its first registering lane) owns gate rows VERBATIM; board
+  comments are the evidence layer and STATE.md `## EVENTS` the
+  resolution layer (GIT-WINS unchanged).
+- **DIGEST.md is rendered output, never hand-edited** — gates in
+  canonical order as compact per-gate blocks. This is what an agent
+  loads into context instead of the raw registry. Single-writer rule:
+  the registering lane renders; everyone else consumes.
+
+### Registry-driven change protocol (the ONLY way surfaces/gates change)
+
+1. **LOCATE** — before touching anything, find your file/symbol in
+   DIGEST.md (or render_gates.py query mode). Its row hands you: the single owner,
+   inputs/outputs, the validated_by pins that hold today, and every
+   if_changed target your diff can move.
+2. **CHANGE** — implement against the owner symbol only; forking a
+   second writer for an owned surface is a refusal-class violation.
+3. **RE-VALIDATE** — run the row's validated_by pins AND each
+   if_changed target's checks. These are exactly the gates your change
+   can break; nothing else needs re-derivation from scratch.
+4. **UPDATE IN PLACE** — the registry row travels in the SAME commit
+   (owner line numbers, transforms, new pins), DIGEST.md re-rendered.
+   A stale row is a doc-drift bug (HANDOFF rule).
+5. **RECORD** — material changes supersede their Change Board row
+   (`status:` landed) in the same landing touch.

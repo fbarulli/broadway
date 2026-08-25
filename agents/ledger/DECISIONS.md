@@ -301,3 +301,54 @@ refspec `taxi:taxi`; sklearn parity expectations unchanged. If conflicts exceed 
 resolution, STOP and re-present options instead of force-merging.
 Rationale: one gate cost instead of two; D-register rulings may still reshape taxi-relevant
 surfaces. | Ruling: human, this session | Executor: main agent only |
+ADDENDUM (ADV-3 findings adopted by main agent): origin/taxi verified STRICT ANCESTOR of the
+sklearn line with ZERO unique commits (rev-list counts sklearn-only>0, taxi-only=0) — the
+cherry-pick machinery above is superseded: the single reconciliation pass IS one non-force
+`git push origin sklearn:taxi` (fast-forward). Procedure: execute only at worktree quiescence;
+pre-step asserts and logs `HEAD == sklearn tip`; acknowledge CD side effect (:taxi image
+build/publish fires on the ref update). ship.sh tree-vs-refspec gap (F-2) covered procedurally
+by that assert — ship.sh itself untouched (gate-list law). Event-id: EVT-D24-TAXISYNC-B
+(ledger-canonical; gh-comms rejected per D22).
+PRECISION (ADV-3 N-7/N-8): the pass carries EXACTLY the commit list {619f069, 953c727,
+d53f7b9, 5016e93} plus any commit bearing tag FIX-WAVE-1 or NOTES-CONSOLIDATE recorded in
+this log before execution begins — no open-ended "whatever stands" reading. Quiescent :=
+`git status --porcelain` empty except agents/ledger/** and the foreign untracked
+experiments/more_modeling/{16..22}* batch. Mechanical resolution := conflict hunks whose
+changed lines were all introduced by the listed commits themselves; anything else STOPs
+and re-presents.
+
+## D25 — PUSH-STANDING-GO: ship every green batch immediately, no per-push human go (human-ratified)
+Human directive: "don't wait for me, push already, always." Amends the per-push-human-go clause of
+the push-custody law for THIS working style effective immediately and for the rest of the session.
+RULE: main agent ships via `scripts/ship.sh` the moment a batch is committed and LOCAL-CI GREEN —
+no confirmation round-trip. The gate remains absolute: RED means refused, never overridden;
+quiescence rule (D24) still applies before cross-line reconciliation; foreign/untracked surfaces
+still never ship. | Ruling: human, this session |
+ADDENDUM (ADV-3 findings adopted by main agent): D25 SUPERSEDES the second push-custody conjunct
+("last CI run on the branch tip green") for this session — ci.yml cancel-in-progress makes it
+structurally unreachable under push-always. Compensating controls, mandatory on every push:
+(i) ship.sh LOCAL full-tier GREEN immediately pre-push (stricter than any stale remote run);
+(ii) the post-push Actions run on the new tip is monitored; a remote RED triggers same-session
+fix-forward or revert, ruled and recorded in FIXES.md — a red remote tip is never left
+unaddressed across a session boundary. Event-id: EVT-D25-PUSHGO (ledger-canonical; gh-comms
+rejected per D22).
+PRECISION (ADV-3 N-6/N-9): the gate verdict certifies the pushed tip only when, at push time,
+the worktree's dirty set contains no tracked code file outside the just-committed batch(es);
+if sibling WIP landed in between, gates re-run after the tree settles before the push fires.
+PUSH-STANDING-GO sunsets automatically at session end or on explicit human revocation,
+whichever comes first.
+
+## D26 — ARBITER-DELEGATION: senior stage rules the open decision register (human-ratified)
+Human directive ("lets see them then, lets go … send all these decisions to the senior") delegates
+ratification of the accumulated open-decision register — FX-A D1–D7, FX-B DR-1…DR-14, CODELAW
+automation candidates A1–A9, adversary BM-/N-findings routing, test-hardening remainder W4–W6,
+project/tests blind-spot scope (old D3), doc-truth riders N-1/N-2/N-12 — to the SENIOR arbitration
+stage operating under agents/contracts/SENIOR.md + the D18 verdict-class table.
+EFFECT: senior verdicts (ADOPT/MODIFY/REJECT, rationale mandatory) execute immediately as
+standard implementation contracts through zero-write workers; run_local_ci.sh gate-list edits
+become executable upon senior adoption rather than separate per-item human rounds; five-banner
+gates remain absolute before any commit; D25 push-always applies to every green result. The human
+retains session-level veto and receives the full verdict ledger as briefing. Items whose evidence
+packets are still undelivered (FX-A/FX-B second halves) are ruled provisionally from compliance
+addenda + banked summaries and flagged PROVISIONAL pending those packets. Event-id:
+EVT-D26-SENIORDELEGATE. | Ruling: human, this session |

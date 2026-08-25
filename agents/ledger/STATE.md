@@ -5,7 +5,15 @@
 > instructions. Stale on arrival = STOP-and-report, never improvise.
 
 ## Last refreshed
-2026-08-24, after GATE-SSOT + COV-95 landing (`ff595b4`).
+2026-08-24 (later session), at CHANGE BOARD creation + SENIOR contract
+recreation (tip `5016e93`; tree uncommitted).
+
+2026-08-24 arbitration stage: all five senior verdict reports persisted
+VERBATIM under agents/ledger/arbitration/2026-08-24/{A..E}-verdicts.md and
+the seven human rulings recorded in 00-resolutions.md (HC-1 voided; HC-2
+approved; asymmetry ratified; evidence JSONs demoted; decisions_dir delete;
+project/scripts classification; D11 delete). Clerk board batch follows;
+registry rows land with the batch.
 
 ## Landed state — DERIVE FROM GIT, do not trust this section for SHAs
 Authoritative: `git log --oneline -12`, `git log --grep='^Contract:'
@@ -18,32 +26,30 @@ if it contradicts git, GIT WINS.
 ## Active lanes (in flight NOW)
 | Agent | Contract | State |
 |---|---|---|
-| `b983b5a5` | Senior decision-pipeline close | delivered (3 rulings) |
-| TIERREV-1 worker | Batch A: classifier + probes + Tier trailers | dispatched |
-| panel agents `81abc1fe` `299ae05a` `91bfb004` | Test-effectiveness panel (adversarial reviewer trio) | delivered; findings queued for senior synthesis |
+| (none) | Prior-session DG-MAP-1..4 cartography lanes LAPSED with that session — no fact sheets landed in-tree; treat as NOT in flight; redispatch under fresh contracts if wanted. Senior synthesis queued behind them is void until then. | - |
 
-## Lane telemetry schema
-Stage-split timing columns per dispatched lane (TIERREV-1, D19 P1 telemetry
-condition). Schema ONLY — the main agent populates values at
-dispatch/arbitration; no rows exist yet, none are fabricated here.
-| Column | Meaning |
-|---|---|
-| `lane_id` | dispatched agent id (8-hex) or worker label |
-| `contract_id` | dispatch contract label (e.g. TIERREV-1) |
-| `classify_ts` | ISO-8601 UTC instant the change set was risk-tiered via `scripts/tier_classifier.py` |
-| `dispatch_ts` | ISO-8601 UTC instant the worker launched |
-| `verdict_ts` | ISO-8601 UTC instant the arbitration verdict landed |
+Pending-change inventory is mirrored on the CHANGE BOARD (issue #5, locked):
+rows R1–R5 cover the uncommitted ETL batch, ingest-surface tests, the
+foreign experiments batch, the SENIOR/board governance landing, and the
+event-id recomputation anomaly; rows R6–R11 (2026-08-24T21:0xZ) carry the
+five verification-lane verdicts — tripwire gaps, SECRET-1 open,
+determinism silence list, deployment mismatches, D23 recorder absent —
+plus the proactive register awaiting one ratification packet. Full fact
+sheets live in agents/ledger/factsheets/2026-08-24-*.md; every row carries
+a `root:` line per the ROOT-CAUSE MANDATE (MAIN_AGENT_CONTRACT §14).
 
-Landed since last refresh: e9fce2d (D17 GATE-SSOT), 9f50574 (COV-95 +49 tests,
-floor 95 bound in script), ff595b4 (ledger). Suite tail NOW: 827P/1S gated
-scope (95.31%), 846P/1S root scope. Pending fix queue from panel:
-get_champion MlflowException swallow (deploy-critical), config-silence
-cluster, assertion-strength gaps (test_baseline decorative, message pins
-~8%, timeline dark), mutation survivors M1/M10 (+verify M5/M2/M9 against
-post-commit tree).
+Prior lanes (senior close b983b5a5, TIERREV-1, test-effectiveness panel)
+are delivered; their outcomes live in git history and FIXES.md, not here.
+
+Suite tail expectations are unchanged from the previous refresh (827P/1S
+gated scope, 846P/1S root scope); no gates were re-run at this refresh —
+re-derive at step-0 if your contract needs them.
 
 ## Uncommitted worktree content (do NOT duplicate or revert)
-(none — worktree clean as of ff595b4)
+Untracked batch owned by a prior human-directed session, present at this
+refresh — every lane treats it as read-only context:
+experiments/more_modeling/{16..22}_*.py (7 scripts) and
+experiments/results/more_modeling/*.csv (7 result CSVs).
 
 ## Standing hazards (learned the hard way)
 - `/tmp` is namespaced PER TOOL CALL here — nothing persists between calls;
@@ -63,6 +69,9 @@ post-commit tree).
   event-ids live ONLY in the ## EVENTS registry below — never repeat them
   as bare hex in prose (probe C scans this file).
   Citation rule + resolution procedure now in MAIN_AGENT_CONTRACT.md.
+  CHANGE BOARD = issue #5 (locked; designated third ledger issue this
+  session, human-approved via GUI): pending-change rows R1–R5 seeded
+  2026-08-24T20:43Z, store-then-hash posting, all five byte-verified.
 - Phantom-channel incident: adversary 35266af4 (CI-proposal attack —
   contract work itself excellent) post-completion emitted three
   unsolicited elaborations of a read-audit system and claimed relay to a
@@ -96,10 +105,13 @@ citation rule in MAIN_AGENT_CONTRACT.md). A FULL-LINE `EVENT: issues/<n>#
 issuecomment-<m> event-id <8hex>` line is valid iff a UNIQUE row exists here;
 role vocabulary is no escape in this namespace, and duplicate event-id rows
 are a probe violation. Superseded rows may outlive their EVENT lines.
-Created_at values verified via gh api at pilot close. Provenance: all six
-rows are pilot backfills entered via owner gh-api writes (two genesis
-events, D19-D21 backfills, custody-baseline); each row's `type` keeps its
-per-event ruling class, one unique row per legacy narrative id.
+Created_at values verified via gh api at pilot close; board-row created_at
+values verified via api at seeding (store-then-hash). Provenance: the first
+six rows are pilot backfills entered via owner gh-api writes (two genesis
+events, D19-D21 backfills, custody-baseline); the five 2026-08-24T20:43Z
+rows are CHANGE BOARD (#5) seeds R1-R5 posted this session. Each row's
+`type` keeps its per-event ruling class, one unique row per legacy
+narrative id.
 
 | event-id | issue | comment-id | created_at | type | supersedes |
 |---|---|---|---|---|---|
@@ -109,3 +121,33 @@ per-event ruling class, one unique row per legacy narrative id.
 | 3afcd9b1 | issues/4#issuecomment-5398092508 | 5398092508 | 2026-08-24T16:19:09Z | ratification | - |
 | 7595cb13 | issues/4#issuecomment-5398092820 | 5398092820 | 2026-08-24T16:19:11Z | verdict | - |
 | 555b6fb8 | issues/4#issuecomment-5398093134 | 5398093134 | 2026-08-24T16:19:13Z | verdict | - |
+| bb8c548b | issues/5#issuecomment-5401138010 | 5401138010 | 2026-08-24T20:43:14Z | board-row | - |
+| e277f63a | issues/5#issuecomment-5401138608 | 5401138608 | 2026-08-24T20:43:16Z | board-row | - |
+| ebf1c913 | issues/5#issuecomment-5401139225 | 5401139225 | 2026-08-24T20:43:19Z | board-row | - |
+| 392fa146 | issues/5#issuecomment-5401139768 | 5401139768 | 2026-08-24T20:43:22Z | board-row | - |
+| ae44dbfd | issues/5#issuecomment-5401140343 | 5401140343 | 2026-08-24T20:43:24Z | anomaly | - |
+| 8ee2eb96 | issues/5#issuecomment-5401490304 | 5401490304 | 2026-08-24T21:17:00Z | board-row | - |
+| de82c84b | issues/5#issuecomment-5401490717 | 5401490717 | 2026-08-24T21:17:02Z | board-row | - |
+| 64864f79 | issues/5#issuecomment-5401491180 | 5401491180 | 2026-08-24T21:17:05Z | board-row | - |
+| 434a8be2 | issues/5#issuecomment-5401491636 | 5401491636 | 2026-08-24T21:17:08Z | board-row | - |
+| 357eb775 | issues/5#issuecomment-5401492192 | 5401492192 | 2026-08-24T21:17:11Z | board-row | - |
+| a682f9f5 | issues/5#issuecomment-5401492630 | 5401492630 | 2026-08-24T21:17:14Z | board-row | - |
+| 392683bf | issues/5#issuecomment-5401517725 | 5401517725 | 2026-08-24T21:19:49Z | board-row | - |
+| 162938c2 | issues/5#issuecomment-5401518149 | 5401518149 | 2026-08-24T21:19:52Z | board-row | - |
+| facb63f1 | issues/5#issuecomment-5401518526 | 5401518526 | 2026-08-24T21:19:55Z | board-row | - |
+| db84cc51 | issues/5#issuecomment-5401518902 | 5401518902 | 2026-08-24T21:19:57Z | board-row | - |
+| 5e83df74 | issues/5#issuecomment-5401519275 | 5401519275 | 2026-08-24T21:20:00Z | board-row | - |
+| 53c5b09a | issues/5#issuecomment-5401519805 | 5401519805 | 2026-08-24T21:20:03Z | board-row | - |
+| 137464a0 | issues/5#issuecomment-5401524262 | 5401524262 | 2026-08-24T21:20:31Z | board-row | - |
+| f0ef9baf | issues/5#issuecomment-5401532216 | 5401532216 | 2026-08-24T21:21:22Z | board-row | - |
+| 5ca166eb | issues/5#issuecomment-5401532706 | 5401532706 | 2026-08-24T21:21:25Z | board-row | - |
+| c9b9345b | issues/5#issuecomment-5402315704 | 5402315704 | 2026-08-24T22:26:22Z | board-row | - |
+| a4d6f7c2 | issues/5#issuecomment-5402316139 | 5402316139 | 2026-08-24T22:26:25Z | board-row | - |
+| 70859c98 | issues/5#issuecomment-5402316504 | 5402316504 | 2026-08-24T22:26:27Z | board-row | - |
+| 007c632c | issues/5#issuecomment-5402316944 | 5402316944 | 2026-08-24T22:26:30Z | board-row | - |
+| 384bc23c | issues/5#issuecomment-5402317352 | 5402317352 | 2026-08-24T22:26:32Z | board-row | - |
+| 6094ce2b | issues/5#issuecomment-5402317727 | 5402317727 | 2026-08-24T22:26:35Z | board-row | de82c84b |
+| 674adc2e | issues/5#issuecomment-5402318084 | 5402318084 | 2026-08-24T22:26:37Z | board-row | - |
+| b625b5e0 | issues/5#issuecomment-5402318525 | 5402318525 | 2026-08-24T22:26:40Z | board-row | ae44dbfd |
+| 3191279b | issues/5#issuecomment-5402421646 | 5402421646 | 2026-08-24T22:36:11Z | board-row | b625b5e0 |
+| ed2f1fdf | issues/5#issuecomment-5402422093 | 5402422093 | 2026-08-24T22:36:14Z | board-row | ae44dbfd |

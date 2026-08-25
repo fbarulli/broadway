@@ -52,7 +52,7 @@ EVENT_LINE = re.compile(EVENT_GRAMMAR_CANONICAL, re.MULTILINE)
 EVENTS_HEADER = ("event-id", "issue", "comment-id", "created_at", "type", "supersedes")
 REGISTRY_ROW_SHAPE = re.compile(
     r"^\s*\|\s*(?P<eid>[0-9a-f]{8})\s*\|\s*issues/(?P<issue>\d+)#issuecomment-(?P<cid>\d+)\s*\|"
-    r"\s*(?P=cid)\s*\|\s*\d{4}-\d{2}-\d{2}T[\d:.+Z-]+\s*\|\s*\w+\s*\|\s*(?:-|[0-9a-f]{8})\s*\|\s*$"
+    r"\s*(?P=cid)\s*\|\s*\d{4}-\d{2}-\d{2}T[\d:.+Z-]+\s*\|\s*[\w-]+\s*\|\s*(?:-|[0-9a-f]{8})\s*\|\s*$"
 )
 SEP_ROW = re.compile(r"^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)+\|?\s*$")
 HISTORICAL_MARKERS = ("deleted", "historic", "b15f66e", "once")
@@ -345,7 +345,8 @@ def test_probe_c_live_8hex_tokens_declared_or_resolvable() -> None:
 
 
 def test_probe_d_live_floor_quotes_match_gate_script() -> None:
-    docs = {name: (ROOT / name).read_text(encoding="utf-8") for name in ["README.md", "SKLEARN_PIPELINES.md"]}
+    docs = {name: (ROOT / "agents/ledger" / name).read_text(encoding="utf-8") for name in ["SKLEARN_PIPELINES.md"]}
+    docs["README.md"] = (ROOT / "README.md").read_text(encoding="utf-8")
     probe_coverage_floor(docs, (ROOT / "scripts/run_local_ci.sh").read_text(encoding="utf-8"))
 
 
@@ -481,7 +482,7 @@ def test_probe_d_red_stale_floor_quote(tmp_path: Path) -> None:
     def stale_floor(lines: list[str]) -> list[str]:
         return [ln.replace("cov-fail-under=95", "cov-fail-under=94") for ln in lines]
 
-    seeded = _seeded_copy(tmp_path, "SKLEARN_PIPELINES.md", stale_floor)
+    seeded = _seeded_copy(tmp_path, "agents/ledger/SKLEARN_PIPELINES.md", stale_floor)
     with pytest.raises(AssertionError, match="owns 95"):
         probe_coverage_floor({"SKLEARN_PIPELINES.md": seeded}, script)
     with pytest.raises(AssertionError, match="owns 95"):
