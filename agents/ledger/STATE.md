@@ -5,8 +5,14 @@
 > instructions. Stale on arrival = STOP-and-report, never improvise.
 
 ## Last refreshed
-2026-08-24 (later session), at CHANGE BOARD creation + SENIOR contract
-recreation (tip `5016e93`; tree uncommitted).
+2026-08-25, after the arbitration-cycle landing (tip `00db1c1`, pushed via
+ship.sh): the ETL ingest-audit batch, dead-code deletions, custody laws,
+stats test-hardening, trust-D11 deletion, and the governance ledger batch all
+landed as one logical change each (fc2f32a · 294a27f · bf599f9 · fc85f05 ·
+4cab4e1 · 00db1c1). Board rows R1/R2/R4 superseded to `landed`
+(store-then-hash, byte-verified — see ## EVENTS for the three new
+supersede event-ids). R3 (foreign more_modeling batch) remains active pending
+human ruling; scratch agents/notes/SENIOR.md remains untracked by design.
 
 2026-08-24 arbitration stage: all five senior verdict reports persisted
 VERBATIM under agents/ledger/arbitration/2026-08-24/{A..E}-verdicts.md and
@@ -29,9 +35,11 @@ if it contradicts git, GIT WINS.
 | (none) | Prior-session DG-MAP-1..4 cartography lanes LAPSED with that session — no fact sheets landed in-tree; treat as NOT in flight; redispatch under fresh contracts if wanted. Senior synthesis queued behind them is void until then. | - |
 
 Pending-change inventory is mirrored on the CHANGE BOARD (issue #5, locked):
-rows R1–R5 cover the uncommitted ETL batch, ingest-surface tests, the
+rows R1–R5 covered the uncommitted ETL batch, ingest-surface tests, the
 foreign experiments batch, the SENIOR/board governance landing, and the
-event-id recomputation anomaly; rows R6–R11 (2026-08-24T21:0xZ) carry the
+event-id recomputation anomaly; R1/R2/R4 are now LANDED (superseded 2026-08-25
+— see the three new ## EVENTS rows); R3 (foreign more_modeling) remains active
+pending a human ruling; rows R6–R11 (2026-08-24T21:0xZ) carry the
 five verification-lane verdicts — tripwire gaps, SECRET-1 open,
 determinism silence list, deployment mismatches, D23 recorder absent —
 plus the proactive register awaiting one ratification packet. Full fact
@@ -151,3 +159,6 @@ narrative id.
 | b625b5e0 | issues/5#issuecomment-5402318525 | 5402318525 | 2026-08-24T22:26:40Z | board-row | ae44dbfd |
 | 3191279b | issues/5#issuecomment-5402421646 | 5402421646 | 2026-08-24T22:36:11Z | board-row | b625b5e0 |
 | ed2f1fdf | issues/5#issuecomment-5402422093 | 5402422093 | 2026-08-24T22:36:14Z | board-row | ae44dbfd |
+| 0aef1131 | issues/5#issuecomment-5407855643 | 5407855643 | 2026-08-25T08:50:59Z | board-row | bb8c548b |
+| b0df65f1 | issues/5#issuecomment-5407856241 | 5407856241 | 2026-08-25T08:51:03Z | board-row | e277f63a |
+| a886ae68 | issues/5#issuecomment-5407856844 | 5407856844 | 2026-08-25T08:51:06Z | board-row | 392fa146 |
