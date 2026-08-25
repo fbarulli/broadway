@@ -108,7 +108,7 @@ HYPOTHESIS, not a fix. Every senior producing a NOW-SLATE proves it:
 
 - Create exactly ONE detached scratch worktree OUTSIDE the repo:
   `git worktree add --detach /tmp/<label>-verify <head-sha>`, then
-  inside it once: `UV_CACHE_DIR=<main-repo>/.uv-cache uv sync --frozen`.
+  inside it once: `uv sync --frozen` (default `$HOME/.cache/uv`, the single sanctioned cache root).
 - Apply each slate item there yourself, run ITS acceptance command,
   capture the output tail, then REVERT the item
   (`git checkout -- . && git clean -fd`) before the next one, so

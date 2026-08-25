@@ -902,3 +902,404 @@ def test_probe_e_new_surface_tripwire_live_and_falsifiable() -> None:
     probe_new_surfaces_registered(
         ["project/scripts/99_future_teaching.py"], [], today=_today(),
     )
+
+
+# --------------------------------------------------------------------------- #
+# Probes f-j — enforcement lane WH (five teeth from Scout-4's findings).
+# House pattern as probes a-e: constants + pure helpers + ONE test node each,
+# carrying the LIVE half plus in-test falsifiability against synthetic
+# corruption (no tree mutation — fixture law). Datetimes ride _today()
+# (DTZ-clean); git access is read-only inspection per WORKER_CONTRACT.
+#
+# Rulings landed with this lane (human-sanctioned custody extensions):
+# gates.yaml meta.head re-stamped 1cf33b5->f638f27 (probe f found the stamp
+# in violation of the parent-stamp law it pins), SENIOR.md:111 rewritten to
+# the sanctioned cache-root form (probe i's live contradiction).
+# --------------------------------------------------------------------------- #
+GATES_REGISTRY = "agents/ledger/gates.yaml"
+STATE_LEDGER = "agents/ledger/STATE.md"
+CI_WORKFLOW = ".github/workflows/ci.yml"
+
+
+# --- Probe (f): meta.head parent-stamp pin -------------------------------- #
+# Law derived from precedent (abcb729 stamped its parent; b06bdd2-era held
+# too): meta.head records the FIRST PARENT of the last commit touching
+# gates.yaml. A registry edit must re-stamp; anything else drifts.
+META_HEAD_LINE = re.compile(r"^  head:\s*(\S+)\s*$", re.MULTILINE)
+
+
+def parse_meta_head(registry_text: str, source: str = GATES_REGISTRY) -> str:
+    """The short-sha stamp under the gate registry's meta: block."""
+    found = META_HEAD_LINE.search(registry_text)
+    if not found:
+        raise AssertionError(f"{source}: no `head:` stamp under the meta: block")
+    return found.group(1)
+
+
+def assert_parent_stamp(actual: str, required: str, source: str = GATES_REGISTRY) -> None:
+    """Pure comparison: meta.head must equal the toucher's first parent."""
+    if actual != required:
+        raise AssertionError(
+            f"{source}: meta.head {actual!r} violates the parent-stamp law — required "
+            f"{required!r} (first parent of the last commit touching {GATES_REGISTRY}); "
+            "re-stamp meta.head with every registry edit (precedent abcb729)"
+        )
+
+
+@cache
+def _last_commit_touching(path: str) -> str | None:
+    proc = subprocess.run(
+        ["git", "log", "-1", "--format=%H", "--", path],
+        capture_output=True, text=True, cwd=ROOT, check=True,
+    )
+    return proc.stdout.strip() or None
+
+
+def _first_parent(commit: str) -> str | None:
+    """Short hash of ``commit``'s first parent; None for a root commit.
+
+    rev-list --parents -n 1 prints '<commit>' ALONE when no parent exists —
+    explicit root detection instead of parsing rev-parse failures.
+    """
+    out = subprocess.run(
+        ["git", "rev-list", "--parents", "-n", "1", commit],
+        capture_output=True, text=True, cwd=ROOT, check=True,
+    ).stdout.split()
+    if len(out) == 1:
+        return None
+    return subprocess.run(
+        ["git", "rev-parse", "--short=7", out[1]],
+        capture_output=True, text=True, cwd=ROOT, check=True,
+    ).stdout.strip()
+
+
+def test_probe_f_meta_head_parent_stamp_live_and_falsifiable() -> None:
+    """LIVE green at HEAD; wrong synthetic stamps fire through the pure helper."""
+    toucher = _last_commit_touching(GATES_REGISTRY)
+    assert toucher is not None, f"{GATES_REGISTRY} has no committing history?"
+    actual = parse_meta_head((ROOT / GATES_REGISTRY).read_text(encoding="utf-8"))
+    parent = _first_parent(toucher)
+    if parent is None:
+        # Root-commit edge: nothing precedes the toucher, no stamp can exist.
+        print(f"[P1] SKIP-WITH-PASS: {toucher} ({GATES_REGISTRY} toucher) is the root commit")
+        pytest.skip("gates.yaml toucher is the root commit — no parent stamp derivable")
+    print(f"[P1] meta.head parent-stamp: required={parent} actual={actual} match={actual == parent}")
+    assert_parent_stamp(actual, parent)
+    # Negative control — a synthetic wrong stamp through the pure helper.
+    with pytest.raises(AssertionError, match="violates the parent-stamp law"):
+        assert_parent_stamp("0badf00d", parent, source="synthetic-gates")
+    assert_parent_stamp(parent, parent, source="synthetic-gates")  # positive twin
+    with pytest.raises(AssertionError, match="no `head:` stamp"):  # parser fails loud
+        parse_meta_head("meta:\n  assembled: '2026-08-24'\n", source="synthetic-gates")
+
+
+# --- Probe (g): EVENTS tamper-lock (D31(2)) ------------------------------- #
+# A change to STATE.md's normative ## EVENTS table between two commits needs
+# an authorizing instrument: the landing commit body must cite >=1 event-id
+# holding a row in the POST-change registry. Identical sections pass free.
+def events_section(state_text: str) -> str:
+    """STATE.md bytes between ## EVENTS and the next top-level ## heading."""
+    lines: list[str] = []
+    in_events = False
+    for line in state_text.splitlines(keepends=True):
+        if line.startswith("#"):
+            if in_events:
+                break
+            in_events = line.strip() == "## EVENTS"
+            continue
+        if in_events:
+            lines.append(line)
+    return "".join(lines)
+
+
+def normalized_ws(text: str) -> str:
+    """Whitespace-collapsed form for tamper-insensitive comparison."""
+    return " ".join(text.split())
+
+
+def assert_events_change_authorized(
+    before: str,
+    after: str,
+    commit_body: str,
+    post_table_ids: frozenset[str] | set[str],
+) -> None:
+    """Tamper-lock over the ## EVENTS table (pure; feeds the negative control)."""
+    if normalized_ws(before) == normalized_ws(after):
+        return
+    cited = sorted({t for t in HEX8.findall(commit_body) if t in post_table_ids})
+    if not cited:
+        raise AssertionError(
+            "STATE.md ## EVENTS changed WITHOUT authorization: the landing commit "
+            "body cites none of the POST-change registry event-ids (D31(2) requires "
+            "an authorizing event row); hex tokens seen in body: "
+            f"{sorted(set(HEX8.findall(commit_body)))}"
+        )
+
+
+def test_probe_g_events_tamper_lock_live_and_falsifiable() -> None:
+    """LIVE: HEAD vs working-tree EVENTS agree today; tampering goes RED."""
+    head_text = subprocess.run(
+        ["git", "show", f"HEAD:{STATE_LEDGER}"],
+        capture_output=True, text=True, cwd=ROOT, check=True,
+    ).stdout
+    work_text = (ROOT / STATE_LEDGER).read_text(encoding="utf-8")
+    body = subprocess.run(
+        ["git", "log", "-1", "--format=%B"],
+        capture_output=True, text=True, cwd=ROOT, check=True,
+    ).stdout
+    # Falsifiability first, so a live RED below can only mean the TREE, never
+    # an unproven detector: negative controls on synthetic strings...
+    with pytest.raises(AssertionError, match="WITHOUT authorization"):
+        assert_events_change_authorized("a | b", "a | c", "routine refresh cafe1234", {"deadbeef"})
+    assert_events_change_authorized(  # authorized twin: body cites the row id
+        "a | b", "a | c", "board ruling event deadbeef recorded", {"deadbeef"},
+    )
+    assert_events_change_authorized("x", "x\n ", "", set())  # identical always passes
+    # ...then the clean-tree twin on REAL HEAD data (HEAD vs HEAD is always
+    # authorized) proving the live comparison shape on actual registry bytes.
+    assert_events_change_authorized(
+        events_section(head_text), events_section(head_text),
+        body, _parse_event_registry(work_text),
+    )
+    # LIVE verdict last: RED here means working-tree EVENTS diverged from HEAD
+    # without an authorizing commit body (e.g. another lane's WIP rows).
+    assert_events_change_authorized(
+        events_section(head_text), events_section(work_text),
+        body, _parse_event_registry(work_text),
+    )
+
+
+# --- Probe (h): repo-root dot-dir / tracked-cache ban (L5) ---------------- #
+SANCTIONED_ROOT_DOT_DIRS = frozenset({
+    ".git", ".github", ".mplconfig",  # floor: git itself, workflows, sanctioned MPL root
+    ".venv", ".uv-cache", ".pytest_cache", ".mypy_cache", ".ruff_cache",
+})
+BANNED_TRACKED_PREFIXES = (".uv-cache/", ".pytest_cache/", ".mypy_cache/", ".ruff_cache/")
+
+
+def stray_root_dot_dirs(entries: Sequence[str], allowed: frozenset[str]) -> list[str]:
+    """Repo-root dot-DIRECTORIES outside the sanctioned set."""
+    return sorted(e for e in entries if e.startswith(".") and e not in allowed)
+
+
+def banned_tracked_paths(
+    tracked: Sequence[str], prefixes: Sequence[str] = BANNED_TRACKED_PREFIXES,
+) -> list[str]:
+    """Tracked files living under a banned cache root."""
+    return sorted(p for p in tracked if any(p.startswith(pre) for pre in prefixes))
+
+
+def assert_root_hygiene(stray: Sequence[str], banned: Sequence[str], source: str = "repo-root") -> None:
+    """Both ban classes RED together; empty inputs pass."""
+    problems = []
+    if stray:
+        problems.append(f"unsanctioned dot-dir(s) at repo root: {list(stray)}")
+    if banned:
+        problems.append(f"tracked file(s) under banned cache roots: {list(banned)}")
+    if problems:
+        raise AssertionError(f"{source}: " + "; ".join(problems))
+
+
+def test_probe_h_root_dot_dir_and_cache_ban_live_and_falsifiable() -> None:
+    """LIVE green at HEAD; stray dot-dirs and tracked caches go RED."""
+    entries = [p.name for p in ROOT.iterdir() if p.is_dir()]
+    tracked = subprocess.run(
+        ["git", "ls-files"], capture_output=True, text=True, cwd=ROOT, check=True,
+    ).stdout.splitlines()
+    stray = stray_root_dot_dirs(entries, SANCTIONED_ROOT_DOT_DIRS)
+    banned = banned_tracked_paths(tracked)
+    print(f"[P3] root dot-dirs={[e for e in entries if e.startswith('.')]} banned-tracked={banned}")
+    assert_root_hygiene(stray, banned)
+    # Negative controls (synthetic): a new tool-cache dir at root...
+    with pytest.raises(AssertionError, match="unsanctioned dot-dir"):
+        assert_root_hygiene([".tox"], [])
+    # ...a cache root sneaking into git tracking...
+    with pytest.raises(AssertionError, match="banned cache roots"):
+        assert_root_hygiene([], [".uv-cache/wheels/x.whl"])
+    # ...and the clean twin passes.
+    assert_root_hygiene([], [])
+
+
+# --- Probe (i): UV_CACHE_DIR export ban (L10, single sanctioned root) ----- #
+# Creation-time law (arbitration row 146 / D32): $HOME/.cache/uv is the ONLY
+# uv cache root. Any tracked-file mention of UV_CACHE_DIR= outside DATED
+# exemption records is RED; expired rows fail loud (probe-e decay pattern).
+UV_CACHE_NEEDLE = "UV_CACHE_DIR="
+UV_CACHE_EXEMPTIONS: tuple[tuple[str, str, str], ...] = (
+    ("agents/contracts/G0B.md",
+     "archived completed-dispatch record (frozen G0B execution command)", "2026-09-08"),
+    ("agents/ledger/DECISIONS.md",
+     "historical D28/D32 measured-run records", "2026-09-08"),
+    ("agents/ledger/STATE.md",
+     "courtesy D28 suite-tail baseline command", "2026-09-08"),
+    ("agents/audits/B-TRUTH-ENFORCEMENT.md",
+     "audit prose quoting an in-venv run observation", "2026-09-08"),
+    ("agents/ledger/arbitration/2026-08-24/H-infra-custody-verdicts.md",
+     "row-146 cache-root fork-law verdict prose", "2026-09-08"),
+    ("agents/ledger/arbitration/2026-08-24/consolidation-slate.md",
+     "GATE-INFRA-146 slate entry (historical proposal record)", "2026-09-08"),
+    ("agents/ledger/arbitration/2026-08-24/gap-object-creators.md",
+     "packet-H finding that created the fork-site law", "2026-09-08"),
+    ("agents/ledger/gates.yaml",
+     "HISTORY finding string documenting the retired ship.sh fork site", "2026-09-08"),
+)
+
+
+def parse_git_grep_hits(payload: str) -> list[tuple[str, int]]:
+    """`git grep -n` rows into (path, lineno) pairs."""
+    return [(path, int(no)) for path, no, _line in (r.split(":", 2) for r in payload.splitlines())]
+
+
+# This module necessarily quotes the needle verbatim in its falsifiability
+# fixtures and failure-message strings; the live scan skips itself by path.
+UV_CACHE_SELF_SCAN_PATHS = frozenset({"tests/test_governance_probes.py"})
+
+
+def unexempted_uv_cache_hits(
+    hits: Sequence[tuple[str, int]],
+    exemptions: Sequence[tuple[str, str, str]],
+    today: date,
+) -> list[str]:
+    """Hits whose path carries no ACTIVE dated exemption."""
+    active = {path for path, _reason, review in exemptions if date.fromisoformat(review) >= today}
+    return [f"{path}:{no}" for path, no in hits if path not in active]
+
+
+def probe_uv_cache_export_ban(
+    hits: Sequence[tuple[str, int]],
+    *,
+    today: date,
+    exemptions: Sequence[tuple[str, str, str]] = UV_CACHE_EXEMPTIONS,
+    source: str = "git grep UV_CACHE_DIR=",
+) -> None:
+    """Single-sanctioned-root enforcement over tracked UV_CACHE_DIR= mentions."""
+    failures = [
+        f"exemption entry expired: {entry}"
+        for entry in expired_allowlist_entries(exemptions, today)
+    ]
+    offenders = unexempted_uv_cache_hits(hits, exemptions, today)
+    if offenders:
+        failures.append(
+            f"UV_CACHE_DIR= outside dated exemption records: {offenders} — "
+            "$HOME/.cache/uv is the single sanctioned root; remove the override "
+            "or add a dated UV_CACHE_EXEMPTIONS row with a stated reason"
+        )
+    if failures:
+        raise AssertionError(f"{source}: " + "; ".join(failures))
+
+
+def test_probe_i_uv_cache_ban_live_and_falsifiable() -> None:
+    """LIVE green post-SENIOR-fix; the pre-fix instruction line goes RED."""
+    payload = subprocess.run(
+        ["git", "grep", "-n", UV_CACHE_NEEDLE],
+        capture_output=True, text=True, cwd=ROOT, check=False,
+    ).stdout  # exit 1 == zero hits: the future-green shape parses to []
+    hits = [
+        (path, no) for path, no in parse_git_grep_hits(payload)
+        if path not in UV_CACHE_SELF_SCAN_PATHS  # this module's own fixture quotes
+    ]
+    probe_uv_cache_export_ban(hits, today=_today())
+    # Negative control grounded in this lane's own repair: yesterday's
+    # SENIOR.md instruction line must classify RED...
+    with pytest.raises(AssertionError, match="outside dated exemption"):
+        probe_uv_cache_export_ban([("agents/contracts/SENIOR.md", 111)], today=_today())
+    # ...an exempted historical record stays GREEN...
+    probe_uv_cache_export_ban([("agents/ledger/DECISIONS.md", 367)], today=_today())
+    # ...an expired exemption fails loud...
+    stale = (("agents/ledger/DECISIONS.md", "historical", "2026-01-01"),)
+    with pytest.raises(AssertionError, match="exemption entry expired"):
+        probe_uv_cache_export_ban([("agents/ledger/DECISIONS.md", 367)], today=_today(), exemptions=stale)
+    # ...and the parser round-trips a realistic grep payload.
+    sample = "scripts/ship.sh:10:export UV_CACHE_DIR=${UV_CACHE_DIR:-$PWD/.uv-cache}\n"
+    assert parse_git_grep_hits(sample) == [("scripts/ship.sh", 10)]
+
+
+# --- Probe (j): CI gate-divergence watcher (L2) --------------------------- #
+# Same decay philosophy as probe e: TODAY'S ci.yml run-block commands are the
+# frozen dated baseline; a future run-line whose command head is neither in
+# the hand-written floor, the dated snapshot, nor the run_local_ci SSOT rule
+# goes RED until deliberately baselined. Continuation lines (trailing `\`)
+# join into their logical command so only NEW command heads trip.
+RUN_LOCAL_CI_INVOCATION = "bash scripts/run_local_ci.sh"
+TOKEN_FLOOR = frozenset({
+    "kubeconform", "docker", "python", "sh", "shellcheck", "uv", "tar", "ls",
+    "echo", "git", "mkdir", "cp", "sed", "grep",
+})
+# Snapshot @eb9ea18 (2026-08-25, review 2026-10-01): every first token
+# observable in today's run: blocks beyond TOKEN_FLOOR — control-flow words,
+# the gzip pipe, shell variable assignments, and the python -c string
+# fragments of the config-load boot step (verbatim, however inelegant).
+TOKEN_BASELINE = frozenset({
+    "set", "for", "do", "done", "if", "fi", "gzip", "import", "from", "cfg",
+    "hpo", "assert", "print('config", 'ref="${{', 'registry="ghcr.io/${{',
+    "Path('/app/configs/experiments/mlflow.yaml').read_text())['hpo'])",
+})
+
+
+def collect_run_lines(workflow: dict[str, object]) -> list[str]:
+    """Logical shell lines from every run: block, backslash-continuations joined."""
+    logical: list[str] = []
+    pending = ""
+    for job in workflow["jobs"].values():
+        for step in job.get("steps", []):
+            if "run" not in step:
+                continue
+            for raw in str(step["run"]).splitlines():
+                line = raw.strip()
+                if not line or line.startswith("#"):
+                    continue
+                if line.endswith("\\"):
+                    pending += line[:-1] + " "
+                    continue
+                logical.append((pending + line).strip())
+                pending = ""
+    if pending:
+        logical.append(pending.strip())
+    return logical
+
+
+def divergent_run_lines(
+    lines: Sequence[str], allowed_tokens: frozenset[str], baseline_tokens: frozenset[str],
+) -> list[str]:
+    """Run-lines whose command head escapes floor ∪ baseline ∪ SSOT-invocation."""
+    offenders = []
+    for line in lines:
+        if line.startswith(RUN_LOCAL_CI_INVOCATION):
+            continue
+        head = line.split()[0]
+        if head not in allowed_tokens and head not in baseline_tokens:
+            offenders.append(line)
+    return offenders
+
+
+def assert_gate_divergence(offenders: Sequence[str]) -> None:
+    """RED with remediation guidance when CI grows an unbasetlined command."""
+    if offenders:
+        raise AssertionError(
+            f"{CI_WORKFLOW}: run-line(s) outside the dated allowlist∪baseline: "
+            f"{list(offenders)} — baseline the new command head(s) in TOKEN_BASELINE "
+            "(or extend TOKEN_FLOOR by ruling) with a fresh review date"
+        )
+
+
+def test_probe_j_gate_divergence_watcher_live_and_falsifiable() -> None:
+    """LIVE: zero divergent lines today; novel command heads go RED."""
+    workflow = yaml.safe_load((ROOT / CI_WORKFLOW).read_text(encoding="utf-8"))
+    lines = collect_run_lines(workflow)
+    offenders = divergent_run_lines(lines, TOKEN_FLOOR, TOKEN_BASELINE)
+    print(f"[P5] ci.yml run-lines={len(lines)} divergent={offenders}")
+    assert_gate_divergence(offenders)
+    # Negative controls (synthetic): a foreign package manager and a novel
+    # runner head must both classify divergent...
+    assert divergent_run_lines(["npm ci", "uvx ruff check"], TOKEN_FLOOR, TOKEN_BASELINE) == [
+        "npm ci", "uvx ruff check",
+    ]
+    with pytest.raises(AssertionError, match="outside the dated allowlist"):
+        assert_gate_divergence(["pip install requests"])
+    # ...while the SSOT gate invocation passes WITHOUT being in either set...
+    assert divergent_run_lines(
+        ["bash scripts/run_local_ci.sh", "bash scripts/run_local_ci.sh --tier=fast"],
+        TOKEN_FLOOR, TOKEN_BASELINE,
+    ) == []
+    # ...and a baselined exotic head stays green.
+    assert divergent_run_lines(['ref="${{ github.ref }}"'], TOKEN_FLOOR, TOKEN_BASELINE) == []
