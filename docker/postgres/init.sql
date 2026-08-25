@@ -1,5 +1,2 @@
-CREATE TABLE IF NOT EXISTS etl_file_manifest (
-    filename TEXT PRIMARY KEY,
-    row_count INTEGER NOT NULL,
-    loaded_at TIMESTAMPTZ DEFAULT now()
-);
+-- Intentionally empty bootstrap: etl_file_manifest schema deleted (orphan,
+-- no consumer); file kept because docker/postgres/Dockerfile COPYs init.sql.

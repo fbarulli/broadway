@@ -177,7 +177,7 @@ broadway/
 │   ├── mlflow/
 │   │   └── Dockerfile                   # Minimal MLflow tracking server image
 │   └── postgres/
-│       └── init.sql                     # Schema: etl_file_manifest table
+│       └── init.sql                     # Postgres bootstrap (intentionally empty)
 │
 ├── k8s/
 │   ├── mlflow-deployment.yaml           # MLflow tracking server Deployment + Service
