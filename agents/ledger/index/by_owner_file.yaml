@@ -1,0 +1,224 @@
+# Rendered by agents/tools/render_gates.py from agents/ledger/gates.yaml — do not hand-edit.
+./Dockerfile:
+- GATE-INFRA-127
+.github/workflows/ci.yml:
+- GATE-INFRA-99
+- GATE-INFRA-143
+- GATE-INFRA-144
+.gitignore:
+- GATE-SURF-68
+docker-compose.yml:
+- GATE-INFRA-128
+- GATE-INFRA-137
+experiments.py:
+- GATE-INFRA-122
+experiments/mlflow/03_optuna_worker.py:
+- GATE-INFRA-129
+- GATE-CUST-149
+- GATE-CUST-152
+experiments/mlflow/_common.py:
+- GATE-CFG-111
+experiments_ui.py:
+- GATE-SURF-102
+- GATE-INFRA-123
+k8s/api-deployment.yaml:
+- GATE-INFRA-131
+k8s/optuna/Dockerfile.worker:
+- GATE-INFRA-126
+k8s/optuna/lifecycle.sh:
+- GATE-INFRA-124
+- GATE-CUST-151
+k8s/optuna/optuna-init.yaml:
+- GATE-INFRA-125
+k8s/optuna/render_worker_jobs.py:
+- GATE-HPO-87
+k8s/optuna/teardown.sh:
+- GATE-INFRA-145
+k8s/postgres-deployment.yaml:
+- GATE-INFRA-133
+project/data.py:
+- GATE-TRAIN-32
+- GATE-CFG-104
+project/etl/process.py:
+- GATE-INGEST-01
+- GATE-INGEST-04
+- GATE-ETL-17
+- GATE-ETL-18
+- GATE-ETL-19
+project/etl/process_config.py:
+- GATE-ETL-117
+scripts/check_branch_parity.sh:
+- GATE-INFRA-93
+- GATE-INFRA-94
+- GATE-INFRA-95
+- GATE-INFRA-142
+scripts/check_e2e_determinism.sh:
+- GATE-INFRA-97
+scripts/run_local_ci.sh:
+- GATE-INFRA-90
+- GATE-INFRA-91
+- GATE-INFRA-92
+scripts/ship.sh:
+- GATE-INFRA-96
+- GATE-INFRA-141
+- GATE-INFRA-146
+scripts/tier_classifier.py:
+- GATE-INFRA-98
+src/broadway/baseline/module.py:
+- GATE-TRAIN-118
+src/broadway/causal/module.py:
+- GATE-TRAIN-119
+src/broadway/cleaning/structural.py:
+- GATE-INGEST-05
+- GATE-INGEST-06
+- GATE-ETL-15
+src/broadway/cli.py:
+- GATE-TLINE-59
+src/broadway/config/loader.py:
+- GATE-CFG-70
+- GATE-CFG-72
+- GATE-CFG-78
+- GATE-CFG-103
+src/broadway/config/resolver.py:
+- GATE-CFG-71
+src/broadway/config/schema.py:
+- GATE-CFG-73
+- GATE-CFG-74
+- GATE-CFG-76
+- GATE-HPO-89
+src/broadway/contracts/pandera.py:
+- GATE-INGEST-09
+- GATE-CFG-75
+src/broadway/data/cleaner.py:
+- GATE-INGEST-08
+src/broadway/data/join_audit.py:
+- GATE-ETL-13
+src/broadway/data/loader.py:
+- GATE-INGEST-02
+- GATE-ETL-11
+- GATE-ETL-12
+- GATE-ETL-16
+- GATE-CFG-107
+src/broadway/data/lookup_value_audit.py:
+- GATE-ETL-14
+src/broadway/discover/columns.py:
+- GATE-SURF-101
+src/broadway/discover/module.py:
+- GATE-SURF-66
+src/broadway/etl/module.py:
+- GATE-INGEST-03
+- GATE-INGEST-07
+- GATE-ETL-10
+src/broadway/evaluate/metrics.py:
+- GATE-TRAIN-36
+src/broadway/evaluate/module.py:
+- GATE-TRAIN-35
+src/broadway/evaluate/promotion.py:
+- GATE-TRAIN-37
+src/broadway/features/builders.py:
+- GATE-FEAT-20
+- GATE-FEAT-21
+- GATE-FEAT-22
+src/broadway/features/generic.py:
+- GATE-FEAT-26
+- GATE-FEAT-27
+src/broadway/features/module.py:
+- GATE-FEAT-25
+src/broadway/features/pipeline.py:
+- GATE-FEAT-23
+- GATE-FEAT-24
+src/broadway/features/recipe.py:
+- GATE-CFG-77
+src/broadway/inference/api.py:
+- GATE-SURF-100
+src/broadway/lineage/models.py:
+- GATE-CFG-112
+src/broadway/lineage/module.py:
+- GATE-SURF-64
+src/broadway/lineage/records.py:
+- GATE-TLINE-58
+src/broadway/lineage/state.py:
+- GATE-TLINE-114
+src/broadway/onboard/infer.py:
+- GATE-CFG-108
+src/broadway/onboard/module.py:
+- GATE-CFG-105
+src/broadway/reports/__init__.py:
+- GATE-SURF-69
+src/broadway/reports/audit.py:
+- GATE-SURF-63
+src/broadway/reports/results.py:
+- GATE-SURF-62
+src/broadway/samples/generate.py:
+- GATE-ETL-116
+src/broadway/samples/loader.py:
+- GATE-CFG-79
+src/broadway/schemas/__init__.py:
+- GATE-FEAT-29
+src/broadway/stats/anova.py:
+- GATE-STATS-45
+src/broadway/stats/assumptions.py:
+- GATE-STATS-46
+src/broadway/stats/describe.py:
+- GATE-STATS-49
+- GATE-SURF-65
+src/broadway/stats/groups.py:
+- GATE-STATS-42
+src/broadway/stats/guards.py:
+- GATE-STATS-44
+- GATE-STATS-113
+src/broadway/stats/module.py:
+- GATE-STATS-40
+- GATE-STATS-41
+- GATE-STATS-43
+src/broadway/stats/post_hoc.py:
+- GATE-STATS-47
+src/broadway/stats/robust.py:
+- GATE-TRAIN-38
+- GATE-STATS-48
+src/broadway/timeline/decide.py:
+- GATE-TLINE-52
+src/broadway/timeline/models.py:
+- GATE-TLINE-50
+- GATE-TLINE-51
+src/broadway/timeline/module.py:
+- GATE-TLINE-53
+src/broadway/timeline/runners.py:
+- GATE-TLINE-55
+- GATE-TLINE-56
+src/broadway/timeline/sequence.py:
+- GATE-TLINE-57
+src/broadway/timeline/walkthrough.py:
+- GATE-TLINE-54
+- GATE-SURF-60
+- GATE-SURF-61
+src/broadway/training/hpo.py:
+- GATE-HPO-80
+- GATE-HPO-81
+- GATE-HPO-82
+- GATE-HPO-83
+- GATE-HPO-84
+- GATE-HPO-85
+- GATE-HPO-88
+src/broadway/training/mlflow_utils.py:
+- GATE-TRAIN-39
+- GATE-TRAIN-120
+- GATE-CUST-147
+- GATE-CUST-148
+- GATE-CUST-150
+src/broadway/training/module.py:
+- GATE-TRAIN-30
+- GATE-TRAIN-31
+- GATE-TRAIN-33
+src/broadway/training/optuna.py:
+- GATE-HPO-86
+src/broadway/training/trainer.py:
+- GATE-TRAIN-34
+src/broadway/utils.py:
+- GATE-FEAT-28
+tests/conftest.py:
+- GATE-INFRA-138
+tests/test_surface_integrity.py:
+- GATE-SURF-67
+tests/test_uv_probe_guard.py:
+- GATE-INFRA-139

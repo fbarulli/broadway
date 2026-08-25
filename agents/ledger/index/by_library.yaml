@@ -1,0 +1,616 @@
+# Rendered by agents/tools/render_gates.py from agents/ledger/gates.yaml — do not hand-edit.
+.git/hooks/pre-push:5:
+- GATE-INFRA-90
+.github/workflows/ci.yml:47 (invokes bare → full tier):
+- GATE-INFRA-90
+CLI dispatch src/broadway/cli.py:156-160:
+- GATE-STATS-49
+DEPLOY-DIFF lane (kubeconform scope ruling):
+- GATE-INFRA-99
+SKLEARN_PIPELINES.md §End-to-end verification criteria (structural rendering target):
+- GATE-INFRA-97
+_STEP_SECTION_REQUIREMENTS table (loader.py:72-78):
+- GATE-CFG-72
+_TOP_LEVEL_SECTIONS fence (loader.py:66):
+- GATE-CFG-72
+_build_config (loader.py:126):
+- GATE-CFG-71
+_build_config (loader.py:134):
+- GATE-CFG-74
+_build_config (loader.py:136):
+- GATE-CFG-76
+_build_config (loader.py:139):
+- GATE-CFG-77
+_build_config sibling/full-step loads (loader.py:143,149):
+- GATE-CFG-70
+_merge_section (loader.py:109):
+- GATE-CFG-70
+_missing_step_sections (loader.py:119):
+- GATE-CFG-70
+ad-hoc experiment scripts only; NO broadway/src writer, NO test:
+- GATE-SURF-68
+agents/contracts/MAIN_AGENT_CONTRACT.md §2 (branch model):
+- GATE-INFRA-93
+'agents/contracts/MAIN_AGENT_CONTRACT.md §6 (MAIN-AGENT-only Tier: trailer at staging)':
+- GATE-INFRA-98
+agents/contracts/MAIN_AGENT_CONTRACT.md §Ship-path law:
+- GATE-INFRA-90
+agents/contracts/MAIN_AGENT_CONTRACT.md §Ship-path law (:148-155):
+- GATE-INFRA-96
+agents/ledger/DECISIONS.md D16/D21 (design + relocation):
+- GATE-INFRA-94
+'agents/ledger/DECISIONS.md D16a/D26 (gate-list SSOT law: edit HERE, never YAML)':
+- GATE-INFRA-90
+agents/ledger/DECISIONS.md D16b/F2-revised:
+- GATE-INFRA-95
+agents/ledger/DECISIONS.md D21 (F1b closure):
+- GATE-INFRA-91
+agents/ledger/DECISIONS.md D24/D25 (ship semantics + PUSH-STANDING-GO compensating control i):
+- GATE-INFRA-96
+agents/ledger/DECISIONS.md D26 (senior adoption makes gate-list edits executable):
+- GATE-INFRA-92
+agents/ledger/DECISIONS.md:327 D25 ADDENDUM (supersedes 'last CI-on-tip green' conjunct):
+- GATE-INFRA-99
+broadway.analysis.contracts.require_mode/AnalysisMode:
+- GATE-STATS-40
+broadway.baseline.contracts save_result/load_result:
+- GATE-TRAIN-118
+broadway.baseline.hypothesis (:13):
+- GATE-STATS-42
+broadway.cleaning.models:
+- GATE-ETL-10
+broadway.cleaning.models.ParseFailure:
+- GATE-ETL-15
+broadway.cleaning.structural:
+- GATE-ETL-10
+broadway.config.loader.CONFIGS_DIR:
+- GATE-ETL-19
+broadway.config.schema:
+- GATE-ETL-10
+- GATE-ETL-11
+broadway.config.schema(DatasetContract, FeatureConfig):
+- GATE-FEAT-29
+broadway.config.schema(DatasetContract, FeatureConfig, PipelineConfig):
+- GATE-FEAT-26
+- GATE-FEAT-27
+broadway.config.schema(EncodingConfig, FeatureConfig):
+- GATE-FEAT-23
+- GATE-FEAT-24
+broadway.config.schema.DatasetContract:
+- GATE-ETL-17
+- GATE-ETL-19
+broadway.config.schema.DerivedFeature:
+- GATE-FEAT-20
+- GATE-FEAT-21
+broadway.config.schema.EnvironmentConfig/EtlStep:
+- GATE-ETL-16
+broadway.config.schema.LookupSpec:
+- GATE-ETL-13
+broadway.config.schema.LookupSpec/LookupValuePolicy:
+- GATE-ETL-14
+broadway.config.schema.PipelineConfig:
+- GATE-FEAT-25
+- GATE-FEAT-28
+- GATE-STATS-40
+broadway.config.schema.StatsStep:
+- GATE-STATS-43
+broadway.config.schema.normalize_dtype:
+- GATE-SURF-101
+broadway.contracts.pandera:
+- GATE-ETL-10
+- GATE-ETL-11
+- GATE-ETL-19
+broadway.contracts.pandera (build_raw_schema):
+- GATE-ETL-12
+broadway.contracts.pandera(pandera_dtype):
+- GATE-FEAT-26
+- GATE-FEAT-27
+broadway.contracts.selectors:
+- GATE-ETL-10
+broadway.data.cleaner:
+- GATE-ETL-10
+broadway.data.join_audit:
+- GATE-ETL-10
+- GATE-ETL-11
+broadway.data.loader:
+- GATE-ETL-10
+broadway.data.loader.canonical_path:
+- GATE-STATS-41
+broadway.data.lookup_value_audit:
+- GATE-ETL-10
+- GATE-ETL-11
+broadway.data.splitter:
+- GATE-ETL-10
+broadway.features.builders(build_derived, load_custom_builders):
+- GATE-FEAT-23
+- GATE-FEAT-24
+broadway.features.builders(builder_dtype):
+- GATE-FEAT-26
+- GATE-FEAT-27
+broadway.features.builders.BUILDERS:
+- GATE-FEAT-22
+broadway.features.generic(build_generic_feature_specs — LAZY, function-scope only):
+- GATE-FEAT-29
+broadway.features.generic(build_generic_feature_specs):
+- GATE-FEAT-25
+broadway.features.pipeline(FeaturePipeline):
+- GATE-FEAT-25
+broadway.features.schema(FeatureSpec):
+- GATE-FEAT-26
+- GATE-FEAT-27
+broadway.features.schema(build_engineered_schema):
+- GATE-FEAT-25
+broadway.features.transformers(FrequencyEncoding.transform, TargetEncoding.transform):
+- GATE-FEAT-24
+broadway.features.transformers(TargetEncoding, FrequencyEncoding):
+- GATE-FEAT-23
+broadway.lineage.ids:
+- GATE-ETL-10
+broadway.lineage.ids(node_id):
+- GATE-FEAT-25
+broadway.lineage.ids.node_id:
+- GATE-ETL-19
+- GATE-STATS-41
+broadway.lineage.models:
+- GATE-ETL-10
+broadway.lineage.models(TransformAudit):
+- GATE-FEAT-25
+broadway.lineage.models.TransformAudit:
+- GATE-ETL-18
+- GATE-ETL-19
+broadway.lineage.records:
+- GATE-ETL-10
+broadway.lineage.records write_record:
+- GATE-TRAIN-118
+broadway.lineage.records(enforce_drop_fraction, write_record):
+- GATE-FEAT-25
+broadway.lineage.records.enforce_drop_fraction (downstream consumer):
+- GATE-ETL-18
+broadway.lineage.records.write_record:
+- GATE-ETL-19
+- GATE-STATS-41
+- GATE-STATS-49
+broadway.lineage.sample load path (lineage/sample.py):
+- GATE-CFG-112
+broadway.schemas(schema_columns → GATE-FEAT-29):
+- GATE-FEAT-28
+broadway.schemas.joined(joined_schema_columns):
+- GATE-FEAT-26
+- GATE-FEAT-27
+- GATE-FEAT-29
+broadway.stats.anova:
+- GATE-STATS-44
+broadway.stats.anova.run_anova:
+- GATE-STATS-43
+broadway.stats.assumptions:
+- GATE-STATS-44
+broadway.stats.describe (:50, :107):
+- GATE-STATS-42
+broadway.stats.diagnostic_models:
+- GATE-STATS-48
+broadway.stats.effect_size:
+- GATE-STATS-45
+broadway.stats.effect_size.cohens_d/hedges_g:
+- GATE-STATS-47
+broadway.stats.groups.build_declared_groups:
+- GATE-STATS-49
+- GATE-STATS-113
+broadway.stats.guards:
+- GATE-STATS-45
+- GATE-STATS-46
+broadway.stats.module (:45-47):
+- GATE-STATS-42
+broadway.stats.plan.AnalysisPlan:
+- GATE-STATS-45
+broadway.stats.plan.save_plan/load_plan:
+- GATE-STATS-41
+broadway.timeline.runners (:107):
+- GATE-STATS-42
+broadway.timeline.runners.run_omnibus (:315-319):
+- GATE-STATS-45
+broadway.timeline.runners.run_posthoc (:396):
+- GATE-STATS-47
+broadway.viz.palette_colors (:112 — indirect viz.yaml disk read, see GATE-STATS-48 FINDING):
+- GATE-STATS-49
+broadway.viz.palette_colors — INDIRECT CONFIG READ (see FINDING):
+- GATE-STATS-48
+build_generic_feature_specs nullable=null_count>0 (features/generic.py:19):
+- GATE-CFG-74
+build_pipeline consumers (training):
+- GATE-CFG-77
+build_raw_schema (contracts/pandera.py:58):
+- GATE-CFG-74
+champion registry state (feeds exempt delta fields):
+- GATE-INFRA-97
+cli.py:184 (decision save):
+- GATE-TLINE-53
+collections.Counter:
+- GATE-ETL-11
+- GATE-ETL-12
+collections.abc(Callable):
+- GATE-FEAT-29
+collections.abc.Iterable:
+- GATE-ETL-11
+configs/environment/production.yaml:2-11:
+- GATE-CFG-71
+configs/environment/staging.yaml:2-11 (${DATA_DIR}, ${DATABASE_PORT}…):
+- GATE-CFG-71
+configs/flow/*.yaml (prediction/causal/hypothesis/stats_sequence/walkthrough):
+- GATE-CFG-78
+configs/step/stats.yaml:
+- GATE-STATS-43
+data/loader.py:99-109:
+- GATE-CFG-75
+dataclasses(field):
+- GATE-FEAT-23
+ds-pipeline audit (cli.py elif 'audit' -> audit.run):
+- GATE-SURF-63
+ds-pipeline discover:
+- GATE-SURF-66
+ds-pipeline lineage (cli.py elif 'lineage' -> lineage/module.run):
+- GATE-SURF-64
+ds-pipeline profile:
+- GATE-SURF-66
+ds-pipeline report (cli.py:122-135 re-render from persisted evidence):
+- GATE-SURF-62
+ds-pipeline walkthrough:
+- GATE-SURF-61
+ds-pipeline walkthrough (cli.py:87 parser -> timeline/walkthrough.py:291 run()):
+- GATE-SURF-60
+ds-pipeline walkthrough (walkthrough.py:91):
+- GATE-SURF-62
+ds-pipeline walkthrough steps describe_groups / normality:
+- GATE-SURF-65
+eligible_feature_columns (utils.py, pinned by Decision-5 tests):
+- GATE-CFG-77
+etl/module.py:95:
+- GATE-CFG-75
+'every command that renders: walkthrough, report, audit, lineage':
+- GATE-SURF-69
+every step module consuming cfg.environment (etl/module.py:92):
+- GATE-CFG-73
+features/generic.py:52:
+- GATE-CFG-75
+features/schema.py:32:
+- GATE-CFG-75
+full dispatch (loader.py:146):
+- GATE-CFG-76
+full sub-step resolution (loader.py:150):
+- GATE-CFG-71
+importlib:
+- GATE-FEAT-20
+importlib.import_module:
+- GATE-FEAT-22
+indirectly walkthrough gates that consume the recorded decision:
+- GATE-TLINE-52
+joined_schema_columns (schemas/joined.py:27-30):
+- GATE-CFG-74
+lightgbm:
+- GATE-STATS-48
+load_config (loader.py:192-197):
+- GATE-CFG-72
+load_config('full') (loader.py:197):
+- GATE-CFG-78
+load_config→_build_config (loader.py:132-138):
+- GATE-CFG-73
+load_config→_build_config dispatch (loader.py:132-138):
+- GATE-CFG-103
+logging:
+- GATE-ETL-10
+- GATE-ETL-17
+- GATE-ETL-19
+- GATE-FEAT-25
+- GATE-STATS-40
+lookup value audit (data/lookup_value_audit.py:48):
+- GATE-CFG-74
+matplotlib (Agg):
+- GATE-STATS-48
+matplotlib Agg (:8):
+- GATE-STATS-49
+mlflow:
+- GATE-TRAIN-30
+- GATE-TRAIN-33
+- GATE-TRAIN-35
+- GATE-TRAIN-39
+- GATE-HPO-83
+- GATE-HPO-84
+- GATE-HPO-87
+mlflow.exceptions.MlflowException:
+- GATE-TRAIN-120
+mlflow.tracking.MlflowClient:
+- GATE-CUST-147
+no dedicated CI job wiring found in scripts/ or pyproject:
+- GATE-SURF-67
+numpy:
+- GATE-TRAIN-32
+- GATE-TRAIN-36
+- GATE-STATS-42
+- GATE-STATS-44
+- GATE-STATS-45
+- GATE-STATS-48
+- GATE-HPO-81
+- GATE-HPO-88
+numpy(np.isinf sibling require_finite):
+- GATE-FEAT-28
+numpy(np.log1p):
+- GATE-FEAT-20
+numpy(via BUILDERS lambdas):
+- GATE-FEAT-21
+numpy.random.default_rng:
+- GATE-STATS-46
+optuna:
+- GATE-HPO-80
+- GATE-HPO-82
+- GATE-HPO-83
+- GATE-HPO-86
+- GATE-HPO-88
+orchestration entrypoints dispatching flows:
+- GATE-CFG-78
+os:
+- GATE-ETL-10
+- GATE-ETL-19
+pandas:
+- GATE-INGEST-01
+- GATE-INGEST-02
+- GATE-INGEST-04
+- GATE-INGEST-05
+- GATE-INGEST-06
+- GATE-INGEST-08
+- GATE-ETL-11
+- GATE-ETL-12
+- GATE-ETL-13
+- GATE-ETL-14
+- GATE-ETL-15
+- GATE-ETL-19
+- GATE-ETL-116
+- GATE-FEAT-23
+- GATE-FEAT-26
+- GATE-FEAT-27
+- GATE-TRAIN-30
+- GATE-TRAIN-31
+- GATE-TRAIN-32
+- GATE-TRAIN-33
+- GATE-TRAIN-34
+- GATE-TRAIN-35
+- GATE-TRAIN-38
+- GATE-TRAIN-39
+- GATE-STATS-42
+- GATE-STATS-47
+- GATE-STATS-48
+- GATE-STATS-49
+- GATE-SURF-101
+- GATE-HPO-81
+- GATE-HPO-84
+pandas (df ops):
+- GATE-ETL-17
+pandas (via df.to_parquet at call site):
+- GATE-ETL-16
+pandas(df.copy):
+- GATE-FEAT-24
+pandas(df.copy/columns):
+- GATE-FEAT-21
+pandas(pd.to_datetime):
+- GATE-FEAT-20
+pandas(read_parquet/to_parquet):
+- GATE-FEAT-25
+pandas(select_dtypes):
+- GATE-FEAT-28
+pandas.read_parquet:
+- GATE-STATS-41
+pandera:
+- GATE-INGEST-01
+- GATE-INGEST-02
+- GATE-INGEST-04
+- GATE-INGEST-09
+- GATE-ETL-19
+- GATE-FEAT-27
+pandera(pa.DataFrameSchema via sink):
+- GATE-FEAT-26
+pandera.errors(SchemaError, SchemaErrors):
+- GATE-FEAT-26
+- GATE-FEAT-27
+pandera.errors.SchemaError:
+- GATE-ETL-11
+- GATE-ETL-12
+pathlib (stdlib only — NO direct pandas/polars/pydantic import in this file):
+- GATE-ETL-10
+pathlib.Path:
+- GATE-ETL-11
+- GATE-ETL-16
+- GATE-ETL-19
+- GATE-FEAT-25
+- GATE-STATS-41
+pickle:
+- GATE-FEAT-25
+pingouin:
+- GATE-STATS-47
+polars:
+- GATE-INGEST-01
+- GATE-INGEST-02
+- GATE-INGEST-04
+- GATE-ETL-11
+- GATE-ETL-19
+- GATE-TRAIN-32
+project.etl.process (caller chain):
+- GATE-ETL-117
+project.etl.process_config:
+- GATE-ETL-19
+project.etl.process_config (indirectly via caller chain):
+- GATE-ETL-17
+project/data.py:
+- GATE-STATS-43
+psycopg2-binary:
+- GATE-HPO-86
+pyarrow:
+- GATE-TRAIN-32
+pydantic:
+- GATE-INGEST-05
+- GATE-INGEST-06
+- GATE-INGEST-07
+- GATE-ETL-13
+- GATE-ETL-14
+- GATE-ETL-15
+- GATE-ETL-116
+- GATE-HPO-89
+pydantic (extra=forbid models :25-45):
+- GATE-STATS-49
+python -m broadway.cli equivalent:
+- GATE-TLINE-59
+pyyaml:
+- GATE-INGEST-01
+- GATE-INGEST-04
+- GATE-INGEST-09
+- GATE-TRAIN-32
+- GATE-HPO-87
+- GATE-HPO-89
+re:
+- GATE-ETL-10
+- GATE-ETL-19
+re (both sides):
+- GATE-ETL-18
+read_named_sample consumers (stats/timeline runners):
+- GATE-CFG-79
+reports.describe.GroupSummary consumer:
+- GATE-STATS-49
+resolve_full_steps flow load (loader.py:167):
+- GATE-CFG-70
+root pytest gate (D4 uv run pytest -q):
+- GATE-SURF-67
+sample_generate.generate_sample writer side:
+- GATE-CFG-79
+samples/loader.py:44:
+- GATE-CFG-75
+scikit-learn:
+- GATE-TRAIN-31
+- GATE-TRAIN-34
+- GATE-TRAIN-36
+- GATE-HPO-81
+- GATE-HPO-87
+scipy.stats:
+- GATE-STATS-45
+scipy.stats (levene/skew/kurtosis/shapiro):
+- GATE-STATS-46
+scripts/check_branch_parity.sh:109 (the marker line itself):
+- GATE-INFRA-91
+scripts/check_e2e_determinism.sh:174-187:
+- GATE-CFG-70
+scripts/run_local_ci.sh header (CI-only roster naming):
+- GATE-INFRA-99
+scripts/run_local_ci.sh:30 (consumes pinned copy of THIS file):
+- GATE-INFRA-93
+scripts/run_local_ci.sh:30 (runs pinned custody on every CI event):
+- GATE-INFRA-95
+scripts/run_local_ci.sh:36 (marker grep keys on ^PARITY_ERA=):
+- GATE-INFRA-94
+scripts/run_local_ci.sh:47-51 (loads all configs/experiment/*.yaml through this gate):
+- GATE-CFG-73
+scripts/run_local_ci.sh:47-51 configs gate:
+- GATE-CFG-70
+scripts/ship.sh:17:
+- GATE-INFRA-90
+sklearn.metrics:
+- GATE-STATS-48
+sqlalchemy:
+- GATE-HPO-80
+- GATE-HPO-86
+src/broadway/cli.py:127-128 (report subcommand reads):
+- GATE-TLINE-53
+src/broadway/cli.py:132 (report path):
+- GATE-TLINE-57
+src/broadway/cli.py:166-173 (walkthrough subcommand):
+- GATE-TLINE-54
+src/broadway/cli.py:183 (only production caller):
+- GATE-TLINE-52
+src/broadway/cli.py:183-184 (decide command build+save):
+- GATE-TLINE-51
+src/broadway/discover/qq.py:_plot_qq_joint (figure only):
+- GATE-TLINE-56
+src/broadway/etl/module.py:151/:162/:167/:171 (coercion/join/lookup_value/etl records):
+- GATE-TLINE-58
+src/broadway/lineage/{graph,state,module,mermaid}.py (read/render side):
+- GATE-TLINE-58
+src/broadway/reports/results.py + reports/timeline.py + reports/index.py (renderers):
+- GATE-TLINE-50
+src/broadway/reports/{timeline,index,results}.py:
+- GATE-TLINE-54
+src/broadway/stats/anova.py:
+- GATE-TLINE-55
+src/broadway/stats/describe.py:143 (describe record):
+- GATE-TLINE-58
+src/broadway/stats/module.py:50:
+- GATE-STATS-45
+src/broadway/timeline/decide.py:15/:27:
+- GATE-TLINE-57
+src/broadway/timeline/decide.py:35 (sole constructor):
+- GATE-TLINE-51
+src/broadway/timeline/module.py:43 save_decision():
+- GATE-TLINE-51
+src/broadway/timeline/runners.py (all executors):
+- GATE-TLINE-54
+src/broadway/timeline/runners.py:158/:243/:285/:365/:416/:513 (six constructors):
+- GATE-TLINE-50
+src/broadway/timeline/runners.py:53-54 (_thresholds in every runner):
+- GATE-TLINE-57
+src/broadway/timeline/suggest.py (cfg threading):
+- GATE-TLINE-57
+src/broadway/timeline/suggest.py (post-step/post-gate suggestions):
+- GATE-TLINE-54
+src/broadway/timeline/suggest.py (via loaded lists):
+- GATE-TLINE-53
+src/broadway/timeline/suggest.py:295 (by_id lookup):
+- GATE-TLINE-50
+src/broadway/timeline/walkthrough.py executors:
+- GATE-TLINE-56
+src/broadway/timeline/walkthrough.py:106 (_handle_failure builds FAILED step):
+- GATE-TLINE-50
+src/broadway/timeline/walkthrough.py:121 (failure step save):
+- GATE-TLINE-53
+src/broadway/timeline/walkthrough.py:231-278 (_run_omnibus/_run_posthoc/_run_conclusion wrappers enforcing prerequisites):
+- GATE-TLINE-55
+src/broadway/timeline/walkthrough.py:297-298 (loads both per run):
+- GATE-TLINE-57
+src/broadway/timeline/walkthrough.py:384 (save_step of executor result):
+- GATE-TLINE-50
+src/broadway/timeline/walkthrough.py:65/:194 (load side):
+- GATE-TLINE-51
+src/project/etl/process.py (ingest record, process.py:218 log):
+- GATE-TLINE-58
+stats/post_hoc.py games_howell:
+- GATE-TLINE-55
+statsmodels:
+- GATE-STATS-48
+step-section attachment (loader.py:144):
+- GATE-CFG-71
+tests reading the files back:
+- GATE-TLINE-56
+tests/test_branch_parity_scripts.py:66 (parses SHARED array):
+- GATE-INFRA-93
+tests/test_cli.py TestWalkthroughCLI:
+- GATE-TLINE-59
+tests/test_cli_dispatch.py spies:
+- GATE-TLINE-59
+tests/test_config.py::_experiment_config builder:
+- GATE-CFG-76
+tests/test_decide.py:
+- GATE-TLINE-52
+tests/test_governance_probes.py (mechanical probe battery consumer):
+- GATE-INFRA-98
+tests/test_governance_probes.py:287 probe_coverage_floor (floor-quote SSOT check):
+- GATE-INFRA-92
+tests/test_loader.py synthetic environments (tests/test_loader.py:14-31):
+- GATE-CFG-73
+tests/test_samples.py fixtures writing configs/sample/*.yaml:
+- GATE-CFG-79
+tests/test_walkthrough.py:
+- GATE-TLINE-55
+training HPO engine:
+- GATE-CFG-76
+typing(Any):
+- GATE-FEAT-23
+- GATE-FEAT-24
+uv run ds-pipeline (installed entry point):
+- GATE-TLINE-59
+walkthrough.py:384 (step save):
+- GATE-TLINE-53
+yaml:
+- GATE-ETL-19
