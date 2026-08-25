@@ -12,6 +12,10 @@ cd "$(dirname "$0")/.."
 # MPLCONFIGDIR stays: matplotlib font-cache determinism for the plotting path.
 export MPLCONFIGDIR="${MPLCONFIGDIR:-$PWD/.mplconfig}"
 
+# --- TIER-GATE machinery (D34/D35 teeth ①): one grammar, shared with hooks ---
+# shellcheck source=scripts/tier_gate.sh
+. scripts/tier_gate.sh
+
 REMOTE="${1:-origin}"; shift || true
 REFSPECS=("$@")
 [ ${#REFSPECS[@]} -eq 0 ] && REFSPECS=("sklearn:sklearn")
@@ -22,6 +26,30 @@ if ! bash scripts/run_local_ci.sh; then
   echo "SHIP REFUSED: LOCAL-CI RED. Fix above. No flag exists to override this;" >&2
   echo "raw 'git push' is a policy violation (MAIN_AGENT_CONTRACT §push-custody)." >&2
   exit 1
+fi
+
+echo "== ship.sh: L1 pre-push hook guard =="
+# L1 (Scout-4 / D34 teeth ①): VERIFICATION, not auto-install — core.hooksPath
+# is machine-local by design, so ship.sh only verifies the guard is in place.
+if ! { [ -x .git/hooks/pre-push ] && grep -q run_local_ci.sh .git/hooks/pre-push; }; then
+  echo "SHIP REFUSED: .git/hooks/pre-push missing or stale (must exec scripts/run_local_ci.sh)." >&2
+  echo "Remediation — install manually from the tracked template:" >&2
+  echo "  cp agents/contracts/hooks-pre-push.template .git/hooks/pre-push" >&2
+  echo "  chmod +x .git/hooks/pre-push" >&2
+  exit 1
+fi
+
+echo "== ship.sh: TIER-GATE on the unpushed batch (D34/D35) =="
+branch="${REFSPECS[0]##*:}"; branch="${branch#refs/heads/}"
+if git rev-parse --verify -q "origin/$branch" >/dev/null 2>&1; then
+  if ! git rev-list "origin/$branch..HEAD" | tg_run; then
+    echo "SHIP REFUSED: TIER-GATE rejected the batch (offender + missing piece above)." >&2
+    echo "The batch ships atomically, all-or-nothing — amend/rebase the offending" >&2
+    echo "commit(s) or land the missing EVENTS row first. No flag overrides this." >&2
+    exit 1
+  fi
+else
+  echo "SHIP NOTICE: origin/$branch does not exist yet — TIER-GATE skipped (no baseline)." >&2
 fi
 
 echo "== pushing $REMOTE ${REFSPECS[*]} (single invocation -> one hook gate) =="

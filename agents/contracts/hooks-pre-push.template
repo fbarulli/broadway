@@ -1,0 +1,16 @@
+#!/bin/sh
+# hooks-pre-push.template — SSOT for this repository's pre-push hook contract.
+#
+# Class declaration: L1 LOCAL GUARD. Contract: a push is admitted only if the
+# full-tier local CI gate passes first — this hook exits non-zero exactly when
+# scripts/run_local_ci.sh does (mirrors the live .git/hooks/pre-push).
+#
+# Installation is a DOCUMENTED MANUAL STEP by design: core.hooksPath is
+# machine-local, and L1's remedy is VERIFICATION (scripts/ship.sh refuses to
+# push when this hook is missing or stale), never auto-install. At repo root:
+#   cp agents/contracts/hooks-pre-push.template .git/hooks/pre-push
+#   chmod +x .git/hooks/pre-push
+#
+# Provenance: D34 teeth ① (TIER-GATE packet) + Scout-4 L1 finding, 2026-08-25.
+
+bash scripts/run_local_ci.sh || exit 1
