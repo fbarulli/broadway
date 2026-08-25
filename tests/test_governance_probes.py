@@ -775,10 +775,11 @@ def probe_new_surfaces_registered(
     whitespace token, line-reference stripped) of ``owner:`` — NEVER from
     ``transforms:``/``findings:``/``touched_by:``/``validated_by:``/
     ``if_changed:`` free text. Within those fields only unambiguous forms
-    count: exact file paths, trailing-slash directory tokens, ``k8s/optuna/
-    **``-style globs (prefix before the first ``*``), brace-expanded
-    ``experiments/{a,b}/`` lists, and slash-tokens resolving to a live
-    directory in the tree. Directory power additionally requires a SUBSURFACE
+    count: exact file paths bearing a basename extension (Dockerfile-style
+    names included), trailing-slash directory tokens, ``k8s/optuna/
+    **``-style globs (prefix before the first ``*``), and brace-expanded
+    ``experiments/{a,b}/`` lists; a yielded token that nonetheless resolves
+    to a live tree directory lands in the declared tier. Directory power additionally requires a SUBSURFACE
     (>=2 path segments): a bare root token ('src/', 'tests/') mid-entry names
     the governed tree itself and declares nothing. Three coverage tiers —
     (files) a declaration names the path itself; (parent) a declaration names
@@ -849,16 +850,21 @@ def test_probe_e_new_surface_tripwire_live_and_falsifiable() -> None:
         assert find_unregistered([ghost], coverage, NEW_SURFACE_EXEMPTS) == [ghost]
         with pytest.raises(AssertionError, match="unregistered tracked file"):
             probe_new_surfaces_registered([ghost], live_rows, today=_today())
-    # Blanket-transform control — a realistic transform sentence declaring
-    # every root registers NOTHING under the strict grammar.
+    # Blanket-transform control — the adversarial-review sentence declaring
+    # two roots mid-prose registers NOTHING under the strict grammar: a
+    # transforms-only row yields an empty SurfaceCoverage, and even inside a
+    # realistic full row (owner/inputs/outputs present) the ghost stays red.
+    blanket_sentence = "zero callers in src/, tests integrated via scripts/"
+    prose_only_cov = parse_surface_coverage([{
+        "id": "SYNTH-PROSE", "phase": "synth", "order": 0, "owner": "",
+        "inputs": [], "outputs": [], "transforms": [blanket_sentence],
+    }], ROOT)
+    assert prose_only_cov == SurfaceCoverage(frozenset(), frozenset(), frozenset())
     blanket_row = {
         "id": "SYNTH-BLANKET", "phase": "synth", "order": 0,
         "owner": "src/broadway/ok_module.py:1 run()",
         "inputs": [], "outputs": [],
-        "transforms": [
-            ("behavior prefixes src/ tests/ k8s/ experiments/ project/ scripts/ "
-             "(+ pyproject.toml uv.lock *.sh docker*) apply everywhere here"),
-        ],
+        "transforms": [blanket_sentence],
     }
     blanket_cov = parse_surface_coverage([blanket_row], ROOT)
     assert not blanket_cov.declared_dirs  # the prose sentence granted nothing
@@ -866,6 +872,21 @@ def test_probe_e_new_surface_tripwire_live_and_falsifiable() -> None:
     assert find_unregistered(
         [blanket_ghost], blanket_cov, NEW_SURFACE_EXEMPTS,
     ) == [blanket_ghost]
+    with pytest.raises(AssertionError, match="unregistered tracked file"):
+        probe_new_surfaces_registered(
+            [blanket_ghost], [blanket_row], today=_today(),
+        )
+    # Rollback proof — strike every row whose ACCEPTED fields mention the
+    # experiments tree: with registration collapsed, the tracked batch fires.
+    survivors = [r for r in live_rows
+                 if not any("experiments" in t for t in _declaration_texts(r))]
+    assert survivors != live_rows  # real rows do declare the tree
+    batch = [p for p in tracked if p.startswith("experiments/")]
+    assert batch
+    with pytest.raises(AssertionError, match="unregistered tracked file"):
+        probe_new_surfaces_registered(
+            [batch[0]], survivors, today=_today(),
+        )
     # Decay proof — an expired entry fails loud; the same entry unexpired
     # registers an otherwise-uncovered path.
     stale = (("experiments/legacy_one_off.py", "intentional one-off", "2026-01-01"),)

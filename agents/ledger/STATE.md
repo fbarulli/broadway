@@ -121,6 +121,12 @@ experiments/results/more_modeling/*.csv (7 result CSVs).
   precedent; full token list + disposition in FIXES.md
   LIVEPROBE-FALSEALARM-1; treat any off-tree register claiming canonical
   status as void per D22.
+- Fragment-dangle policy (permanent, D32 ruling #8): pre-retirement
+  citations to the retired gates/*.md fragments — including citations
+  inside board rows still marked active — are HISTORICAL context, never
+  live law; they resolve via arbitration/2026-08-24/surface-and-analysis-
+  preservation.md plus the current gates.yaml band ids, and fragment rows
+  are never rewritten to fix stale pointers.
 
 ## Open arbitrations (awaiting main-agent ruling)
 - Dead-code candidates: baseline/module.py:72 (KEEP ruled);
@@ -143,10 +149,20 @@ MAIN_AGENT_CONTRACT ~30KB-cap remediation (30,928 B; relocate Stamp-semantics
 bullet to WORKER_CONTRACT or appendix file) · consolidation-slate.md:134
 superseding footnote (dead "local-only, credential-bearing" wording) · HPO
 bool-param contract (GATE-HPO-82 three-layer defect reproduced live
-2026-08-25) · decision packets awaiting routing: the three active
-verification-lane board rows (teeth thresholds, determinism silences,
-deployment wiring + CI scope), RGC end-state, qq-demo __main__, GHCR
-version-cap executor, dead fragment-citation dangle policy.
+2026-08-25) · decision packets awaiting routing: RGC end-state steps 2..8
+(RGC-1 parity flip landed this cycle), qq-demo __main__, GHCR version-cap
+executor, dead fragment-citation dangle policy. [Former three active
+verification-lane rows — teeth thresholds, determinism silences,
+deployment wiring + CI scope — are RULED: DECISIONS.md D32-D35.] ·
+Probe-E allowlist clock: four prefix seeds (experiments/multivariate/,
+experiments/polynomial_regression_et_all/, experiments/univariate/fare_amount_trip_distance/,
+project/tests/) EXPIRE 2026-09-08 — promote each into real inputs/outputs
+registry entries before expiry or the new-surface tripwire goes RED by
+design. Canonical RGC
+pointer (eight-packet batch, ruling #5): the full RGC-1..8 checklist lives
+at agents/ledger/arbitration/2026-08-24/gap-foreign.md (~:182-210);
+RGC-1 — the parity SHARED flip — is the hard prerequisite for every later
+item, executed first, remainder in listed order.
 
 ## TELEMETRY
 
@@ -158,7 +174,7 @@ GitHub Actions API; each mirrored row cites the query class that surfaced it.
 ### COLDPROBE-1 — spec (DECISIONS.md D23 :283-286)
 One-byte src push on sklearn tip, fired ONLY after BOTH hold: (i) XDIST-1b
 accepted [LANDED b7086b0, 2026-08-24T17:17:26Z]; (ii) >=5 post-landing GREEN
-Actions runs on branch sklearn (LITERAL bar; currently 2/5 — no window-reset
+Actions runs on branch sklearn (LITERAL bar; currently 3/5 — no window-reset
 rule was ever ruled). Per firing record {push sha8, cold_bb_s,
 cache_hit=false, queue_s} here + a D23 addendum note. Machinery does NOT
 exist in-tree yet (~5 runner-min; Actions-API wall-time read).
@@ -173,8 +189,9 @@ exist in-tree yet (~5 runner-min; Actions-API wall-time read).
 | 2026-08-25 | 64abc58 | failure | no |
 | 2026-08-25 | 0d30eb2 | failure | no |
 | 2026-08-25 | c4f3018 | failure (shellcheck SC2015 teardown.sh:24 — repaired in-tree this cycle) | no |
+| 2026-08-25 | 1cf33b5 | success (streak ends; shellcheck class structurally repaired by the CI-PARITY commit) | yes (3/5) |
 
-STATUS: **UNMET — 2/5 greens → probe HELD.** The next three green tips
+STATUS: **UNMET — 3/5 greens → probe HELD.** The next two green tips
 satisfy the literal bar; re-derive before firing:
 `gh api 'repos/fbarulli/broadway/actions/runs?branch=sklearn&per_page=30' --jq '[.workflow_runs[] | select(.created_at > "2026-08-24T17:17:26Z" and .conclusion == "success")] | length'`
 
