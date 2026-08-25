@@ -57,6 +57,17 @@ Governance decision, not an implementation question: if they are intentionally
 record-free teaching surfaces, say so in the contract; otherwise put them
 under the relevant gate.
 
+> ADDENDUM (2026-08-25, eight-packet batch, ruling #4): the EXPLICIT
+> CLASSIFICATION REQUIRED question above is RESOLVED — project/scripts/*
+> are intentionally record-free teaching surfaces; they bypass
+> timeline/lineage gates by design; promotion to production surfaces
+> requires record-writing shims first. Codified verbatim as a hygiene
+> bullet in MAIN_AGENT_CONTRACT §14 ("Ledger & artifact hygiene"). The
+> archived ruling text above is untouched; this addendum appends only.
+> Companion note from the same batch: GATE-STATS-48 provisional pins for
+> the five caller-less project/scripts functions stay provisional until
+> such shims land (DECISIONS.md D32(4)).
+
 ## 7 · D11 dead EnvironmentConfig fields (packet C #25) — STRAIGHT DELETE AUTHORIZED
 
 Evidence unusually clean; dead fields need no speculative migration

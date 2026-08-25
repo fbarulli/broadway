@@ -400,3 +400,74 @@ agent. (2) TAMPER LOCK (lands with this governance-file touch per the ruling): a
 edits STATE.md ## EVENTS must reference its authorizing event-id within the same commit (message
 body or adjacent same-commit row). (3) Board-mirroring proposal REJECTED — do not build.
 | Ruling: human, this session |
+
+## D32 — EIGHT-PACKET RULING BATCH (human, this session)
+Eight rulings on the pending decision packets; doc halves land this batch,
+code halves belong to their owning lanes.
+(1) teeth-thresholds: ONE consolidated ratification packet is REQUIRED before
+any teeth batch executes; a draft is prepared separately so the human can
+edit-and-ratify in one pass (agents/ledger/arbitration/
+teeth-thresholds-packet-DRAFT.md); thresholds remain human-set.
+(2) deployment wiring + CI-scope extension land in the SAME commit: F-1 path
+fix plus F-2 seven env/mount entries; kubeconform AND build-and-boot extend
+to cover top-level manifests alongside k8s/optuna/.
+(3) determinism: config-carried seeds only for (a)(b)(f); global NumPy RNG
+mutation BANNED for (c); the dual-numpy lock STAYS and golden tests hold at
+ULP/approx tolerance (e); (d)(g)(h) remain documented silences until the
+freeze-flag. RIDER captured: the RNG single-source-of-truth owner MUST be
+named in the NEXT contract edit touching randomness surfaces.
+(4) project/scripts classification: intentionally record-free teaching
+surfaces — codified as a MAIN_AGENT_CONTRACT §14 hygiene bullet plus a
+00-resolutions.md §6 addendum this batch; GATE-STATS-48 pins for the five
+caller-less functions stay PROVISIONAL; promotion to production surfaces
+requires record-writing shims first.
+(5) RGC end-state: execute RGC-1 FIRST — the parity SHARED flip is the hard
+prerequisite — remainder in listed order; STATE gains the canonical pointer
+to the gap-foreign checklist (RGC-1..8).
+(6) MAC cap law: the ~30 KB contract cap counts RAW BYTES; the
+Stamp-semantics bullet relocates verbatim to MAC_APPENDIX.md NOW; the cap
+wording itself is NOT amended.
+(7) cache corpses: delete four pure caches (.uv-cache/.mypy_cache/
+.pytest_cache/.ruff_cache), add .ruff_cache to .gitignore; §14 cache law
+gains the MPLCONFIGDIR exception sentence matching GATE-INFRA-146; NO
+residual UV_CACHE_DIR export anywhere.
+(8) fragment-dangle policy: historical board citations stay untouched; ONE
+permanent pointer note lands in STATE hazards; test_source_fragments_retired
+is NOT extended to comment bodies.
+| Ruling: human, this session |
+
+## D33 — DEPLOYMENT OPERATIONAL RULINGS
+Three operational decisions answering the deployment-wiring open questions
+(follow-up to D32(2)):
+(1) Secrets: population stays OUTSIDE the tree — external manager
+(sealed-secrets / vault / manual). NO generator script that materializes
+real credentials may ever be committed. The placeholder skeleton
+(CHANGE_ME_BEFORE_APPLY convention) is ratified as correct.
+(2) Prod ConfigMap: database_user=postgres and database_name=broadway STAY
+in the ConfigMap (documented development defaults); ONLY the password lives
+in the Secret (matches landed train-job/postgres wiring).
+(3) Image tags: the :latest trio stands for this landing; sha/registry
+pinning deferred as a later product decision (backlog).
+| Ruling: human, this session |
+
+## D34 — TEETH THRESHOLDS RATIFIED
+The teeth thresholds packet is RATIFIED 2026-08-25 AS WRITTEN in
+agents/ledger/arbitration/teeth-thresholds-packet-DRAFT.md — all seven
+D-items and three queued tripwires adopt their PROPOSED defaults verbatim
+(silence-equals-adopt applied; no amendments filed). RETAINED OPENNESS:
+(i) D3 grammar precondition stands — the trailer-validation grammar (what
+counts as a resolvable reviewer verdict) requires its own ratification
+before TIER-GATE enforces; (ii) D4 pilot-row question (supersede-and-repin
+vs recipe-amendment for six pilot rows) remains an open HUMAN-CALL outside
+this ratification. Mechanization order adopted: ① TIER-GATE →
+② STAGE-GUARD → ③ ACCEPTANCE-GRAMMAR → ④ CONFIRMATION-CITE → ⑤ SNAPSHOT-LINT
+→ ⑥ DEADCODE-CENSUS → ⑦ TAMPER-LOCK, executing as normal contracts.
+| Ruling: human, this session |
+
+## D35 — TEETH FOLLOW-UP RULINGS
+D32(1)-follow-up D4: six pilot event-id rows supersede-and-repin (recomputed sha8s).
+D32(1)-follow-up D3: trailer-validation grammar = STATE.md ## EVENTS row cited in the same commit.
+(3) API endpoint: deferred stance CONFIRMED — broadway.inference.api remains a documented stub; CI asserts import-wiring only; re-open only under explicit product ruling for /health /predict /metrics.
+(4) Image tags: :latest stands for this landing; sha/registry pinning later (existing CD $sha tags already carry the audit trail).
+TIER-GATE precondition SATISFIED by (2); mechanization order ① cleared to start.
+| Ruling: human, this session |

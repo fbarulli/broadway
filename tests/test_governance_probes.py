@@ -28,11 +28,14 @@ import os
 import re
 import subprocess
 import sys
-from collections.abc import Callable
+from collections.abc import Callable, Iterator, Sequence
+from datetime import UTC, date, datetime
 from functools import cache, lru_cache
 from pathlib import Path
+from typing import NamedTuple
 
 import pytest
+import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 from tier_classifier import CHECKLIST, FULL, classify
@@ -554,7 +557,9 @@ def test_classifier_cli_end_to_end() -> None:
 
 
 # --------------------------------------------------------------------------- #
-# Stamp-semantics tripwire (MAIN_AGENT_CONTRACT.md §5): standing contracts must
+# Stamp-semantics tripwire (doctrine text lives in MAC_APPENDIX.md; the
+# MAIN_AGENT_CONTRACT.md §5 bullet is a pointer there since D32(6)):
+# standing contracts must
 # never encode absolute-SHA equality as an executable precondition ("must equal
 # <sha>"). Dispatch stamps are relative by law; absolute SHAs belong only to
 # immutable records as provenance anchors. G0B.md is the single frozen
@@ -577,5 +582,302 @@ def test_no_new_absolute_sha_gates_in_contracts() -> None:
     assert hits == SHA_GATE_BASELINE, (
         f"absolute-sha equality gates changed under agents/contracts/: {hits} "
         f"(baseline {SHA_GATE_BASELINE}). Dispatch stamps must stay relative — "
-        "see MAIN_AGENT_CONTRACT.md §5 Stamp semantics."
+        "see MAC_APPENDIX.md Stamp semantics "
+        "(pointer at MAIN_AGENT_CONTRACT.md §5)."
+    )
+
+
+# --------------------------------------------------------------------------- #
+# Probe (e): new-surface tripwire (capture mechanism #2; human ruling under
+# D31): an unregistered TRACKED file under a governed code-bearing surface is
+# RED. STRICT DECLARATION GRAMMAR (post-vacuity repair, adversarial-review
+# mandated): scanning every row string let prose slash-tokens blanket-declare
+# all six roots, so the live half could never fire. Declarations are read
+# ONLY from inputs:/outputs: list entries and the path prefix of owner:
+# strings — NEVER from transforms:/findings:/touched_by:/validated_by:/
+# if_changed: free text — and directory/glob declarations must name a
+# SUBSURFACE (>=2 path segments): a bare 'src/' mid-sentence grants nothing,
+# while 'experiments/results/' and 'k8s/optuna/**' register their subtree.
+# Pure classification lives in the functions below; the single test node
+# carries the LIVE half plus in-process falsifiability proofs against the
+# LIVE registry shape (no git writes, no tree mutation — fixture law).
+# --------------------------------------------------------------------------- #
+TRIPWIRE_SURFACES = ("src", "scripts", "k8s", "experiments", "project", "tests")
+BRACED_PATH = re.compile(r"((?:[\w.-]+/)+)\{([^{}]+)\}([\w./-]*)")
+SURFACE_PATH_TOKEN = re.compile(r"(?:[\w.-]+/)+[\w.*-]*")
+OWNER_LINE_REF = re.compile(r":\d[\d-]*$")
+NEW_SURFACE_EXEMPTS: dict[str, str] = {
+    "project/scripts": "D32(4) intentionally record-free teaching surfaces "
+                       "(MAIN_AGENT_CONTRACT.md §14 hygiene bullet; "
+                       "00-resolutions.md §6 addendum)",
+}
+# (path-or-prefix, reason, review-date ISO) — path = a file or a directory
+# prefix (trailing slash optional); entries past their review date fail loud
+# ('allowlist entry expired'). Seeded from the strict-grammar sweep at
+# meta.head=1cf33b5: the four prefixes below are genuinely uncovered because
+# their ownership prose lives in grammar-excluded fields.
+NEW_SURFACE_ALLOWLIST: tuple[tuple[str, str, str], ...] = (
+    ("experiments/multivariate/",
+     ("family custody lives only in GATE-INFRA-129 transform prose "
+      "(SPLIT-OWNER sublanes), excluded from declarations; promote to an "
+      "inputs/outputs entry or dedicated row"), "2026-09-08"),
+    ("experiments/polynomial_regression_et_all/",
+     ("same GATE-INFRA-129 transform-prose custody, excluded from "
+      "declarations; promote to an inputs/outputs entry"), "2026-09-08"),
+    ("experiments/univariate/fare_amount_trip_distance/",
+     ("subdir named only in excluded free text; parent "
+      "experiments/univariate remains registry-covered"), "2026-09-08"),
+    ("project/tests/",
+     ("ingest-gate pins ride findings/validated_by fields, excluded from "
+      "declarations; promote the pins to inputs/outputs"), "2026-09-08"),
+)
+
+
+def _today() -> date:
+    """Current date, timezone-aware per repo convention (DTZ011-clean)."""
+    return datetime.now(tz=UTC).date()
+
+
+def _surface_tokens(text: str) -> Iterator[tuple[str, bool]]:
+    """Surface-rooted tokens as (path, declares_subsurface) — strict forms.
+
+    Directory power (trailing-slash and glob tokens) requires >=2 path
+    segments: a bare surface-root token names the governed tree itself, it
+    does not declare a registrable subsurface. Exact-file form requires a
+    basename extension (Dockerfile-style names included); an extensionless
+    path reference declares nothing.
+    """
+    expanded = BRACED_PATH.sub(
+        lambda m: " ".join(m.group(1) + alt.strip() + m.group(3)
+                           for alt in m.group(2).split(",")),
+        text,
+    )
+    for match in SURFACE_PATH_TOKEN.finditer(expanded):
+        token = match.group(0).rstrip(".,")
+        if token.split("/", 1)[0] not in TRIPWIRE_SURFACES:
+            continue
+        if "*" in token:
+            base = token.split("*", 1)[0].rstrip("/")
+        elif token.endswith("/"):
+            base = token.rstrip("/")
+        elif "." in token.rsplit("/", 1)[-1]:
+            yield token, False  # exact-file form: basename bears an extension
+            continue
+        else:
+            continue  # extensionless path reference declares nothing
+        if "/" in base:
+            yield base, True
+
+
+def _declaration_texts(row: dict[str, object]) -> Iterator[str]:
+    """Strings allowed to declare coverage: owner path prefix, inputs, outputs.
+
+    All gates.yaml rows carry these three keys (verified across the registry);
+    direct indexing fails loud on schema drift. transforms/findings/
+    touched_by/validated_by/if_changed free text is deliberately never read.
+    """
+    head = str(row["owner"]).split(None, 1)
+    yield OWNER_LINE_REF.sub("", head[0].rstrip(":")) if head else ""
+    for entry in [*(row["inputs"] or []), *(row["outputs"] or [])]:
+        yield str(entry)
+
+
+class SurfaceCoverage(NamedTuple):
+    """gates.yaml-derived registration prefixes for governed surface files."""
+
+    declared_dirs: frozenset[str]
+    mentioned_dirs: frozenset[str]
+    files: frozenset[str]
+
+
+def parse_surface_coverage(rows: list[dict[str, object]], root: Path) -> SurfaceCoverage:
+    """Collapse strict-grammar declaration texts into the three tiers."""
+    declared: set[str] = set()
+    mentioned: set[str] = set()
+    files: set[str] = set()
+    for row in rows:
+        for value in _declaration_texts(row):
+            for path, declares_subsurface in _surface_tokens(value):
+                if declares_subsurface or (root / path).is_dir():
+                    declared.add(path)
+                else:
+                    files.add(path)
+                    mentioned.add(path.rsplit("/", 1)[0])
+    return SurfaceCoverage(frozenset(declared), frozenset(mentioned), frozenset(files))
+
+
+def find_unregistered(
+    tracked: Sequence[str], coverage: SurfaceCoverage, exemptions: dict[str, str],
+) -> list[str]:
+    """Tracked surface files covered by NO tier and NO cited exemption."""
+
+    def registered(path: str) -> bool:
+        segments = path.split("/")
+        ancestors = ["/".join(segments[:i]) for i in range(1, len(segments))]
+        if not ancestors:
+            return False
+        parent = ancestors[-1]
+        if path in coverage.files:
+            return True
+        if parent in coverage.declared_dirs or parent in coverage.mentioned_dirs:
+            return True
+        return any(dir_ in coverage.declared_dirs for dir_ in ancestors[:-1])
+
+    def exempted(path: str) -> bool:
+        for prefix in exemptions:  # trailing slash on a prefix is tolerated
+            bare = prefix.rstrip("/")
+            if path == bare or path.startswith(bare + "/"):
+                return True
+        return False
+
+    return sorted(
+        p for p in tracked
+        if p.split("/", 1)[0] in TRIPWIRE_SURFACES
+        and not registered(p)
+        and not exempted(p)
+    )
+
+
+def expired_allowlist_entries(
+    allowlist: Sequence[tuple[str, str, str]], today: date,
+) -> list[str]:
+    """Allowlist (path, reason, review-date) rows strictly past their review."""
+    return [
+        f"{path} ({reason}; review {review})"
+        for path, reason, review in allowlist
+        if date.fromisoformat(review) < today
+    ]
+
+
+def probe_new_surfaces_registered(
+    tracked: Sequence[str],
+    registry_rows: list[dict[str, object]],
+    *,
+    today: date,
+    root: Path = ROOT,
+    exemptions: dict[str, str] | None = None,
+    allowlist: Sequence[tuple[str, str, str]] = NEW_SURFACE_ALLOWLIST,
+    source: str = "agents/ledger/gates.yaml",
+) -> None:
+    """New-surface tripwire: an unregistered tracked surface file is RED.
+
+    Human ruling (eight-packet batch follow-up, capture mechanism #2), under
+    D31's REGISTRY-AUDIT duty. SURFACES are the six code-bearing top-level
+    trees in ``TRIPWIRE_SURFACES``; ``.venv``/``data``/``artifacts`` are
+    excluded by construction and docs/ledger/contracts trees are exempt
+    outright — ``agents/**`` carries its own ownership law
+    (HELPER_FILE_OWNERSHIP.md) and self-describes through probes a-d.
+
+    Registration is derived from ``agents/ledger/gates.yaml`` rows ONLY
+    (never ``meta:`` — the ledger may not self-register code), under a STRICT
+    declaration grammar: declaration-bearing text is read ONLY from
+    ``inputs:``/``outputs:`` list entries and the path prefix (first
+    whitespace token, line-reference stripped) of ``owner:`` — NEVER from
+    ``transforms:``/``findings:``/``touched_by:``/``validated_by:``/
+    ``if_changed:`` free text. Within those fields only unambiguous forms
+    count: exact file paths, trailing-slash directory tokens, ``k8s/optuna/
+    **``-style globs (prefix before the first ``*``), brace-expanded
+    ``experiments/{a,b}/`` lists, and slash-tokens resolving to a live
+    directory in the tree. Directory power additionally requires a SUBSURFACE
+    (>=2 path segments): a bare root token ('src/', 'tests/') mid-entry names
+    the governed tree itself and declares nothing. Three coverage tiers —
+    (files) a declaration names the path itself; (parent) a declaration names
+    a path whose immediate parent directory equals the file's directory, with
+    NO further cascade; (declared) an ANCESTOR subsurface was declared.
+    Parent-tier mentions never cascade upward: one stray file mention must
+    not blanket a whole surface, or the tripwire could never fire.
+
+    Vacuity incident: an earlier draft scanned EVERY row string, so ~13 rows'
+    prose slash-tokens blanket-declared all six governed roots through the
+    declared tier and no synthetic ghost could ever fire; this grammar is the
+    mandated minimum repair.
+
+    ``project/scripts/*`` is EXEMPT BY NAME with citation — D32(4) rules these
+    intentionally record-free teaching surfaces (MAIN_AGENT_CONTRACT.md §14
+    hygiene bullet + 00-resolutions.md §6 addendum) — deliberately not an ad
+    hoc allowlist row. ``NEW_SURFACE_ALLOWLIST`` is the dated escape hatch;
+    entries strictly past their review date fail loud (decay by design).
+    Seeded NON-EMPTY from the strict sweep at meta.head=1cf33b5: exactly four
+    genuinely uncovered prefixes remain (experiments/multivariate/,
+    experiments/polynomial_regression_et_all/,
+    experiments/univariate/fare_amount_trip_distance/, project/tests/) because
+    their ownership lives in grammar-excluded fields; each seed states its
+    promotion path and reviews 2026-09-08. The experiments/more_modeling
+    batch stays registered by GATE-INFRA-93's amended parity input string.
+    """
+    exemptions = NEW_SURFACE_EXEMPTS if exemptions is None else dict(exemptions)
+    failures = [
+        f"allowlist entry expired: {entry}"
+        for entry in expired_allowlist_entries(allowlist, today)
+    ]
+    # Active (unexpired) allowlist entries ARE registration: subtract them.
+    effective = {
+        **exemptions,
+        **{path: f"allowlisted: {reason}"
+           for path, reason, review in allowlist
+           if date.fromisoformat(review) >= today},
+    }
+    unregistered = find_unregistered(
+        list(tracked), parse_surface_coverage(registry_rows, root), effective,
+    )
+    if unregistered:
+        failures.append(
+            "unregistered tracked file(s) under governed surfaces "
+            f"{list(TRIPWIRE_SURFACES)}: {unregistered} — add a gates.yaml row "
+            "naming the path/directory, a NEW_SURFACE_EXEMPTS citation, or a "
+            "dated NEW_SURFACE_ALLOWLIST entry"
+        )
+    if failures:
+        raise AssertionError(f"{source}: " + "; ".join(failures))
+
+
+def test_probe_e_new_surface_tripwire_live_and_falsifiable() -> None:
+    """LIVE green at HEAD; per-root ghosts fire against the LIVE registry."""
+    doc = yaml.safe_load((ROOT / "agents/ledger/gates.yaml").read_text(encoding="utf-8"))
+    live_rows: list[dict[str, object]] = doc["gates"]
+    tracked = subprocess.run(
+        ["git", "ls-files", "--", *TRIPWIRE_SURFACES],
+        capture_output=True, text=True, cwd=ROOT, check=True,
+    ).stdout.splitlines()
+    coverage = parse_surface_coverage(live_rows, ROOT)
+    probe_new_surfaces_registered(tracked, live_rows, today=_today())
+    # Six-ghost negative controls — one synthetic file under EACH governed
+    # root, judged against the FULL LIVE registry shape (nothing stripped):
+    # each must be classified uncovered and each must turn the probe RED.
+    for root_name in TRIPWIRE_SURFACES:
+        ghost = f"{root_name}/zzz_ghost_probe/{root_name}_ghost.py"
+        assert find_unregistered([ghost], coverage, NEW_SURFACE_EXEMPTS) == [ghost]
+        with pytest.raises(AssertionError, match="unregistered tracked file"):
+            probe_new_surfaces_registered([ghost], live_rows, today=_today())
+    # Blanket-transform control — a realistic transform sentence declaring
+    # every root registers NOTHING under the strict grammar.
+    blanket_row = {
+        "id": "SYNTH-BLANKET", "phase": "synth", "order": 0,
+        "owner": "src/broadway/ok_module.py:1 run()",
+        "inputs": [], "outputs": [],
+        "transforms": [
+            ("behavior prefixes src/ tests/ k8s/ experiments/ project/ scripts/ "
+             "(+ pyproject.toml uv.lock *.sh docker*) apply everywhere here"),
+        ],
+    }
+    blanket_cov = parse_surface_coverage([blanket_row], ROOT)
+    assert not blanket_cov.declared_dirs  # the prose sentence granted nothing
+    blanket_ghost = "src/zzz_ghost_probe/src_ghost.py"
+    assert find_unregistered(
+        [blanket_ghost], blanket_cov, NEW_SURFACE_EXEMPTS,
+    ) == [blanket_ghost]
+    # Decay proof — an expired entry fails loud; the same entry unexpired
+    # registers an otherwise-uncovered path.
+    stale = (("experiments/legacy_one_off.py", "intentional one-off", "2026-01-01"),)
+    fresh = (("experiments/legacy_one_off.py", "intentional one-off", "2999-01-01"),)
+    with pytest.raises(AssertionError, match="allowlist entry expired"):
+        probe_new_surfaces_registered(
+            ["experiments/legacy_one_off.py"], [], today=_today(), allowlist=stale,
+        )
+    probe_new_surfaces_registered(
+        ["experiments/legacy_one_off.py"], [], today=_today(), allowlist=fresh,
+    )
+    # Exemption proof — project/scripts passes BY CITATION, not by allowlist.
+    probe_new_surfaces_registered(
+        ["project/scripts/99_future_teaching.py"], [], today=_today(),
     )

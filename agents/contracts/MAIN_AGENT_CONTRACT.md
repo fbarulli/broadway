@@ -91,10 +91,8 @@ more reading `parse_numeric` than any checklist produced).
 - **Step-0 hash gate (mandatory):** worker's first action is
   `git rev-parse --short HEAD` against the dispatch stamp; mismatch → STOP
   before reading further.
-- **Stamp semantics:** a dispatch stamp is RELATIVE — the HEAD at dispatch
-  open, recorded in the worker's report. Absolute SHAs appear only inside
-  immutable records as provenance anchors, never as executable preconditions
-  in standing contracts.
+- Stamp semantics (dispatch stamps are RELATIVE; absolute SHAs are
+  provenance anchors only): see MAC_APPENDIX.md.
 - **Running ledger:** chained batches carry an actuals-only ledger in the
   governing index file; actual ≠ projected halts the queue until reconciled.
 
@@ -370,39 +368,10 @@ in flight, or undecided.
 
 ### Accessing the board via gh
 
-Repo `fbarulli/broadway`, board = issue #5, conversation-locked.
-Read-only inspection is allowed and expected at any tier; WRITES are
-owner-only and follow the store-then-hash recipe below — workers,
-seniors, and adversaries never post.
-
-```bash
-# Row index — one line per comment (id · created_at · subject):
-gh api repos/fbarulli/broadway/issues/5/comments --jq \
-  '.[] | [.id, .created_at, (.body | split("\n")[0])] | @tsv'
-
-# Active rows only:
-gh api repos/fbarulli/broadway/issues/5/comments --jq \
-  '.[] | select(.body | test("^status: active", "m")) | .id'
-
-# Full text of ONE row — take <comment-id> from STATE.md ## EVENTS:
-gh api repos/fbarulli/broadway/issues/comments/<comment-id> --jq '.body'
-
-# Issue metadata / lock check:
-gh api repos/fbarulli/broadway/issues/5 --jq '{title, locked, open}'
-
-# Verify an event-id recomputes (D4/D8: paste command WITH output):
-gh api repos/fbarulli/broadway/issues/comments/<id> --jq '.body' > /tmp/b
-python3 - <<'PY'
-import hashlib
-lines=[l for l in open('/tmp/b').read().splitlines()
-       if not l.startswith(('event-id:','recorded-time:'))]
-print(hashlib.sha256('\n'.join(lines).encode()).hexdigest()[:8])
-PY
-```
-
-Cite rows as `issues/5#issuecomment-<id> event-id <sha8>`; resolution
-rows live in STATE.md `## EVENTS`. If github.com is unreachable, no
-gate blocks — the tree registry (GIT-WINS) remains authoritative.
+Recipe relocated VERBATIM to `MAC_APPENDIX.md` (appendix class per the ~30 KB
+contract-cap law in this section). Unchanged law: read-only inspection is
+allowed and expected at any tier; WRITES are owner-only store-then-hash —
+workers, seniors, and adversaries never post.
 
 ### Reproducibility mandate
 
@@ -445,6 +414,9 @@ gate blocks — the tree registry (GIT-WINS) remains authoritative.
 - Every new file under `agents/**` declares its class at creation:
   `SSOT` (single source of truth) · `derived` (regenerated from an
   SSOT) · `cycle-scoped` (belongs to one work cycle, then archives).
+- project/scripts/* are intentionally record-free teaching surfaces;
+  they bypass timeline/lineage gates by design; promotion to production
+  surfaces requires record-writing shims first.
 - Derived/rendered artifacts stay under ~50 KB tracked. When they
   outgrow the budget the fix is regeneration or retirement, never
   accumulation. Intermediates whose content survives verbatim inside
@@ -466,6 +438,8 @@ gate blocks — the tree registry (GIT-WINS) remains authoritative.
   repo root) are PROHIBITED; teardown scripts must return
   container/image/volume state to zero; new durable object creators
   require a registered lifecycle owner before first use.
+  MPLCONFIGDIR may point at repo-root `.mplconfig` for font-cache
+  determinism; all other repo-local caches remain PROHIBITED.
 
 ### Registry maintenance duty
 
