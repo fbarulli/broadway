@@ -1,6 +1,6 @@
 # Gate registry SSOT — hand-maintained; the {01..09} gate fragments it consolidated predate git custody.
 meta:
-  head: b06bdd2
+  head: 1cf33b5
   assembled: '2026-08-24'
   source_fragments:
   - agents/ledger/gates/01-ingest.md
@@ -3262,7 +3262,7 @@ gates:
   - rejects any fetched checker lacking inline `^PARITY_ERA=` marker (:36) — a stale checkout of main cannot gate CI with the pre-D16 legacy script
   - executes pinned copy under bash and propagates its rc (:39-41)
   touched_by:
-  - scripts/check_branch_parity.sh:109 (the marker line itself)
+  - scripts/check_branch_parity.sh:111 (the marker line itself)
   - agents/ledger/DECISIONS.md D21 (F1b closure)
   validated_by:
   - tests/test_branch_parity_scripts.py::test_f1b_guard_rejects_legacy_checker_without_era_marker[legacy]
@@ -3313,17 +3313,18 @@ gates:
 - id: GATE-INFRA-93
   phase: infra-meta
   order: 110
-  owner: scripts/check_branch_parity.sh:69 check() (SHARED lockstep, list at :42-67) + sync_to_main() :87
+  owner: scripts/check_branch_parity.sh:71 check() (SHARED lockstep, list at :43-69) + sync_to_main() :89
   inputs:
-  - '24-entry SHARED surface: src/ tests/ demo/ configs/dataset/test.yaml configs/experiment/{baseline,engineered,hyperopt}.yaml configs/analysis/{test,test_hypothesis,test_causal}.yaml configs/step/{causal,etl}.yaml configs/environment/ configs/flow/ k8s/ docker/ .github/workflows/ pyproject.toml Dockerfile docker-compose.yml .gitignore .dockerignore README.md scripts/'
+  - '25-entry SHARED surface: src/ tests/ demo/ configs/dataset/test.yaml configs/experiment/{baseline,engineered,hyperopt}.yaml configs/analysis/{test,test_hypothesis,test_causal}.yaml configs/step/{causal,etl}.yaml configs/environment/ configs/flow/ k8s/ docker/ .github/workflows/ pyproject.toml Dockerfile docker-compose.yml .gitignore .dockerignore README.md scripts/ experiments/more_modeling/'
   - origin/main vs origin/taxi tips
   outputs:
   - 'PARITY OK | DRIFT: <path> differs … PARITY FAILED — run $0 --sync'
-  - 'sync mode: taxi→main checkout + deletion mirror (:87-101)'
+  - 'sync mode: taxi→main checkout + deletion mirror (:89-103)'
   transforms:
-  - byte-identical git diff --exit-code per SHARED path, deletions included (:75)
+  - byte-identical git diff --exit-code per SHARED path, deletions included (:77)
   - anything NOT listed is deliberately single-branch (:39-41)
-  - --sync refused outside main era (dev dispatch :200-203)
+  - --sync refused outside main era (dev dispatch :202-205)
+  - 'RGC-1 custody flip (gap-foreign ratification checklist): experiments/more_modeling/ JOINED the declared surface — the {16..22} batch landed by human ruling, so its directory is no longer foreign-by-omission; gate met: checker passes WITH the entry (dev-era custody anchor-diff green; origin/main sits at PARITY_MAIN_ANCHOR)'
   touched_by:
   - scripts/run_local_ci.sh:30 (consumes pinned copy of THIS file)
   - tests/test_branch_parity_scripts.py:66 (parses SHARED array)
@@ -3340,17 +3341,17 @@ gates:
 - id: GATE-INFRA-94
   phase: infra-meta
   order: 111
-  owner: scripts/check_branch_parity.sh:109 inline era declaration PARITY_ERA/PARITY_TRACK_BRANCH/PARITY_ALLOWLIST/PARITY_MAIN_ANCHOR (:109-112) + anchor guards :119-130 + dev-era dispatch :190-224
+  owner: scripts/check_branch_parity.sh:111 inline era declaration PARITY_ERA/PARITY_TRACK_BRANCH/PARITY_ALLOWLIST/PARITY_MAIN_ANCHOR (:111-114) + anchor guards :121-132 + dev-era dispatch :192-226
   inputs:
   - inline constants (no env dialect, D21)
-  - GITHUB_REF_NAME else `git rev-parse --abbrev-ref HEAD` (:185)
+  - GITHUB_REF_NAME else `git rev-parse --abbrev-ref HEAD` (:187)
   - origin refs
   outputs:
   - PARITY OK (era=… branch=…) | FATAL anchor shape/resolution errors | TAXI DRIFT | FORK | REFUSED (--sync off-era)
   transforms:
-  - anchor must be full 40-hex AND resolve to a commit — garbled pin fails as CONFIG ERROR up front (:119-126)
-  - era vocabulary restricted to {dev,main} (:127-130); editing these lines IS the main-day flip act (D16c)
-  - 'dev era: custody FIRST on every event/branch (:204), then branch-aware pass-along — push-to-taxi requires byte-identical fast-forward (:210), push-to-track requires origin/taxi ancestor (never fork, :216), empty/main/other refs custody-only'
+  - anchor must be full 40-hex AND resolve to a commit — garbled pin fails as CONFIG ERROR up front (:121-128)
+  - era vocabulary restricted to {dev,main} (:129-132); editing these lines IS the main-day flip act (D16c)
+  - 'dev era: custody FIRST on every event/branch (:206), then branch-aware pass-along — push-to-taxi requires byte-identical fast-forward (:212), push-to-track requires origin/taxi ancestor (never fork, :218), empty/main/other refs custody-only'
   touched_by:
   - scripts/run_local_ci.sh:36 (marker grep keys on ^PARITY_ERA=)
   - agents/ledger/DECISIONS.md D16/D21 (design + relocation)
@@ -3363,23 +3364,23 @@ gates:
   - refs/remotes/origin/sklearn
   - GITHUB_REF_NAME
   findings:
-  - anchor shape/resolution guards (:119-126) and both dev-era pass-along guards (:210,:216) are asserted nowhere — no test feeds a non-ancestor taxi or a drifted taxi tip through the dispatch.
+  - anchor shape/resolution guards (:121-128) and both dev-era pass-along guards (:212,:218) are asserted nowhere — no test feeds a non-ancestor taxi or a drifted taxi tip through the dispatch.
 - id: GATE-INFRA-95
   phase: infra-meta
   order: 112
-  owner: scripts/check_branch_parity.sh:132 custody() — layer 1 anchor-drift diff :144, freeze-intact shortcut :160, layer 2 blob-provenance comm -23 :164
+  owner: scripts/check_branch_parity.sh:134 custody() — layer 1 anchor-drift diff :146, freeze-intact shortcut :162, layer 2 blob-provenance comm -23 :166
   inputs:
-  - PARITY_MAIN_ANCHOR=18607091ddbb2602ad4475341ad377bafee5ec4b (:112)
+  - PARITY_MAIN_ANCHOR=18607091ddbb2602ad4475341ad377bafee5ec4b (:114)
   - origin/main SHARED subtree
-  - origin/sklearn object universe (rev-list --objects :176)
-  - PARITY_ALLOWLIST=() prefix skips (:166-175)
+  - origin/sklearn object universe (rev-list --objects :178)
+  - PARITY_ALLOWLIST=() prefix skips (:168-177)
   outputs:
   - 'ROGUE MAIN WRITE: frozen main changed since anchor … (adds/deletes/mods)'
   - 'ROGUE MAIN WRITE: novel blob(s) absent from track universe (head -10)'
   - silent return 0 via shortcut when main==anchor
   transforms:
-  - 'layer 1: diff anchor..origin/main over SHARED catches adds/deletes/mods/smuggling (:144-147)'
-  - 'shortcut: main==anchor ⇒ return before layer 2 — disjoint histories make the universe test false-positive forever otherwise (:153-162)'
+  - 'layer 1: diff anchor..origin/main over SHARED catches adds/deletes/mods/smuggling (:146-149)'
+  - 'shortcut: main==anchor ⇒ return before layer 2 — disjoint histories make the universe test false-positive forever otherwise (:155-164)'
   - 'layer 2: any blob on moved-off-anchor main that exists NOWHERE in sklearn''s universe IS rogue (novel-content adds)'
   touched_by:
   - scripts/run_local_ci.sh:30 (runs pinned custody on every CI event)
@@ -3752,7 +3753,7 @@ gates:
 - id: GATE-INFRA-142
   phase: infra-meta
   order: 131
-  owner: 'scripts/check_branch_parity.sh:87 sync_to_main() ref-management site (stale-ref retirement law; objects: LOCAL refs refs/heads/pr-1 + pr-2, closed-unmerged snapshots)'
+  owner: 'scripts/check_branch_parity.sh:89 sync_to_main() ref-management site (stale-ref retirement law; objects: LOCAL refs refs/heads/pr-1 + pr-2, closed-unmerged snapshots)'
   inputs:
   - named local refs (pr-1/pr-2 and future strays)
   outputs:
@@ -3822,14 +3823,14 @@ gates:
 - id: GATE-INFRA-146
   phase: infra-meta
   order: 135
-  owner: 'scripts/ship.sh:10 UV_CACHE_DIR/MPLCONFIGDIR cache-root exports'
+  owner: 'scripts/ship.sh:13 MPLCONFIGDIR cache-root export — sole surviving export; the UV_CACHE_DIR half is DELETED per the single-sanctioned-root law below'
   inputs:
   - ship-path shell session environment
   outputs:
   - ONE sanctioned uv cache root; deterministic matplotlib font-cache location
   transforms:
-  - 'fork site of the 11.45 G second cache root: export UV_CACHE_DIR="${UV_CACHE_DIR:-$PWD/.uv-cache}" MPLCONFIGDIR=… (:10, HEAD-verified) — the two-root fork''s creator site (packet H #146)'
-  - 'LAW: one sanctioned uv cache root; the fix IS a deletion of the UV_CACHE_DIR export (deletion-first satisfied), landing via the worktree doctrine comment through normal tier gates; MPLCONFIGDIR STAYS (matplotlib font-cache determinism; /tmp variant documented run_local_ci.sh:18)'
+  - 'HISTORY (fork site of the 11.45 G second cache root, packet H #146): export UV_CACHE_DIR="${UV_CACHE_DIR:-$PWD/.uv-cache}" MPLCONFIGDIR=… stood at :10 until the cache-root law landed — HEAD carries NO UV_CACHE_DIR export anywhere in ship.sh (prohibition prose :10-12)'
+  - 'LAW LANDED: one sanctioned uv cache root ($HOME/.cache/uv), a repo-local UV_CACHE_DIR export PROHIBITED (MAIN_AGENT_CONTRACT ledger & artifact hygiene); the fix WAS the deletion of the UV_CACHE_DIR export (deletion-first satisfied); MPLCONFIGDIR STAYS — export MPLCONFIGDIR="${MPLCONFIGDIR:-$PWD/.mplconfig}" at :13 (HEAD-verified), matplotlib font-cache determinism; /tmp variant documented run_local_ci.sh:18; §14 EXCEPTION (2026-08-25, eight-packet batch ruling #7): repo-root .mplconfig is the SANCTIONED MPLCONFIGDIR target — the SOLE permitted repo-local cache, per the contract sentence'
   - 'object deleted @ hygiene-exec, creator site persists ⇒ CREATION-TIME LAW: YES — repo-root .uv-cache/.mplconfig absent at ruling time (packet H DRIFT #2/#3); home-side ~/.cache/uv persists'
   touched_by: []
   validated_by: []

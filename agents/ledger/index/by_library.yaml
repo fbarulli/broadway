@@ -490,7 +490,7 @@ scipy.stats:
 - GATE-STATS-45
 scipy.stats (levene/skew/kurtosis/shapiro):
 - GATE-STATS-46
-scripts/check_branch_parity.sh:109 (the marker line itself):
+scripts/check_branch_parity.sh:111 (the marker line itself):
 - GATE-INFRA-91
 scripts/check_e2e_determinism.sh:174-187:
 - GATE-CFG-70

@@ -6,8 +6,9 @@
 #             taxi fast-forwards to it after each green push; main is frozen
 #             until declared main-day.
 #
-# src/, tests/, demo/, scripts/, the synthetic-demo configs, and the deployment
-# files (k8s/, docker/, .github/workflows/) are meant to be IDENTICAL on both
+# src/, tests/, demo/, scripts/, experiments/more_modeling/, the synthetic-demo
+# configs, and the deployment files (k8s/, docker/, .github/workflows/) are
+# meant to be IDENTICAL on both
 # branches. This script fails loudly the moment they drift — including
 # deletions and content changes — so a change made on one branch cannot
 # silently diverge.
@@ -64,6 +65,7 @@ SHARED=(
   .dockerignore
   README.md
   scripts/
+  experiments/more_modeling/
 )
 
 check() {

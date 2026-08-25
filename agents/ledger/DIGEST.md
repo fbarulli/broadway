@@ -1,6 +1,6 @@
 # DIGEST.md — rendered from agents/ledger/gates.yaml · NEVER HAND-EDIT ·
 
-> 141 gates · rendered 2026-08-25 @ HEAD b06bdd2 · load THIS into context;
+> 141 gates · rendered 2026-08-25 @ HEAD 1cf33b5 · load THIS into context;
 > gates.yaml is the sole SSOT; the retired GATES.md/gates/*.md markdown world survives in agents/ledger/arbitration/2026-08-24/surface-and-analysis-preservation.md.
 
 | band | phase | gates | findings |
@@ -265,12 +265,12 @@
   [refs/remotes/origin/sklearn:scripts/check_branch_parity.sh via `git show` (:33)] → [parity sub-verdict to run() aggregator, FAIL parity (F1b): origin/sklearn unavailable | legacy pre-D16 checker on track ref] · pins: 3
 - **GATE-INFRA-92** `scripts/run_local_ci.sh:44 gate battery (ruff :44-45, mypy :46, configs :47-51, pytest+cov floor=95 :53-54)` ⚠FINDING
   [src/** tests/** experiments/mlflow experiments/fare_prediction experiments.py experiments_ui.py project/working.py project/data.py (ruff), src/broadway/** (mypy), configs/experiment/*.yaml via load_config(dataset='test') (configs), tests/** (pytest -n 4 --dist worksteal, --cov-fail-under=95)] → [PASS/FAIL ruff|mypy|configs|pytest banners + 40-line tails, cov floor breach ⇒ FAIL pytest] · pins: 2
-- **GATE-INFRA-93** `scripts/check_branch_parity.sh:69 check() (SHARED lockstep, list at :42-67) + sync_to_main() :87` ⚠FINDING
-  [24-entry SHARED surface: src/ tests/ demo/ configs/dataset/test.yaml configs/experiment/{baseline,engineered,hyperopt}.yaml configs/analysis/{test,test_hypothesis,test_causal}.yaml configs/step/{causal,etl}.yaml configs/environment/ configs/flow/ k8s/ docker/ .github/workflows/ pyproject.toml Dockerfile docker-compose.yml .gitignore .dockerignore README.md scripts/, origin/main vs origin/taxi tips] → [PARITY OK | DRIFT: <path> differs … PARITY FAILED — run $0 --sync, sync mode: taxi→main checkout + deletion mirror (:87-101)] · pins: 2
-- **GATE-INFRA-94** `scripts/check_branch_parity.sh:109 inline era declaration PARITY_ERA/PARITY_TRACK_BRANCH/PARITY_ALLOWLIST/PARITY_MAIN_ANCHOR (:109-112) + anchor guards :119-130 + dev-era dispatch :190-224` ⚠FINDING
-  [inline constants (no env dialect, D21), GITHUB_REF_NAME else `git rev-parse --abbrev-ref HEAD` (:185), origin refs] → [PARITY OK (era=… branch=…) | FATAL anchor shape/resolution errors | TAXI DRIFT | FORK | REFUSED (--sync off-era)] · pins: 2
-- **GATE-INFRA-95** `scripts/check_branch_parity.sh:132 custody() — layer 1 anchor-drift diff :144, freeze-intact shortcut :160, layer 2 blob-provenance comm -23 :164` ⚠FINDING
-  [PARITY_MAIN_ANCHOR=18607091ddbb2602ad4475341ad377bafee5ec4b (:112), origin/main SHARED subtree, origin/sklearn object universe (rev-list --objects :176), PARITY_ALLOWLIST=() prefix skips (:166-175)] → [ROGUE MAIN WRITE: frozen main changed since anchor … (adds/deletes/mods), ROGUE MAIN WRITE: novel blob(s) absent from track universe (head -10), silent return 0 via shortcut when main==anchor] · pins: none direct
+- **GATE-INFRA-93** `scripts/check_branch_parity.sh:71 check() (SHARED lockstep, list at :43-69) + sync_to_main() :89` ⚠FINDING
+  [25-entry SHARED surface: src/ tests/ demo/ configs/dataset/test.yaml configs/experiment/{baseline,engineered,hyperopt}.yaml configs/analysis/{test,test_hypothesis,test_causal}.yaml configs/step/{causal,etl}.yaml configs/environment/ configs/flow/ k8s/ docker/ .github/workflows/ pyproject.toml Dockerfile docker-compose.yml .gitignore .dockerignore README.md scripts/ experiments/more_modeling/, origin/main vs origin/taxi tips] → [PARITY OK | DRIFT: <path> differs … PARITY FAILED — run $0 --sync, sync mode: taxi→main checkout + deletion mirror (:89-103)] · pins: 2
+- **GATE-INFRA-94** `scripts/check_branch_parity.sh:111 inline era declaration PARITY_ERA/PARITY_TRACK_BRANCH/PARITY_ALLOWLIST/PARITY_MAIN_ANCHOR (:111-114) + anchor guards :121-132 + dev-era dispatch :192-226` ⚠FINDING
+  [inline constants (no env dialect, D21), GITHUB_REF_NAME else `git rev-parse --abbrev-ref HEAD` (:187), origin refs] → [PARITY OK (era=… branch=…) | FATAL anchor shape/resolution errors | TAXI DRIFT | FORK | REFUSED (--sync off-era)] · pins: 2
+- **GATE-INFRA-95** `scripts/check_branch_parity.sh:134 custody() — layer 1 anchor-drift diff :146, freeze-intact shortcut :162, layer 2 blob-provenance comm -23 :166` ⚠FINDING
+  [PARITY_MAIN_ANCHOR=18607091ddbb2602ad4475341ad377bafee5ec4b (:114), origin/main SHARED subtree, origin/sklearn object universe (rev-list --objects :178), PARITY_ALLOWLIST=() prefix skips (:168-177)] → [ROGUE MAIN WRITE: frozen main changed since anchor … (adds/deletes/mods), ROGUE MAIN WRITE: novel blob(s) absent from track universe (head -10), silent return 0 via shortcut when main==anchor] · pins: none direct
 - **GATE-INFRA-96** `scripts/ship.sh:17 ship gate (`if ! bash scripts/run_local_ci.sh` → refuse :17-22; push :25) mirrored by .git/hooks/pre-push:5` ⚠FINDING
   [argv remote/refspec (default origin sklearn:sklearn :14), full-tier verdict of scripts/run_local_ci.sh] → [SHIP OK | SHIP REFUSED: LOCAL-CI RED … exit 1, single git push invocation → one hook gate (:25)] · pins: none direct
 - **GATE-INFRA-97** `scripts/check_e2e_determinism.sh:106 compare_trees() (json_diff whitelist :35-46, compare_file :89, --run chain run_e2e :163)` ⚠FINDING
@@ -307,7 +307,7 @@
   [uv editable-install discovery behavior] → [package-discovery guard contract (excludes the harness checkout, walks the repo root)] · pins: 2
 - **GATE-INFRA-141** `scripts/ship.sh push-path creator site for annotated tags (law: manual git tag -a mints ONLY via a named ledger-row procedure; NO scripted minter exists at HEAD)` ⚠FINDING
   [release/tag minting intent] → [published annotated tag with a ledger row naming its procedure] · pins: none direct
-- **GATE-INFRA-142** `scripts/check_branch_parity.sh:87 sync_to_main() ref-management site (stale-ref retirement law; objects: LOCAL refs refs/heads/pr-1 + pr-2, closed-unmerged snapshots)` ⚠FINDING
+- **GATE-INFRA-142** `scripts/check_branch_parity.sh:89 sync_to_main() ref-management site (stale-ref retirement law; objects: LOCAL refs refs/heads/pr-1 + pr-2, closed-unmerged snapshots)` ⚠FINDING
   [named local refs (pr-1/pr-2 and future strays)] → [retire-or-own verdict per named ref; detect-and-retire loop execution record] · pins: none direct
 - **GATE-INFRA-143** `.github/workflows/ci.yml:145 actions/cache@v4 cache retention/dedupe law`
   [CI cache key family (broadway-base hashFiles key)] → [one save-site per key family; size-budget watch; purge as invoked workflow step] · pins: none direct
@@ -315,7 +315,7 @@
   [verified image builds from the CD job] → [registry writes: broadway-optuna-worker + mlflow-server ONLY, $sha always; :latest main-only; :taxi taxi-only] · pins: none direct
 - **GATE-INFRA-145** `k8s/optuna/teardown.sh teardown zero-footprint creation-time law (HEAD has ZERO rmi/residual lines; codified shape = WIP worktree :63-73)` ⚠FINDING
   [teardown invocation after cluster/image-producing lanes] → [host returned to ZERO project containers/images/volumes, FAILING LOUD otherwise] · pins: none direct
-- **GATE-INFRA-146** `scripts/ship.sh:10 UV_CACHE_DIR/MPLCONFIGDIR cache-root exports`
+- **GATE-INFRA-146** `scripts/ship.sh:13 MPLCONFIGDIR cache-root export — sole surviving export; the UV_CACHE_DIR half is DELETED per the single-sanctioned-root law below`
   [ship-path shell session environment] → [ONE sanctioned uv cache root; deterministic matplotlib font-cache location] · pins: none direct
 
 ### 81-object-custody — object-custody
