@@ -54,6 +54,8 @@ scripts/check_branch_parity.sh:
 - GATE-INFRA-142
 scripts/check_e2e_determinism.sh:
 - GATE-INFRA-97
+scripts/deadcode_census.py:
+- GATE-INFRA-147
 scripts/run_local_ci.sh:
 - GATE-INFRA-90
 - GATE-INFRA-91

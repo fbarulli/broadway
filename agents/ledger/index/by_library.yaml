@@ -506,7 +506,7 @@ scripts/run_local_ci.sh:47-51 (loads all configs/experiment/*.yaml through this 
 - GATE-CFG-73
 scripts/run_local_ci.sh:47-51 configs gate:
 - GATE-CFG-70
-scripts/ship.sh:17:
+scripts/ship.sh:24:
 - GATE-INFRA-90
 sklearn.metrics:
 - GATE-STATS-48

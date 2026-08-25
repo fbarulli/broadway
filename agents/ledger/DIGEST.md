@@ -1,6 +1,6 @@
 # DIGEST.md — rendered from agents/ledger/gates.yaml · NEVER HAND-EDIT ·
 
-> 141 gates · rendered 2026-08-25 @ HEAD 1cf33b5 · load THIS into context;
+> 142 gates · rendered 2026-08-25 @ HEAD eb9ea18 · load THIS into context;
 > gates.yaml is the sole SSOT; the retired GATES.md/gates/*.md markdown world survives in agents/ledger/arbitration/2026-08-24/surface-and-analysis-preservation.md.
 
 | band | phase | gates | findings |
@@ -14,9 +14,9 @@
 | 07-surfaces | surfaces | 13 | 1 |
 | 08-config | config-schema | 17 | 12 |
 | 80-hpo-optuna | hpo-optuna | 10 | 9 |
-| 09-infra | infra-meta | 29 | 17 |
+| 09-infra | infra-meta | 30 | 17 |
 | 81-object-custody | object-custody | 6 | 0 |
-| **total** | | **141** | **85** |
+| **total** | | **142** | **85** |
 
 ### 01-ingest — ingest
 
@@ -259,26 +259,26 @@
 
 ### 09-infra — infra-meta
 
-- **GATE-INFRA-90** `scripts/run_local_ci.sh:11 case-dispatch STATIC/TIER (+ run() aggregator :20, banner law :17/:56-61)` ⚠FINDING
-  [argv[1] ∈ {unset, --static, --tier=fast, --tier=full} (else usage exit 2), sub-gate verdicts via run() <name> <cmd...>] → [banner FAST-GREEN | LOCAL-CI GREEN | LOCAL-CI RED, exit 0 green / 1 red / 2 usage] · pins: none direct
+- **GATE-INFRA-90** `scripts/run_local_ci.sh:16 case-dispatch STATIC/TIER/CLEAN_LINT (+ run() aggregator :26-31, banner law :23/:100)` ⚠FINDING
+  [argv[1] ∈ {unset, --static, --tier=fast, --tier=full, --clean-lint} (else usage exit 2), sub-gate verdicts via run() <name> <cmd...>] → [banner FAST-GREEN | LOCAL-CI GREEN | LOCAL-CI RED, exit 0 green / 1 red / 2 usage] · pins: none direct
 - **GATE-INFRA-91** `scripts/run_local_ci.sh:30 gate_parity() (F1b pin-guard, wired at :43)` ⚠FINDING
   [refs/remotes/origin/sklearn:scripts/check_branch_parity.sh via `git show` (:33)] → [parity sub-verdict to run() aggregator, FAIL parity (F1b): origin/sklearn unavailable | legacy pre-D16 checker on track ref] · pins: 3
-- **GATE-INFRA-92** `scripts/run_local_ci.sh:44 gate battery (ruff :44-45, mypy :46, configs :47-51, pytest+cov floor=95 :53-54)` ⚠FINDING
-  [src/** tests/** experiments/mlflow experiments/fare_prediction experiments.py experiments_ui.py project/working.py project/data.py (ruff), src/broadway/** (mypy), configs/experiment/*.yaml via load_config(dataset='test') (configs), tests/** (pytest -n 4 --dist worksteal, --cov-fail-under=95)] → [PASS/FAIL ruff|mypy|configs|pytest banners + 40-line tails, cov floor breach ⇒ FAIL pytest] · pins: 2
+- **GATE-INFRA-92** `scripts/run_local_ci.sh:81 gate battery (ruff :81-84 incl. scripts/, mypy :85, configs :86-90, shell-scripts :91-93 both dirs, pytest+cov floor=95 :95-96, project-tests :97)` ⚠FINDING
+  [src/** tests/** experiments/mlflow experiments/fare_prediction experiments.py experiments_ui.py project/working.py project/data.py scripts/ (ruff), src/broadway/** (mypy), configs/experiment/*.yaml via load_config(dataset='test') (configs), k8s/optuna/*.sh + scripts/*.sh via sh -n + shellcheck (shell-scripts), tests/** (pytest -n 4 --dist worksteal, --cov-fail-under=95), project/tests/** (project-tests: full tier only, -q --dist worksteal, NO coverage flags)] → [PASS/FAIL ruff|mypy|configs|shell-scripts|pytest|project-tests banners + 40-line tails, cov floor breach ⇒ FAIL pytest] · pins: 2
 - **GATE-INFRA-93** `scripts/check_branch_parity.sh:71 check() (SHARED lockstep, list at :43-69) + sync_to_main() :89` ⚠FINDING
   [25-entry SHARED surface: src/ tests/ demo/ configs/dataset/test.yaml configs/experiment/{baseline,engineered,hyperopt}.yaml configs/analysis/{test,test_hypothesis,test_causal}.yaml configs/step/{causal,etl}.yaml configs/environment/ configs/flow/ k8s/ docker/ .github/workflows/ pyproject.toml Dockerfile docker-compose.yml .gitignore .dockerignore README.md scripts/ experiments/more_modeling/, origin/main vs origin/taxi tips] → [PARITY OK | DRIFT: <path> differs … PARITY FAILED — run $0 --sync, sync mode: taxi→main checkout + deletion mirror (:89-103)] · pins: 2
 - **GATE-INFRA-94** `scripts/check_branch_parity.sh:111 inline era declaration PARITY_ERA/PARITY_TRACK_BRANCH/PARITY_ALLOWLIST/PARITY_MAIN_ANCHOR (:111-114) + anchor guards :121-132 + dev-era dispatch :192-226` ⚠FINDING
   [inline constants (no env dialect, D21), GITHUB_REF_NAME else `git rev-parse --abbrev-ref HEAD` (:187), origin refs] → [PARITY OK (era=… branch=…) | FATAL anchor shape/resolution errors | TAXI DRIFT | FORK | REFUSED (--sync off-era)] · pins: 2
 - **GATE-INFRA-95** `scripts/check_branch_parity.sh:134 custody() — layer 1 anchor-drift diff :146, freeze-intact shortcut :162, layer 2 blob-provenance comm -23 :166` ⚠FINDING
   [PARITY_MAIN_ANCHOR=18607091ddbb2602ad4475341ad377bafee5ec4b (:114), origin/main SHARED subtree, origin/sklearn object universe (rev-list --objects :178), PARITY_ALLOWLIST=() prefix skips (:168-177)] → [ROGUE MAIN WRITE: frozen main changed since anchor … (adds/deletes/mods), ROGUE MAIN WRITE: novel blob(s) absent from track universe (head -10), silent return 0 via shortcut when main==anchor] · pins: none direct
-- **GATE-INFRA-96** `scripts/ship.sh:17 ship gate (`if ! bash scripts/run_local_ci.sh` → refuse :17-22; push :25) mirrored by .git/hooks/pre-push:5` ⚠FINDING
+- **GATE-INFRA-96** `scripts/ship.sh:24 ship gate (`if ! bash scripts/run_local_ci.sh` → refuse :24-27; single push later) + WAVE-A teeth insertions (:15-19 tier_gate sourcing, :31-40 L1 hook guard, :42-53 TIER-GATE batch) mirrored by .git/hooks/pre-push:5` ⚠FINDING
   [argv remote/refspec (default origin sklearn:sklearn :14), full-tier verdict of scripts/run_local_ci.sh] → [SHIP OK | SHIP REFUSED: LOCAL-CI RED … exit 1, single git push invocation → one hook gate (:25)] · pins: none direct
 - **GATE-INFRA-97** `scripts/check_e2e_determinism.sh:106 compare_trees() (json_diff whitelist :35-46, compare_file :89, --run chain run_e2e :163)` ⚠FINDING
   [two artifact trees (positional) or --run, JSON leaves after canonical sorted-keys re-dump, whitelist EXACT={trace.created_at, artifact_path, train_time_seconds, promote, reason, warnings} :45 + PATTERN comparison.metrics.<m>.{champion,delta,delta_pct} :46] → [DETERMINISM OK + exit 0 | one `<file>: <field-path>` line per offender + exit 1 | `<file>: missing counterpart` | usage exit 2] · pins: 6
 - **GATE-INFRA-98** `scripts/tier_classifier.py:104 classify() (triggers :51-64, parse_diff_payload :138, CLI main :162)` ⚠FINDING
   [git-diff payload on stdin (files + added lines), governance basenames {CONTRACT_TEMPLATE,WORKER_CONTRACT,MAIN_AGENT_CONTRACT,DECISIONS,FIXES}.md + agents/ledger/STATE.md (:34-37), behavior prefixes src/ tests/ project/ experiments/ scripts/ .github/ k8s/ + pyproject.toml uv.lock *.sh docker* + configs/*.yaml (:40-43)] → [{"tier": FULL|CHECKLIST, "reasons": [...]} JSON] · pins: 7
-- **GATE-INFRA-99** `.github/workflows/ci.yml:47 platform job step "Platform gates (SSOT)" (delegation law :42-45; docker-only checks :53-104; build-and-boot :132; CD :246; concurrency :11-13)` ⚠FINDING
-  [push/PR to main|taxi|sklearn (:3-7), fetch-depth 0 for parity tips (:28), uv sync --all-extras --frozen (:40), bash scripts/run_local_ci.sh (no args ⇒ full tier)] → [platform job verdict (parity+ruff+mypy+configs+pytest+cov≥95 via SSOT script), docker-only verdicts: sh -n + shellcheck k8s/optuna/*.sh (:57-62), kubeconform -strict k8s/optuna/ minus kind-config.yaml (:71-80), orchestrator dry-run render+kubeconform (:85-104), sha-tagged images built/boot-tested; CD publishes bit-for-bit verified tarball to GHCR on main/taxi pushes only (:217-303)] · pins: none direct
+- **GATE-INFRA-99** `.github/workflows/ci.yml:47 platform job step "Platform gates (SSOT)" (delegation law :42-46; docker-only checks :51-66; build-and-boot :151; CD job :310; concurrency :11-13)` ⚠FINDING
+  [push/PR to main|taxi|sklearn (:3-7), fetch-depth 0 for parity tips (:28), uv sync --all-extras --frozen (:40), bash scripts/run_local_ci.sh (no args ⇒ full tier)] → [platform job verdict (parity+ruff+mypy+configs+shell-scripts+pytest+cov≥95+project-tests via SSOT script), docker-only verdicts: sh -n + shellcheck k8s/optuna/*.sh AND scripts/*.sh (:57-66), kubeconform -strict k8s/optuna/ minus kind-config.yaml (:79), orchestrator dry-run render+kubeconform (:104), sha-tagged images built/boot-tested; CD publishes bit-for-bit verified tarball to GHCR on main/taxi pushes only (:290-376)] · pins: none direct
 - **GATE-INFRA-122** `experiments.py:495 main argparse dispatcher (ols|diagnostics|qq_legend|verify)`
   [argv subcommand] → [plots/results CSVs/verification JSON (self-auditing verify subcommand)] · pins: none direct
 - **GATE-INFRA-123** `experiments_ui.py:893 __main__ uvicorn.run entry`
@@ -311,12 +311,14 @@
   [named local refs (pr-1/pr-2 and future strays)] → [retire-or-own verdict per named ref; detect-and-retire loop execution record] · pins: none direct
 - **GATE-INFRA-143** `.github/workflows/ci.yml:145 actions/cache@v4 cache retention/dedupe law`
   [CI cache key family (broadway-base hashFiles key)] → [one save-site per key family; size-budget watch; purge as invoked workflow step] · pins: none direct
-- **GATE-INFRA-144** `.github/workflows/ci.yml:282 Push verified images to GHCR (CD single writer)` ⚠FINDING
+- **GATE-INFRA-144** `.github/workflows/ci.yml:355 Push verified images to GHCR (CD single writer)` ⚠FINDING
   [verified image builds from the CD job] → [registry writes: broadway-optuna-worker + mlflow-server ONLY, $sha always; :latest main-only; :taxi taxi-only] · pins: none direct
 - **GATE-INFRA-145** `k8s/optuna/teardown.sh teardown zero-footprint creation-time law (HEAD has ZERO rmi/residual lines; codified shape = WIP worktree :63-73)` ⚠FINDING
   [teardown invocation after cluster/image-producing lanes] → [host returned to ZERO project containers/images/volumes, FAILING LOUD otherwise] · pins: none direct
 - **GATE-INFRA-146** `scripts/ship.sh:13 MPLCONFIGDIR cache-root export — sole surviving export; the UV_CACHE_DIR half is DELETED per the single-sanctioned-root law below`
   [ship-path shell session environment] → [ONE sanctioned uv cache root; deterministic matplotlib font-cache location] · pins: none direct
+- **GATE-INFRA-147** `scripts/deadcode_census.py:1 module — teeth ⑥ DEADCODE-CENSUS advisory engine`
+  [tracked *.py corpus via git ls-files (src/project/experiments/tests/scripts), pyproject [project.scripts] entrypoint table] → [data/processed/deadcode_census.md suspicion report (gitignored sink); stdout default] · pins: none direct
 
 ### 81-object-custody — object-custody
 

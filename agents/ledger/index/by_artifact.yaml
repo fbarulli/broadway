@@ -241,7 +241,7 @@ PARITY_ALLOWLIST=() prefix skips (:168-177):
 - GATE-INFRA-95
 PARITY_MAIN_ANCHOR=18607091ddbb2602ad4475341ad377bafee5ec4b (:114):
 - GATE-INFRA-95
-PASS/FAIL ruff|mypy|configs|pytest banners + 40-line tails:
+PASS/FAIL ruff|mypy|configs|shell-scripts|pytest|project-tests banners + 40-line tails:
 - GATE-INFRA-92
 PipelineConfig (cfg.dataset + cfg.etl + cfg.experiment):
 - GATE-ETL-10
@@ -367,7 +367,7 @@ argv remote/refspec (default origin sklearn:sklearn :14):
 - GATE-INFRA-96
 argv subcommand:
 - GATE-INFRA-122
-argv[1] ∈ {unset, --static, --tier=fast, --tier=full} (else usage exit 2):
+argv[1] ∈ {unset, --static, --tier=fast, --tier=full, --clean-lint} (else usage exit 2):
 - GATE-INFRA-90
 artifacts <dataset>_clean.json (StructuralCleanResult):
 - GATE-SURF-63
@@ -491,6 +491,8 @@ dashboard series endpoints served by the FastAPI app object:
 - GATE-SURF-102
 dashboard server (uvicorn.run(app, host="127.0.0.1", port=8000) :894):
 - GATE-INFRA-123
+data/processed/deadcode_census.md suspicion report (gitignored sink); stdout default:
+- GATE-INFRA-147
 dataset name → configs/dataset/<name>.yaml via _load_contract (:140):
 - GATE-ETL-19
 dataset.lookup_tables CSVs read with keep_default_na=False + authored na_values:
@@ -529,7 +531,7 @@ direction:
 - GATE-HPO-86
 dispatch into timeline.walkthrough.run (cli.py:166-173):
 - GATE-TLINE-59
-? 'docker-only verdicts: sh -n + shellcheck k8s/optuna/*.sh (:57-62), kubeconform -strict k8s/optuna/ minus kind-config.yaml (:71-80), orchestrator dry-run render+kubeconform (:85-104)'
+? 'docker-only verdicts: sh -n + shellcheck k8s/optuna/*.sh AND scripts/*.sh (:57-66), kubeconform -strict k8s/optuna/ minus kind-config.yaml (:79), orchestrator dry-run render+kubeconform (:104)'
 : - GATE-INFRA-99
 documented CLOSED VOCABULARY {model, study, seed}:
 - GATE-CUST-149
@@ -631,6 +633,8 @@ init-job manifest apply:
 - GATE-INFRA-125
 inline constants (no env dialect, D21):
 - GATE-INFRA-94
+k8s/optuna/*.sh + scripts/*.sh via sh -n + shellcheck (shell-scripts):
+- GATE-INFRA-92
 kind:
 - GATE-TLINE-52
 kind restricted to Literal["omnibus","posthoc"]:
@@ -807,7 +811,7 @@ persisted typed evidence JSON artifacts:
 - GATE-SURF-69
 pingouin pairwise_gameshowell frame augmented with cohens_d / hedges_g / effect_size_note columns (:29-31):
 - GATE-STATS-47
-platform job verdict (parity+ruff+mypy+configs+pytest+cov≥95 via SSOT script):
+platform job verdict (parity+ruff+mypy+configs+shell-scripts+pytest+cov≥95+project-tests via SSOT script):
 - GATE-INFRA-99
 plots/results CSVs/verification JSON (self-auditing verify subcommand):
 - GATE-INFRA-122
@@ -821,6 +825,8 @@ posthoc.json (runners.py:413):
 - GATE-TLINE-55
 pre-merge df.columns:
 - GATE-ETL-12
+'project/tests/** (project-tests: full tier only, -q --dist worksteal, NO coverage flags)':
+- GATE-INFRA-92
 provenance JSON sidecar:
 - GATE-CFG-79
 published annotated tag with a ledger row naming its procedure:
@@ -829,6 +835,8 @@ published worker image:
 - GATE-INFRA-126
 push/PR to main|taxi|sklearn (:3-7):
 - GATE-INFRA-99
+pyproject [project.scripts] entrypoint table:
+- GATE-INFRA-147
 pytest session lifecycle:
 - GATE-INFRA-138
 python /app/worker.py --init-only execution (:19-20):
@@ -953,7 +961,7 @@ sample_name/sample_role:
 - GATE-TLINE-58
 seven module-level config singletons resolved at import (_contract/_project/_etl/_features and siblings):
 - GATE-CFG-104
-sha-tagged images built/boot-tested; CD publishes bit-for-bit verified tarball to GHCR on main/taxi pushes only (:217-303):
+sha-tagged images built/boot-tested; CD publishes bit-for-bit verified tarball to GHCR on main/taxi pushes only (:290-376):
 - GATE-INFRA-99
 ship-path shell session environment:
 - GATE-INFRA-146
@@ -979,7 +987,7 @@ small_n default 30 (:11); SOLE production caller timeline/runners.py:396 passes 
 - GATE-STATS-47
 source_group_column:
 - GATE-STATS-42
-? src/** tests/** experiments/mlflow experiments/fare_prediction experiments.py experiments_ui.py project/working.py project/data.py (ruff)
+? src/** tests/** experiments/mlflow experiments/fare_prediction experiments.py experiments_ui.py project/working.py project/data.py scripts/ (ruff)
 : - GATE-INFRA-92
 src/broadway/** (mypy):
 - GATE-INFRA-92
@@ -1030,6 +1038,8 @@ tests/** (pytest -n 4 --dist worksteal, --cov-fail-under=95):
 threshold flags:
 - GATE-TLINE-56
 - GATE-TLINE-57
+tracked *.py corpus via git ls-files (src/project/experiments/tests/scripts):
+- GATE-INFRA-147
 tracking URI:
 - GATE-TRAIN-120
 tracking_uri (file store auto-flagged via MLFLOW_ALLOW_FILE_STORE :202-204):

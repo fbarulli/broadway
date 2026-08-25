@@ -1,6 +1,6 @@
 # Gate registry SSOT — hand-maintained; the {01..09} gate fragments it consolidated predate git custody.
 meta:
-  head: 1cf33b5
+  head: 977d530
   assembled: '2026-08-24'
   source_fragments:
   - agents/ledger/gates/01-ingest.md
@@ -14,7 +14,7 @@ meta:
   - agents/ledger/gates/09-infra.md
   - agents/ledger/gates/80-hpo-optuna.md
   counts:
-    total: 141
+    total: 142
     gates_with_findings: 85
     finding_strings: 110
     by_band:
@@ -55,7 +55,7 @@ meta:
         flagged: 9
         finding_strings: 13
       09-infra:
-        gates: 29
+        gates: 30
         flagged: 17
         finding_strings: 25
       81-object-custody:
@@ -3223,21 +3223,22 @@ gates:
 - id: GATE-INFRA-90
   phase: infra-meta
   order: 107
-  owner: scripts/run_local_ci.sh:11 case-dispatch STATIC/TIER (+ run() aggregator :20, banner law :17/:56-61)
+  owner: scripts/run_local_ci.sh:16 case-dispatch STATIC/TIER/CLEAN_LINT (+ run() aggregator :26-31, banner law :23/:100)
   inputs:
-  - argv[1] ∈ {unset, --static, --tier=fast, --tier=full} (else usage exit 2)
+  - argv[1] ∈ {unset, --static, --tier=fast, --tier=full, --clean-lint} (else usage exit 2)
   - sub-gate verdicts via run() <name> <cmd...>
   outputs:
   - banner FAST-GREEN | LOCAL-CI GREEN | LOCAL-CI RED
   - exit 0 green / 1 red / 2 usage
   transforms:
-  - --static OR --tier=fast suppresses the pytest+cov block (guard :52 `$STATIC -eq 0 && $TIER == "full"`)
-  - run() never stops at first failure — aggregates fail=1 across all tiers (:19-25)
-  - banner vocabularies deliberately distinct per tier (:17)
+  - --static OR --tier=fast suppresses the pytest+cov AND project-tests block (guard :94 `$STATIC -eq 0 && $TIER == "full"`)
+  - '--clean-lint opt-in mode (:20, :32-61; ratified teeth ⑤ SNAPSHOT-LINT): ruff+mypy dispatch through a throwaway detached-HEAD worktree snapshot OUTSIDE the repo (ensure_clean_snapshot :38-45, built eagerly at :61, EXIT-trap teardown :42) so shared-tree WIP cannot false-red/green lint; every other gate stays tree-bound, pytest deliberately so (:35)'
+  - run() never stops at first failure — aggregates fail=1 across all tiers (:25-31)
+  - banner vocabularies deliberately distinct per tier (:23)
   touched_by:
   - .github/workflows/ci.yml:47 (invokes bare → full tier)
   - .git/hooks/pre-push:5
-  - scripts/ship.sh:17
+  - scripts/ship.sh:24
   - agents/contracts/MAIN_AGENT_CONTRACT.md §Ship-path law
   - 'agents/ledger/DECISIONS.md D16a/D26 (gate-list SSOT law: edit HERE, never YAML)'
   validated_by: []
@@ -3246,7 +3247,7 @@ gates:
   - pyproject.toml
   - uv.lock
   findings:
-  - no test executes this script end-to-end — tier parsing (:11-16), --static/--tier suppression logic (:52), run() aggregation/banner emission (:20-25,:56-60) have zero coverage; tests only read its TEXT (see GATE-INFRA-91/92).
+  - no test executes this script end-to-end — tier parsing (:15-21), --static/--tier suppression logic (:94), --clean-lint snapshot machinery (:36-61), run() aggregation/banner emission (:26-31,:99-103) have zero coverage; tests only read its TEXT (see GATE-INFRA-91/92).
   - --static alone skips pytest+cov on a nominally full tier; scope discipline ("static is for iteration, not landing") is contract prose, not enforced by code.
 - id: GATE-INFRA-91
   phase: infra-meta
@@ -3276,17 +3277,21 @@ gates:
 - id: GATE-INFRA-92
   phase: infra-meta
   order: 109
-  owner: scripts/run_local_ci.sh:44 gate battery (ruff :44-45, mypy :46, configs :47-51, pytest+cov floor=95 :53-54)
+  owner: scripts/run_local_ci.sh:81 gate battery (ruff :81-84 incl. scripts/, mypy :85, configs :86-90, shell-scripts :91-93 both dirs, pytest+cov floor=95 :95-96, project-tests :97)
   inputs:
-  - src/** tests/** experiments/mlflow experiments/fare_prediction experiments.py experiments_ui.py project/working.py project/data.py (ruff)
+  - src/** tests/** experiments/mlflow experiments/fare_prediction experiments.py experiments_ui.py project/working.py project/data.py scripts/ (ruff)
   - src/broadway/** (mypy)
   - configs/experiment/*.yaml via load_config(dataset='test') (configs)
+  - k8s/optuna/*.sh + scripts/*.sh via sh -n + shellcheck (shell-scripts)
   - tests/** (pytest -n 4 --dist worksteal, --cov-fail-under=95)
+  - 'project/tests/** (project-tests: full tier only, -q --dist worksteal, NO coverage flags)'
   outputs:
-  - PASS/FAIL ruff|mypy|configs|pytest banners + 40-line tails
+  - PASS/FAIL ruff|mypy|configs|shell-scripts|pytest|project-tests banners + 40-line tails
   - cov floor breach ⇒ FAIL pytest
   transforms:
-  - ruff/mypy/configs run in EVERY tier incl. fast/static
+  - ruff/mypy/configs/shell-scripts run in EVERY tier incl. fast/static
+  - 'shell-scripts widened to BOTH glob dirs (:93) — sh -n + shellcheck over k8s/optuna/*.sh AND scripts/*.sh, command-identical to ci.yml ''Shell scripts'' step (gate-divergence law comment :91)'
+  - 'project-tests step (:97, full-tier-only): uv run pytest project/tests -q --dist worksteal with NO coverage flags — the >=95 floor deliberately stays on tests/ (header :7-8); closes the data-gate hole (human ruling): 26 tests / 6 files collected+passing at HEAD eb9ea18'
   - coverage floor value 95 owned here; docs must quote it identically
   - configs gate asserts non-empty glob then loads every experiment config
   touched_by:
@@ -3306,9 +3311,10 @@ gates:
   - experiments/fare_prediction/
   - configs/experiment/
   - configs/dataset/test.yaml
+  - scripts/
   findings:
   - mypy covers src/broadway ONLY; ruff covers just two project/ files — project/etl/process.py etc. lint/type-check in NO tier.
-  - pytest runs `tests/` only — project/tests/ never executes in any tier nor in ci.yml (untracked project/tests/test_ingest_*.py currently sit outside every gate).
+  - data-gate hole CLOSED at this landing: project/tests executes via project-tests in every FULL tier incl. CI (ci.yml:47 invokes the bare SSOT script); fast/static tiers still skip it by design.
   - probes validate the floor NUMBER as text, not enforcement behavior — no test proves a sub-95 cov run actually fails.
 - id: GATE-INFRA-93
   phase: infra-meta
@@ -3396,7 +3402,7 @@ gates:
 - id: GATE-INFRA-96
   phase: infra-meta
   order: 113
-  owner: scripts/ship.sh:17 ship gate (`if ! bash scripts/run_local_ci.sh` → refuse :17-22; push :25) mirrored by .git/hooks/pre-push:5
+  owner: 'scripts/ship.sh:24 ship gate (`if ! bash scripts/run_local_ci.sh` → refuse :24-27; single push later) + WAVE-A teeth insertions (:15-19 tier_gate sourcing, :31-40 L1 hook guard, :42-53 TIER-GATE batch) mirrored by .git/hooks/pre-push:5'
   inputs:
   - argv remote/refspec (default origin sklearn:sklearn :14)
   - full-tier verdict of scripts/run_local_ci.sh
@@ -3407,6 +3413,9 @@ gates:
   - push lines reachable ONLY on run_local_ci.sh exit 0 — keyword-grep gating and newline-chained pushes structurally impossible (born of two 2026-08-24 push-on-red recurrences)
   - set -euo pipefail (:8); no override flag exists by design
   - hook re-runs the SAME full tier fail-closed server-side-of-your-fingers; sole bypass is visible `git push --no-verify`
+  - 'WAVE-A teeth ① insertions: sources scripts/tier_gate.sh (:17); L1 pre-push hook guard VERIFIES (never auto-installs) that .git/hooks/pre-push execs run_local_ci.sh, refusing with manual-install remediation naming agents/contracts/hooks-pre-push.template (:31-40); TIER-GATE runs tg_run over the origin/$branch..HEAD unpushed batch — atomic all-or-nothing, skipped with a SHIP NOTICE when no remote baseline exists (:42-53)'
+  - 'TIER-GATE grammar custody lands HERE as FILE-law co-aspect (distinct symbols, one ship-path artifact): scripts/tier_gate.sh tg_* library (_TG_TIERS :20, tg_check_message :64, tg_run :96) implements the D35(2) two-key rule — Tier ∈ {FULL,FAST,STATIC,DOCS} case-sensitive; FULL resolves Reviewer: against the EVENTS table AT THAT SHA plus the event-id echoed in the message'
+  - 'POSTURE RIDER (mint deferred): tier_gate.sh has zero automated validation (no test executes any tg_*) and scripts/deadcode_census.py (teeth ⑥, advisory-never-gate by ratified law) is wired to NO tier — a dedicated registry row is OWED but ids are EXHAUSTED through 153 (burned incl.) under the suite''s BAND_RANGES law; minting awaits the band-range extension owned outside ledger custody'
   touched_by:
   - agents/contracts/MAIN_AGENT_CONTRACT.md §Ship-path law (:148-155)
   - agents/ledger/DECISIONS.md D24/D25 (ship semantics + PUSH-STANDING-GO compensating control i)
@@ -3414,11 +3423,13 @@ gates:
   if_changed:
   - scripts/run_local_ci.sh
   - scripts/ship.sh
+  - scripts/tier_gate.sh
   - .git/hooks/pre-push
+  - agents/contracts/hooks-pre-push.template
   - REFSPEC arguments
   findings:
   - ship.sh has zero automated validation — no test imports or executes it; its exit-code law lives entirely in contract prose + DECISIONS.
-  - .git/hooks/pre-push is UNTRACKED machine-local (under .git/, invisible to git status; core.hooksPath unset) — every fresh clone ships with NO local gate; the "tracked counterpart same law" claim is procedural only.
+  - '.git/hooks/pre-push remains UNTRACKED machine-local (under .git/, invisible to git status; core.hooksPath unset) — every fresh clone ships with NO local gate; WAVE-A adds the tracked SSOT template (agents/contracts/hooks-pre-push.template) plus a ship-path REFUSAL when the live hook is missing/stale (:31-40), so the gap is now detected-and-named instead of procedural-only.'
 - id: GATE-INFRA-97
   phase: infra-meta
   order: 114
@@ -3484,18 +3495,19 @@ gates:
 - id: GATE-INFRA-99
   phase: infra-meta
   order: 116
-  owner: .github/workflows/ci.yml:47 platform job step "Platform gates (SSOT)" (delegation law :42-45; docker-only checks :53-104; build-and-boot :132; CD :246; concurrency :11-13)
+  owner: '.github/workflows/ci.yml:47 platform job step "Platform gates (SSOT)" (delegation law :42-46; docker-only checks :51-66; build-and-boot :151; CD job :310; concurrency :11-13)'
   inputs:
   - push/PR to main|taxi|sklearn (:3-7)
   - fetch-depth 0 for parity tips (:28)
   - uv sync --all-extras --frozen (:40)
   - bash scripts/run_local_ci.sh (no args ⇒ full tier)
   outputs:
-  - platform job verdict (parity+ruff+mypy+configs+pytest+cov≥95 via SSOT script)
-  - 'docker-only verdicts: sh -n + shellcheck k8s/optuna/*.sh (:57-62), kubeconform -strict k8s/optuna/ minus kind-config.yaml (:71-80), orchestrator dry-run render+kubeconform (:85-104)'
-  - sha-tagged images built/boot-tested; CD publishes bit-for-bit verified tarball to GHCR on main/taxi pushes only (:217-303)
+  - platform job verdict (parity+ruff+mypy+configs+shell-scripts+pytest+cov≥95+project-tests via SSOT script)
+  - 'docker-only verdicts: sh -n + shellcheck k8s/optuna/*.sh AND scripts/*.sh (:57-66), kubeconform -strict k8s/optuna/ minus kind-config.yaml (:79), orchestrator dry-run render+kubeconform (:104)'
+  - sha-tagged images built/boot-tested; CD publishes bit-for-bit verified tarball to GHCR on main/taxi pushes only (:290-376)
   transforms:
   - gate list lives in the SCRIPT — editing YAML alone reopens two-source drift (D16d C7 rejection, header :3-4)
+  - 'Shell-scripts step (:57-66) mirrors the SSOT script''s shell-scripts gate COMMAND-IDENTICALLY (for-loop sh -n + shellcheck over BOTH glob dirs; gate-divergence-law comment :55-56) — edit the SCRIPT, never YAML (D16a/D16d)'
   - cancel-in-progress:true keyed workflow-ref cancels superseded runs (:11-13); CD job separately cancel-in-progress:false serialized per ref (:255-257)
   - only broadway-base cached, key hashes deps AND src/project code (:148) — prevents stale-code base + mislabeled-provenance ship
   touched_by:
@@ -3788,13 +3800,13 @@ gates:
 - id: GATE-INFRA-144
   phase: infra-meta
   order: 133
-  owner: '.github/workflows/ci.yml:282 Push verified images to GHCR (CD single writer)'
+  owner: '.github/workflows/ci.yml:355 Push verified images to GHCR (CD single writer)'
   inputs:
   - verified image builds from the CD job
   outputs:
   - 'registry writes: broadway-optuna-worker + mlflow-server ONLY, $sha always; :latest main-only; :taxi taxi-only'
   transforms:
-  - 'writer identity defined and serialized (packet H #144): CD job needs:[platform, build-and-boot], concurrency-serialized; push/tag block verified at ci.yml:281-301'
+  - 'writer identity defined and serialized (packet H #144): CD job needs:[platform, build-and-boot], concurrency-serialized; push/tag block verified at ci.yml:355-376'
   - 'VERSION-CAP LAW lands as creation-time law ON THE PUSH SITE (site persists while versions may or may not): mutable-tag writes are append-by-design; capping/pruning requires registry-side operations OUTSIDE repo reach — declare the cap and the unverifiability; do NOT mint teeth the repo cannot execute'
   touched_by: []
   validated_by: []
@@ -3837,10 +3849,28 @@ gates:
   if_changed:
   - cache-root export vocabulary
   findings: []
+- id: GATE-INFRA-147
+  phase: infra-meta
+  order: 136
+  owner: 'scripts/deadcode_census.py:1 module — teeth ⑥ DEADCODE-CENSUS advisory engine'
+  inputs:
+  - tracked *.py corpus via git ls-files (src/project/experiments/tests/scripts)
+  - pyproject [project.scripts] entrypoint table
+  outputs:
+  - data/processed/deadcode_census.md suspicion report (gitignored sink); stdout default
+  transforms:
+  - 'ADVISORY-ONLY LAW (D34 tripwire 1 adopted verbatim, wave-A dispatch): census files findings to the backlog; NEVER a red gate — measures suspicion, not guilt; exclusion classes derived, never hardcoded'
+  - 'engine: AST exact-token positional reference graph, substring-free; recursion/alias-safe after two scanner bug classes were fixed AGAINST live greps during delivery (ImportFrom alias invisibility; recursion-masked same-file refs) — true zero-reference count at HEAD eb9ea18 = 0; ledger-known same-module-only clusters confirmed (reports/audit.py render branch ×17, discover/qq.py ×6)'
+  - 'ruff gate scope covers scripts/ dir (GATE-INFRA-92); census itself stays OUTSIDE every red gate by this row''s law'
+  touched_by: []
+  validated_by: []
+  if_changed:
+  - deadcode census vocabulary
+  findings: []
 # --- BAND 81-OBJECT-CUSTODY (minted per slate §0; header law above) ------
 - id: GATE-CUST-147
   phase: object-custody
-  order: 136
+  order: 137
   owner: 'src/broadway/training/mlflow_utils.py:162 promote_candidate()'
   inputs:
   - 'model_uri + alias="champion"'
@@ -3859,7 +3889,7 @@ gates:
   findings: []
 - id: GATE-CUST-148
   phase: object-custody
-  order: 137
+  order: 138
   owner: 'src/broadway/training/mlflow_utils.py:163 register_model call sites'
   inputs:
   - candidate model_uri + dataset name
@@ -3875,7 +3905,7 @@ gates:
   findings: []
 - id: GATE-CUST-149
   phase: object-custody
-  order: 138
+  order: 139
   owner: 'experiments/mlflow/03_optuna_worker.py:111 set_tag trio (model/study/seed) + hpo callback tags + battle writers'
   inputs:
   - every mlflow.set_tag call across the independent writer sites
@@ -3892,7 +3922,7 @@ gates:
   findings: []
 - id: GATE-CUST-150
   phase: object-custody
-  order: 139
+  order: 140
   owner: 'src/broadway/training/mlflow_utils.py:59 set_experiment auto-create chokepoint (inside setup_mlflow :54-63)'
   inputs:
   - experiment_name argument at setup time
@@ -3907,7 +3937,7 @@ gates:
   findings: []
 - id: GATE-CUST-151
   phase: object-custody
-  order: 140
+  order: 141
   owner: 'k8s/optuna/lifecycle.sh:149 dump_state() snapshot generations (keep-N cap) + training-plane registry-prune policy (non-champion versions)'
   inputs:
   - registry versions + $BACKUP_DIR snapshot generations
@@ -3924,7 +3954,7 @@ gates:
   findings: []
 - id: GATE-CUST-152
   phase: object-custody
-  order: 141
+  order: 142
   owner: 'experiments/mlflow/03_optuna_worker.py:106 optuna_{model} run-name convention (+ {study} trial {n}, battle names)'
   inputs:
   - every run-name emission across optuna/battle/callback writers
