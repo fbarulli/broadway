@@ -17,13 +17,23 @@ spec:
           image: broadway:latest
           command:
             - uvicorn
-            - inference.api:app
+            - broadway.inference.api:app
             - --host
             - "0.0.0.0"
             - --port
             - "8000"
           ports:
             - containerPort: 8000
+          # api.py loads its model from the MLflow registry (module docstring);
+          # MLFLOW_TRACKING_URI is the documented interpolation source of
+          # configs/environment/production.yaml (mlflow_tracking_uri) and the
+          # mlflow client's native variable.
+          env:
+            - name: MLFLOW_TRACKING_URI
+              valueFrom:
+                configMapKeyRef:
+                  name: environment
+                  key: mlflow_tracking_uri
 ---
 apiVersion: v1
 kind: Service
@@ -53,4 +63,6 @@ spec:
         name: cpu
         target:
           type: Utilization
-          averageUtilization: 70
+          # Aligned with the documented api_hpa_cpu_threshold (80) in
+          # configs/environment/production.yaml — the two values must agree.
+          averageUtilization: 80

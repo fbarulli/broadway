@@ -69,16 +69,31 @@ jobs:
 
       # CI-only — named in scripts/run_local_ci.sh header.
       # Manifests must be structurally valid Kubernetes (no cluster needed).
+      # Scope covers BOTH stacks: k8s/optuna/ AND the top-level manifests
+      # (api/mlflow/postgres/train-job). train-job.yaml carries un-rendered
+      # Helm placeholders ({{ .Values.* }}) that no YAML parser accepts, so it
+      # is rendered to dummies first — its structure still gets checked.
       - name: Manifests (kubeconform)
         run: |
+          set -euo pipefail
+
+          mkdir -p "${RUNNER_TEMP}/manifests"
+          sed 's/{{[^}]*}}/ci-placeholder/g' k8s/train-job.yaml \
+            > "${RUNNER_TEMP}/manifests/train-job.yaml"
+
           docker run --rm \
             -v "$PWD:/work" \
+            -v "${RUNNER_TEMP}/manifests:/rendered" \
             -w /work \
             ghcr.io/yannh/kubeconform:v0.6.7 \
             -strict \
             -summary \
             -ignore-filename-pattern "kind-config\\.yaml" \
-            k8s/optuna/
+            k8s/optuna/ \
+            k8s/api-deployment.yaml \
+            k8s/mlflow-deployment.yaml \
+            k8s/postgres-deployment.yaml \
+            /rendered/train-job.yaml
 
       # CI-only — named in scripts/run_local_ci.sh header.
       # Orchestrator dry-run: render the worker Jobs for the HPO spec's models
@@ -133,7 +148,9 @@ jobs:
   build-and-boot:
     name: Build & Boot (docker images — no cluster)
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # 30min: the root platform image adds a full uv sync on top of the
+    # optuna trio (no docker layer cache between runs).
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with:
@@ -187,6 +204,32 @@ jobs:
             -t mlflow-server:${{ github.sha }} \
             .
 
+      # Top-level-manifest images — the tags the top-level manifests demand
+      # must always have a build source in-tree: root Dockerfile → broadway
+      # (k8s/api-deployment.yaml + k8s/train-job.yaml), docker/mlflow →
+      # broadway-mlflow (k8s/mlflow-deployment.yaml), docker/postgres →
+      # broadway-postgres (k8s/postgres-deployment.yaml + docker-compose.yml).
+      - name: Build platform image (root Dockerfile)
+        run: |
+          docker build \
+            -f Dockerfile \
+            -t broadway:${{ github.sha }} \
+            .
+
+      - name: Build manifest mlflow image (docker/mlflow)
+        run: |
+          docker build \
+            -f docker/mlflow/Dockerfile \
+            -t broadway-mlflow:${{ github.sha }} \
+            .
+
+      - name: Build manifest postgres image (docker/postgres)
+        run: |
+          docker build \
+            -f docker/postgres/Dockerfile \
+            -t broadway-postgres:${{ github.sha }} \
+            docker/postgres
+
       # Imports _common -> project.working (working.yaml), resolves
       # HPO_CONFIG_PATH via parents[] at the mirrored pod path, parses the HPO
       # spec and builds CLI choices. Catches the layout/import bug class.
@@ -211,6 +254,32 @@ jobs:
 
       - name: Boot — mlflow image health
         run: docker run --rm --entrypoint python mlflow-server:${{ github.sha }} -c "import mlflow; print('mlflow', mlflow.__version__)"
+
+      # IMPORT-PATH WIRING ONLY — NOT A SERVING CHECK. The api target
+      # `broadway.inference.api:app` (k8s/api-deployment.yaml) is a DEFERRED
+      # STUB: src/broadway/inference/api.py is docstring-only and exposes NO
+      # ASGI app object (as of 2026-08-25, human ruling #4, eight-packet
+      # batch), so the real serving command `uvicorn
+      # broadway.inference.api:app` CANNOT start today. These checks assert
+      # only that the manifest's module path resolves under the image's
+      # PYTHONPATH=/app/src and that the invoked binaries exist; they
+      # deliberately do NOT claim an endpoint serves. A first real endpoint
+      # requires a future product ruling.
+      # The CLI check guards the import chain of the exact entrypoint
+      # k8s/train-job.yaml invokes (the root Dockerfile runtime stage
+      # installs libgomp1 for lightgbm; it once shipped without it, leaving
+      # the image unable to run its own CMD).
+      - name: Platform image — import-path wiring + entrypoint presence (not a serving check)
+        run: |
+          docker run --rm broadway:${{ github.sha }} python -c "import broadway.inference.api; print('module path OK — wiring only; ASGI app object DEFERRED (stub)')"
+          docker run --rm broadway:${{ github.sha }} uvicorn --version
+          docker run --rm broadway:${{ github.sha }} ds-pipeline --help > /dev/null
+
+      - name: Boot — manifest mlflow image health
+        run: docker run --rm --entrypoint python broadway-mlflow:${{ github.sha }} -c "import mlflow; print('mlflow', mlflow.__version__)"
+
+      - name: Boot — manifest postgres init script present
+        run: docker run --rm --entrypoint ls broadway-postgres:${{ github.sha }} /docker-entrypoint-initdb.d/init.sql
 
       # Protected refs ONLY: package the exact sha-tagged images that just
       # passed boot tests, so cd publishes bit-for-bit what was verified —

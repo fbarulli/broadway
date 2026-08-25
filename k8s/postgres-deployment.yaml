@@ -1,3 +1,35 @@
+# Non-secret environment surface for the top-level stack — the interpolation
+# sources behind configs/environment/production.yaml's ${VARS}. Every value is
+# derived from landed surfaces: data_dir → train PVC mount
+# (k8s/train-job.yaml); mlflow_tracking_uri → Service `mlflow`
+# (k8s/mlflow-deployment.yaml, same value as k8s/optuna/configmap.yaml);
+# database_host → Service `postgres` below; database_port → docker-compose.yml
+# default ${DATABASE_PORT:-5432}; database_user/name → documented development
+# defaults (configs/environment/development.yaml).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: environment
+data:
+  data_dir: /workspace/data
+  mlflow_tracking_uri: http://mlflow:5000
+  database_user: postgres
+  database_name: broadway
+  database_host: postgres
+  database_port: "5432"
+---
+# Credentials are never committed (HC-1 void precedent): placeholder skeleton
+# following the k8s/optuna/secret.yaml template convention. Populate out of
+# band before apply, e.g. kubectl create secret generic environment-secrets
+# --from-literal=database_password=...
+apiVersion: v1
+kind: Secret
+metadata:
+  name: environment-secrets
+type: Opaque
+stringData:
+  database_password: CHANGE_ME_BEFORE_APPLY
+---
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -26,8 +58,8 @@ spec:
                   key: database_user
             - name: POSTGRES_PASSWORD
               valueFrom:
-                configMapKeyRef:
-                  name: environment
+                secretKeyRef:
+                  name: environment-secrets
                   key: database_password
             - name: POSTGRES_DB
               valueFrom:

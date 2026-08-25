@@ -1,4 +1,9 @@
 # Docker build context exclusions — keep the worker image lean.
+# .env + deepseek-harness/ hold live credentials/harness material — never
+# stream them into a build context (Scout-1 F4, 2026-08-25).
+.env
+deepseek-harness/
+artifacts/
 .git
 .venv
 __pycache__

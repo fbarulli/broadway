@@ -8,9 +8,10 @@ spec:
       containers:
         - name: train
           image: broadway:latest
+          # The broadway image bakes the completed venv onto PATH
+          # (Dockerfile: ENV PATH=/app/.venv/bin:...) and ships no `uv`
+          # binary in its runtime stage — invoke the console script directly.
           command:
-            - uv
-            - run
             - ds-pipeline
             - train
             - --dataset
@@ -19,4 +20,69 @@ spec:
             - "{{ .Values.experiment }}"
             - --environment
             - production
+          # configs/environment/production.yaml interpolates exactly these
+          # seven OS vars via os.path.expandvars
+          # (src/broadway/config/resolver.py); unset vars pass through
+          # literally and database_port int coercion fails at config load.
+          # Every source below is defined in this tree — ConfigMap
+          # `environment` and Secret `environment-secrets` in
+          # k8s/postgres-deployment.yaml. No literal values here.
+          env:
+            - name: DATA_DIR
+              valueFrom:
+                configMapKeyRef:
+                  name: environment
+                  key: data_dir
+            - name: MLFLOW_TRACKING_URI
+              valueFrom:
+                configMapKeyRef:
+                  name: environment
+                  key: mlflow_tracking_uri
+            - name: DATABASE_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: environment
+                  key: database_user
+            - name: DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: environment-secrets
+                  key: database_password
+            - name: DATABASE_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: environment
+                  key: database_name
+            - name: DATABASE_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: environment
+                  key: database_host
+            - name: DATABASE_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: environment
+                  key: database_port
+            # discover/module.py defaults these to cwd-relative "dataset"/
+            # "artifacts"; the documented overrides pin both write roots onto
+            # the durable claim mounted below.
+            - name: BROADWAY_DATASET_DIR
+              value: /workspace/dataset
+            - name: BROADWAY_ARTIFACTS_DIR
+              value: /workspace/artifacts
+          volumeMounts:
+            - name: train-data
+              mountPath: /workspace
       restartPolicy: Never
+---
+# Durable storage for pipeline writes (DATA_DIR data, dataset configs,
+# artifacts) — cwd-relative writes would otherwise die with the pod.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: train-data
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 10Gi
