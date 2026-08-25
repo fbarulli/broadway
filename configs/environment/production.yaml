@@ -2,7 +2,6 @@ log_level: WARNING
 data_dir: ${DATA_DIR}
 raw_subdir: raw
 processed_subdir: processed
-download_chunk_size: 8192
 mlflow_tracking_uri: ${MLFLOW_TRACKING_URI}
 database_user: ${DATABASE_USER}
 database_password: ${DATABASE_PASSWORD}

@@ -16,7 +16,6 @@ _ENVIRONMENT = {
     "data_dir": "data",
     "raw_subdir": "raw",
     "processed_subdir": "processed",
-    "download_chunk_size": 8192,
     "mlflow_tracking_uri": "http://localhost:5000",
     "database_user": "postgres",
     "database_password": "postgres",

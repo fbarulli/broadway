@@ -64,7 +64,6 @@ class EnvironmentConfig(BaseModel):
     data_dir: str
     raw_subdir: str
     processed_subdir: str
-    download_chunk_size: int
     mlflow_tracking_uri: str
     database_user: str
     database_password: str

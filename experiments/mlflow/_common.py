@@ -153,7 +153,6 @@ def battle_pipeline_config() -> PipelineConfig:
         data_dir="data",
         raw_subdir="raw",
         processed_subdir="processed",
-        download_chunk_size=8192,
         mlflow_tracking_uri=str(MLRUNS),
         database_user="user",
         database_password="pass",

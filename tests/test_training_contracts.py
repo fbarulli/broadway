@@ -178,7 +178,6 @@ def _make_config(tmp_path: Path) -> PipelineConfig:
         data_dir=str(tmp_path / "data"),
         raw_subdir="raw",
         processed_subdir="processed",
-        download_chunk_size=8192,
         mlflow_tracking_uri=str(tmp_path / "mlruns"),
         database_user="user",
         database_password="pass",
