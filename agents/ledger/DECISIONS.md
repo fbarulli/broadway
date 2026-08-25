@@ -471,3 +471,6 @@ D32(1)-follow-up D3: trailer-validation grammar = STATE.md ## EVENTS row cited i
 (4) Image tags: :latest stands for this landing; sha/registry pinning later (existing CD $sha tags already carry the audit trail).
 TIER-GATE precondition SATISFIED by (2); mechanization order ① cleared to start.
 | Ruling: human, this session |
+
+## D36 — REVIEWER-AUTHORITY REGISTRATION
+Reviewer-authority registration: 2d9ab1a1 entered into ## EVENTS as grandfathered harness-era authority (out-of-band verification; enables TIER-GATE clause (a)). | Ruling: human, this session |

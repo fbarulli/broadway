@@ -174,7 +174,7 @@ GitHub Actions API; each mirrored row cites the query class that surfaced it.
 ### COLDPROBE-1 — spec (DECISIONS.md D23 :283-286)
 One-byte src push on sklearn tip, fired ONLY after BOTH hold: (i) XDIST-1b
 accepted [LANDED b7086b0, 2026-08-24T17:17:26Z]; (ii) >=5 post-landing GREEN
-Actions runs on branch sklearn (LITERAL bar; currently 3/5 — no window-reset
+Actions runs on branch sklearn (LITERAL bar; currently 4/5 — no window-reset
 rule was ever ruled). Per firing record {push sha8, cold_bb_s,
 cache_hit=false, queue_s} here + a D23 addendum note. Machinery does NOT
 exist in-tree yet (~5 runner-min; Actions-API wall-time read).
@@ -190,8 +190,9 @@ exist in-tree yet (~5 runner-min; Actions-API wall-time read).
 | 2026-08-25 | 0d30eb2 | failure | no |
 | 2026-08-25 | c4f3018 | failure (shellcheck SC2015 teardown.sh:24 — repaired in-tree this cycle) | no |
 | 2026-08-25 | 1cf33b5 | success (streak ends; shellcheck class structurally repaired by the CI-PARITY commit) | yes (3/5) |
+| 2026-08-25 | eb9ea18 | success (eight-packet batch; post-push monitor stage live and exercised — SHIP MONITOR OK) | yes (4/5) |
 
-STATUS: **UNMET — 3/5 greens → probe HELD.** The next two green tips
+STATUS: **UNMET — 4/5 greens → probe HELD.** The next green tip
 satisfy the literal bar; re-derive before firing:
 `gh api 'repos/fbarulli/broadway/actions/runs?branch=sklearn&per_page=30' --jq '[.workflow_runs[] | select(.created_at > "2026-08-24T17:17:26Z" and .conclusion == "success")] | length'`
 
@@ -208,7 +209,14 @@ six rows are pilot backfills entered via owner gh-api writes (two genesis
 events, D19-D21 backfills, custody-baseline); the five 2026-08-24T20:43Z
 rows are CHANGE BOARD (#5) seeds R1-R5 posted this session. Each row's
 `type` keeps its per-event ruling class, one unique row per legacy
-narrative id.
+narrative id. One further class exists: reviewer-authority rows registering
+HARNESS-ERA AGENT AUTHORITIES so the ratified TIER-GATE grammar can resolve
+Reviewer:-trailer verdicts; such a row carries NO GitHub comment provenance
+(out-of-band verification only, grandfathered per the agent-id namespace
+disposition lean), and its id pins the canonical posted form: sha256
+first-8 over the row line with the id cell itself blanked — byte form:
+single-space cells (`| |`), no trailing newline; any other blanking
+reproduces a DIFFERENT hash and must be re-pinned.
 
 | event-id | issue | comment-id | created_at | type | supersedes |
 |---|---|---|---|---|---|
@@ -252,3 +260,4 @@ narrative id.
 | b0df65f1 | issues/5#issuecomment-5407856241 | 5407856241 | 2026-08-25T08:51:03Z | board-row | e277f63a |
 | a886ae68 | issues/5#issuecomment-5407856844 | 5407856844 | 2026-08-25T08:51:06Z | board-row | 392fa146 |
 | 3ca96ffd | issues/5#issuecomment-5408050227 | 5408050227 | 2026-08-25T09:05:32Z | board-row | ebf1c913 |
+| 39de4245 | reviewer-authority:2d9ab1a1 — HARNESS-ERA AGENT AUTHORITY, grandfathered per the agent-id namespace disposition lean; verified out-of-band via its two delivered read-only review reports this session (ten-ruling batch + eight-packet batch); scope: valid Reviewer:-trailer resolution target for TIER-GATE | 0 | 2026-08-25T14:48:29Z | reviewer-authority | - |
