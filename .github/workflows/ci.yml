@@ -48,19 +48,22 @@ jobs:
 
       # Local parity exists since 2026-08-25 (shell-scripts gate inside
       # scripts/run_local_ci.sh); CI remains the enforcement tier.
-      # k8s lifecycle + entrypoint scripts must at least be valid shell; the
-      # runner ships shellcheck (syntax-level CI — the deployment itself is a
-      # manual on-demand run via k8s/optuna/lifecycle.sh).
+      # Shell scripts (k8s/optuna lifecycle + entrypoint AND repo scripts/)
+      # must at least be valid shell; the runner ships shellcheck (syntax-
+      # level CI — the deployment itself is a manual on-demand run via
+      # k8s/optuna/lifecycle.sh).
+      # Gate-divergence law: this command shape MUST stay identical to the
+      # 'shell-scripts' gate in scripts/run_local_ci.sh.
       - name: Shell scripts (sh -n + shellcheck)
         shell: bash
         run: |
           set -euo pipefail
-          for f in k8s/optuna/*.sh; do
+          for f in k8s/optuna/*.sh scripts/*.sh; do
             sh -n "$f"
           done
 
           # Don't silently weaken CI if shellcheck disappears from the runner.
-          shellcheck k8s/optuna/*.sh
+          shellcheck k8s/optuna/*.sh scripts/*.sh
 
       # CI-only — named in scripts/run_local_ci.sh header.
       # Pull once; reuse the exact kubeconform image in later checks.
@@ -123,7 +126,7 @@ jobs:
       - name: Experiment smoke (taxi branch only — experiments.py)
         if: github.ref == 'refs/heads/taxi' || (github.event_name == 'pull_request' && github.base_ref == 'taxi')
         env:
-          MPLCONFIGDIR: ${{ runner.temp }}/mplconfig
+          MPLCONFIGDIR: "${{ runner.temp }}/mplconfig"
         run: uv run python experiments.py verify
 
   # CI-only — named in scripts/run_local_ci.sh header.
