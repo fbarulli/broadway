@@ -31,6 +31,16 @@ tg_events_has() {
   printf '%s\n' "$1" | grep -Eq "^\|[[:space:]]*$2[[:space:]]*\|"
 }
 
+# Resolution-via-authority-row (D35(2) "resolves iff row ... cited"): the
+# verdict token resolves iff it IS a row id OR it occurs inside the EVENTS
+# section body — i.e. an authority-class registration row whose stated scope
+# is "valid Reviewer:-trailer resolution target". Unregistered ids still
+# fail closed; registry-context occurrence is legal hex discipline.
+tg_events_resolves() {
+  tg_events_has "$@" && return 0
+  printf '%s\n' "$1" | grep -Eq "(^|[^0-9a-fA-F])$2([^0-9a-fA-F]|$)"
+}
+
 # FULL-tier reviewer-verdict resolution; echoes a refusal reason, '' iff resolved.
 _tg_reviewer_reason() {
   local reviewer token
@@ -48,8 +58,8 @@ _tg_reviewer_reason() {
       ;;
   esac
   token="$(printf '%s' "$token" | tr 'A-F' 'a-f')"
-  if ! tg_events_has "$1" "$token"; then
-    echo "reviewer verdict $token is NOT a row id in $_TG_EVENTS_FILE $_TG_EVENTS_HEADER at that commit"
+  if ! tg_events_resolves "$1" "$token"; then
+    echo "reviewer verdict $token does NOT resolve in $_TG_EVENTS_FILE $_TG_EVENTS_HEADER at that commit (no row id, no authority-row registration)"
     return 0
   fi
   case "$2" in

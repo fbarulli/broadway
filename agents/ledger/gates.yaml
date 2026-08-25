@@ -1,6 +1,6 @@
 # Gate registry SSOT — hand-maintained; the {01..09} gate fragments it consolidated predate git custody.
 meta:
-  head: 977d530
+  head: 88e2931
   assembled: '2026-08-24'
   source_fragments:
   - agents/ledger/gates/01-ingest.md
@@ -3414,7 +3414,7 @@ gates:
   - set -euo pipefail (:8); no override flag exists by design
   - hook re-runs the SAME full tier fail-closed server-side-of-your-fingers; sole bypass is visible `git push --no-verify`
   - 'WAVE-A teeth ① insertions: sources scripts/tier_gate.sh (:17); L1 pre-push hook guard VERIFIES (never auto-installs) that .git/hooks/pre-push execs run_local_ci.sh, refusing with manual-install remediation naming agents/contracts/hooks-pre-push.template (:31-40); TIER-GATE runs tg_run over the origin/$branch..HEAD unpushed batch — atomic all-or-nothing, skipped with a SHIP NOTICE when no remote baseline exists (:42-53)'
-  - 'TIER-GATE grammar custody lands HERE as FILE-law co-aspect (distinct symbols, one ship-path artifact): scripts/tier_gate.sh tg_* library (_TG_TIERS :20, tg_check_message :64, tg_run :96) implements the D35(2) two-key rule — Tier ∈ {FULL,FAST,STATIC,DOCS} case-sensitive; FULL resolves Reviewer: against the EVENTS table AT THAT SHA plus the event-id echoed in the message'
+  - 'TIER-GATE grammar custody lands HERE as FILE-law co-aspect (distinct symbols, one ship-path artifact): scripts/tier_gate.sh tg_* library (_TG_TIERS :20, tg_check_message :64, tg_run :96) implements the D35(2) two-key rule — Tier ∈ {FULL,FAST,STATIC,DOCS} case-sensitive; FULL resolves Reviewer: against the EVENTS section AT THAT SHA plus the event-id echoed in the message. RESOLUTION SEMANTICS (fix-forward commit after the gate refused its own maiden batch): tg_events_resolves accepts the token as a row id OR as an exact word occurrence inside the EVENTS body — i.e. via an authority-class registration row whose stated scope is "valid Reviewer:-trailer resolution target" (row 39de4245 registers 2d9ab1a1 exactly so); unregistered ids still fail closed'
   - 'POSTURE RIDER (mint deferred): tier_gate.sh has zero automated validation (no test executes any tg_*) and scripts/deadcode_census.py (teeth ⑥, advisory-never-gate by ratified law) is wired to NO tier — a dedicated registry row is OWED but ids are EXHAUSTED through 153 (burned incl.) under the suite''s BAND_RANGES law; minting awaits the band-range extension owned outside ledger custody'
   touched_by:
   - agents/contracts/MAIN_AGENT_CONTRACT.md §Ship-path law (:148-155)
