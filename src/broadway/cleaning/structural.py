@@ -4,7 +4,10 @@ Also the single owner of the coercion-evidence record (FIX_4 G1 / Option E):
 ``parse_numeric``'s astype-back-to-declared branch records every coercion event
 into a caller-supplied collector instead of silently restoring the dtype, and
 etl surfaces the collected records with the run's evidence (same channel family
-as JoinAudit/LookupValueAudit).
+as JoinAudit/LookupValueAudit). Fractional values bound for an integer dtype
+refuse the repair entirely (FX-A05): they are recorded as a ``ParseFailure``
+through the same channel as unparseable values and the astype-back is skipped,
+leaving the column float64 so the downstream dtype gate fails loud.
 """
 
 from __future__ import annotations
@@ -58,6 +61,25 @@ def parse_datetime(series: pd.Series, column: str) -> tuple[pd.Series, ParseFail
     return coerced, failure
 
 
+def _fractional_refusal(
+    series: pd.Series,
+    coerced: pd.Series,
+    column: str,
+    target_dtype: str,
+) -> ParseFailure | None:
+    """Failure for non-integral values an integer astype would silently truncate."""
+    fractional = coerced.notna() & (coerced % 1 != 0)
+    if not fractional.any():
+        return None
+    examples = [str(v) for v in series[fractional].dropna().unique()[:5]]
+    return ParseFailure(
+        column=column,
+        count=int(fractional.sum()),
+        examples=examples,
+        target_dtype=target_dtype,
+    )
+
+
 def parse_numeric(
     series: pd.Series,
     column: str,
@@ -78,6 +100,9 @@ def parse_numeric(
     if target_dtype in ("int8", "int16", "int32", "int64") and not coerced.isna().any():
         arriving_dtype = str(series.dtype)
         if arriving_dtype != target_dtype:
+            refusal = _fractional_refusal(series, coerced, column, target_dtype)
+            if refusal is not None:
+                return coerced, refusal
             coerced = coerced.astype(target_dtype)
             if coercions is not None:
                 coercions.append(

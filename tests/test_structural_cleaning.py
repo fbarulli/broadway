@@ -77,6 +77,47 @@ def test_parse_numeric_failure_stays_float() -> None:
     assert failure is not None
 
 
+def test_parse_numeric_fractional_records_failure_and_stays_float() -> None:
+    series = pd.Series(["1.7", "3"])
+    coerced, failure = parse_numeric(series, "num", "int64")
+    assert coerced.dtype == "float64"
+    assert coerced.tolist() == [1.7, 3.0]
+    assert failure is not None
+    assert failure.column == "num"
+    assert failure.count == 1
+    assert failure.target_dtype == "int64"
+    assert failure.examples == ["1.7"]
+
+
+def test_parse_numeric_negative_fraction_refuses_toward_zero() -> None:
+    series = pd.Series(["-1.5"])
+    coerced, failure = parse_numeric(series, "num", "int64")
+    assert coerced.dtype.kind == "f"
+    assert coerced.tolist() == [-1.5]
+    assert failure is not None
+    assert failure.count == 1
+    assert failure.examples == ["-1.5"]
+
+
+def test_parse_numeric_infinity_records_failure_instead_of_raising() -> None:
+    series = pd.Series(["inf"])
+    coerced, failure = parse_numeric(series, "num", "int64")
+    assert coerced.dtype.kind == "f"
+    assert failure is not None
+    assert failure.count == 1
+    assert failure.examples == ["inf"]
+
+
+def test_parse_numeric_huge_float_precision_loss_refused() -> None:
+    series = pd.Series(["2251799813685247.5"])  # 2**51 - 0.5: last exact half
+    coerced, failure = parse_numeric(series, "num", "int64")
+    assert coerced.iloc[0] == 2251799813685247.5
+    assert coerced.dtype.kind == "f"
+    assert failure is not None
+    assert failure.count == 1
+    assert failure.examples == ["2251799813685247.5"]
+
+
 def test_canonicalize_coerces_numeric() -> None:
     df = pd.DataFrame(
         {

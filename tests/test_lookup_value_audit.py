@@ -56,41 +56,94 @@ def _column(audit, name: str):
 def test_unmatched_rows_excluded_from_null_count() -> None:
     audit = _audit()
     district = _column(audit, "district")
-    assert district is not None
+
+    # Fixture hand-count: matched rows are location_id 1-4 and only id 3
+    # carries a null district. Row 99 has no lookup hit, so its post-merge
+    # NaN must NOT register -- a bare isna().sum() over the merged frame
+    # would report 2.
+    assert district.null_count == 1
 
 
 def test_null_count_counts_only_matched_null_values() -> None:
     audit = _audit()
     district = _column(audit, "district")
-    assert district is not None
     zone = _column(audit, "Zone")
+
+    # Matched districts are North, Unknown, None, South -> exactly one
+    # matched null; every matched Zone value is populated.
+    assert district.null_count == 1
     assert zone.null_count == 0
 
 
 def test_sentinel_counts_only_configured_sentinels() -> None:
-    audit = _audit(sentinels=["Unknown"])
+    audit = _audit(sentinels=["Unknown", "NeverSeen"])
     district = _column(audit, "district")
-    assert district is not None
+    zone = _column(audit, "Zone")
+
+    # Matched districts: North, Unknown, None(null), South. "Unknown" hits
+    # exactly one row; configured-but-absent "NeverSeen" stays at zero;
+    # ordinary values must never grow sentinel buckets. Zone has no policy,
+    # so its bucket set stays empty.
+    assert district.sentinel_counts == {"Unknown": 1, "NeverSeen": 0}
+    assert zone.sentinel_counts == {}
 
 
 def test_affected_rate_is_affected_rows_over_matched() -> None:
     audit = _audit(sentinels=["Unknown"])
     district = _column(audit, "district")
-    assert district is not None
-    assert district is not None
+
+    # district: 1 matched null (id 3) + 1 sentinel hit (id 2) = 2 affected
+    # rows out of matched=4 -> rate 0.5. Dividing by all 5 merged rows
+    # would give 0.4, so the matched-only denominator is pinned too.
+    assert district.affected_rows == 2
+    assert district.affected_rate == 0.5
 
 
 def test_affected_lookup_keys_come_from_right_key() -> None:
-    audit = _audit(sentinels=["Unknown"])
+    lookup_df = pd.DataFrame(
+        {"Code": ["R1", "R2", "R3"], "district": ["North", "Bad", None]}
+    )
+    merged = pd.DataFrame(
+        {
+            "row_id": [10.0, 20.0, 30.0, 99.0],
+            "district": ["North", "Bad", None, None],
+        }
+    )
+    spec = LookupSpec(
+        path="lookup.csv",
+        key="Code",
+        value_policies={"district": LookupValuePolicy(sentinel_values=["Bad"])},
+    )
+    audit = audit_lookup_values(
+        df_merged=merged,
+        left_key="row_id",
+        lookup=spec,
+        lookup_df=lookup_df,
+        merged_names={"Code": "row_id", "district": "district"},
+        matched=3,
+    )
     district = _column(audit, "district")
-    assert district is not None
+
+    # Affected right-side rows: R2 (sentinel) and R3 (null). Left ids run
+    # 10..30, so echoing LEFT keys would yield ["20", "30"] and fail --
+    # the disjoint key spaces make the provenance observable.
+    assert district.affected_lookup_keys == ["R2", "R3"]
 
 
 def test_no_sentinels_yields_empty_counts() -> None:
     audit = _audit()
     district = _column(audit, "district")
-    assert district is not None
-    assert district is not None
+    zone = _column(audit, "Zone")
+
+    # Without a policy only the matched null (id 3) registers: empty
+    # sentinel bucket set, affected_rows == 1 (rate 0.25 over matched=4).
+    # The null's right key still appears -- null coverage does not depend
+    # on any sentinel policy; the unconfigured Zone column stays at zero.
+    assert district.sentinel_counts == {}
+    assert district.affected_rows == 1
+    assert district.affected_lookup_keys == ["3"]
+    assert zone.affected_rows == 0
+    assert zone.affected_lookup_keys == []
 
 
 def test_every_non_key_column_gets_an_entry() -> None:

@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 from pathlib import Path
 
 import pandera as pa
@@ -12,9 +13,16 @@ from broadway.config.schema import DatasetContract
 from broadway.contracts.pandera import build_raw_schema, pandera_dtype
 from project.etl import process_config as cfg
 from broadway.lineage.ids import node_id
+from broadway.lineage.models import TransformAudit
 from broadway.lineage.records import write_record
 
 logger = logging.getLogger(__name__)
+
+# Drop-reason grammar shared with broadway.etl.module._explained_rows:
+# reasons must end in "-<N> rows" so explained drops stay machine-parseable.
+_ROW_DELTA = re.compile(r"-(\d+) rows$")
+
+StageLedger = list[tuple[str, int]]
 
 
 def get_raw_files() -> list[Path]:
@@ -87,7 +95,11 @@ def rename_columns(df: pd.DataFrame) -> pd.DataFrame:
     return df.rename(columns=cfg.rename_map)
 
 
-def select_and_clean_columns(df: pd.DataFrame, contract: DatasetContract) -> pd.DataFrame:
+def select_and_clean_columns(
+    df: pd.DataFrame,
+    contract: DatasetContract,
+    ledger: StageLedger | None = None,
+) -> pd.DataFrame:
     cols = list(contract.columns.keys())
     missing = [c for c in cols if c not in df.columns]
     if missing:
@@ -98,6 +110,13 @@ def select_and_clean_columns(df: pd.DataFrame, contract: DatasetContract) -> pd.
     n_before = len(df)
     df = df[cols].dropna()
     logger.info(f"After dropna: {len(df)} ({n_before - len(df)} dropped)")
+    if ledger is not None:
+        ledger.append(("dropna", len(df)))
+    n_duplicates_before = len(df)
+    df = df.drop_duplicates()
+    logger.info(f"After drop_duplicates: {len(df)} ({n_duplicates_before - len(df)} dropped)")
+    if ledger is not None:
+        ledger.append(("duplicates", len(df)))
     return df
 
 
@@ -123,6 +142,55 @@ def _load_contract(dataset: str) -> DatasetContract:
     return DatasetContract(**yaml.safe_load(path.read_text()))
 
 
+def _stage_ledger(
+    df: pd.DataFrame, contract: DatasetContract
+) -> tuple[pd.DataFrame, StageLedger]:
+    """Run the ingest filter chain, recording (stage, rows_out) after each stage."""
+    stages: StageLedger = []
+    n_before = len(df)
+    df = sample_for_ci(df)
+    if len(df) < n_before:
+        stages.append(("ci_sample", len(df)))
+    logger.info("Filtering invalid trips...")
+    df = filter_valid_trips(df)
+    stages.append(("filter_valid_trips", len(df)))
+    df = compute_trip_duration(df, contract.target)
+    stages.append(("compute_trip_duration", len(df)))
+    df = filter_valid_duration(df, contract.target)
+    stages.append(("filter_valid_duration", len(df)))
+    df = filter_valid_passenger_count(df)
+    stages.append(("filter_valid_passenger_count", len(df)))
+    df = rename_columns(df)
+    df = select_and_clean_columns(df, contract, stages)
+    return df, stages
+
+
+def _ingest_audit(
+    rows_in: int,
+    stages: StageLedger,
+    columns_before: list[str],
+    columns_after: list[str],
+) -> TransformAudit:
+    rows_out = stages[-1][1] if stages else rows_in
+    dropped_total = max(0, rows_in - rows_out)
+    reasons: list[str] = []
+    previous = rows_in
+    for name, stage_rows in stages:
+        dropped = previous - stage_rows
+        if dropped > 0:
+            reasons.append(f"{name}: -{dropped} rows")
+        previous = stage_rows
+    explained = sum(int(m.group(1)) for r in reasons if (m := _ROW_DELTA.search(r)))
+    return TransformAudit(
+        rows_in=rows_in, rows_out=rows_out, reasons=reasons,
+        rows_dropped_total=dropped_total,
+        rows_dropped_unexplained=max(0, dropped_total - explained),
+        columns_before=columns_before, columns_after=columns_after,
+        columns_added=sorted(set(columns_after) - set(columns_before)),
+        columns_removed=sorted(set(columns_before) - set(columns_after)),
+    )
+
+
 def process_data(dataset: str) -> None:
     logger.info("Processing data...")
 
@@ -130,16 +198,10 @@ def process_data(dataset: str) -> None:
 
     files = get_raw_files()
     df = read_raw_data(files)
-    df = sample_for_ci(df)
+    rows_in = len(df)
+    columns_before = list(df.columns)
 
-    logger.info("Filtering invalid trips...")
-    df = filter_valid_trips(df)
-    df = compute_trip_duration(df, contract.target)
-    df = filter_valid_duration(df, contract.target)
-    df = filter_valid_passenger_count(df)
-
-    df = rename_columns(df)
-    df = select_and_clean_columns(df, contract)
+    df, stages = _stage_ledger(df, contract)
 
     validate_contract_schema(df, contract)
 
@@ -151,5 +213,6 @@ def process_data(dataset: str) -> None:
         "ingest",
         str(processed_path),
         [node_id("dataset", dataset)],
+        audit=_ingest_audit(rows_in, stages, columns_before, list(df.columns)),
     )
     logger.info("ingest lineage record written")
