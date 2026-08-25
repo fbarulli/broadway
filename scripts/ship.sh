@@ -7,7 +7,10 @@
 # Usage: bash scripts/ship.sh [remote] [refspec...]   (default: origin +refs/heads/sklearn)
 set -euo pipefail
 cd "$(dirname "$0")/.."
-export UV_CACHE_DIR="${UV_CACHE_DIR:-$PWD/.uv-cache}" MPLCONFIGDIR="${MPLCONFIGDIR:-$PWD/.mplconfig}"
+# Single sanctioned uv cache root: $HOME/.cache/uv — a repo-local UV_CACHE_DIR
+# export is prohibited (MAIN_AGENT_CONTRACT "Ledger & artifact hygiene").
+# MPLCONFIGDIR stays: matplotlib font-cache determinism for the plotting path.
+export MPLCONFIGDIR="${MPLCONFIGDIR:-$PWD/.mplconfig}"
 
 REMOTE="${1:-origin}"; shift || true
 REFSPECS=("$@")
