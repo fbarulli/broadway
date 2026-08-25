@@ -6,8 +6,21 @@ Step 5: Check ANOVA's assumptions before trusting the last step's result.
 
 Run with: python project/scripts/05_anova_assumptions.py
 """
-from project import data
+from pathlib import Path
+
+import yaml
+
 from broadway.stats import assumptions
+from broadway.utils import require_keys
+from project import data
+
+
+def _shapiro_seed() -> int:
+    """Seed from configs/project/taxi.yaml — this teaching layer's owning config."""
+    path = Path("configs/project/taxi.yaml")
+    config = yaml.safe_load(path.read_text())
+    require_keys(config, ["shapiro_seed"], path.name)
+    return int(config["shapiro_seed"])
 
 
 def main() -> None:
@@ -38,7 +51,7 @@ def main() -> None:
     # thousand rows). We check skew/kurtosis on the full group, and run
     # Shapiro on a small random subsample just to see the shape.
     print("\n=== Normality per group ===")
-    normality = assumptions.check_normality(groups)
+    normality = assumptions.check_normality(groups, shapiro_seed=_shapiro_seed())
     for name, res in normality.items():
         print(f"{name}: skew={res['skew']:.2f}, kurtosis={res['kurtosis']:.2f}, "
               f"Shapiro p (n=5000 subsample)={res['shapiro_p']:.4f}")

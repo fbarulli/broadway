@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import statsmodels.api as sm
-from _common import RESULTS, SAFE_NUMERIC_FEATURES
+from _common import RESULTS, SAFE_NUMERIC_FEATURES, SEED
 from scipy.stats import pearsonr, spearmanr
 from sklearn.feature_selection import mutual_info_regression
 from statsmodels.regression.linear_model import RegressionResultsWrapper
@@ -28,7 +28,6 @@ RESET_VARIANTS = (
 )
 AUDIT_COLS = list(SAFE_NUMERIC_FEATURES)
 MI_NEIGHBORS = 5
-MI_RANDOM_STATE = 42
 DELTA_THRESHOLD = 0.05
 R2_FLOOR = 0.01
 N_FITTED_BINS = 10
@@ -115,7 +114,7 @@ def correlation_evidence(df: pd.DataFrame) -> pd.DataFrame:
 def mi_r2_evidence(df: pd.DataFrame) -> pd.DataFrame:
     """Per audit feature: mutual information (nats), R² (pearson²), and MI/R² ratio."""
     mi = mutual_info_regression(
-        df[AUDIT_COLS], df[TARGET], random_state=MI_RANDOM_STATE, n_neighbors=MI_NEIGHBORS
+        df[AUDIT_COLS], df[TARGET], random_state=SEED, n_neighbors=MI_NEIGHBORS
     )
     rows = []
     for col, value in zip(AUDIT_COLS, mi):
@@ -206,7 +205,7 @@ def _residuals_fitted(
     ax: plt.Axes, model: RegressionResultsWrapper, reset: dict[int, tuple[float, float]]
 ) -> None:
     """Subsampled residuals-vs-fitted scatter with binned means and the RESET annotation."""
-    rng = np.random.default_rng(MI_RANDOM_STATE)
+    rng = np.random.default_rng(SEED)
     idx = rng.choice(len(model.resid), SCATTER_SAMPLE, replace=False)
     ax.scatter(np.asarray(model.fittedvalues)[idx], np.asarray(model.resid)[idx],
                s=3, alpha=0.25, color="#4c72b0")
@@ -228,7 +227,7 @@ def _residuals_fitted(
 
 def _route_curve(ax: plt.Axes, df: pd.DataFrame) -> None:
     """Fare vs route_id_encoded: linear / log / quadratic fits over the same curve."""
-    sample = df.sample(n=min(SCATTER_SAMPLE, len(df)), random_state=MI_RANDOM_STATE)
+    sample = df.sample(n=min(SCATTER_SAMPLE, len(df)), random_state=SEED)
     d = sample["route_id_encoded"]
     y = sample[TARGET]
     ax.scatter(d, y, s=3, alpha=0.12, color="#4c72b0")

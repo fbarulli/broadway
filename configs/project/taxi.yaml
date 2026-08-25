@@ -21,3 +21,6 @@ rush_hour_evening_start: 16
 rush_hour_evening_end: 19
 night_start: 22
 night_end: 5
+# Shapiro subsample seed for project/scripts/05_anova_assumptions.py
+# (determinism ledger item a; carries the former code literal verbatim).
+shapiro_seed: 0

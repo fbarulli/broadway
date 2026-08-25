@@ -28,6 +28,9 @@ def _git_commit() -> str:
 
 
 def _build_trace(cfg: PipelineConfig) -> ArtifactTrace:
+    # DOCUMENTED SILENCE (determinism ledger d): wall-clock bytes — created_at
+    # stamps run time into persisted artifacts by design; byte-stability
+    # awaits a freeze flag (pinned-timestamp config/env).
     return ArtifactTrace(
         created_at=datetime.now(UTC),
         commit=_git_commit(),

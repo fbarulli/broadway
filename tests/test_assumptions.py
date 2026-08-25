@@ -24,7 +24,7 @@ def test_run_levene_returns_statistic_and_p_value() -> None:
 
 
 def test_check_normality_returns_per_group_stats() -> None:
-    result = check_normality(_groups())
+    result = check_normality(_groups(), shapiro_seed=0)
     assert set(result.keys()) == {"A", "B", "C"}
     for stats in result.values():
         assert set(stats.keys()) == {"skew", "kurtosis", "shapiro_p"}
@@ -61,7 +61,7 @@ def test_check_normality_caps_subsample(monkeypatch: pytest.MonkeyPatch) -> None
         "other": rng.normal(0.0, 1.0, group_size),
     }
 
-    result = check_normality(groups)
+    result = check_normality(groups, shapiro_seed=0)
 
     # The frame is LARGER than the default cap, so no statistic may ever
     # see a full-size array: both spied calls must receive subsamples.
@@ -77,9 +77,31 @@ def test_check_normality_caps_subsample(monkeypatch: pytest.MonkeyPatch) -> None
     # groups must be handed to shapiro pre-trimmed to the cap.
     check_normality(
         {"g1": groups["big"][:200], "g2": groups["other"][:200]},
+        shapiro_seed=0,
         shapiro_max_n=64,
     )
     assert shapiro_sizes[-1] == 64
+
+
+def test_shapiro_subsample_is_seed_carried() -> None:
+    """Same config seed reproduces the subsample statistics; a new seed moves them.
+
+    Pins the provenance contract of ledger item (a): the >cap subsample is a
+    function of the caller-supplied seed (threaded from walkthrough.yaml),
+    not of hidden module state.
+    """
+    rng = np.random.default_rng(1)
+    groups = {
+        "big_a": rng.normal(0.0, 1.0, 6000),
+        "big_b": rng.normal(0.0, 1.0, 6000),
+    }
+
+    first = check_normality(groups, shapiro_seed=0)
+    second = check_normality(groups, shapiro_seed=0)
+    other = check_normality(groups, shapiro_seed=1)
+
+    assert first == second
+    assert first["big_a"]["shapiro_p"] != other["big_a"]["shapiro_p"]
 
 
 def test_levene_zero_variance_raises() -> None:
@@ -89,4 +111,4 @@ def test_levene_zero_variance_raises() -> None:
 
 def test_check_normality_empty_group_raises() -> None:
     with pytest.raises(ValueError):
-        check_normality({"a": np.array([]), "b": np.array([1.0, 2.0, 3.0])})
+        check_normality({"a": np.array([]), "b": np.array([1.0, 2.0, 3.0])}, shapiro_seed=0)

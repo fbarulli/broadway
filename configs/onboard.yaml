@@ -1,0 +1,5 @@
+# Onboard scaffolder defaults — single source of truth for values stamped
+# into freshly generated configs/experiment/<name>.yaml files.
+# Consumed by broadway.onboard.module.build_experiment_config via require_keys;
+# no seed literal lives in code (determinism ledger item b).
+default_random_state: 42

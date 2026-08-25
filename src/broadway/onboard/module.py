@@ -29,6 +29,7 @@ from broadway.lineage.ids import node_id
 from broadway.lineage.records import write_record
 from broadway.onboard.infer import infer
 from broadway.onboard.models import InferenceReport
+from broadway.utils import require_keys
 
 ARTIFACTS_DIR = Path(os.getenv("BROADWAY_ARTIFACTS_DIR", "artifacts"))
 
@@ -115,6 +116,14 @@ def build_analysis_contract(
     )
 
 
+def _scaffold_random_state() -> int:
+    """Scaffold default seed from configs/onboard.yaml — no literal in code."""
+    path = CONFIGS_DIR / "onboard.yaml"
+    config = yaml.safe_load(path.read_text(encoding="utf-8"))
+    require_keys(config, ["default_random_state"], path.name)
+    return int(config["default_random_state"])
+
+
 def build_experiment_config(
     report: InferenceReport,
     target: str,
@@ -160,7 +169,7 @@ def build_experiment_config(
         features=FeatureConfig(include=include, exclude=[], derived=derived, encodings=encodings),
         model=ModelConfig(type="linear", params={}),
         split=SplitConfig(type="time" if split_column else "random", validation_size=0.2),
-        random_state=42,
+        random_state=_scaffold_random_state(),
         target_metric="rmse",
         hpo=None,
     )

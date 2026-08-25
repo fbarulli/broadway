@@ -55,6 +55,9 @@ def _thresholds() -> WalkthroughConfig:
 
 
 def now_iso() -> str:
+    # DOCUMENTED SILENCE (determinism ledger d): wall-clock bytes — every
+    # performed_at stamp is run-unique by design; pinned only once a freeze
+    # flag (pinned-timestamp config/env) exists.
     return datetime.now(UTC).isoformat()
 
 
@@ -196,9 +199,9 @@ def run_normality(
     sample_name: str | None,
 ) -> AnalysisStep:
     viz_cfg = load_viz_config()
-    result = check_normality(groups)
-    figures_dir.mkdir(parents=True, exist_ok=True)
     thresholds = _thresholds()
+    result = check_normality(groups, shapiro_seed=thresholds.shapiro_seed)
+    figures_dir.mkdir(parents=True, exist_ok=True)
     max_qq_groups = thresholds.max_qq_groups
     normality_figure = viz_cfg.normality_figure
     pooled = np.concatenate(list(groups.values()))

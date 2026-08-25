@@ -4,16 +4,29 @@ The pipeline's internals were re-expressed over the platform encoding
 transformers (``broadway.features.transformers``). The literals below were
 captured from the pre-change merge-based implementation on synthetic data, so
 they pin the frozen feature names, dtypes, and encoded values exactly.
+
+Float goldens no longer use bare ``==``: the dual-numpy lock (uv.lock pins
+numpy 2.3.5 on darwin/x86_64 and 2.5.2 everywhere else) makes ~16th-digit
+results stack-dependent (FIXES.md golden-float row: one fresh-clone failure
+observed). Float fields therefore tolerate up to 8 double-precision ULPs at
+each golden value's magnitude; column names, dtypes, integers, and strings
+stay exact-equality until a byte-freeze flag exists.
 """
 
 from __future__ import annotations
 
+import math
 from unittest import mock
 
 import pandas as pd
 import pytest
 
 from project.ml_pipeline import FeaturePipeline
+
+# Float tolerance: 8 double-precision ULPs at the golden magnitude — clears
+# the observed cross-numpy 16th-digit drift with headroom while still pinning
+# every other digit.
+_ULP_BUDGET = 8
 
 GOLDEN_COLUMNS = [
     "pickup_hour",
@@ -150,6 +163,37 @@ def _make_pipeline(lookup_path: str) -> FeaturePipeline:
     )
 
 
+def _float_close(actual: float, golden: float) -> bool:
+    """ULP-budgeted equality (see module docstring for the derivation)."""
+    return math.isclose(
+        actual, golden, rel_tol=0.0, abs_tol=_ULP_BUDGET * math.ulp(abs(golden))
+    )
+
+
+def _list_close(actual: list[float], golden: list[float]) -> bool:
+    """Element-wise ULP-budget compare for a float column."""
+    return len(actual) == len(golden) and all(
+        _float_close(a, g) for a, g in zip(actual, golden)
+    )
+
+
+def _records_match(frame: pd.DataFrame, golden_rows: list[dict[str, object]]) -> bool:
+    """Row-for-row golden compare: floats within the ULP budget, rest exact."""
+    records = frame.to_dict("records")
+    if len(records) != len(golden_rows):
+        return False
+    for row, golden in zip(records, golden_rows):
+        if set(row) != set(golden):
+            return False
+        for key, expected in golden.items():
+            value = row[key]
+            if isinstance(expected, float) and not _float_close(value, expected):
+                return False
+            if not isinstance(expected, float) and value != expected:
+                return False
+    return True
+
+
 def test_transform_matches_pre_change_golden(tmp_path) -> None:
     zones_path = tmp_path / "zones.csv"
     _write_zones(zones_path)
@@ -158,9 +202,9 @@ def test_transform_matches_pre_change_golden(tmp_path) -> None:
 
     assert out.columns.tolist() == GOLDEN_COLUMNS
     assert {col: str(dtype) for col, dtype in out.dtypes.items()} == GOLDEN_DTYPES
-    assert out["route_avg_duration"].tolist() == GOLDEN_ROUTE_AVG_DURATION
+    assert _list_close(out["route_avg_duration"].tolist(), GOLDEN_ROUTE_AVG_DURATION)
     assert out["route_frequency"].tolist() == GOLDEN_ROUTE_FREQUENCY
-    assert out.to_dict("records") == GOLDEN_ROWS
+    assert _records_match(out, GOLDEN_ROWS)
 
 
 def test_transform_preserves_row_count(tmp_path) -> None:

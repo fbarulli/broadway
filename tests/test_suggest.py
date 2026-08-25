@@ -56,6 +56,7 @@ def test_load_walkthrough_config_defaults() -> None:
     assert cfg.skew_threshold == 2.0
     assert cfg.kurtosis_threshold == 7.0
     assert cfg.shapiro_alpha == 0.05
+    assert cfg.shapiro_seed == 0
     assert cfg.imbalance_ratio_threshold == 1.5
     assert cfg.significance_alpha == 0.05
     assert cfg.max_qq_groups == 12
@@ -70,6 +71,7 @@ def test_load_walkthrough_config_picks_up_custom_threshold(
         "skew_threshold: 5.0\n"
         "kurtosis_threshold: 7.0\n"
         "shapiro_alpha: 0.05\n"
+        "shapiro_seed: 3\n"
         "imbalance_ratio_threshold: 1.5\n"
         "significance_alpha: 0.05\n"
         "max_qq_groups: 12\n",
@@ -77,6 +79,7 @@ def test_load_walkthrough_config_picks_up_custom_threshold(
     )
     monkeypatch.setattr(loader, "CONFIGS_DIR", configs_dir)
     assert load_walkthrough_config().skew_threshold == 5.0
+    assert load_walkthrough_config().shapiro_seed == 3
     assert runners._thresholds().skew_threshold == 5.0
 
 

@@ -12,6 +12,7 @@
 
 from __future__ import annotations
 
+import argparse
 import logging
 import os
 from pathlib import Path
@@ -817,10 +818,19 @@ def plot_numeric_qq(
 
 
 if __name__ == "__main__":
-    np.random.seed(42)
+    # Demo randomness comes from a LOCAL Generator seeded via --seed; the
+    # legacy global np.random.seed(...) mutation is banned (determinism
+    # ledger item c) because it leaks state into any later NumPy consumer.
+    parser = argparse.ArgumentParser(description="QQ demo over synthetic features")
+    parser.add_argument(
+        "--seed", type=int, required=True,
+        help="seed for the demo's local numpy Generator (no code default)",
+    )
+    args = parser.parse_args()
     n_rows = 200
+    rng = np.random.default_rng(args.seed)
     df = pd.DataFrame(
-        {f"feat_{i:02d}": np.random.normal(i * 0.5, 1.0, n_rows) for i in range(22)}
+        {f"feat_{i:02d}": rng.normal(i * 0.5, 1.0, n_rows) for i in range(22)}
     )
     df["feat_05"] = 3.0        # zero variance -> excluded
     df["feat_12"] = np.nan     # non-finite   -> excluded

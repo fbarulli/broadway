@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from _common import RESULTS, SAFE_CATEGORICAL_FEATURES, SAFE_FEATURES
+from _common import RESULTS, SAFE_CATEGORICAL_FEATURES, SAFE_FEATURES, SEED
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
 PREPARED_DIR = RESULTS / "prepared"
@@ -22,7 +22,8 @@ LGBM_PARAMS = {
     "n_estimators": 500,
     "learning_rate": 0.05,
     "num_leaves": 63,
-    "random_state": 42,
+    # Config-carried (configs/experiments/fare_prediction.yaml) — ledger item f.
+    "random_state": SEED,
     "verbosity": -1,
 }
 METRICS_CSV = RESULTS / "08_lightgbm_baseline_describe.csv"
@@ -75,7 +76,7 @@ def plot_importance(importance: pd.Series, out_path: Path) -> None:
 
 def plot_fit(test: pd.DataFrame, preds_log: np.ndarray, out_path: Path) -> None:
     """Predicted vs actual dollars on TEST (downsampled), with y=x reference line."""
-    rng = np.random.default_rng(42)
+    rng = np.random.default_rng(SEED)
     idx = rng.choice(len(test), min(FIT_SAMPLE, len(test)), replace=False)
     preds = np.expm1(preds_log)[idx]
     actuals = test[TARGET].to_numpy()[idx]

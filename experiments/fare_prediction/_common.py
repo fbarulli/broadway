@@ -18,14 +18,27 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+import yaml
 from matplotlib.ticker import FuncFormatter, LogLocator
 
 from broadway.config.schema import DerivedFeature
 from broadway.features.builders import build_derived
+from broadway.utils import require_keys
 
 HERE = Path(__file__).resolve().parent
 RESULTS = HERE.parents[1] / "experiments" / "results" / HERE.name
 SAMPLE_NAME = "fare_prediction_1m"
+
+
+def _load_experiment_seed() -> int:
+    """Shared seed from configs/experiments/fare_prediction.yaml (YAML SSOT)."""
+    path = HERE.parents[1] / "configs" / "experiments" / "fare_prediction.yaml"
+    config = yaml.safe_load(path.read_text(encoding="utf-8"))
+    require_keys(config, ["seed"], path.name)
+    return int(config["seed"])
+
+
+SEED = _load_experiment_seed()
 
 # Pre-trip feature contract: fare prediction uses only information known
 # before the trip starts. Post-trip columns are LEAKAGE and are excluded from

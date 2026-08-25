@@ -51,6 +51,9 @@ def parse_datetime(series: pd.Series, column: str) -> tuple[pd.Series, ParseFail
     failed = series.notna() & coerced.isna()
     failure = None
     if failed.any():
+        # DOCUMENTED SILENCE (determinism ledger h): warning-example ordering
+        # — unique() emits in input row order, so example bytes depend on row
+        # arrival; pinned only once a freeze flag sorts these examples.
         examples = [str(v) for v in series[failed].dropna().unique()[:5]]
         failure = ParseFailure(
             column=column,
@@ -71,6 +74,7 @@ def _fractional_refusal(
     fractional = coerced.notna() & (coerced % 1 != 0)
     if not fractional.any():
         return None
+    # Row-order-dependent example pick (determinism ledger h; see parse_datetime).
     examples = [str(v) for v in series[fractional].dropna().unique()[:5]]
     return ParseFailure(
         column=column,
@@ -90,6 +94,7 @@ def parse_numeric(
     failed = series.notna() & coerced.isna()
     failure = None
     if failed.any():
+        # Row-order-dependent example pick (determinism ledger h; see parse_datetime).
         examples = [str(v) for v in series[failed].dropna().unique()[:5]]
         failure = ParseFailure(
             column=column,

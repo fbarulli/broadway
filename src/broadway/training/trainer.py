@@ -59,6 +59,10 @@ def train(
     if cfg.experiment is None:
         raise ValueError("train requires an experiment config")
     model = build_model_pipeline(cfg, cfg.experiment.model.type, params)
+    # DOCUMENTED SILENCE (determinism ledger g): wall-clock timing —
+    # train_time_seconds comes from time.time() and its persist path through
+    # TrainingResult is unverified for byte-stability; stays silent until a
+    # freeze flag (pinned-timer or recorded-metrics contract) exists.
     start = time.time()
     model.fit(X_train, y_train)
     elapsed = time.time() - start
