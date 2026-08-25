@@ -91,6 +91,10 @@ more reading `parse_numeric` than any checklist produced).
 - **Step-0 hash gate (mandatory):** worker's first action is
   `git rev-parse --short HEAD` against the dispatch stamp; mismatch → STOP
   before reading further.
+- **Stamp semantics:** a dispatch stamp is RELATIVE — the HEAD at dispatch
+  open, recorded in the worker's report. Absolute SHAs appear only inside
+  immutable records as provenance anchors, never as executable preconditions
+  in standing contracts.
 - **Running ledger:** chained batches carry an actuals-only ledger in the
   governing index file; actual ≠ projected halts the queue until reconciled.
 

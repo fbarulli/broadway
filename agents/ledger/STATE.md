@@ -95,6 +95,10 @@ experiments/results/more_modeling/*.csv (7 result CSVs).
   foreign — reconcile, wait, or scope-gate, then record which.
 - Concurrent lanes DO edit shared files mid-flight: re-read targets
   immediately before editing; declare tree-state in every report.
+- Orphaned pre-rewrite lineage: tag tier-1-complete (rooted at 6be4ff7,
+  incl. commit 8e7d51a) shares NO history with sklearn (root 0561e93) —
+  its stamps are archived history, never current branch state; evidence
+  citation via git show remains valid while the tag exists.
 
 ## Open arbitrations (awaiting main-agent ruling)
 - Dead-code candidates: baseline/module.py:72 (KEEP ruled);

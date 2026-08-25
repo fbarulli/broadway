@@ -551,3 +551,31 @@ def test_classifier_cli_end_to_end() -> None:
     )
     assert proc.returncode == 0, proc.stderr
     assert json.loads(proc.stdout) == {"tier": CHECKLIST, "reasons": ["descriptive prose, zero triggers"]}
+
+
+# --------------------------------------------------------------------------- #
+# Stamp-semantics tripwire (MAIN_AGENT_CONTRACT.md §5): standing contracts must
+# never encode absolute-SHA equality as an executable precondition ("must equal
+# <sha>"). Dispatch stamps are relative by law; absolute SHAs belong only to
+# immutable records as provenance anchors. G0B.md is the single frozen
+# completed-dispatch exception (archival note pending a separate decision) —
+# the baseline below pins it, so any NEW occurrence anywhere under
+# agents/contracts/ turns this probe RED.
+SHA_GATE_LINE = re.compile(
+    r"rev-parse[^\n]*must\s+equal[^\n]*[0-9a-f]{6,40}",
+    re.IGNORECASE,
+)
+SHA_GATE_BASELINE: dict[str, int] = {"G0B.md": 1}
+
+
+def test_no_new_absolute_sha_gates_in_contracts() -> None:
+    hits: dict[str, int] = {}
+    for path in sorted((ROOT / "agents" / "contracts").glob("*.md")):
+        count = len(SHA_GATE_LINE.findall(path.read_text(encoding="utf-8")))
+        if count:
+            hits[path.name] = count
+    assert hits == SHA_GATE_BASELINE, (
+        f"absolute-sha equality gates changed under agents/contracts/: {hits} "
+        f"(baseline {SHA_GATE_BASELINE}). Dispatch stamps must stay relative — "
+        "see MAIN_AGENT_CONTRACT.md §5 Stamp semantics."
+    )
