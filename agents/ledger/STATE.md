@@ -136,6 +136,42 @@ adds new files. FIX planned: rewrite script with WHITELIST approach — list
 exactly what main should contain and copy only those. Also: README
 collision (MM staged+unstaged) needs resolution. Main restored clean to
 7136943; no damage.
+Refresh 15, same day: FIRST FULL MAIN-DAY TEST — ran whitelist script v2
+(commit 1b27cd4) + full local CI on main's synced tree. Found systematic
+gaps the script alone can't solve:
+
+=== GATES RED ON MAIN AFTER SYNC ===
+ruff: project/working.py slate code has unsorted imports + unused Path
+mypy: src/broadway/data/download.py:25 references EnvironmentConfig.download_chunk_size (dev config field not in main's snapshot)
+shell-scripts: SC2015 in k8s/optuna/lifecycle.sh:115 (fixed in worktree)
+pytest: 17 failures
+  - test_governance_probes (×13): require agents/ledger/STATE.md + dev house — main is a blank slate
+  - test_init (×3): FileNotFoundError on configs/structure.yaml etc. — dev payload
+  - test_onboarding_e2e (×1): expects configs/experiments/ — main's generic configs don't match
+coverage: 92.81% < 95% (cascading from test failures)
+project-tests: fails (dev payloads)
+
+=== ROOT CAUSES (3 structural issues) ===
+1. AGENTS/ EXCLUSION IS CORRECT but test suite requires dev house.
+   Governance probes, init tests, onboarding all read agents/** files.
+   Main without agents/ = broken test suite. Options: (a) marker-skip on
+   main, (b) minimal agents/ stub for probes, (c) main CI = static only.
+2. PROJECT/WORKING.PY SLATE CODE is sloppy — needs ruff format after write.
+   Trivial fix in script.
+3. SRC/ brings dev's bleeding-edge code that references config fields
+   main's snapshot doesn't have. MyPy catches this. General: main can't
+   track dev tip same-day if dev's src/ references new config fields.
+
+=== IMPROVEMENTS FOR NEXT TIME ===
+- Script: add `python -m ruff format` on slate writes
+- Script: add `python -m ruff check --fix` on project/working.py
+- Decide: agents/ stub for main (minimal: just the files probes scan) OR
+  accept main's test bar is lower (static gates only) OR gate the probes
+  to skip on main
+- Decide: mypy config-field drift — either pin src/ to a "stable"
+  subset OR track dev same-day and accept the red until dev fixes
+
+Main restored to 7136943; full findings saved to /tmp/main_day1_ci.log.
 
 2026-08-25 (second refresh), during the ten-ruling governance batch: the
 human ruled on ten pending decisions; seven read-only investigator/verifier
