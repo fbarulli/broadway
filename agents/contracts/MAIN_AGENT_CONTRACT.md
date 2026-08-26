@@ -109,46 +109,20 @@ more reading `parse_numeric` than any checklist produced).
   that the brief never mentioned.
 - **Anti-fabrication (2026-08-22):** reports claiming coordinator dialogue are
   unverified by default; ratification flows human → main → brief.
-- **Confirmation ledger (2026-08-23):** every human-gated action records who
-  authorized it, when, via which channel, BEFORE execution.
-- **Authorization-citation rule (USER-MVP pilot; sovereign-approved; amends the D22 deferral):**
-  Any claim that a human authorized, ratified, dispatched, accepted, rejected, or overruled
-  something is NON-AUTHORITATIVE unless it cites a GitHub issue-comment URL
-  (`…/issues/<n>#issuecomment-<id>`) in fbarulli/broadway whose body carries a valid event
-  header. A bare issue URL does not cite. Validity is RESOLVED, never presumed: fetch
-  `gh api repos/fbarulli/broadway/issues/comments/<id>` and require (a) parent issue is a
-  designated ledger issue (#3 AUTHORIZATION LEDGER, #4 VERDICT LOG,
-  #5 CHANGE BOARD) AND `.locked == true`;
-  (b) `.user.login == "fbarulli"` at resolution time; (c) recomputed event-id == header
-  event-id (first 8 hex of sha256 over the comment body after deleting every
-  `event-id:`/`recorded-time:` line and joining remaining lines with `\n`, with NO trailing
-  newline appended); (d) `status: active` and type matching the claimed kind.
-   - **Genesis-id resolution (re-ruled 2026-08-24 on GENESIS-REPRO evidence, 6/6
-     byte-exact):** the six genesis events b16fb9ca, e1f7cc62, 493e21ce, 3afcd9b1,
-     7595cb13, 555b6fb8 DO recompute under (c) — sha256 first-8 over the stored UTF-8
-     body after deleting every `event-id:`/`recorded-time:` line and joining remaining
-     lines with `\n`, EXCLUDING the body's own trailing newline. The previously landed
-     "pre-normalization drafts" grandfather exception is WITHDRAWN: the reported
-     mismatch was a verifier bug that retained the trailing newline. All ledger
-     citations — genesis rows included — resolve by full (c) recomputation with NO
-     exceptions; any body edit still voids per immutability. Reference implementation:
-     `gh api repos/fbarulli/broadway/issues/comments/<id> | jq -j '.body' |
-     sed '/^event-id:/d;/^recorded-time:/d' | sed -z '$s/\n$//' | sha256sum | cut -c1-8`.
-  Record the resolution (event-id, comment id, created_at) into STATE.md/DECISIONS.md BEFORE
-  relying on the claim. Historical events carry `backfill: true` with distinct event-time and
-  recorded-time. Ledger comments are immutable by POLICY: corrections are NEW comments with
-  `supersedes:`; an edited comment fails (c) and voids itself. GitHub unreachable ⇒ affected
-  claims remain non-authoritative until resolved; the tree remains the governing substrate
-  (GIT-WINS unchanged). Absence of citation bars AUTHORITY, not action: work proceeds only
-  where standing written rules already authorize it.
-- **Citation-resolution procedure (arbitration checklist addition):** when someone cites X#Y:
-  (1) Parse ref — must be `fbarulli/broadway/issues/<n>#issuecomment-<m>`; bare issue link →
-  INVALID. (2) Fetch `gh api …/issues/comments/<m>` (+ `/issues/<n>` for lock/title).
-  (3) Check: title prefix ∈ {AUTHORIZATION LEDGER, VERDICT LOG, CHANGE BOARD}; `.locked==true`;
-  `.user.login=="fbarulli"`; header parses; recomputed sha8 == `event-id`; `status: active`;
-  type matches claim kind. (4) Any failure → verdict INVALID; log a fabrication-suspect event
-  citing the bad URL; claim non-authoritative. (5) Pass → write resolution row (event-id +
-  comment id + created_at + sha8) into the tree; cite THAT tree row onward.
+- **Human-gate recording:** every human-gated action records, in its own
+  commit message, which trigger applied and that a human confirmed it —
+  no separate ledger file, no cross-referenced ID scheme required.
+- **Authority resolution (ENFORCED — the sole surviving mechanism):** claims
+  of human authorization resolve against `agents/ledger/STATE.md ## EVENTS`,
+  machine-checked at every push by TIER-GATE (`scripts/tier_gate.sh`:
+  reviewer token must resolve in EVENTS AT THAT COMMIT and be echoed in the
+  same message) and by probe g in `tests/test_governance_probes.py`
+  (EVENTS drift requires an authorizing event-id in the landing body).
+  Prose-only citation ceremony (issue-comment URL validity, genesis-id
+  lists, manual resolution checklists) RETIRED 2026-08-26 under the
+  enforced/unenforced principle: law with a live test behind it stays;
+  untested ceremony goes. Historical rulings remain verbatim in
+  DECISIONS.md and agents/ledger/arbitration/**.
 - **Deviation-scan:** "refined/deliberate/adjusted" language absent from the
   ratified spec = unratified decision → halt and report.
 - **Provenance-check:** `git log` alongside `git status`; `checkout --`
@@ -322,51 +296,27 @@ times: test counts, commands, paths; `dataflow.md`, `src/broadway/stats/API.md`,
 - Agents: fresh subagents per contract; workers run no git operations at all —
   main agent verifies, commits, pushes.
 
-## 14. Change Board & senior arbitration stage (2026-08-24)
+## 14. Human gates & push discipline
 
-Findable surfaces for approach review and everything currently pending,
-in flight, or undecided.
+Five human-check triggers. Everything not matching one of them is decided
+by "gates pass" alone — no ruling, verdict, or board step exists or is
+required:
 
-### Senior arbitration stage
+1. Credentials / secrets.
+2. Irreversible actions.
+3. External-exposure changes.
+4. Money or real external systems.
+5. Every shared-branch push: the exact command and the full diff are
+   presented to the human BEFORE execution — no exceptions, no batching,
+   no inherited authority from an earlier turn or session. This supersedes
+   any prior standing-go authorization.
 
-- Contract: `agents/contracts/SENIOR.md` — receives PROBLEM → SOLUTION
-  pairs (findings, proposals, register rows) and rules per pair through
-  three independent kill-questions: correct approach? simpler form?
-  another angle? Verdicts: ADOPT · MODIFY(to:) · REJECT(with:),
-  rationale mandatory; ESCALATE/PROVISIONAL flags per D18/D26.
-- Read-only, zero writes anywhere; step-0 gates as per worker norm.
-  Verdicts execute LATER as standard zero-write worker contracts (D26);
-  the senior never implements.
-
-### Change Board — locked ledger issue #5
-
-- fbarulli/broadway#5 "CHANGE BOARD", conversation-locked, owner
-  gh-api writes only; THIRD designated ledger issue alongside #3/#4 —
-  the §6 citation-validity rule applies to board citations verbatim.
-- One comment = one row = one change ON THE BOARD. Grammar identical
-  to EVENT-lines: `type:` board-row|anomaly; `status:` ∈ {active,
-  landed, dropped}. Transitions are NEW comments carrying
-  `supersedes: <prior event-id>` — comments are never edited (an edit
-  breaks recomputation and voids the row by policy).
-- **Event-id recipe (store-then-hash):** compute the §6 sha8 over the
-  STORED body, never a local draft — GitHub normalizes bytes on store
-  (genesis-row anomaly, FIXES.md 2026-08-24). Procedure: post draft →
-  fetch stored body → compute sha8 → repost with `event-id:` line →
-  delete the draft; verify the survivor recomputes byte-exact.
-- Canonical state stays IN-TREE: every posted row mirrors into
-  STATE.md `## EVENTS` (GIT-WINS; no gate ever requires github.com
-  online, D22 doctrine).
-- Routing: every non-REJECT senior verdict is recorded by the MAIN
-  AGENT as ONE board row; the senior itself posts nothing anywhere.
-  Landing a row's change ends with a superseding comment flipping
-  `status:` to landed/dropped, mirrored in the same touch.
-
-### Accessing the board via gh
-
-Recipe relocated VERBATIM to `MAC_APPENDIX.md` (appendix class per the ~30 KB
-contract-cap law in this section). Unchanged law: read-only inspection is
-allowed and expected at any tier; WRITES are owner-only store-then-hash —
-workers, seniors, and adversaries never post.
+Retired 2026-08-26 (D37): Change Board locked-issue #5 apparatus, the
+senior-arbitration tier (`SENIOR.md`), single-use work orders (`G0B.md`),
+and the board recipe appendix (`MAC_APPENDIX.md`). The surviving ENFORCED
+register is `STATE.md ## EVENTS` (read by TIER-GATE and probe g).
+Historical rulings remain verbatim in DECISIONS.md and
+`agents/ledger/arbitration/**` as dated records.
 
 ### Reproducibility mandate
 
