@@ -1,16 +1,14 @@
 #!/usr/bin/env bash
-# MAIN-DAY SYNC — resync main from dev (sklearn) with slate exceptions
-# Run from main worktree root. Requires: git, python3, uv sync'd.
-# Safe to run multiple times; idempotent where possible.
+# MAIN-DAY SYNC — resync main from dev (sklearn) via WHITELIST
+# Run from main worktree root. Requires: git, bash.
+# Design: copy only what main should contain, then re-apply main-only files.
+# Idempotent: safe to re-run.
 
 set -euo pipefail
 
-echo "==> MAIN-DAY SYNC: resyncing main from sklearn"
+echo "==> MAIN-DAY SYNC: resyncing main from sklearn (whitelist)"
 
 # --- 0) Preconditions
-if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  echo "Not a git repo" >&2; exit 1
-fi
 current_branch=$(git symbolic-ref --short HEAD)
 if [[ "$current_branch" != "main" ]]; then
   echo "Must be on main branch (currently on $current_branch)" >&2; exit 1
@@ -19,46 +17,63 @@ if [[ -n $(git status --porcelain) ]]; then
   echo "Working tree not clean — commit or stash first" >&2; exit 1
 fi
 
-# --- 1) Snapshot main-only files BEFORE we overwrite them
+# --- 1) Snapshot main's slate BEFORE the swap (in case we need to restore)
 TMPDIR=$(mktemp -d)
 trap 'rm -rf "$TMPDIR"' EXIT
-echo "==> Snapshotting main-only files to $TMPDIR"
+echo "==> Snapshotting main's slate to $TMPDIR"
+
+# README: main has its own (governance-flavored); preserve it
 cp README.md "$TMPDIR/README.md" 2>/dev/null || true
-cp GOVERNANCE-POINTER.md "$TMPDIR/GOVERNANCE-POINTER.md" 2>/dev/null || true
-# Snapshot main's synthetic evidence blob + sidecar (5KB parquet)
+
+# Evidence: main has its own synthetic 5KB blob + provenance sidecar
 mkdir -p "$TMPDIR/evidence"
 cp experiments/results/univariate/sample_evidence/sample_evidence.parquet "$TMPDIR/evidence/" 2>/dev/null || true
 cp experiments/results/univariate/sample_evidence/sample_evidence.json "$TMPDIR/evidence/" 2>/dev/null || true
 
-# --- 2) Fetch dev and checkout its full tree
-echo "==> Fetching origin/sklearn and checking out full tree"
+# Governance pointer
+cp GOVERNANCE-POINTER.md "$TMPDIR/GOVERNANCE-POINTER.md" 2>/dev/null || true
+
+# --- 2) Fetch dev
+echo "==> Fetching origin/sklearn"
 git fetch origin sklearn
-git checkout origin/sklearn -- .
 
-# --- 3) Delete the taxi use-case payload (dev owns it; main is blank slate)
-echo "==> Deleting use-case payload"
-git rm -rf --ignore-unmatch \
-  experiments/univariate \
-  experiments/multivariate \
-  experiments/fare_prediction \
-  experiments/polynomial_regression_et_all \
-  experiments/mlflow/_common.py \
-  project/data.py \
-  project/working.py \
-  configs/experiments \
-  HPO_TRAINING.md \
-  SKLEARN_PIPELINES.md \
-  BROADWAY.md \
-  dataflow.md \
-  2>/dev/null || true
+# --- 3) WHITELIST: only what main should contain
+echo "==> Checking out platform surface from sklearn (whitelist)"
+# Platform core + tests + demo + gates + shared infra
+git checkout origin/sklearn -- \
+  src/ \
+  tests/ \
+  demo/ \
+  scripts/ \
+  pyproject.toml \
+  uv.lock \
+  Dockerfile \
+  docker-compose.yml \
+  .github/workflows/ \
+  .gitignore \
+  .dockerignore \
+  2>&1 | tail -5
 
-# --- 4) Restore main's slate (its own files)
+# Configs (platform-owned, generic)
+git checkout origin/sklearn -- \
+  configs/dataset/ \
+  configs/analysis/ \
+  configs/environment/ \
+  configs/flow/ \
+  configs/step/ \
+  configs/experiment/ \
+  2>&1 | tail -3
+
+# --- 4) Restore main's slate (overwrite what dev brought)
 echo "==> Restoring main's slate"
 
-# a) Governance
+# a) README (main owns)
+cp "$TMPDIR/README.md" README.md
+
+# b) Governance pointer (main owns)
 cp "$TMPDIR/GOVERNANCE-POINTER.md" GOVERNANCE-POINTER.md
 
-# b) Generic dataset configs
+# c) Main's generic dataset bindings (configs/experiments/)
 mkdir -p configs/experiments
 cat > configs/experiments/working.yaml <<'YAML'
 parquet: experiments/results/univariate/sample_evidence/sample_evidence.parquet
@@ -75,7 +90,8 @@ time_buckets:
 time_bucket_default: day
 YAML
 
-# c) Project bindings (generic, reads working.yaml above)
+# d) Main's generic project bindings (project/working.py only)
+mkdir -p project
 cat > project/working.py <<'PY'
 from pathlib import Path
 import yaml
@@ -129,12 +145,13 @@ def time_buckets():
     return cfg["time_buckets"], cfg["time_bucket_default"]
 PY
 
-# d) Synthetic evidence blob + provenance (restore main's 5KB blob)
+# e) Synthetic evidence (restore main's 5KB blob)
 mkdir -p experiments/results/univariate/sample_evidence
 cp "$TMPDIR/evidence/sample_evidence.parquet" experiments/results/univariate/sample_evidence/
 cp "$TMPDIR/evidence/sample_evidence.json" experiments/results/univariate/sample_evidence/
 
-# e) README (main's governance + platform description)
-cp "$TMPDIR/README.md" README.md
+# --- 5) Stage everything for one atomic commit
+git add -A
 
-echo "==> Slate restored. Next: run full CI on this tree, then commit + push."
+echo "==> DONE. Working tree ready. Review: git diff --cached --stat"
+echo "==> Next: run full CI (bash scripts/run_local_ci.sh), then commit + push."

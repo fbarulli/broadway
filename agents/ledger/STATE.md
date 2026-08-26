@@ -116,6 +116,26 @@ quality gates green at commit time (parity/ruff/mypy/configs/shell/
 pytest/cov 95.31%/project-tests); bypass applied to the meta-pin only,
 never to quality gates. Future pushes clean: origin checker now accepts
 current main state.
+Refresh 13, same day: MAIN-DAY PROCEDURE CODIFIED (Option 2, ratified
+"yes"). Created scripts/main_day_sync.sh — the single official procedure:
+fetch dev → checkout full tree → delete taxi payload → re-apply main's
+slate (GOVERNANCE-POINTER, generic working.yaml/project.working.py,
+synthetic evidence, main's README) → full CI on main's own tree → one
+commit → push. Zero choreography, single source of truth. Commit
+74126cb on sklearn; pushed (full CI green).
+Refresh 14, same day: FIRST MAIN-DAY DRY-RUN — aborted. The blacklist
+delete-list in scripts/main_day_sync.sh was TOO NARROW: it missed
+experiments.py (root), configs/analysis/taxi*.yaml,
+configs/dataset/taxi.yaml, configs/experiment/taxi.yaml,
+configs/project/, configs/sample/, configs/slice/, configs/onboard.yaml,
+data/raw/, readmore/, reports/, synth.md, project.md, project/etl/,
+project/features.py, project/boroughs.py, docker/postgres/, and the
+WHOLESALE copy brought agents/ (contracts, ledger, arbitration, audits,
+notes) which main should NOT carry. Root cause: blacklist breaks when dev
+adds new files. FIX planned: rewrite script with WHITELIST approach — list
+exactly what main should contain and copy only those. Also: README
+collision (MM staged+unstaged) needs resolution. Main restored clean to
+7136943; no damage.
 
 2026-08-25 (second refresh), during the ten-ruling governance batch: the
 human ruled on ten pending decisions; seven read-only investigator/verifier
