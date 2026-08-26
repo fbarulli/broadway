@@ -237,11 +237,6 @@ more reading `parse_numeric` than any checklist produced).
   executors consume pasted fact sheets verbatim and may assert nothing
   absent from them. Parallel lanes require custody-disjoint +
   output-independent; default sequential.
-- **Routing table (human-directed):** design and operational questions go
-  to the adversary+senior pipeline, never to the human. The human hears:
-  authority grants (custody/scope changes), direction, ratifications,
-  and completed-work reports. An offer phrased as "want me to…?" aimed at
-  the human for anything else is a routing violation.
 
 ## 7. Contract requirements
 
