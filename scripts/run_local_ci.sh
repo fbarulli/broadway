@@ -6,20 +6,42 @@
 # orchestrator dry-run, build-and-boot. experiments.py verify
 # runs on taxi only. The full tier additionally runs 'project-tests'
 # (project/tests, collected WITHOUT --cov; the >=95 floor stays on tests/).
-# Usage: run_local_ci.sh [--static|--tier=fast|--tier=full] [--clean-lint];
-# exit 0 green / 1 red. --clean-lint: ruff+mypy scan a throwaway HEAD
-# worktree snapshot instead of this possibly-dirty tree (WIP-immune);
-# every other gate stays tree-bound. Never silent.
+# Usage: run_local_ci.sh [--static|--tier=fast|--tier=full] [--clean-lint]
+#        [-h|--help]; flags COMBINE (e.g. --tier=fast --clean-lint);
+# exit 0 green / 1 red / 2 usage error. --clean-lint: ruff+mypy scan a
+# throwaway HEAD worktree snapshot instead of this possibly-dirty tree
+# (WIP-immune); every other gate stays tree-bound. Alone, --clean-lint keeps
+# its historical coupling to the FULL tier (pytest itself stays tree-bound).
+# CONFLICT RULE: --static together with any --tier=X is refused loudly
+# (exit 2) — they select disjoint gate sets by design. Never silent.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 STATIC=0; TIER="full"; CLEAN_LINT=0
-case "${1:-}" in
-  --static) STATIC=1 ;;                        # doc-only micro edits
-  --tier=fast) TIER="fast" ;;                  # parity+ruff+mypy+configs+shell-scripts (<30s)
-  --tier=full|"") TIER="full" ;;               # everything incl. pytest+cov>=95 + project-tests
-  --clean-lint) CLEAN_LINT=1 ;;                # ruff+mypy vs pristine HEAD snapshot (teeth 5)
-  *) echo "usage: run_local_ci.sh [--static|--tier=fast|--tier=full|--clean-lint]" >&2; exit 2 ;;
-esac
+SEEN_STATIC=0; SEEN_TIER=0
+usage() {  # stdout for -h|--help; error paths call `usage >&2`
+  cat <<'EOF'
+usage: run_local_ci.sh [--static|--tier=fast|--tier=full] [--clean-lint] [-h|--help]
+  flags combine (e.g. --tier=fast --clean-lint); --clean-lint alone = full tier;
+  CONFLICT: --static together with --tier=X is refused (exit 2)
+EOF
+}
+for arg in "$@"; do
+  case "$arg" in
+    -h|--help) usage; exit 0 ;;
+    --static)
+      if [[ $SEEN_TIER -eq 1 ]]; then
+        echo "REFUSED: --static conflicts with already-parsed --tier=$TIER" >&2; usage >&2; exit 2
+      fi
+      STATIC=1; SEEN_STATIC=1 ;;               # doc-only micro edits
+    --tier=fast|--tier=full)
+      if [[ $SEEN_STATIC -eq 1 ]]; then
+        echo "REFUSED: $arg conflicts with already-parsed --static" >&2; usage >&2; exit 2
+      fi
+      TIER="${arg#--tier=}"; SEEN_TIER=1 ;;    # fast: parity+ruff+mypy+configs+shell (<30s) / full: +pytest+cov>=95 + project-tests
+    --clean-lint) CLEAN_LINT=1 ;;              # ruff+mypy vs pristine HEAD snapshot (teeth 5)
+    *) echo "unknown argument: '$arg'" >&2; usage >&2; exit 2 ;;
+  esac
+done
 FAST_BANNERS="FAST-GREEN"; FULL_BANNERS="LOCAL-CI GREEN"   # distinct vocabularies
 export MPLCONFIGDIR="${MPLCONFIGDIR:-${TMPDIR:-/tmp}/broadway-mpl}"; mkdir -p "$MPLCONFIGDIR"
 fail=0
@@ -97,7 +119,10 @@ if [[ $STATIC -eq 0 && $TIER == "full" ]]; then
   run project-tests uv run pytest project/tests -q --dist worksteal
 fi
 if [[ $fail -eq 0 ]]; then
-  [[ $TIER == "fast" ]] && echo "$FAST_BANNERS (tiers: parity/ruff/mypy/configs/shell-scripts)" || echo "$FULL_BANNERS"
+  CL_NOTE=""
+  [[ $CLEAN_LINT -eq 1 ]] && CL_NOTE=" + clean-lint(ruff+mypy@HEAD-snapshot)"
+  [[ $TIER == "fast" ]] && echo "$FAST_BANNERS (tiers: parity/ruff/mypy/configs/shell-scripts)$CL_NOTE" \
+                        || echo "$FULL_BANNERS$CL_NOTE"
 else
   echo "LOCAL-CI RED — fix above before commit/push"
 fi
