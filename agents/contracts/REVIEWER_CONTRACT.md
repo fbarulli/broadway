@@ -88,6 +88,14 @@ its own parent). Sign-off names any such ordering the batch depends on;
   says it is (authority rows carry out-of-band verification only, NO GitHub
   comment provenance). Never invent comment ids, created_at values, or
   backfill stories to make a citation resolve.
+- **Ground-truth law (2026-08-26):** a MENTION of a thing is not proof the
+  thing exists or happens. A finding or a defense resting on indirect
+  evidence — a registry row citing an artifact, a config key naming a file,
+  doc prose describing behavior — verifies against the PRIMARY source (the
+  blob/ref at its stamped commit, file:line, byte size/digest, pasted command
+  output) before the verdict stands. If the primary source cannot be
+  resolved, the underlying claim is **UNVERIFIED**, and a verdict built on it
+  does not stand either.
 - **Refusal-to-weaken rule:** when an enforcing gate refuses, first ask
   whether the refusal is designed. Report designed refusals as evidence the
   tooth works; never weaken gate grammar to make a batch pass. TIER-GATE
@@ -97,6 +105,11 @@ its own parent). Sign-off names any such ordering the batch depends on;
   unregistered ids failing closed — the fail-closed property was never the
   thing being fixed. Bypassing or loosening enforcement to clear a queue is a
   BLOCKER, committed by whoever proposes it.
+- **Board provenance:** GitHub Projects cards (project #4 "Broadway Ops
+  Board") are an AVAILABILITY layer, never evidence. A claim whose only
+  citation is a card resolves against `STATE.md` / git before the verdict
+  stands (Ground-truth law above); a card contradicting either is itself
+  a finding.
 
 ## 7. Hex discipline
 

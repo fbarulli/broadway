@@ -1,10 +1,45 @@
 # STATE.md — living agent context (single source of "what has been done")
 
-> Refreshed by the main agent at every arbitration/push. Every dispatched
+> Refreshed by the main agent at EVERY material event (dispatch/settle/
+> edit batch/decision) per BOARD-CHECKPOINT DISCIPLINE 2026-08-26 —
+> supersedes the former arbitration/push-only rule. Every dispatched
 > agent MUST read this file as step-0 and echo any line that contradicts its
 > instructions. Stale on arrival = STOP-and-report, never improvise.
 
 ## Last refreshed
+2026-08-26 (human-directed governance session): the GROUND-TRUTH LAW clause
+landed in THREE contract files — MAIN_AGENT_CONTRACT §6 Verification +
+WORKER_CONTRACT Live-fact-checking duty + REVIEWER_CONTRACT §6 fabrication
+guards (essence: a MENTION of a thing is not proof it exists; claims trace
+to primary sources or carry UNVERIFIED; verdicts built on unresolved claims
+do not stand). Edits are uncommitted worktree content (see that section);
+landing waits on gates + human go. Two READ-ONLY lanes dispatched against
+branch `main` ONLY (taxi mention-census + taxi ground-truth audit; rows in
+Active lanes). BOARD-CHECKPOINT DISCIPLINE adopted per human instruction
+2026-08-26: this board refreshes at EVERY material event (dispatch,
+settle, edit batch, decision) — not only at arbitration/push — so a
+rate-limit or connection loss always leaves a resumable state here.
+Refresh 2, same day: GROUND-TRUTH lane DELIVERED (verdict inline in Active
+lanes); CENSUS lane still IN FLIGHT.
+Refresh 3, same day: CENSUS lane DELIVERED — BOTH read-only lanes closed;
+no lanes in flight. Five census open questions (main-tree governance:
+doctrine ledger absent on main; README §7 wording; k8s/ci-fixture tpep_
+bindings locality; parquet-fossil intent; QqZonesConfig rename) await
+human routing — recorded, nothing dispatched.
+Refresh 4, same day: LIVE OPS BOARD moved to GitHub Projects per human
+instruction — project #4 "Broadway Ops Board", owner fbarulli,
+id PVT_kwHOAZFnCc4Bhhjq, https://github.com/users/fbarulli/projects/4 .
+Cards: ground-truth batch [In Progress], census Q1–Q5 routing [Todo],
+taxi-audit done-record [Done]. Board token scopes OBSERVED via
+`gh auth status` 2026-08-26: gist, project, read:org, repo, workflow —
+`project` alone covers card read/write; `read:project` NOT present
+(device-flow grant documented at MAIN_AGENT_CONTRACT §6). Project #4 is
+PRIVATE (review finding N2): the availability layer requires an
+authenticated host; fresh hosts need their own gh login. DIVISION OF
+TRUTH: STATE.md remains the
+primary record; project cards are the AVAILABILITY layer (survives local
+loss, reachable from any session) — every card body points back here.
+
 2026-08-25 (second refresh), during the ten-ruling governance batch: the
 human ruled on ten pending decisions; seven read-only investigator/verifier
 lanes derived the facts; three worker lanes landed the registry banner/meta
@@ -32,10 +67,22 @@ current era/custody posture, suite tail expectations, gate law pointers.
 Anything duplicated below is a courtesy summary written once at refresh;
 if it contradicts git, GIT WINS.
 
-## Active lanes (in flight NOW)
+## Lane ledger — current cycle
 | Agent | Contract | State |
 |---|---|---|
-| (none) | This cycle's lanes DELIVERED (W1 ledger / W2 registry / W3 code+policy, plus seven read-only investigator-verifier lanes); next scheduled lane: REGISTRY-AUDIT sweep per D31, first opportunity after this landing. Prior-session DG-MAP-1..4 cartography lanes remain LAPSED — treat as NOT in flight; senior synthesis queued behind them stays void. | - |
+| subagent 73abf568 (read-only) | Taxi-MENTION-CENSUS @ ref `main` ONLY: exhaustive case-insensitive sweep (~30 pattern families incl. tpep/lpep/vendor_id/ratecode/taxi_zone/borough), per-file bucket classification, src/broadway/** doctrine-violation adjudication. Zero mutations; citations via git plumbing only. | DELIVERED 2026-08-26 — VERDICT: **ZERO doctrine violations in src/broadway @ main** (strict master regex = 0 lines; wide net decomposes into format-generic parquet/csv I/O, a benign "zone"-vocab collision in QQ-plot shading (`QqZonesConfig` — rename candidate `qq_bands`), and parameterized feature defaults). Census: **34 files / ~236 genuine hits** across 309 tracked files — heaviest coupling: root `experiments.py` (50; taxi-CI-gated dead-but-present domain code, :58 LOOKUP constant, :401-417 fake zones CSV), tests/ (83 hits, incl. NYC borough strings baked into `tests/test_results.py:340`), infra (37; ⚠ `tpep_*` column maps HARDCODED in k8s/optuna/configmap.yaml:20-22 + .github/ci-fixtures/k8s-config.yaml:10-12 OUTSIDE configs//project/), docs (41). SURPRISES: (1) agents/, reports/, docs/ ABSENT on main — no doctrine ledger exists on the frozen line; (2) README:398 claims "no taxi configs/experiments/project/" yet main commits project/ mirrors + working.yaml + the parquet (letter ≠ spirit); (3) ratecode1_sample.parquet = deliberate un-ignored TLC fossil (.gitignore:21-22, Dockerfile.worker COPY); (4) HEAD commit subject itself says "(sync from taxi)". Method: ~60 EREs, saturation reached (final passes 0 new files); 6 false-positive classes hand-adjudicated. Full report in session record. |
+| subagent eb83ab52 (read-only) | Taxi-GROUND-TRUTH @ ref `main` ONLY: `git ls-tree -r -l` blob enumeration + byte sizes, data/ mode fields (symlink/gitlink), ignore-layer rules, every referenced data path resolved (tracked / ignored / out-of-repo), fresh-clone executability verdict REAL-DATA / EXTERNAL-DEP / SYNTHETIC-ONLY / MENTION-ONLY. Worktree observations labeled sklearn-worktree facts. | DELIVERED 2026-08-26 — VERDICT: NO real taxi data reachable from `main`, and none EVER in its 2-commit history (1860709 = origin/main, no divergence). Only real blobs: demo/demo.csv 851 B + experiments/results/univariate/fare_amount_trip_distance/ratecode1_sample.parquet 5,531 B — BOTH synthetic-schema demo content. configs/dataset/taxi.yaml ABSENT; `data/` never existed in main's object store (full-history log empty; zero symlink/gitlink modes). Every taxi reference = MENTION-ONLY (paths into gitignored space). Fresh clone of main: demo pipeline ✔, taxi pipeline ✖ (main:experiments.py:402 concedes "the real taxi data file (absent in CI)"). ~150 MB yellow_tripdata_2024-{01..3}.parquet + out-of-repo taxi_zone_lookup.csv symlink exist ONLY as UNTRACKED sklearn-worktree state. Mention loci pinned: main:experiments.py:53/:58/:69 (training_data / taxi_zone_lookup.csv / joined_sample_live path constants); design intent on record at main README §7 ("public platform branch: NO taxi content"). HUMAN RULING 2026-08-26: DISREGARD the `taxi` branch — that open question is CLOSED, no lane will ever be dispatched against it. Still open: .gitignore promises ratecode1_sample.json sidecar that never landed; pr-1/pr-2 unaudited. Full report in session record. |
+
+PICKUP RULE (rate-limit / connection-loss recovery): if a session dies while
+these rows read IN FLIGHT, re-dispatch NOTHING automatically — on resume,
+check each lane's report arrival first; process every report exactly once
+(registry discipline); flip rows to DELIVERED here with one-line outcomes.
+Prior cycle's lanes DELIVERED (W1 ledger / W2 registry / W3 code+policy,
+plus seven read-only investigator-verifier lanes); next scheduled lane:
+REGISTRY-AUDIT sweep per D31, first opportunity after the 2026-08-25
+governance landing.
+Prior-session DG-MAP-1..4 cartography lanes remain LAPSED — treat as NOT
+in flight; senior synthesis queued behind them stays void.
 
 Pending-change inventory is mirrored on the CHANGE BOARD (issue #5, locked):
 rows R1–R5 covered the uncommitted ETL batch, ingest-surface tests, the
@@ -71,6 +118,23 @@ promotion into real inputs/outputs entries or a dedicated row is OWED;
 end-state classification awaits the RGC follow-up rulings):
 experiments/more_modeling/{16..22}_*.py (7 scripts) and
 experiments/results/more_modeling/*.csv (7 result CSVs).
+
+Added 2026-08-26 (owner: main agent, human-directed, THIS session):
+- agents/contracts/MAIN_AGENT_CONTRACT.md — Ground-truth law bullet in §6
+  (after "Reports are hypotheses until verified").
+- agents/contracts/WORKER_CONTRACT.md — Ground-truth law bullet in Live
+  fact-checking duty (after Step-0 hash gate).
+- agents/contracts/REVIEWER_CONTRACT.md — Ground-truth law bullet in §6
+  Independence & fabrication guards (verdict consequence variant).
+All three uncommitted; landing = local gates green + explicit human go on
+the presented diff. CONTRACT_TEMPLATE.md intentionally untouched (inherits
+via its hard reference to WORKER_CONTRACT.md).
+Extended same day (board-work mechanics, human-directed): MAIN_AGENT_
+CONTRACT §6 "Live ops board" bullet (project ids, GraphQL draft-issue
+mutation incl. projectItem-not-item trap, Status field/option ids, card
+hygiene prefixes); WORKER_CONTRACT "Live ops board" section (availability-
+layer rules, write-only-when-contracted); REVIEWER_CONTRACT §6 "Board
+provenance" guard (cards are never evidence).
 
 ## Standing hazards (learned the hard way)
 - `/tmp` is namespaced PER TOOL CALL here — nothing persists between calls;

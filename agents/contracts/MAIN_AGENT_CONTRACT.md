@@ -105,6 +105,17 @@ more reading `parse_numeric` than any checklist produced).
   (D4).
 - Reports are hypotheses until verified: re-run cheap high-signal checks
   yourself; expensive full-suite runs may stay delegated once corroborated.
+- **Ground-truth law (2026-08-26): every claim is verifiable and
+  transparently evidenced — traceable to a primary source a fresh agent can
+  resolve.** Indirect evidence never substitutes for the underlying fact: a
+  MENTION of a thing is not proof the thing exists or happens. A config key
+  naming `taxi.yaml`, a ledger row citing an artifact, a doc line describing
+  a gate — each is a pointer to VERIFY, not verification itself. Before
+  asserting the fact, resolve the primary source: the actual blob/ref at a
+  stamped commit, file:line, pasted command output beside its command, byte
+  size or digest. If the primary source cannot be resolved, the claim is
+  carried explicitly marked `UNVERIFIED` — prose proximity never upgrades it.
+  Verdicts state what was verified, by what command, and against which ref.
 - **Assumption audit:** every worker report contains ≥ 3 brief assertions
   re-verified against live code (commands + outputs) PLUS ≥ 1 thing checked
   that the brief never mentioned.
@@ -182,8 +193,37 @@ more reading `parse_numeric` than any checklist produced).
   with agent ids, files under other lanes' custody, path to
   `agents/ledger/STATE.md` — and the receiving agent's step-0 becomes:
   read STATE.md, echo any contradiction with dispatch instructions, STOP
-  stale-on-arrival instead of improvising. Main agent refreshes STATE.md at
-  every arbitration/push; a dispatch without a CONTEXT block is incomplete.
+  stale-on-arrival instead of improvising. Main agent refreshes STATE.md
+  at every material event (BOARD-CHECKPOINT DISCIPLINE 2026-08-26,
+  superseding arbitration/push-only); a dispatch without a CONTEXT block
+  is incomplete.
+
+- **Live ops board (GitHub Projects, ratified 2026-08-26):** the
+  AVAILABILITY layer for lane/checkpoint state — survives local loss and
+  session death; STATE.md stays the PRIMARY record and every card body
+  points back to it. Project: #4 "Broadway Ops Board", owner `fbarulli`,
+  project node id `PVT_kwHOAZFnCc4Bhhjq`,
+  https://github.com/users/fbarulli/projects/4 . Update it at EVERY
+  material event — same triggers as the STATE.md checkpoint discipline.
+  Mechanics (figured out live 2026-08-26; gh ≥2.96 behavior):
+  * Auth once: `gh auth refresh --hostname github.com -s read:project,project`
+    (device flow; plain tokens lack project scopes).
+  * ADD a card — `gh project item-add` takes ONLY `--url` (existing
+    issues/PRs); draft cards go through GraphQL:
+    `gh api graphql -f query='mutation($p:ID!,$t:String!,$b:String!){addProjectV2DraftIssue(input:{projectId:$p,title:$t,body:$b}){projectItem{id}}}' -f p=PVT_kwHOAZFnCc4Bhhjq -f t="TITLE" -f b="BODY"`
+    Payload field is `projectItem`, NOT `item`; a GraphQL error rejects
+    the WHOLE query — no partial cards land.
+  * SET Status — Status field id `PVTSSF_lAHOAZFnCc4Bhhjqzhgc_SQ`
+    (re-derive anytime: `gh project field-list 4 --owner fbarulli`);
+    option ids Todo `f75ad846` · In Progress `47fc9ee4` · Done `98236657`;
+    `mutation($p:ID!,$i:ID!,$f:ID!,$o:String!){updateProjectV2ItemFieldValue(input:{projectId:$p,itemId:$i,fieldId:$f,value:{singleSelectOptionId:$o}}){projectV2Item{id}}}`.
+  * CARD HYGIENE: title prefixes carry state vocabulary —
+    `[LANDED-PENDING]` (diff presented, awaiting human go) · `Q#` (open
+    question routed to human) · `[DONE RECORD]` (closed lane outcome);
+    body MUST cite primary sources (file:line, byte sizes, refs) and name
+    the STATE.md row it mirrors; each report is processed into the board
+    EXACTLY once (registry discipline). These GitHub node ids are
+    system-resolvable constants of this project, not ledger event-ids.
 
 - **Commit trailer convention** (every main-agent commit, forward-looking):
   trailing lines `Contract: <id>`, `Gates: <gate verdict + suite tail>`,

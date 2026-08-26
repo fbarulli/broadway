@@ -44,6 +44,15 @@ against — re-derive, don't trust:
 - **Step-0 hash gate:** first action of every dispatch is
   `git rev-parse --short HEAD` against the dispatch stamp. Mismatch → STOP
   before reading or acting on anything else in the brief.
+- **Ground-truth law (2026-08-26):** a MENTION of a thing is not proof the
+  thing exists or happens. Every fact you rely on or report resolves to a
+  primary source you opened yourself — the actual blob/ref at the stamped
+  commit, file:line, pasted command output beside its command, byte size or
+  digest. Indirect evidence (a config key naming a file, a ledger row citing
+  an artifact, doc prose describing behavior) is a pointer to VERIFY, never
+  verification itself. Claims whose primary source cannot be resolved are
+  carried explicitly marked `UNVERIFIED` — prose proximity never upgrades
+  them.
 - **Re-verify ≥ 3 assertions** from the brief against live code before
   implementing; paste the commands + outputs into your report.
 - **Assumption audit (mandatory report section):** those three
@@ -72,6 +81,24 @@ lint (ruff), types (mypy), config-parse, and the coverage floor live ONLY in
 that script; assembling gates ad hoc is how F401-class residue reached
 remote CI (incident GATE-SSOT, FIXES.md). A full-suite pytest run alone does
 not substitute.
+
+## Live ops board (GitHub Projects)
+
+The session mirrors operational state to GitHub Project #4 "Broadway Ops
+Board" (owner `fbarulli`, https://github.com/users/fbarulli/projects/4) —
+an AVAILABILITY layer that survives local loss or connection death.
+
+- It is NEVER a primary record: card bodies are pointers; every fact
+  resolves against `STATE.md` / git (Ground-truth law above).
+- Step-0 reads it alongside `STATE.md`; a card contradicting either is
+  echoed stale-on-arrival, never improvised around.
+- You write cards ONLY when your contract directs a checkpoint (lane
+  dispatch/settle, long-dispatch heartbeat). One card per material
+  event; title prefixed with your role + lane id; body cites the primary
+  record row it mirrors. Mutation mechanics live in
+  MAIN_AGENT_CONTRACT §6 (draft-issue GraphQL mutation, Status options).
+- Never flip or edit a card you did not create without recording who
+  changed it and why in the mirrored STATE.md row.
 
 ## Report format (every dispatch)
 
