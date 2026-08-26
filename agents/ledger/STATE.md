@@ -63,10 +63,12 @@ warnings never count (per-path pins only, D4); trailing text doesn't count.
 
 ## Uncommitted worktree content (do NOT duplicate or revert)
 Untracked batch owned by a prior human-directed session, present at this
-refresh — every lane treats it as read-only context (DELIBERATELY untracked:
-the "landed" wording above refers to the R3 BOARD-paperwork mirror, NOT git
-tracking of these files; end-state classification awaits the RGC follow-up
-rulings):
+refresh — every lane treats it as read-only context (TRACKED since landing
+commit 229ba2d per human ruling R3 — the earlier "deliberately untracked"
+note is superseded; registry custody = parity-SHARED via RGC-1 but NO owning
+GATE row yet, so the probe-E allowlist seed carries it until 2026-09-08:
+promotion into real inputs/outputs entries or a dedicated row is OWED;
+end-state classification awaits the RGC follow-up rulings):
 experiments/more_modeling/{16..22}_*.py (7 scripts) and
 experiments/results/more_modeling/*.csv (7 result CSVs).
 
@@ -158,7 +160,12 @@ Probe-E allowlist clock: four prefix seeds (experiments/multivariate/,
 experiments/polynomial_regression_et_all/, experiments/univariate/fare_amount_trip_distance/,
 project/tests/) EXPIRE 2026-09-08 — promote each into real inputs/outputs
 registry entries before expiry or the new-surface tripwire goes RED by
-design. Canonical RGC
+design. · REGISTRY-AUDIT fill (2026-08-26, CD prep): GATE-SURF-68 + GATE-
+ETL-117 validated_by now cite live tests; GATE-INFRA-122 stays empty —
+NO test drives experiments.py main() dispatcher (routing + verify-JSON
+test owed, one pytest suffices); more_modeling/** tracked-but-unowned
+(superseded-untracked note above) joins the same 2026-09-08 promotion
+clock. Canonical RGC
 pointer (eight-packet batch, ruling #5): the full RGC-1..8 checklist lives
 at agents/ledger/arbitration/2026-08-24/gap-foreign.md (~:182-210);
 RGC-1 — the parity SHARED flip — is the hard prerequisite for every later

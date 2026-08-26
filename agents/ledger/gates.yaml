@@ -1,6 +1,6 @@
 # Gate registry SSOT — hand-maintained; the {01..09} gate fragments it consolidated predate git custody.
 meta:
-  head: 88e2931
+  head: 1bce284
   assembled: '2026-08-24'
   source_fragments:
   - agents/ledger/gates/01-ingest.md
@@ -704,7 +704,8 @@ gates:
   - 'retirement/fork guard cites BOTH dialect facts (packet F #26 rider feeding GATE-CFG-104): the twin imports CONFIGS_DIR from broadway.config.loader (:6) while project/data.py hardcodes relative Paths (:31-47)'
   touched_by:
   - project.etl.process (caller chain)
-  validated_by: []
+  validated_by:
+  - project/tests/test_process_config.py::test_project_config_matches_process_constants
   if_changed:
   - legacy global names consumed by process_data (GATE-ETL-19)
   findings: []
@@ -2375,7 +2376,8 @@ gates:
   - global *.png ignore (:23) keeps experiment PNGs (e.g. experiments/results/univariate/**/01_*.png …) UNTRACKED; only !reports/figures/*.png (:24) is exempted
   touched_by:
   - ad-hoc experiment scripts only; NO broadway/src writer, NO test
-  validated_by: []
+  validated_by:
+  - tests/test_governance_probes.py::test_probe_e_new_surface_tripwire_live_and_falsifiable
   if_changed:
   - loosening :23 or :19 silently changes which result surfaces are committed; any new figure format under reports/figures needs its own negation
   findings: []
