@@ -88,6 +88,21 @@ gate evidence); out-of-scope pushes still present. EFFECT IMMEDIATE:
 P1 delivery + README hunk + ci.yml byte-proof + full CI green triggers
 the full sequence WITHOUT further asks: push sklearn -> ff taxi ->
 push main -> report shas.
+Refresh 10, same day: LANDING COMPLETE — all three refs pushed, every
+hook run LOCAL-CI GREEN (full tier incl pytest): origin/sklearn 23d15ca
+(sweep p1 + contract amendment), origin/taxi ff 7c5ca95..23d15ca,
+origin/main 1860709..7136943 (24e8e0a docs-gov Q1/Q2 + 7136943 sweep).
+Batch#2 CLOSED. Follow-up cards opened: value-blind CI sim, load_sample
+coverage, taxi-runtime rebinding (C3), series-vocab coexistence.
+Refresh 11, same day: HUMAN DOCTRINE RULING (verbatim): "main = data
+agnostic and fully 'working' meaning only clean updates from dev /
+taxi = up to date use case, fully green / all other branches are dev"
+(+ earlier: "taxi is to forever be taxi... main is the blank slate").
+CODIFIED verbatim into MAIN_AGENT_CONTRACT section 2; freeze proposal
+REJECTED by this ruling — taxi keeps receiving ffs after every green
+sklearn push. Structural consequence recorded in-contract: dataset-truth
+values inside parity-shared files serve two legitimate truths; open
+board item, not silently decided.
 
 2026-08-25 (second refresh), during the ten-ruling governance batch: the
 human ruled on ten pending decisions; seven read-only investigator/verifier
