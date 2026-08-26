@@ -55,7 +55,7 @@ def load_dataset(cfg: dict) -> pd.DataFrame:
     """Demo rows from the config parquet with the config filters."""
     ds = cfg["dataset"]
     df = pd.read_parquet(ds["parquet"])
-    df = df[df[ds["fare_column"]] > ds["min_fare"]]
+    df = df[df[ds["fare_column"]] > ds["min_target_value"]]
     duration = ((df[ds["dropoff_datetime"]] - df[ds["pickup_datetime"]])
                 .dt.total_seconds() / 60)
     keep = (duration > 0) & (duration < ds["max_duration_minutes"])

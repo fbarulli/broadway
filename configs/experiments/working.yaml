@@ -1,12 +1,12 @@
 # Demo working dataset (main branch) — mirrors the taxi working.yaml
 # contract so the shared worker image + CI boot checks resolve on main.
 # Backed by the synthetic demo dataset; no taxi content.
-parquet: experiments/results/univariate/fare_amount_trip_distance/ratecode1_sample.parquet
+parquet: experiments/results/univariate/sample_evidence/sample_evidence.parquet
 columns:
-  fare: target
+  target: target
   pickup_datetime: pickup_datetime
   dropoff_datetime: dropoff_datetime
-min_fare: 0.0
+min_target_value: 0.0
 max_duration_minutes: 240
 time_buckets:
   day: {start: 6, end: 16}

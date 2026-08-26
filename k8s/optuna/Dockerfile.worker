@@ -8,8 +8,10 @@ COPY experiments/mlflow/03_optuna_worker.py /app/experiments/mlflow/03_optuna_wo
 COPY experiments/mlflow/_common.py /app/experiments/mlflow/_common.py
 COPY configs/experiments/mlflow.yaml /app/configs/experiments/mlflow.yaml
 COPY configs/experiments/working.yaml /app/configs/experiments/working.yaml
-COPY experiments/results/univariate/fare_amount_trip_distance/ratecode1_sample.parquet \
-     /app/experiments/results/univariate/fare_amount_trip_distance/ratecode1_sample.parquet
+COPY experiments/results/univariate/sample_evidence/sample_evidence.parquet \
+     /app/experiments/results/univariate/sample_evidence/sample_evidence.parquet
+COPY experiments/results/univariate/sample_evidence/sample_evidence.json \
+     /app/experiments/results/univariate/sample_evidence/sample_evidence.json
 # Base image sets PYTHONPATH=/app/src (for broadway.*); the worker ALSO needs
 # the repo root on the path so `project.*` and the baked _common.py resolve.
 ENV PYTHONPATH="/app/src:/app"

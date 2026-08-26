@@ -6,7 +6,7 @@
 # the battle orchestrator (01, hpo.run_hpo) and the k8s per-model workers
 # (03, hpo.run_model_study) — the k8s worker only injects the RDB storage_url
 # at runtime, so no storage_url is set here.
-sample_size: 1000
+sample_size: 50  # evidence population is 50 rows (load_sample raises otherwise)
 test_fraction: 0.2
 seed: 42
 continuous_features: [feature_1, feature_2]

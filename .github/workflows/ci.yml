@@ -44,7 +44,7 @@ jobs:
       - name: Lint (ruff)
         run: >
           uv run ruff check src tests experiments/mlflow experiments/fare_prediction
-          experiments.py experiments_ui.py project/working.py project/data.py
+          experiments_ui.py project/working.py project/data.py
 
       - name: Type check (mypy)
         run: uv run mypy src/broadway

@@ -12,18 +12,19 @@ metadata:
 data:
   config.yaml: |
     dataset:
-      name: ratecode1_sample
-      parquet: /app/experiments/results/univariate/fare_amount_trip_distance/ratecode1_sample.parquet
-      target: total_amount
-      min_fare: 2.5
+      name: sample_evidence
+      parquet: /app/experiments/results/univariate/sample_evidence/sample_evidence.parquet
+      target: target
+      fare_column: target
+      min_target_value: 2.5
       max_duration_minutes: 240
-      pickup_datetime: tpep_pickup_datetime
-      dropoff_datetime: tpep_dropoff_datetime
-      features: [trip_distance, duration_minutes, pickup_hour, pickup_weekday]
+      pickup_datetime: pickup_datetime
+      dropoff_datetime: dropoff_datetime
+      features: [feature_1, feature_2, feature_3, duration_minutes, hour]
     databases:
       optuna: {driver: postgresql+psycopg2, host: postgres, port: "5432", name: optuna}
       mlflow: {driver: postgresql+psycopg2, host: postgres, port: "5432", name: mlflow}
     mlflow:
       tracking_uri: http://mlflow:5000
-      experiment: ratecode1_model_battle
+      experiment: model_battle
       allowed_hosts: "*"   # local kind cluster; tighten for real deployments

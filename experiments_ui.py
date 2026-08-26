@@ -3,9 +3,9 @@
 The UI is multi-series: any folder under ``experiments/`` that contains at
 least one numbered ``NN_*.py`` step script is a series, addressed by its id
 (the folder path relative to ``experiments/``, e.g.
-``univariate/fare_amount_trip_distance``) via the ``?focus=<series id>`` query
+``univariate/sample_evidence``) via the ``?focus=<series id>`` query
 parameter on every page. The default focus is the univariate
-``fare_amount_trip_distance`` series.
+``sample_evidence`` series.
 
 To add a series: drop a folder with numbered ``NN_*.py`` scripts under
 ``experiments/``; its results live in ``experiments/results/<series id>`` and
@@ -40,10 +40,10 @@ from fastapi.staticfiles import StaticFiles
 logger = logging.getLogger(__name__)
 
 EXPERIMENTS_ROOT = Path(__file__).resolve().parent / "experiments"
-DEFAULT_SERIES = "univariate/fare_amount_trip_distance"
+DEFAULT_SERIES = "univariate/sample_evidence"
 OBSERVATIONS_DIR = Path(__file__).resolve().parent / "artifacts" / "experiments" / "observations"
 
-_PARQUET_CONSTANTS = ("CLEAN_PARQUET", "FULL_PARQUET", "RATECODE1_PARQUET")
+_PARQUET_CONSTANTS = ("CLEAN_PARQUET", "FULL_PARQUET", "SAMPLE_EVIDENCE_PARQUET")
 _EXTERNAL_RE = re.compile(r"read_training_sample|load_metered|load_working")
 _NUMBER_PREFIX = re.compile(r"^\d+[a-z]?:\s*")
 _STEM_PREFIX = re.compile(r"^\d+")

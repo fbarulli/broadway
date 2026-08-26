@@ -53,6 +53,10 @@ MODEL_KEYS = {display_name(key): key for key in model_keys()}
 def load_metered_with_features() -> pd.DataFrame:
     """Metered rows + hour + time_bucket columns (battle scope)."""
     df = load_metered()
+    # SSOT: the literal "pickup_datetime" here mirrors working.yaml's
+    # columns.pickup_datetime binding (project.working.PICKUP_DATETIME_COL) —
+    # the binding, not this literal, is the single source of truth for the
+    # column name; they coincide on main by construction.
     df["hour"] = df["pickup_datetime"].dt.hour
     df["time_bucket"] = df["hour"].map(time_bucket)
     return df
