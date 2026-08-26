@@ -330,10 +330,11 @@ verification.
 Immutable coding rules: `WORKER_CONTRACT.md`. Plots use seaborn unless stated.
 Docs updated in the SAME commit as any change (`README.md` current at ALL
 times: test counts, commands, paths; `dataflow.md`, `src/broadway/stats/API.md`,
-`tests/README.md`). Scratch docs are never touched (`01.md`, `agents/notes/TODO_*.md`,
-`GOALS.md`, `LEARN.md`, `trust.md`, `synth.md`, `project.md`,
-`FEEDBACK.md`, `DATA_VALIDATION.md`, `GENERAL_TODO.md`, `project/STATS.md`;
-`SENIOR.md` retired from this list and from the tree 2026-08-26).
+`tests/README.md`). Scratch docs are never touched (`agents/notes/TODO_01.md`,
+`synth.md`, `project.md`, `project/STATS.md`).
+Retired 2026-08-26 (removed from the tree; names kept here as plain prose,
+not backticked, so the path probe stays green): 01.md, GOALS.md, LEARN.md,
+trust.md, FEEDBACK.md, DATA_VALIDATION.md, GENERAL_TODO.md, SENIOR.md.
 `HANDOFF.md` is maintained on explicit user request.
 
 ## 12. Git & product policy
@@ -463,6 +464,15 @@ Historical rulings remain verbatim in DECISIONS.md and
   registry test blocks landing exactly like any other gate.
 - Before proposing a change, run the blast-radius query for the
   target path; its output IS the list of rows the change owes.
+- Blast-radius is now a WORKER duty at investigation time (2026-08-26):
+  the dispatched agent runs `uv run python agents/tools/render_gates.py
+  --blast-radius <path>` on every surface it intends to touch BEFORE
+  editing, as part of its step-0 investigation (WORKER_CONTRACT "Surface
+  & gate registration duty" — blast-radius check FIRST), and pastes the
+  output in its report. The main agent VERIFIES that the worker's
+  reported blast radius matches the rows actually owed at landing; a
+  "no gate owns or references" miss on a path the worker modified is a
+  finding the worker must close by ADDING the owning row.
 - Staleness is loud by design: deleted owners, renamed symbols,
   vanished pins, and broken id references fail the registry test.
   Silence is a bug in the test, report it like one.

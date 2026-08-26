@@ -7,19 +7,21 @@
 > instructions. Stale on arrival = STOP-and-report, never improvise.
 
 ## Last refreshed
-2026-08-26 (diagnostic-track session): two main-agent commits landed on
-origin/sklearn — `0ea2267` (timeline: `AnalysisStep.diagnostic:
-DiagnosticResult | None` + report renderer Evidence/Warnings sections) and
-`7c9627b` (stats: D3 `constant_variance_diagnostic` as typed
-`DiagnosticResult`). Both full local CI green (LOCAL-CI GREEN, 7 gates).
-Platform stays data-agnostic: no taxi literal introduced into src/.
-Notes `agents/notes/01.md` (D1 design + status addendum) and
-`agents/notes/02.md` (data-agnostic confirmation + status addendum) carry
-the post-landing reconciliation; D1/D3 landed, `plot_residuals()` Q-Q +
-histogram split and D4 (influence) remain open. Two read-only
-investigation lanes dispatched (plot-split, D4-influence); board cards
-mirroring this refresh posted per §6. STATE.md stays the primary record;
-git is authoritative for SHAs.
+2026-08-26 (diagnostic-track session, supersedes prior 2026-08-26 paragraph):
+the typed diagnostic matrix is FULLY LANDED on origin/sklearn —
+`0ea2267` (timeline: `AnalysisStep.diagnostic: DiagnosticResult | None`
++ report renderer Evidence/Warnings sections), `7c9627b` (D3
+`constant_variance_diagnostic`), `1ac00f9` (D4 `influence_diagnostic`,
+D5 `residual_distribution_diagnostic`, plot split into
+`plot_residuals_vs_fitted`/`_qq`/`_histogram`, notes finalized). Every
+commit full local CI green. Platform stays data-agnostic: no taxi literal
+introduced into src/. Design notes `agents/notes/01.md` (D1 design) and
+`agents/notes/02.md` (data-agnostic confirmation) served their purpose,
+carried completion addenda, and are ARCHIVED — deleted 2026-08-26; their
+conclusions live in the commits above and the gates.yaml/index registry.
+Board mirrors: [DONE RECORD] Diagnostic matrix complete (1ac00f9) and
+[DONE RECORD] Notes 01+02 finalized — both Done on Broadway Ops Board.
+STATE.md stays the primary record; git is authoritative for SHAs.
 
 2026-08-26 (human-directed governance session): the GROUND-TRUTH LAW clause
 landed in THREE contract files — MAIN_AGENT_CONTRACT §6 Verification +
