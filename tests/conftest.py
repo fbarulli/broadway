@@ -3,6 +3,8 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 
+import pytest
+
 _SNAPSHOT_DIRS = ["artifacts", "reports"]
 _snapshot: dict[str, dict[str, str]] = {}
 
@@ -17,12 +19,19 @@ def _tree_hashes(root: Path) -> dict[str, str]:
     return out
 
 
-def pytest_sessionstart(session: object) -> None:
+def pytest_sessionstart(session: pytest.Session) -> None:
+    # XDIST-1b amendment (a): custody snapshot is controller-only. Under xdist,
+    # workers execute session hooks too; a worker-side RuntimeError here would
+    # surface as noisy internal_error (xdist remote.py hookwrapper path).
+    if hasattr(session.config, "workerinput"):  # xdist worker -> skip
+        return
     for d in _SNAPSHOT_DIRS:
         _snapshot[d] = _tree_hashes(Path(d))
 
 
-def pytest_sessionfinish(session: object, exitstatus: int) -> None:
+def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
+    if hasattr(session.config, "workerinput"):  # xdist worker -> skip
+        return
     problems = []
     for d in _SNAPSHOT_DIRS:
         before = _snapshot.get(d, {})

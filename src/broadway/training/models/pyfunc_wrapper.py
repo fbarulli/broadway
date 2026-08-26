@@ -1,4 +1,11 @@
-"""MLflow PyFunc wrapper — loads a pickled model for inference."""
+"""MLflow PyFunc wrapper — loads a pickled bare model for inference.
+
+SCOPE: kept ONLY for previously logged bare-model artifacts (backward
+compat). New-path artifacts are sklearn Pipelines logged with an explicit
+signature; they load through MLflow's native pyfunc flavor, which carries
+preprocessing inside the Pipeline and enforces the logged signature at
+predict time. This wrapper is a plain pickled-model loader — no functional
+change."""
 
 from __future__ import annotations
 

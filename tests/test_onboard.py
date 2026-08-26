@@ -46,3 +46,24 @@ def test_infer_non_date_string_not_datetime() -> None:
     report = infer("test", df)
     assert report.columns["s"].datetime_candidate is False
     assert report.columns["s"].categorical is True
+
+
+def test_infer_mixed_format_datetime_no_parse_warning() -> None:
+    import warnings
+
+    df = pd.DataFrame(
+        {
+            "ts": [
+                "2024-01-01",
+                "2024-01-02 10:30:00",
+                "2024-01-03",
+                "2024-01-04 08:00:00",
+            ]
+        }
+    )
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        report = infer("test", df)
+    assert report.columns["ts"].datetime_candidate is True
+    assert report.columns["ts"].suggested_role == "datetime"
+    assert not any("format" in str(w.message) for w in caught)

@@ -21,6 +21,8 @@ dependencies = [
     "kubernetes>=32.0.0",
     "python-dotenv>=1.1.0",
     "pytest>=8.4.0",
+    # XDIST-1a: gate parallelization (D19-P3 ruling) — -n 4 --dist worksteal
+    "pytest-xdist>=3.6",
     "pingouin>=0.6.0",
     "statsmodels>=0.14.6",
     "matplotlib>=3.10.0",
@@ -58,6 +60,10 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools.packages.find]
 where = ["src", "."]
 include = ["broadway*", "project*"]
+# deepseek-harness (gitignored DSH checkout) holds node_modules symlink loops:
+# discovery walks it with followlinks=True and spins forever in the
+# editable-build probe whenever uv re-syncs (incident 2026-08-23).
+exclude = ["deepseek-harness*"]
 
 [tool.mypy]
 python_version = "3.12"
@@ -70,6 +76,8 @@ warn_unused_ignores = true
 [tool.ruff]
 target-version = "py312"
 line-length = 100
+
+[tool.ruff.lint]
 # Rules that are INTENTIONAL in this codebase:
 #   B017  — test_loud_failures deliberately asserts blind Exception (that's the test's job)
 #   BLE001 — fail-loud wrappers catch Exception to annotate and re-raise

@@ -38,6 +38,9 @@ class WalkthroughConfig(BaseModel):
     skew_threshold: float
     kurtosis_threshold: float
     shapiro_alpha: float
+    # Subsample seed consumed by stats.assumptions.check_normality; required
+    # so no code-side default can shadow the YAML value.
+    shapiro_seed: int
     imbalance_ratio_threshold: float
     significance_alpha: float
     max_qq_groups: int

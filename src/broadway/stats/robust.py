@@ -32,13 +32,32 @@ def winsorize(df: pd.DataFrame, columns: list[str], cap_quantile: float) -> pd.D
 
 
 def estimation_table(model, alpha: float = 0.05) -> pd.DataFrame:
-    """Coefficient table with robust (HC3) SEs and confidence interval bounds."""
+    """Coefficient table with HC3 robust SEs and confidence interval bounds.
+
+    The HC3_SE / CI_low / CI_high columns are derived from an HC3-robust
+    covariance: this function internally re-fits the covariance of the passed
+    results object with ``get_robustcov_results(cov_type="HC3")`` and reads
+    ``bse`` and ``conf_int(alpha=alpha)`` from that object. The HC3 labels are
+    therefore truthful by construction, regardless of how the input model was
+    fitted (e.g. a plain non-robust OLS fit still yields true HC3 columns).
+
+    The input must be a fitted statsmodels regression results object exposing
+    ``get_robustcov_results``; anything else raises TypeError.
+    """
+    if not hasattr(model, "get_robustcov_results"):
+        raise TypeError(
+            "estimation_table requires a fitted statsmodels regression results "
+            "object exposing get_robustcov_results (needed to derive the HC3 "
+            "standard errors and confidence intervals); "
+            f"got {type(model).__name__!r}"
+        )
+    robust = model.get_robustcov_results("HC3")
     names = model.model.exog_names
-    ci = pd.DataFrame(model.conf_int(alpha=alpha), index=names)
+    ci = pd.DataFrame(robust.conf_int(alpha=alpha), index=names)
     return pd.DataFrame(
         {
             "coef": pd.Series(model.params, index=names),
-            "HC3_SE": pd.Series(model.bse, index=names),
+            "HC3_SE": pd.Series(robust.bse, index=names),
             "CI_low": ci.iloc[:, 0],
             "CI_high": ci.iloc[:, 1],
         }

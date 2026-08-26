@@ -1,7 +1,7 @@
 """Platform test hygiene — project-layer coupling is FORBIDDEN in the
 platform suite.
 
-Standing rule (HANDOFF.md): every platform test runs on **generated data
+Standing rule (agents/ledger/HANDOFF.md): every platform test runs on **generated data
 only** and never references project-level data or configs. This guard
 fails loudly the moment a platform test regresses:
 
@@ -73,4 +73,26 @@ def test_platform_test_has_no_project_coupling(path: Path) -> None:
     assert not hits, (
         f"{path.name} references project-level data/configs — "
         f"platform tests must use generated data only:\n" + "\n".join(hits)
+    )
+
+
+def _storytelling_modules() -> list[Path]:
+    return sorted(
+        p
+        for root in (
+            REPO_ROOT / "src/broadway/timeline",
+            REPO_ROOT / "src/broadway/reports",
+        )
+        for p in root.glob("**/*.py")
+        if "__pycache__" not in p.parts
+    )
+
+
+@pytest.mark.parametrize("path", _storytelling_modules(), ids=lambda p: p.name)
+def test_storytelling_module_never_imports_broadway_evaluate(path: Path) -> None:
+    text = path.read_text()
+    assert "broadway.evaluate" not in text and "from broadway import evaluate" not in text, (
+        f"{path.relative_to(REPO_ROOT)} imports broadway.evaluate — the "
+        "storytelling layer (walkthrough/timeline/reporting) must not consume "
+        "the CV path; evaluate/module.py is the sole production caller"
     )

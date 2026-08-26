@@ -11,7 +11,6 @@ YAML → Pydantic loading and dataframe contract enforcement.
 
 - `test_config.py` — every step type loads from YAML; missing/invalid config raises.
 - `test_contracts.py` — generated-data columns/nulls validated per `configs/dataset/test.yaml` (never real data).
-- `test_pandera_schemas.py` — raw schema generated from `DatasetContract.columns`.
 - `test_analysis_contract.py` — `AnalysisContract` validation + `require_mode` guardrails.
 - `test_training_contracts.py`, `test_evaluate_contracts.py` — `TrainingResult` / `EvaluationResult` models.
 
@@ -49,7 +48,7 @@ Run graph, sidecar records, and sample specs.
 
 `src/broadway/stats/` (pandas/numpy only).
 
-- `test_base.py`, `test_plan.py` — stratified sampling + `AnalysisPlan` (de)serialization.
+- `test_plan.py` — `AnalysisPlan` (de)serialization.
 - `test_effect_size.py`, `test_assumptions.py`, `test_anova.py`, `test_post_hoc.py` — eta²/omega², Levene/normality, ANOVA/Welch/Kruskal, Games-Howell.
 - `test_regression.py`, `test_diagnostics.py`, `test_time_series.py`, `test_baseline.py` — OLS/robust SE, residual diagnostics, DW/ACF, LightGBM baseline.
 - `test_describe.py`, `test_stats_module.py` — describe result + the `stats run` step.
@@ -63,7 +62,6 @@ Run graph, sidecar records, and sample specs.
 
 ## Modeling / features / baseline
 
-- `test_ml_pipeline.py` — `FeaturePipeline` fit/transform/fit_transform.
 - `test_builders.py`, `test_generic_features.py` — feature-builder registry + generic datetime/categorical builders.
 - `test_baseline_module.py` — mode-dispatched `BaselineResult`.
 
@@ -74,13 +72,11 @@ Run graph, sidecar records, and sample specs.
 ## Pipeline lifecycle / dispatch
 
 - `test_full_dispatch.py` — `full` resolves the mode-specific flow.
-- `test_lifecycle.py` — end-to-end chain wiring.
 
 ## CLI / integration / soundness
 
 - `test_cli.py` — dispatch + argparse errors.
 - `test_integration.py` — synthetic end-to-end: load → clean → split → train → evaluate.
-- `test_imports.py` — all modules import; no stale references.
 - `test_loud_failures.py` — silent-failure regressions (missing/malformed artifacts, non-finite metrics).
 - `test_reports.py` — `reports/` renderers (`index.md`, per-step markdown).
 - `test_surface_integrity.py` — tracked `reports/` markdown link resolution + 5 MB HTML / 2 MB PNG size caps (read-only).

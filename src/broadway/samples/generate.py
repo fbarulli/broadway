@@ -143,6 +143,9 @@ def generate_sample(name: str, samples_dir: Path | None = None) -> Path:
         ],
         "definition_sha256": _canonical_spec_sha256(spec),
         "artifact_sha256": _file_sha256(artifact),
+        # DOCUMENTED SILENCE (determinism ledger d): wall-clock bytes — this
+        # timestamp makes provenance JSON run-unique by design; pinned only
+        # once a freeze flag (pinned-timestamp config/env) exists.
         "created_at": datetime.now(UTC).isoformat(),
     }
     artifact.with_suffix(".json").write_text(

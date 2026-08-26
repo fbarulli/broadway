@@ -64,7 +64,6 @@ class EnvironmentConfig(BaseModel):
     data_dir: str
     raw_subdir: str
     processed_subdir: str
-    download_chunk_size: int
     mlflow_tracking_uri: str
     database_user: str
     database_password: str
@@ -76,7 +75,6 @@ class EnvironmentConfig(BaseModel):
     api_replicas_min: int
     api_replicas_max: int
     api_hpa_cpu_threshold: int
-    monitoring_schedule: str
 
 
 class DerivedFeature(BaseModel):
@@ -91,12 +89,20 @@ class EncodingConfig(BaseModel):
     smoothing: int | None
 
 
+class BuilderParams(BaseModel):
+    """Declared inputs for multi-input builders (e.g. ``same_group``).
+    Absent block -> builders keep their generic-column defaults."""
+    group_col: str
+    lookup_col: str
+
+
 class FeatureConfig(BaseModel):
     include: list[str]
     exclude: list[str]
     derived: list[DerivedFeature]
     encodings: list[EncodingConfig]
     builder_module: str | None = None
+    builder_params: BuilderParams | None = None
 
 
 class ModelConfig(BaseModel):
@@ -126,13 +132,66 @@ class HPOConfig(BaseModel):
     storage_url: str | None = None
 
 
+class DataSourceRef(BaseModel):
+    """The experiment's declared data source — a required, typed config field.
+
+    ``loader`` names the loader that resolves the experiment's data
+    (``canonical`` parquet, ``joined`` cache, ``named_sample`` @version,
+    ``pinned`` artifact); ``version`` is the immutable sample version and is
+    required exactly when ``loader == "named_sample"``; ``schema_contract``
+    names the schema module the source is bound to.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+    loader: Literal["canonical", "joined", "named_sample", "pinned"]
+    version: str | None = None
+    schema_contract: str
+
+    @model_validator(mode="after")
+    def _validate_version_rule(self) -> DataSourceRef:
+        if self.loader == "named_sample" and self.version is None:
+            raise ValueError(
+                "data_source.loader='named_sample' requires data_source.version "
+                "(the immutable sample version, e.g. 'v3')"
+            )
+        if self.loader != "named_sample" and self.version is not None:
+            raise ValueError(
+                f"data_source.version is only valid for loader='named_sample'; "
+                f"got version={self.version!r} for loader={self.loader!r}"
+            )
+        return self
+
+
+class PreprocessingStepConfig(BaseModel):
+    """One ordered preprocessing step of an experiment's pipeline recipe.
+
+    ``type`` names the builder-registered step kind (``target_encoding``,
+    ``frequency_encoding``, ``one_hot``, ``passthrough``); ``columns`` is the
+    name-driven column list enforced against the bound schema contract;
+    ``params`` carries step-specific tuning values (e.g. ``smoothing``).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+    type: Literal["target_encoding", "frequency_encoding", "one_hot", "passthrough"]
+    columns: list[str]
+    params: dict[str, float | int | str | bool] = {}
+
+
+# Prefix marking HPO search-space params that tune preprocessing (pre__<step>__<param>)
+# rather than the registry-validated model params. Single source: schema.py owns the
+# constant, trainer.py imports it — never reversed.
+PRE_PARAM_PREFIX = "pre__"
+
+
 class ExperimentConfig(BaseModel):
+    data_source: DataSourceRef
     features: FeatureConfig
     model: ModelConfig
     split: SplitConfig
     random_state: int
     target_metric: str
     hpo: HPOConfig | None = None
+    preprocessing: list[PreprocessingStepConfig] = []
 
     @model_validator(mode="after")
     def _validate_hpo_search_space(self) -> ExperimentConfig:
@@ -140,11 +199,17 @@ class ExperimentConfig(BaseModel):
             return self
         for spec in self.hpo.models:
             valid_params = allowed_params(spec.name)
-            invalid_params = set(spec.search_space) - valid_params
+            model_params = {
+                key: value
+                for key, value in spec.search_space.items()
+                if not key.startswith(PRE_PARAM_PREFIX)
+            }
+            invalid_params = set(model_params) - valid_params
             if invalid_params:
                 raise ValueError(
                     f"invalid HPO search-space params for model '{spec.name}': "
-                    f"{sorted(invalid_params)}. valid params: {sorted(valid_params)}"
+                    f"{sorted(invalid_params)}. valid params: {sorted(valid_params)} "
+                    f"({PRE_PARAM_PREFIX} params tune preprocessing and are not registry-validated)"
                 )
         return self
 
@@ -212,6 +277,7 @@ class TrainStep(BaseModel):
     random_state: int
     n_jobs: int
     cv_folds: int
+    cv_kind: Literal["kfold", "time_series_split"]
     model_file: str
     n_estimators: int
     learning_rate: float

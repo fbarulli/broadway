@@ -4,6 +4,7 @@ __pycache__/
 *.pyc
 .mypy_cache/
 .pytest_cache/
+.ruff_cache/
 mlruns/
 notebooks/
 *.egg-info/
@@ -28,3 +29,11 @@ diagnostics_experiment/
 legend_experiment/
 .coverage
 data/optuna-backup/
+deepseek-harness/
+.mlflow*.db
+
+.uv-cache/
+
+# SECRET-1: local-only resolved optuna DB credentials — never commit.
+k8s/optuna/secret.local.yaml
+k8s/optuna/.secret.local.*

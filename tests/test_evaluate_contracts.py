@@ -6,6 +6,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
+from pandera.errors import SchemaError
 from sklearn.linear_model import LinearRegression
 
 from broadway.analysis.contracts import AnalysisContract, AnalysisMode
@@ -15,6 +16,7 @@ from broadway.config.schema import (
     ColumnRole,
     ColumnSchema,
     DatasetContract,
+    DataSourceRef,
     EnvironmentConfig,
     EtlStep,
     EvaluateStep,
@@ -148,7 +150,7 @@ def test_cross_validate_returns_finite_metrics() -> None:
     X = rng.normal(size=(60, 3))
     coef = np.array([1.5, -2.0, 0.5])
     y = X @ coef + rng.normal(scale=0.1, size=60)
-    metrics = cross_validate(LinearRegression(), X, y, cv_folds=5, random_state=0)
+    metrics = cross_validate(LinearRegression(), X, y, cv_folds=5, random_state=0, cv_kind="kfold")
     assert set(metrics) == {
         "mae", "rmse", "r2", "mape", "max_error", "median_ae", "explained_var"}
     assert all(np.isfinite(value) for value in metrics.values())
@@ -171,7 +173,6 @@ def _make_config(tmp_path: Path) -> PipelineConfig:
         data_dir=str(tmp_path / "data"),
         raw_subdir="raw",
         processed_subdir="processed",
-        download_chunk_size=8192,
         mlflow_tracking_uri=str(tmp_path / "mlruns"),
         database_user="user",
         database_password="pass",
@@ -183,7 +184,6 @@ def _make_config(tmp_path: Path) -> PipelineConfig:
         api_replicas_min=1,
         api_replicas_max=3,
         api_hpa_cpu_threshold=80,
-        monitoring_schedule="0 * * * *",
     )
     dataset = DatasetContract(
         name="synthetic",
@@ -199,6 +199,7 @@ def _make_config(tmp_path: Path) -> PipelineConfig:
         lookup_tables={},
     )
     experiment = ExperimentConfig(
+        data_source=DataSourceRef(loader="canonical", schema_contract="raw"),
         features=FeatureConfig(include=["rooms", "area"], exclude=[], derived=[], encodings=[]),
         model=ModelConfig(type="linear", params={}),
         split=SplitConfig(type="random", validation_size=0.2),
@@ -221,6 +222,7 @@ def _make_config(tmp_path: Path) -> PipelineConfig:
         random_state=42,
         n_jobs=1,
         cv_folds=2,
+        cv_kind="kfold",
         model_file="model.pkl",
         n_estimators=10,
         learning_rate=0.05,
@@ -327,3 +329,91 @@ def test_module_run_writes_baseline_comparison(tmp_path: Path, monkeypatch: pyte
     assert evaluation.baseline is not None
     assert evaluation.baseline.metric == "mae"
     assert evaluation.baseline.improvement is not None
+
+
+def test_module_run_cv_failure_promotes_nothing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """T-BUG-2 invariant: a loud failure on NaN-target input leaves promotion
+    state untouched — no promote_candidate call, no persisted evaluation
+    artifact, no champion (nothing promoted when any stage raises). The
+    assertion is stage-agnostic: whether the failure surfaces at read-side
+    validation (SchemaError) or inside cross_validate (ValueError), the
+    outcome must be identical — loud propagation, no promotion."""
+    cfg = _make_config(tmp_path)
+    monkeypatch.setattr(records, "LINEAGE_DIR", tmp_path / "lineage")
+    out_dir = Path(cfg.environment.data_dir) / cfg.environment.processed_subdir
+    out_dir.mkdir(parents=True, exist_ok=True)
+    df = pd.DataFrame(
+        {
+            "rooms": np.arange(1, 41),
+            "area": np.arange(40, 80),
+            "price": np.arange(1, 41) * 100.0,
+        }
+    )
+    df.to_parquet(out_dir / cfg.etl.train_features_file, index=False)
+    df.tail(10).to_parquet(out_dir / cfg.etl.val_features_file, index=False)
+
+    training_module.run(cfg)
+
+    # NaN in the float64 target: today it passes engineered-frame validation
+    # (the dtype still matches) and surfaces inside cross_validate; a future
+    # upstream null-gate would instead raise SchemaError earlier. Either way
+    # the pinned invariant holds: the run fails loud and nothing is promoted.
+    bad = df.copy()
+    bad.loc[5, "price"] = np.nan
+    bad.to_parquet(out_dir / cfg.etl.train_features_file, index=False)
+
+    calls: list[tuple[str, str]] = []
+    monkeypatch.setattr(
+        evaluate_module,
+        "promote_candidate",
+        lambda dataset_name, artifact_path: calls.append((dataset_name, artifact_path)),
+    )
+    result_path = Path(cfg.evaluate.output_dir) / cfg.evaluate.output_file
+
+    with pytest.raises((ValueError, SchemaError)):
+        evaluate_module.run(cfg)
+
+    assert calls == []
+    assert not result_path.exists()
+    assert evaluate_module.get_champion(cfg.dataset.name) is None
+
+
+def test_module_run_promotes_only_after_persistence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """T-BUG-2 happy path: promotion is observable only after the
+    EvaluationResult is persisted — promote_candidate must find the persisted
+    artifact on disk (and a loadable, promote=True result) at call time."""
+    cfg = _make_config(tmp_path)
+    monkeypatch.setattr(records, "LINEAGE_DIR", tmp_path / "lineage")
+    out_dir = Path(cfg.environment.data_dir) / cfg.environment.processed_subdir
+    out_dir.mkdir(parents=True, exist_ok=True)
+    df = pd.DataFrame(
+        {
+            "rooms": np.arange(1, 41),
+            "area": np.arange(40, 80),
+            "price": np.arange(1, 41) * 100.0,
+        }
+    )
+    df.to_parquet(out_dir / cfg.etl.train_features_file, index=False)
+    df.tail(10).to_parquet(out_dir / cfg.etl.val_features_file, index=False)
+
+    result_path = Path(cfg.evaluate.output_dir) / cfg.evaluate.output_file
+    promote_events: list[str] = []
+
+    def recorded_promote(dataset_name: str, artifact_path: str) -> None:
+        promote_events.append("promote")
+        # At promotion time the evaluation artifact must already exist and be
+        # loadable — persistence strictly precedes promotion (T-BUG-2).
+        assert result_path.exists(), "promote_candidate ran before artifact persistence"
+        persisted = EvaluationResult.model_validate_json(result_path.read_text(encoding="utf-8"))
+        assert persisted.promote is True
+
+    monkeypatch.setattr(evaluate_module, "promote_candidate", recorded_promote)
+
+    training_module.run(cfg)
+    evaluate_module.run(cfg)
+
+    assert promote_events == ["promote"]

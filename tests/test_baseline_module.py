@@ -98,6 +98,99 @@ def test_module_dispatch_prediction(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     assert r.trace.commit
 
 
+# --- baseline step guard rails ----------------------------------------------
+
+
+def test_git_commit_falls_back_to_unknown(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Outside a git work tree the trace records 'unknown' instead of lying."""
+    import subprocess
+
+    def boom(*a: object, **k: object) -> None:
+        raise subprocess.CalledProcessError(128, ["git"])
+
+    monkeypatch.setattr(module.subprocess, "run", boom)
+    assert module._git_commit() == "unknown"
+
+    def missing(*a: object, **k: object) -> None:
+        raise FileNotFoundError("git")
+
+    monkeypatch.setattr(module.subprocess, "run", missing)
+    assert module._git_commit() == "unknown"
+
+
+def test_baseline_requires_baseline_config() -> None:
+    cfg = load_config("baseline", dataset="test", experiment="baseline", analysis="test_hypothesis")
+    no_baseline = cfg.model_copy(update={"baseline": None})
+    with pytest.raises(ValueError, match="baseline step requires baseline config"):
+        module.run(no_baseline)
+
+
+def test_prediction_baseline_requires_dataset_config() -> None:
+    cfg = load_config("baseline", dataset="test", analysis="test")
+    no_dataset = cfg.model_copy(update={"dataset": None})
+    with pytest.raises(ValueError, match="prediction baseline requires a dataset config"):
+        module._compute_baseline(no_dataset)
+
+
+def test_hypothesis_baseline_requires_dataset_and_hypothesis_group() -> None:
+    cfg = load_config("baseline", dataset="test", experiment="baseline", analysis="test_hypothesis")
+    no_dataset = cfg.model_copy(update={"dataset": None})
+    with pytest.raises(ValueError, match="hypothesis baseline requires a dataset config"):
+        module._compute_baseline(no_dataset)
+
+    no_group = cfg.model_copy(
+        update={"analysis": cfg.analysis.model_copy(update={"hypothesis": None})}
+    )
+    with pytest.raises(
+        ValueError, match="requires an analysis contract with a hypothesis group"
+    ):
+        module._compute_baseline(no_group)
+
+
+def test_module_dispatch_causal(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The causal arm dispatches through causal.run with the merged CausalStep
+    config and persists a sample-size baseline result."""
+    cfg = load_config("baseline", dataset="test", experiment="baseline", analysis="test_causal")
+    assert cfg.analysis is not None
+    cfg = cfg.model_copy(
+        update={
+            "causal": CausalStep(
+                treatment_column="trt",
+                outcome_column="out",
+                power=0.8,
+                alpha=0.05,
+                effect_size=0.5,
+                output_dir=str(tmp_path),
+                output_file="design.json",
+            ),
+            "baseline": cfg.baseline.model_copy(update={"output_dir": str(tmp_path)}),
+        }
+    )
+    monkeypatch.setattr(records, "LINEAGE_DIR", tmp_path / "lineage")
+
+    module.run(cfg)
+
+    saved = load_result(tmp_path / cfg.baseline.output_file)
+    assert saved.mode == AnalysisMode.CAUSAL
+    assert saved.metric == "sample_size"
+
+
+def test_hypothesis_baseline_single_observation_group_std_is_nan() -> None:
+    """n=1 groups report std=NaN in the persisted details (pandas ddof=1
+    semantics), never a fake 0.0."""
+    import math
+
+    df = pd.DataFrame({"g": ["a", "a", "b"], "t": [1.0, 2.0, 7.0]})
+    r = hypothesis.run(df, "t", "g", ["a", "b"])
+    means = r.details["group_means"]
+    assert means["b"]["count"] == 1
+    assert math.isnan(means["b"]["std"])
+    assert means["a"]["std"] == pytest.approx(0.5 ** 0.5)
+    assert r.value == pytest.approx(5.5)  # mean(b)=7.0 - mean(a)=1.5 range
+
+
 def test_improvement_regression_lower_is_better() -> None:
     b = BaselineResult(
         mode=AnalysisMode.PREDICTION,

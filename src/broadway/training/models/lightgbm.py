@@ -6,4 +6,4 @@ from lightgbm import LGBMRegressor
 
 
 def create(**params: float | str) -> LGBMRegressor:
-    return LGBMRegressor(**{k: v for k, v in params.items() if k != "type"})  # type: ignore[arg-type]
+    return LGBMRegressor(**params)  # type: ignore[arg-type]

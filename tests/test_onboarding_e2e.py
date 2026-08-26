@@ -32,6 +32,7 @@ def test_init_and_run_external_dataset(
     shutil.copytree(REPO_ROOT / "configs" / "environment", configs_dir / "environment")
     shutil.copytree(REPO_ROOT / "configs" / "step", configs_dir / "step")
     shutil.copytree(REPO_ROOT / "configs" / "flow", configs_dir / "flow")
+    shutil.copy(REPO_ROOT / "configs" / "onboard.yaml", configs_dir / "onboard.yaml")
 
     monkeypatch.setattr(loader, "CONFIGS_DIR", configs_dir)
     monkeypatch.setattr(onboard_module, "CONFIGS_DIR", configs_dir)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import pandas as pd
@@ -638,3 +639,201 @@ def test_walkthrough_failure_capture(
     replaced = module.load_step("test_hypothesis", "describe_groups")
     assert replaced is not None
     assert replaced.status != StepStatus.FAILED
+
+
+# --- guard rails: config requirements, load branches, unknown methods ------
+
+
+def test_load_frame_and_groups_requires_dataset_and_hypothesis(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _setup(monkeypatch, tmp_path)
+    cfg = _load_cfg()
+    no_dataset = cfg.model_copy(update={"dataset": None})
+    with pytest.raises(ValueError, match="walkthrough requires dataset and hypothesis config"):
+        runners.load_frame_and_groups(no_dataset, None)
+
+    bare_analysis = cfg.analysis.model_copy(update={"hypothesis": None})
+    no_hypothesis = cfg.model_copy(
+        update={"analysis": cfg.analysis.model_copy(update={"hypothesis": None})}
+    )
+    assert bare_analysis.hypothesis is None
+    with pytest.raises(ValueError, match="walkthrough requires dataset and hypothesis config"):
+        runners.load_frame_and_groups(no_hypothesis, None)
+
+
+def test_load_frame_and_groups_missing_canonical_raises(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _setup(monkeypatch, tmp_path)
+    cfg = _load_cfg()
+    missing = tmp_path / "no_such_canonical.parquet"
+    monkeypatch.setattr(runners, "canonical_path", lambda d, e: missing)
+    with pytest.raises(FileNotFoundError, match="canonical dataset not found"):
+        runners.load_frame_and_groups(cfg, None)
+
+
+def test_load_frame_and_groups_sample_branch_maps_columns(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from broadway.lineage.models import SampleSpec
+
+    _setup(monkeypatch, tmp_path)
+    cfg = _load_cfg()
+    group, target = _demo_columns()
+    source_name = f"source_{group}"
+    sample_path = tmp_path / "mapped.parquet"
+    pd.DataFrame({source_name: ["A"] * 5 + ["B"] * 5, target: range(10)}).to_parquet(
+        sample_path, index=False
+    )
+    sample = SampleSpec(
+        name="test_diagnostic", role="diagnostic", path=str(sample_path),
+        column_mapping={group: source_name},
+    )
+
+    _df, group_column, source_group_column, groups, attrition = (
+        runners.load_frame_and_groups(cfg, sample)
+    )
+    assert group_column == group
+    assert source_group_column == source_name
+    assert set(groups) == {"A", "B"}
+    assert attrition["n_total"] == 10
+
+
+def test_load_frame_and_groups_missing_sample_raises(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from broadway.lineage.models import SampleSpec
+
+    _setup(monkeypatch, tmp_path)
+    cfg = _load_cfg()
+    sample = SampleSpec(
+        name="test_diagnostic", role="diagnostic",
+        path=str(tmp_path / "gone.parquet"),
+    )
+    with pytest.raises(FileNotFoundError, match="sample dataset not found"):
+        runners.load_frame_and_groups(cfg, sample)
+
+
+def test_load_frame_and_groups_missing_group_column_raises(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _setup(monkeypatch, tmp_path)
+    cfg = _load_cfg()
+    _, target = _demo_columns()
+    canonical = tmp_path / "target_only.parquet"
+    pd.DataFrame({target: [1.0, 2.0, 3.0]}).to_parquet(canonical, index=False)
+    monkeypatch.setattr(runners, "canonical_path", lambda d, e: canonical)
+    with pytest.raises(ValueError, match="not found in data"):
+        runners.load_frame_and_groups(cfg, None)
+
+
+def test_run_describe_attrition_null_target(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _setup(monkeypatch, tmp_path)
+    cfg = _load_cfg()
+    group, target = _demo_columns()
+    df = pd.DataFrame(
+        {group: ["A", "B"], target: [10.0, None]}
+    )
+    step = runners.run_describe(
+        cfg.analysis, 1, "q?", df, group, group,
+        ["A", "B"], target, "x.parquet",
+        None, "canonical", tmp_path / "timeline" / "test_hypothesis",
+        tmp_path / "reports" / "figures",
+    )
+    rs = step.result_summary
+    assert rs["n_excluded"] == 1
+    assert "null target" in rs["exclusion_reason"]
+
+
+def test_run_describe_flags_imbalance_and_absent_groups(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Both flagged branches of the describe ramification: an absent declared
+    group AND an imbalance ratio above the configured threshold must produce a
+    NOTE status whose ramification names both facts."""
+    _setup(monkeypatch, tmp_path)
+    cfg = _load_cfg()
+    group, target = _demo_columns()
+    df = pd.DataFrame(
+        {group: ["A", "A", "B", "B", "B", "B", "B"], target: list(range(7))}
+    )
+    step = runners.run_describe(
+        cfg.analysis, 1, "q?", df, group, group,
+        ["A", "B", "C"], target, "x.parquet",
+        None, "canonical", tmp_path / "timeline" / "test_hypothesis",
+        tmp_path / "reports" / "figures",
+    )
+    assert step.status == StepStatus.NOTE
+    assert "groups C have no observations" in step.ramification
+    assert "group sizes are imbalanced" in step.ramification
+    assert step.result_summary["absent_groups"] == 1
+
+
+def test_run_omnibus_unknown_method_raises(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _setup(monkeypatch, tmp_path)
+    cfg = _load_cfg()
+    with pytest.raises(ValueError, match="unknown omnibus method 'mode'"):
+        runners.run_omnibus(
+            cfg.analysis, 5, "q?", {"A": np.array([1.0])}, "mode",
+            tmp_path / "timeline" / "test_hypothesis", "canonical", None,
+        )
+
+
+def test_run_posthoc_unknown_method_raises(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _setup(monkeypatch, tmp_path)
+    cfg = _load_cfg()
+    df = pd.DataFrame({"group": ["A", "B"], "dv": [1.0, 2.0]})
+    with pytest.raises(ValueError, match="unknown posthoc method 'anova'"):
+        runners.run_posthoc(
+            cfg.analysis, 7, "q?", df, "group", "dv", "anova",
+            tmp_path / "timeline" / "test_hypothesis", "canonical", None,
+        )
+
+
+def test_walkthrough_run_requires_hypothesis_block_and_dataset(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _setup(monkeypatch, tmp_path)
+    cfg = _load_cfg()
+
+    no_hypothesis = cfg.model_copy(
+        update={"analysis": cfg.analysis.model_copy(update={"hypothesis": None})}
+    )
+    with pytest.raises(ValueError, match="requires a 'hypothesis' block"):
+        walkthrough.run(no_hypothesis, None, force=False)
+
+    no_dataset = cfg.model_copy(update={"dataset": None})
+    with pytest.raises(ValueError, match="walkthrough requires a dataset config"):
+        walkthrough.run(no_dataset, None, force=False)
+
+
+def test_omnibus_executor_stops_when_decision_missing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """The executor-level stop-guard is the last line before dispatching with
+    an unresolved method (the sequence gate normally trips first): call it
+    directly with a decision-free timeline and pin the loud stop."""
+    _setup(monkeypatch, tmp_path)
+    cfg = _load_cfg()
+    ctx = walkthrough.StepContext(
+        analysis=cfg.analysis, df=pd.DataFrame(), groups={},
+        group_column="g", source_group_column="g", group_values=["A", "B"],
+        target="t", source_path="x.parquet", sample_name=None,
+        source="canonical", out_dir=tmp_path / "timeline" / "test_hypothesis",
+        figures_dir=tmp_path / "figures", attrition={},
+        sequence=walkthrough.load_walkthrough_sequence(),
+        thresholds=load_walkthrough_config(),
+    )
+    step = SimpleNamespace(id="omnibus", label="omnibus", order=5,
+                           question="q?", kind="analysis")
+    with pytest.raises(walkthrough._StopWalkthrough):
+        walkthrough._run_omnibus(cfg.analysis, step, ctx)
+    assert "no omnibus decision recorded" in capsys.readouterr().out

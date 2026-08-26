@@ -1,6 +1,10 @@
 skew_threshold: 2.0
 kurtosis_threshold: 7.0
 shapiro_alpha: 0.05
+# RNG seed for the >cap Shapiro/skew/kurtosis subsample in stats.assumptions.
+# Carries the former code literal verbatim; provenance now lives only here
+# (determinism ledger item a).
+shapiro_seed: 0
 imbalance_ratio_threshold: 1.5
 significance_alpha: 0.05
 max_qq_groups: 12

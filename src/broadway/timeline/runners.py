@@ -23,6 +23,7 @@ from broadway.reports.results import humanize_float, humanize_pvalue
 from broadway.stats.anova import run_anova, run_kruskal, run_welch
 from broadway.stats.assumptions import check_normality, run_levene
 from broadway.stats.describe import describe, plot_describe_figures
+from broadway.stats.groups import build_declared_groups
 from broadway.stats.post_hoc import games_howell
 from broadway.timeline.evidence import (
     ConclusionEvidence,
@@ -54,6 +55,9 @@ def _thresholds() -> WalkthroughConfig:
 
 
 def now_iso() -> str:
+    # DOCUMENTED SILENCE (determinism ledger d): wall-clock bytes — every
+    # performed_at stamp is run-unique by design; pinned only once a freeze
+    # flag (pinned-timestamp config/env) exists.
     return datetime.now(UTC).isoformat()
 
 
@@ -103,10 +107,9 @@ def load_frame_and_groups(
         df = pd.read_parquet(path)
     if source_group_column not in df.columns:
         raise ValueError(f"group column '{source_group_column}' not found in data")
-    groups = {
-        g: df[df[source_group_column] == g][cfg.dataset.target].dropna().to_numpy()
-        for g in group_values
-    }
+    groups, _absent_groups = build_declared_groups(
+        df, source_group_column, group_values, cfg.dataset.target
+    )
     attrition = _attrition(df, source_group_column, group_values, cfg.dataset.target)
     return df, group_column, source_group_column, groups, attrition
 
@@ -196,9 +199,9 @@ def run_normality(
     sample_name: str | None,
 ) -> AnalysisStep:
     viz_cfg = load_viz_config()
-    result = check_normality(groups)
-    figures_dir.mkdir(parents=True, exist_ok=True)
     thresholds = _thresholds()
+    result = check_normality(groups, shapiro_seed=thresholds.shapiro_seed)
+    figures_dir.mkdir(parents=True, exist_ok=True)
     max_qq_groups = thresholds.max_qq_groups
     normality_figure = viz_cfg.normality_figure
     pooled = np.concatenate(list(groups.values()))

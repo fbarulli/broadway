@@ -10,11 +10,14 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 def _run(*args: str, **kwargs: object) -> subprocess.CompletedProcess[str]:
+    # timeout=150: a nested `uv run` must fail fast, never hang the suite
+    # (uv editable-rebuild probe stall incident 2026-08-23).
     return subprocess.run(
         ["uv", "run", "ds-pipeline", *args],
         capture_output=True,
         text=True,
         check=False,
+        timeout=150,
         **kwargs,
     )
 
@@ -120,16 +123,34 @@ class TestDiscoverCLI:
 
 
 class TestTrainCLI:
-    def test_train_dispatches_to_pipeline(self) -> None:
+    def test_train_without_analysis_exits_1_naming_contract_requirement(self) -> None:
+        # train requires a prediction-mode analysis contract: without --analysis
+        # the step crashes (exit 1, not argparse exit 2) and names the missing
+        # requirement. The audit (T-BUG-3) found the old test passed while the
+        # command exited 1 — this test pins that contract explicitly.
         result = _run("train", "--dataset", "test", "--experiment", "baseline")
-        assert result.returncode != 2, (
-            f"argparse error (exit 2): {result.stderr}"
+        assert result.returncode == 1, (
+            f"expected exit 1 naming the missing analysis contract, "
+            f"got {result.returncode}: {result.stderr}"
+        )
+        assert "requires an analysis contract (--analysis)" in result.stderr, (
+            f"stderr should name the missing analysis contract: {result.stderr}"
+        )
+        assert "prediction" in result.stderr, (
+            f"stderr should name the required mode 'prediction': {result.stderr}"
         )
 
-    def test_train_without_dataset_still_dispatches(self) -> None:
+    def test_train_without_dataset_exits_1_naming_missing_config(self) -> None:
+        # Without --dataset no dataset config is merged, and train fails (exit 1,
+        # not argparse exit 2) naming the missing config sections rather than
+        # dispatching. Renamed from "still_dispatches": the command crashes.
         result = _run("train", "--experiment", "baseline")
-        assert result.returncode not in (2,), (
-            f"argparse error (exit 2), should have dispatched: {result.stderr}"
+        assert result.returncode == 1, (
+            f"expected exit 1 naming the missing train config, "
+            f"got {result.returncode}: {result.stderr}"
+        )
+        assert "requires dataset, experiment, train, and etl config" in result.stderr, (
+            f"stderr should name the missing config sections: {result.stderr}"
         )
 
 

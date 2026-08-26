@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pandas as pd
+import pytest
 from contract_fixture import frame_slots
 
 import broadway.etl.module as etl_module
@@ -13,7 +14,7 @@ from broadway.cleaning.structural import (
     standardize_missing,
 )
 from broadway.config.loader import load_config
-from broadway.config.schema import ColumnRole, ColumnSchema, LookupSpec
+from broadway.config.schema import ColumnRole, ColumnSchema, DataSourceRef, LookupSpec
 from broadway.contracts.pandera import is_numeric_dtype
 from broadway.data.cleaner import canonicalize
 from broadway.lineage import records
@@ -74,6 +75,47 @@ def test_parse_numeric_failure_stays_float() -> None:
     coerced, failure = parse_numeric(series, "num", "int64")
     assert coerced.dtype.kind == "f"
     assert failure is not None
+
+
+def test_parse_numeric_fractional_records_failure_and_stays_float() -> None:
+    series = pd.Series(["1.7", "3"])
+    coerced, failure = parse_numeric(series, "num", "int64")
+    assert coerced.dtype == "float64"
+    assert coerced.tolist() == [1.7, 3.0]
+    assert failure is not None
+    assert failure.column == "num"
+    assert failure.count == 1
+    assert failure.target_dtype == "int64"
+    assert failure.examples == ["1.7"]
+
+
+def test_parse_numeric_negative_fraction_refuses_toward_zero() -> None:
+    series = pd.Series(["-1.5"])
+    coerced, failure = parse_numeric(series, "num", "int64")
+    assert coerced.dtype.kind == "f"
+    assert coerced.tolist() == [-1.5]
+    assert failure is not None
+    assert failure.count == 1
+    assert failure.examples == ["-1.5"]
+
+
+def test_parse_numeric_infinity_records_failure_instead_of_raising() -> None:
+    series = pd.Series(["inf"])
+    coerced, failure = parse_numeric(series, "num", "int64")
+    assert coerced.dtype.kind == "f"
+    assert failure is not None
+    assert failure.count == 1
+    assert failure.examples == ["inf"]
+
+
+def test_parse_numeric_huge_float_precision_loss_refused() -> None:
+    series = pd.Series(["2251799813685247.5"])  # 2**51 - 0.5: last exact half
+    coerced, failure = parse_numeric(series, "num", "int64")
+    assert coerced.iloc[0] == 2251799813685247.5
+    assert coerced.dtype.kind == "f"
+    assert failure is not None
+    assert failure.count == 1
+    assert failure.examples == ["2251799813685247.5"]
 
 
 def test_canonicalize_coerces_numeric() -> None:
@@ -363,3 +405,31 @@ def test_etl_with_lookups_writes_join_audit(tmp_path: Path, monkeypatch) -> None
 def test_column_schema_normalizes_datetime_dtype() -> None:
     col = ColumnSchema(dtype="datetime64[us]", null_count=0, role=ColumnRole.DATETIME)
     assert col.dtype == "datetime64"
+
+
+def test_etl_data_source_loader_drives_step_eligibility() -> None:
+    cfg = load_config("etl", dataset="test", experiment="baseline")
+    assert cfg.experiment is not None
+
+    # Raw-ingest loaders (canonical, joined) may run etl.
+    etl_module._assert_data_source_supported(cfg)
+
+    joined = cfg.experiment.model_copy(
+        update={"data_source": DataSourceRef(loader="joined", schema_contract="raw")}
+    )
+    etl_module._assert_data_source_supported(cfg.model_copy(update={"experiment": joined}))
+
+    # Pre-built loaders cannot be re-ingested — the declared loader fails loud.
+    for loader, version in (("named_sample", "v3"), ("pinned", None)):
+        ref = cfg.experiment.model_copy(
+            update={"data_source": DataSourceRef(loader=loader, version=version, schema_contract="raw")}
+        )
+        with pytest.raises(ValueError, match="cannot run for data_source.loader"):
+            etl_module._assert_data_source_supported(cfg.model_copy(update={"experiment": ref}))
+
+
+def test_etl_without_experiment_fails_loud() -> None:
+    cfg = load_config("etl", dataset="test")
+    assert cfg.experiment is None
+    with pytest.raises(ValueError, match="requires an experiment binding"):
+        etl_module.run(cfg)

@@ -41,5 +41,8 @@ def record(
         reason=[reason],
         status="resolved",
         parents=list(spec.parents),
+        # DOCUMENTED SILENCE (determinism ledger d): wall-clock bytes — the
+        # decision stamp is run-unique by design; pinned only once a freeze
+        # flag (pinned-timestamp config/env) exists.
         decided_at=datetime.now(UTC).isoformat(),
     )

@@ -17,7 +17,10 @@ def _datetime_candidate(series: pd.Series) -> bool:
         sample = series.dropna().head(100)
         if sample.empty:
             return False
-        converted = pd.to_datetime(sample, errors="coerce")
+        # format="mixed" parses each element individually without the dateutil
+        # fallback warning; columns may legitimately mix ISO dates and full
+        # timestamps, so no single strptime format can be assumed.
+        converted = pd.to_datetime(sample, format="mixed", errors="coerce")
         return bool(converted.notna().mean() > 0.9)
     return False
 

@@ -1,11 +1,16 @@
 from __future__ import annotations
 
+import shutil
+from pathlib import Path
+
 import pandas as pd
 import pytest
 import yaml
 
 from broadway.lineage import records
 from broadway.onboard import module
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 def _write_csv(path) -> str:
@@ -24,7 +29,12 @@ def _write_csv(path) -> str:
 
 
 def _isolate(tmp_path, monkeypatch) -> None:
-    monkeypatch.setattr(module, "CONFIGS_DIR", tmp_path / "configs")
+    configs = tmp_path / "configs"
+    configs.mkdir()
+    # The scaffolder reads its defaults from configs/onboard.yaml; the
+    # isolated configs root carries the real file so the SSOT path is tested.
+    shutil.copy(REPO_ROOT / "configs" / "onboard.yaml", configs / "onboard.yaml")
+    monkeypatch.setattr(module, "CONFIGS_DIR", configs)
     monkeypatch.setattr(module, "ARTIFACTS_DIR", tmp_path / "artifacts")
     monkeypatch.setattr(records, "LINEAGE_DIR", tmp_path / "lineage")
 
@@ -62,6 +72,9 @@ def test_init_writes_configs(tmp_path, monkeypatch) -> None:
 
     experiment = yaml.safe_load((tmp_path / "configs" / "experiment" / "houses.yaml").read_text())
     assert experiment["split"]["type"] == "random"
+    # Scaffolded random_state must equal the configs/onboard.yaml default —
+    # the literal lives in YAML only (determinism ledger item b).
+    assert experiment["random_state"] == 42
 
 
 def test_init_time_split(tmp_path, monkeypatch) -> None:

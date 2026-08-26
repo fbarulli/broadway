@@ -1,55 +1,50 @@
-"""Demo working-data binding (main branch, synthetic demo).
-
-Mirror of the taxi branch's ``project/working.py`` contract (``load_metered``
-+ ``time_bucket`` + config-driven knobs) so the shared worker image layout —
-and its CI boot checks — resolve identically on both branches. Backed by the
-synthetic demo dataset; no taxi content.
-"""
-
-from __future__ import annotations
-
 from pathlib import Path
-
-import pandas as pd
 import yaml
 
-from broadway.utils import require_keys
+_CFG = None
+def _load_cfg():
+    global _CFG
+    if _CFG is None:
+        with open("configs/experiments/working.yaml") as f:
+            _CFG = yaml.safe_load(f)
+    return _CFG
 
-ROOT = Path(__file__).resolve().parents[1]
-CONFIG = ROOT / "configs" / "experiments" / "working.yaml"
-_cfg = yaml.safe_load(CONFIG.read_text())
-require_keys(_cfg, ["parquet", "columns", "min_target_value", "max_duration_minutes",
-                    "time_buckets", "time_bucket_default"], "working.yaml")
-require_keys(_cfg["columns"], ["target", "pickup_datetime", "dropoff_datetime"],
-             "working.yaml columns")
+def require_keys(d, keys):
+    missing = [k for k in keys if k not in d]
+    if missing:
+        raise KeyError(f"config missing required keys: {missing}")
 
-WORKING_DATASET = ROOT / _cfg["parquet"]
-TARGET_COL = _cfg["columns"]["target"]
-PICKUP_DATETIME_COL = _cfg["columns"]["pickup_datetime"]
-DROPOFF_DATETIME_COL = _cfg["columns"]["dropoff_datetime"]
-MIN_TARGET_VALUE = float(_cfg["min_target_value"])
-MAX_DURATION_MINUTES = float(_cfg["max_duration_minutes"])
+def load_working():
+    cfg = _load_cfg()
+    require_keys(cfg, ["parquet", "columns", "min_target_value", "max_duration_minutes", "time_buckets", "time_bucket_default"])
+    require_keys(cfg["columns"], ["target", "pickup_datetime", "dropoff_datetime"])
+    df = __import__("pandas").read_parquet(cfg["parquet"])
+    TARGET_COL = cfg["columns"]["target"]
+    PICKUP_DATETIME_COL = cfg["columns"]["pickup_datetime"]
+    DROPOFF_DATETIME_COL = cfg["columns"]["dropoff_datetime"]
+    df = df.rename(columns={
+        PICKUP_DATETIME_COL: "pickup_datetime",
+        DROPOFF_DATETIME_COL: "dropoff_datetime",
+        TARGET_COL: "target",
+    })
+    MIN_TARGET_VALUE = float(cfg["min_target_value"])
+    return df[df["target"] > MIN_TARGET_VALUE]
 
+def load_metered():
+    cfg = _load_cfg()
+    require_keys(cfg, ["parquet", "columns", "min_target_value", "max_duration_minutes", "time_buckets", "time_bucket_default"])
+    require_keys(cfg["columns"], ["target", "pickup_datetime", "dropoff_datetime"])
+    df = __import__("pandas").read_parquet(cfg["parquet"])
+    TARGET_COL = cfg["columns"]["target"]
+    PICKUP_DATETIME_COL = cfg["columns"]["pickup_datetime"]
+    DROPOFF_DATETIME_COL = cfg["columns"]["dropoff_datetime"]
+    df = df.rename(columns={
+        PICKUP_DATETIME_COL: "pickup_datetime",
+        DROPOFF_DATETIME_COL: "dropoff_datetime",
+        TARGET_COL: "target",
+    })
+    return df
 
-def time_bucket(hour: int) -> str:
-    """Surcharge-style bucket from config boundaries (else = default)."""
-    for label, bounds in _cfg["time_buckets"].items():
-        if bounds["start"] <= hour < bounds["end"]:
-            return label
-    return _cfg["time_bucket_default"]
-
-
-def load_working() -> pd.DataFrame:
-    """Working dataset with dataset-level filters applied."""
-    df = pd.read_parquet(WORKING_DATASET)
-    return df[df[TARGET_COL] > MIN_TARGET_VALUE]
-
-
-def load_metered() -> pd.DataFrame:
-    """Working dataset + duration derived; duration filters applied."""
-    df = load_working()
-    df["trip_duration"] = (
-        df[DROPOFF_DATETIME_COL] - df[PICKUP_DATETIME_COL]
-    ).dt.total_seconds()
-    df["duration_minutes"] = df["trip_duration"] / 60
-    return df[(df["trip_duration"] > 0) & (df["duration_minutes"] < MAX_DURATION_MINUTES)]
+def time_buckets():
+    cfg = _load_cfg()
+    return cfg["time_buckets"], cfg["time_bucket_default"]

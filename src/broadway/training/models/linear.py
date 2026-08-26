@@ -6,4 +6,4 @@ from sklearn.linear_model import LinearRegression
 
 
 def create(**params: float | str) -> LinearRegression:
-    return LinearRegression(**{k: v for k, v in params.items() if k != "type"})
+    return LinearRegression(**params)

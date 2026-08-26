@@ -8,6 +8,7 @@ import re
 from pathlib import Path
 
 from broadway.cleaning.models import StructuralCleanResult
+from broadway.cleaning.structural import CoercionAuditReport, CoercionRecord
 from broadway.config.schema import PipelineConfig
 from broadway.contracts.pandera import build_raw_schema
 from broadway.contracts.selectors import datetime_columns, numeric_columns
@@ -22,6 +23,11 @@ from broadway.lineage.records import enforce_drop_fraction, records_dir, write_r
 
 logger = logging.getLogger(__name__)
 
+# Loaders whose data etl can ingest from the raw source. Experiments bound to
+# pre-built loaders (named_sample, pinned) consume immutable artifacts and
+# must never re-run etl — the declared loader drives that selection.
+_RAW_INGEST_LOADERS = frozenset({"canonical", "joined"})
+
 
 def _explained_rows(reasons: list[str]) -> int:
     total = 0
@@ -32,12 +38,33 @@ def _explained_rows(reasons: list[str]) -> int:
     return total
 
 
+def _assert_data_source_supported(cfg: PipelineConfig) -> None:
+    """The experiment's declared data source selects whether etl may run.
+
+    ``canonical`` and ``joined`` resolve through the raw ingest; any other
+    loader means the experiment consumes a pre-built artifact, so running
+    etl for it fails loud instead of silently re-ingesting.
+    """
+    if cfg.experiment is None:
+        raise ValueError(
+            "etl requires an experiment binding: without one its output "
+            "would overwrite the raw input path declared by dataset.path"
+        )
+    loader = cfg.experiment.data_source.loader
+    if loader not in _RAW_INGEST_LOADERS:
+        raise ValueError(
+            f"etl cannot run for data_source.loader '{loader}' "
+            f"(supported: {', '.join(sorted(_RAW_INGEST_LOADERS))})"
+        )
+
+
 def run(cfg: PipelineConfig) -> None:
     if not cfg.dataset:
         raise ValueError("etl step requires a dataset config")
     if not cfg.etl:
         raise ValueError("etl step requires an etl config")
     dataset = cfg.dataset
+    _assert_data_source_supported(cfg)
     df, join_audits, value_audits = load_with_audit(dataset)
     rows_in = len(df)
     columns_before = list(df.columns)
@@ -51,12 +78,14 @@ def run(cfg: PipelineConfig) -> None:
             reasons.append(f"CI sampling: -{n_before - len(df)} rows")
 
     numeric_map = {col: dataset.columns[col].dtype for col in numeric_columns(dataset)}
+    coercions: list[CoercionRecord] = []
     df, clean_reasons, parse_failures, observed_missing = canonicalize(
         df,
         target=dataset.target,
         datetime_columns=datetime_columns(dataset),
         numeric_columns=numeric_map,
         missing_encodings=cfg.etl.missing_encodings,
+        coercions=coercions,
     )
     reasons.extend(clean_reasons)
 
@@ -113,6 +142,18 @@ def run(cfg: PipelineConfig) -> None:
         if (records_dir() / f"{ingest_id.replace(':', '_')}.json").exists()
         else [node_id("dataset", dataset.name)]
     )
+    if coercions:
+        coercion_audit_path = out_dir / f"{dataset.name}_coercion_audit.json"
+        coercion_audit_path.write_text(
+            CoercionAuditReport(coercions=coercions).model_dump_json(indent=2),
+            encoding="utf-8",
+        )
+        write_record(
+            node_id("coercion", dataset.name),
+            "coercion",
+            str(coercion_audit_path),
+            upstream,
+        )
     if join_audits:
         join_audit_path = out_dir / f"{dataset.name}_join_audit.json"
         join_audit_path.write_text(

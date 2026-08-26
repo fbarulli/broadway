@@ -29,6 +29,9 @@ def test_fit_robust_returns_hc3_covariance() -> None:
 
     assert robust.cov_type == "HC3"
     assert robust.params[1] == pytest.approx(2.0, abs=0.15)
+    # HC3 exists to change the SEs: the robust fit's SEs must differ from the
+    # plain fit's bse on the same fixture.
+    assert not np.allclose(robust.bse, model.bse)
 
 
 def test_bp_jb_returns_six_keys() -> None:
