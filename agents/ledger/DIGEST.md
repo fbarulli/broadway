@@ -1,6 +1,6 @@
 # DIGEST.md — rendered from agents/ledger/gates.yaml · NEVER HAND-EDIT ·
 
-> 142 gates · rendered 2026-08-25 @ HEAD 88e2931 · load THIS into context;
+> 142 gates · rendered 2026-08-26 @ HEAD 1bce284 · load THIS into context;
 > gates.yaml is the sole SSOT; the retired GATES.md/gates/*.md markdown world survives in agents/ledger/arbitration/2026-08-24/surface-and-analysis-preservation.md.
 
 | band | phase | gates | findings |
@@ -64,7 +64,7 @@
 - **GATE-ETL-116** `src/broadway/samples/generate.py:95 generate_sample()`
   [SampleSpec definition] → [<name>@<version>.parquet + provenance json {artifact_sha256, definition_sha256, row_count}] · pins: 1
 - **GATE-ETL-117** `project/etl/process_config.py:10 _PROJECT_YAML/_ETL_YAML module-load constants (legacy globals raw_dir/processed_dir/processed_file :16-25)`
-  [configs/project/taxi.yaml knobs] → [raw_dir/processed_dir/processed_file for the LEGACY pipeline] · pins: none direct
+  [configs/project/taxi.yaml knobs] → [raw_dir/processed_dir/processed_file for the LEGACY pipeline] · pins: 1
 
 ### 03-features — features
 
@@ -187,7 +187,7 @@
 - **GATE-SURF-67** `tests/test_surface_integrity.py:41 test_report_markdown_links_resolve()`
   [git ls-files reports/ '*.md' (tracked surface inventory, :26-38), markdown link regex :23, size caps HTML_CAP_BYTES=5MiB :20 / PNG_CAP_BYTES=2MiB :21] → [] · pins: 3
 - **GATE-SURF-68** `.gitignore:17-19  # experiments/results tracking convention (negation triad), pinned-sample negations :21-22`
-  [experiment script outputs written ad hoc, e.g. experiments/fare_prediction/02_filtered_profile.py:46 desc.to_csv(CSV_OUT), experiments/mlflow/_common.py:51 RESULTS = experiments/results/mlflow convention] → [experiments/results/**/*.csv (tracked), experiments/results/univariate/fare_amount_trip_distance/ratecode1_sample.parquet|.json (pinned, tracked)] · pins: none direct
+  [experiment script outputs written ad hoc, e.g. experiments/fare_prediction/02_filtered_profile.py:46 desc.to_csv(CSV_OUT), experiments/mlflow/_common.py:51 RESULTS = experiments/results/mlflow convention] → [experiments/results/**/*.csv (tracked), experiments/results/univariate/fare_amount_trip_distance/ratecode1_sample.parquet|.json (pinned, tracked)] · pins: 1
 - **GATE-SURF-69** `src/broadway/reports/__init__.py  # renderer-purity contract over the package (markdown.py, results.py, timeline.py, index.py, audit.py, registry.py)`
   [persisted typed evidence JSON artifacts, persisted AnalysisStep/AnalysisDecision models, QqOverview/DatasetProfile/JoinAuditReport/LookupValueAuditReport/StructuralCleanResult models] → [(cross-cutting) all reports/**/*.md listed in GATE-SURF-60..64] · pins: 3
 - **GATE-SURF-100** `src/broadway/inference/api.py:1 FastAPI app stub (module docstring only — NO app symbol at HEAD; gate demands its creation) + k8s/api-deployment.yaml:18 uvicorn command` ⚠FINDING

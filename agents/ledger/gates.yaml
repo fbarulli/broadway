@@ -1,6 +1,6 @@
 # Gate registry SSOT — hand-maintained; the {01..09} gate fragments it consolidated predate git custody.
 meta:
-  head: 1bce284
+  head: 22f33b3
   assembled: '2026-08-24'
   source_fragments:
   - agents/ledger/gates/01-ingest.md
