@@ -10,7 +10,7 @@ from pathlib import Path
 
 from project.working import (
     MAX_DURATION_MINUTES,
-    MIN_FARE,
+    MIN_TARGET_VALUE,
     load_metered,
     load_working,
     time_bucket,

@@ -17,5 +17,6 @@ diagnostics_experiment/
 legend_experiment/
 experiments/results/*
 !experiments/results/univariate/
-!experiments/results/univariate/fare_amount_trip_distance/
-!experiments/results/univariate/fare_amount_trip_distance/ratecode1_sample.parquet
+!experiments/results/univariate/sample_evidence/
+!experiments/results/univariate/sample_evidence/sample_evidence.parquet
+!experiments/results/univariate/sample_evidence/sample_evidence.json

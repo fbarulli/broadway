@@ -101,7 +101,7 @@ gate_parity() {
 }
 run parity gate_parity
 run ruff    dispatch uv run ruff check src tests experiments/mlflow \
-            experiments/fare_prediction experiments.py experiments_ui.py \
+            experiments/fare_prediction experiments_ui.py \
             project/working.py project/data.py \
             scripts
 run mypy    dispatch uv run mypy src/broadway

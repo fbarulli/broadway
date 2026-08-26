@@ -19,8 +19,8 @@ experiments/results/**
 !experiments/results/**/
 !experiments/results/**/*.csv
 # Pinned sample + evidence (single source of truth — committed on purpose)
-!experiments/results/univariate/fare_amount_trip_distance/ratecode1_sample.parquet
-!experiments/results/univariate/fare_amount_trip_distance/ratecode1_sample.json
+!experiments/results/univariate/sample_evidence/sample_evidence.parquet
+!experiments/results/univariate/sample_evidence/sample_evidence.json
 *.png
 !reports/figures/*.png
 graphify-out/

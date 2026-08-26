@@ -39,6 +39,55 @@ authenticated host; fresh hosts need their own gh login. DIVISION OF
 TRUTH: STATE.md remains the
 primary record; project cards are the AVAILABILITY layer (survives local
 loss, reachable from any session) — every card body points back here.
+Refresh 5, same day: batch LANDED as `3fde83c` on origin/sklearn
+(ship.sh full tier GREEN ×2 incl. pre-push hook; TIER-GATE PASS, Tier
+FULL; adversarial review 2d9ab1a1 = 11 findings → B1 false-scope claim +
+S1 checkpoint-trigger contradiction + S2 section rename fixed in-batch,
+7 NOTEs carried for later batches). Board card flipped to [LANDED @
+3fde83c] Done.
+Refresh 6, same day: HUMAN RULINGS via project-board ANSWER lines —
+"class one, pointer only" (Q1) + "class 2 yes" (Q2), "proceed". Executed
+on a dedicated main worktree (/home/opc/ONE/wt-main-broadway, outside
+repo): GOVERNANCE-POINTER.md created + README parity claim corrected to
+enumerated sanctioned exceptions. LOCAL COMMIT 24e8e0a on main (parent =
+origin/main tip); push PRESENTED, awaiting §14(5) final go. Push path
+note: executed from sklearn worktree because main's checkout carries no
+scripts/run_local_ci.sh for the shared pre-push hook; hook then runs full
+CI on the proven-green sklearn tree.
+Refresh 7, same day: HUMAN RULINGS batch#2 (verbatim): src/ shared+agnostic;
+remove ALL taxi refs to generic feature_N/target; SSOT confirmed
+(configs/dataset owns data names); D2=B one batch; D3 split — KEEP
+experiments_ui.py on main, DELETE experiments.py on main only (elsewhere
+kept), plus standing law candidate: orchestrator must EXPLAIN file
+purposes, not just name them; Q4=A rename fossil to sample_evidence.parquet
+w/ provenance sidecar; Q5 yes (taxi_diagnostic->canonical, feeds
+GroupSummary.sample_name). CONSTRAINT: ci.yml ruff list is parity-shared ->
+dropping experiments.py from lint list dual-lands identically (tradeoff
+recorded). PLAN: Phase1 sklearn shared-surface commit (tests fixtures
+LocationID->location_id, Queens/Bronx->downtown/suburbs, ci.yml ruff list,
+configmap/ci-fixtures generic values+features, ignore rules incl ghost-json
+removal, Dockerfile.worker path) -> push+ff taxi; Phase2 main worktree
+branch-local sweep (delete experiments.py, parquet rename+sidecar,
+working.yaml fare->target key + readers, _common.py hardcode fixes,
+experiments_ui series consts/defaults genericized, README exception
+filename sync) + mirrored shared files; pushes each gated §14(5).
+Refresh 8, same day: EXECUTION DISPATCHED — subagent b02bf74e (P1) (sklearn
+tree sweep) + subagent e37de3e3 (P2) (main worktree sweep), custody-disjoint,
+zero-git-op contracts w/ full edit lists incl. defect fixes folded
+(fare_column key added; features list corrected to committed schema;
+min_fare->min_target_value chain). Lane rows below; board card EXEC·IN
+FLIGHT. On delivery: orchestrator verifies, runs full local CI itself on
+sklearn, presents BOTH push packages (sklearn first, then main) for
+§14(5) go.
+Refresh 9, same day: HUMAN RULING (chat, verbatim): "once i agree to
+changes, and they are made and all tests are green the only thing left
+to do is push" + "this should be the standard". CODIFIED: §14(5) item 5
+amended in MAIN_AGENT_CONTRACT.md with PRE-AGREED BATCH exception
+(agreed scope + green gates => autonomous push; commit message carries
+gate evidence); out-of-scope pushes still present. EFFECT IMMEDIATE:
+P1 delivery + README hunk + ci.yml byte-proof + full CI green triggers
+the full sequence WITHOUT further asks: push sklearn -> ff taxi ->
+push main -> report shas.
 
 2026-08-25 (second refresh), during the ten-ruling governance batch: the
 human ruled on ten pending decisions; seven read-only investigator/verifier
@@ -72,6 +121,12 @@ if it contradicts git, GIT WINS.
 |---|---|---|
 | subagent 73abf568 (read-only) | Taxi-MENTION-CENSUS @ ref `main` ONLY: exhaustive case-insensitive sweep (~30 pattern families incl. tpep/lpep/vendor_id/ratecode/taxi_zone/borough), per-file bucket classification, src/broadway/** doctrine-violation adjudication. Zero mutations; citations via git plumbing only. | DELIVERED 2026-08-26 — VERDICT: **ZERO doctrine violations in src/broadway @ main** (strict master regex = 0 lines; wide net decomposes into format-generic parquet/csv I/O, a benign "zone"-vocab collision in QQ-plot shading (`QqZonesConfig` — rename candidate `qq_bands`), and parameterized feature defaults). Census: **34 files / ~236 genuine hits** across 309 tracked files — heaviest coupling: root `experiments.py` (50; taxi-CI-gated dead-but-present domain code, :58 LOOKUP constant, :401-417 fake zones CSV), tests/ (83 hits, incl. NYC borough strings baked into `tests/test_results.py:340`), infra (37; ⚠ `tpep_*` column maps HARDCODED in k8s/optuna/configmap.yaml:20-22 + .github/ci-fixtures/k8s-config.yaml:10-12 OUTSIDE configs//project/), docs (41). SURPRISES: (1) agents/, reports/, docs/ ABSENT on main — no doctrine ledger exists on the frozen line; (2) README:398 claims "no taxi configs/experiments/project/" yet main commits project/ mirrors + working.yaml + the parquet (letter ≠ spirit); (3) ratecode1_sample.parquet = deliberate un-ignored TLC fossil (.gitignore:21-22, Dockerfile.worker COPY); (4) HEAD commit subject itself says "(sync from taxi)". Method: ~60 EREs, saturation reached (final passes 0 new files); 6 false-positive classes hand-adjudicated. Full report in session record. |
 | subagent eb83ab52 (read-only) | Taxi-GROUND-TRUTH @ ref `main` ONLY: `git ls-tree -r -l` blob enumeration + byte sizes, data/ mode fields (symlink/gitlink), ignore-layer rules, every referenced data path resolved (tracked / ignored / out-of-repo), fresh-clone executability verdict REAL-DATA / EXTERNAL-DEP / SYNTHETIC-ONLY / MENTION-ONLY. Worktree observations labeled sklearn-worktree facts. | DELIVERED 2026-08-26 — VERDICT: NO real taxi data reachable from `main`, and none EVER in its 2-commit history (1860709 = origin/main, no divergence). Only real blobs: demo/demo.csv 851 B + experiments/results/univariate/fare_amount_trip_distance/ratecode1_sample.parquet 5,531 B — BOTH synthetic-schema demo content. configs/dataset/taxi.yaml ABSENT; `data/` never existed in main's object store (full-history log empty; zero symlink/gitlink modes). Every taxi reference = MENTION-ONLY (paths into gitignored space). Fresh clone of main: demo pipeline ✔, taxi pipeline ✖ (main:experiments.py:402 concedes "the real taxi data file (absent in CI)"). ~150 MB yellow_tripdata_2024-{01..3}.parquet + out-of-repo taxi_zone_lookup.csv symlink exist ONLY as UNTRACKED sklearn-worktree state. Mention loci pinned: main:experiments.py:53/:58/:69 (training_data / taxi_zone_lookup.csv / joined_sample_live path constants); design intent on record at main README §7 ("public platform branch: NO taxi content"). HUMAN RULING 2026-08-26: DISREGARD the `taxi` branch — that open question is CLOSED, no lane will ever be dispatched against it. Still open: .gitignore promises ratecode1_sample.json sidecar that never landed; pr-1/pr-2 unaudited. Full report in session record. |
+
+| subagent 5aedd882 (read-only) | RENAME-R1 @ ref `main` ONLY: derive the EXISTING generic naming conventions (feature_N / target / engineered format / categorical vocab / lookup keys / slice names), numbered rules w/ evidence, UNDEFINED slots flagged for human decision. Feeds the taxi-identifier rename map. | DELIVERED 2026-08-26 — PALETTE: raw=`feature_<N>`+role{feature,target,datetime,ignore}; target=literal `target`; engineered=`engineered_feature_<N>` exemplar (configs/experiment/engineered.yaml:7-10) or `{col}_{hour\|dayofweek\|month}`; encodings AUTO `{col}_target_enc`/`{col}_freq_enc`+`__unknown__`; lookup left/right_key+`_lookup`; series `<kind>/<snake>`; samples `name@v<n>`. README:446-451 verifies semantic renames pass suite unchanged. 6 NO-PRECEDENT slots need human ruling before rename lands. Corrections: recipe.py/test_transformers.py/ordered=True contracts ABSENT on main. |
+| subagent 90a2edce (read-only) | RENAME-R2 @ ref `main` ONLY: exhaustive inventory of taxi-coupled identifiers — exact string, kind, all occurrences, consumer surfaces, FREE/GATED/PINNED-EVIDENCE verdict per cluster. Feeds the rename map. | DELIVERED 2026-08-26 — 38 clusters: 7 FREE / 29 GATED / 2 PINNED-EVIDENCE. KEY CATCHES: configmap tpep_*/total_amount values = latent KeyErrors vs committed parquet (real schema feature_1..3,target,pickup/dropoff_datetime); ghost .gitignore:22 ratecode1_sample.json rule; unsatisfied fare_column key (worker:58); pickup_hour/weekday demanded vs hour derived; ratecode1_sample.parquet = 7-surface pin whose blob is ALREADY generic (identity purely nominal). DO-NOT-RENAME class: branch-literal 'taxi' prose/logic, doctrine quotes, demo header. Full tables in session record; rename-map PROPOSAL v1 + decision cards D1/D2/D3 + map-informed Q4 posted to board. |
+
+| subagent e37de3e3 | P2 DE-TAXI SWEEP on main worktree: delete experiments.py; evidence pin -> sample_evidence.parquet(+json sidecar); mirror shared files; working.yaml/experiments_ui/readers/README sync. | DELIVERED+STAGED 2026-08-26 — LOCAL COMMITS 24e8e0a (docs-gov Q1/Q2) + 7136943 (sweep, 16 files +48/-547, rename 100%). Orchestrator reconciliations at staging: smoke step RESTORED to parent bytes minus ruff token (parity-safe no-op); min_fare->min_target_value extended to worker reader (one vocabulary); mlflow.yaml sample_size 1000->50 folded (P2-found latent defect). Gates: AST/YAML exit 0, residue grep empty, functional import proof; tier FULL. PUSH PENDING §14(5), sequenced after sklearn. |
+| subagent b02bf74e | P1 DE-TAXI SWEEP on sklearn tree (shared-surface originals): tests fixtures, ci.yml ruff list, configmap/ci-fixtures/Dockerfile/ignore rules, experiments.py taxi_diagnostic->canonical + min_target_value chain. | IN FLIGHT. On report: apply README :400 hunk (NOT in its contract — parity gap found post-dispatch) + verify ci.yml byte-equality vs main@7136943 + full local CI, then commit+present. |
 
 PICKUP RULE (rate-limit / connection-loss recovery): if a session dies while
 these rows read IN FLIGHT, re-dispatch NOTHING automatically — on resume,
@@ -200,40 +255,13 @@ provenance" guard (cards are never evidence).
 - CLI ingest arm: subprocess-only verification accepted; API-doc rider.
 - Warning sweep (25 third-party deprecations): backlog rider.
 
-## Backlog (ratified, unscheduled)
-Experiment lint debt (44 findings, outside CI whitelist) · DatasetContract
-mapping-source gap · floor-kwarg semantic tension · CLI-vs-pipeline sample
-asymmetry doc · dependency-warning sweep · audit.py/qq.py render branches.
-
-Added 2026-08-25 (ten-ruling cycle): REGISTRY-AUDIT sweeps per D31 (owner:
-fresh read-only agent; triggers: every governance-file-touching landing, any
-accuracy dispute, standing weekly sweep — the ruling-#9 calendar entry) ·
-gates.yaml stale-row re-stamp micro-contract (:163/:242/:602 verified stale
-at HEAD; :3007 stays until the HPO bool contract) · registry dupe-scan
-exit-3 findings (pre-existing; --dedupe-proposals mode) ·
-MAIN_AGENT_CONTRACT ~30KB-cap remediation (30,928 B; relocate Stamp-semantics
-bullet to WORKER_CONTRACT or appendix file) · consolidation-slate.md:134
-superseding footnote (dead "local-only, credential-bearing" wording) · HPO
-bool-param contract (GATE-HPO-82 three-layer defect reproduced live
-2026-08-25) · decision packets awaiting routing: RGC end-state steps 2..8
-(RGC-1 parity flip landed this cycle), qq-demo __main__, GHCR version-cap
-executor, dead fragment-citation dangle policy. [Former three active
-verification-lane rows — teeth thresholds, determinism silences,
-deployment wiring + CI scope — are RULED: DECISIONS.md D32-D35.] ·
-Probe-E allowlist clock: four prefix seeds (experiments/multivariate/,
-experiments/polynomial_regression_et_all/, experiments/univariate/fare_amount_trip_distance/,
-project/tests/) EXPIRE 2026-09-08 — promote each into real inputs/outputs
-registry entries before expiry or the new-surface tripwire goes RED by
-design. · REGISTRY-AUDIT fill (2026-08-26, CD prep): GATE-SURF-68 + GATE-
-ETL-117 validated_by now cite live tests; GATE-INFRA-122 stays empty —
-NO test drives experiments.py main() dispatcher (routing + verify-JSON
-test owed, one pytest suffices); more_modeling/** tracked-but-unowned
-(superseded-untracked note above) joins the same 2026-09-08 promotion
-clock. Canonical RGC
-pointer (eight-packet batch, ruling #5): the full RGC-1..8 checklist lives
-at agents/ledger/arbitration/2026-08-24/gap-foreign.md (~:182-210);
-RGC-1 — the parity SHARED flip — is the hard prerequisite for every later
-item, executed first, remainder in listed order.
+## Backlog (ratified, unscheduled) — MOVED TO PROJECT BOARD 2026-08-26
+All ratified-unscheduled items transferred as Todo cards to GitHub Project
+#4 Broadway Ops Board (PVT_kwHOAZFnCc4Bhhjq) WITH full per-item context;
+provenance record = this file's git blob @ 3fde83c + each card's cited
+sources. New backlog items enter as cards; this section is a POINTER
+only. TIME-CRITICAL: Probe-E allowlist seed promotion AND more_modeling
+ownership clock BOTH expire 2026-09-08.
 
 ## TELEMETRY
 
@@ -262,9 +290,13 @@ exist in-tree yet (~5 runner-min; Actions-API wall-time read).
 | 2026-08-25 | c4f3018 | failure (shellcheck SC2015 teardown.sh:24 — repaired in-tree this cycle) | no |
 | 2026-08-25 | 1cf33b5 | success (streak ends; shellcheck class structurally repaired by the CI-PARITY commit) | yes (3/5) |
 | 2026-08-25 | eb9ea18 | success (eight-packet batch; post-push monitor stage live and exercised — SHIP MONITOR OK) | yes (4/5) |
+| 2026-08-26 | 3fde83c | success (ground-truth batch; SHIP MONITOR OK) | yes (5/5) |
 
-STATUS: **UNMET — 4/5 greens → probe HELD.** The next green tip
-satisfy the literal bar; re-derive before firing:
+STATUS: **MET — probe ARMED, awaiting human go.** Live re-derivation
+2026-08-26 (`gh api` query below) counts **8** successes since
+2026-08-24T17:17:26Z — the ≥5 literal bar is satisfied (XDIST-1b landed
+b7086b0). FIRING IS A PUSH → §14(5): exact one-byte diff + command get
+presented to the human BEFORE any probe push. Re-derive before firing:
 `gh api 'repos/fbarulli/broadway/actions/runs?branch=sklearn&per_page=30' --jq '[.workflow_runs[] | select(.created_at > "2026-08-24T17:17:26Z" and .conclusion == "success")] | length'`
 
 ## EVENTS

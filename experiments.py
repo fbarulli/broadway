@@ -46,6 +46,7 @@ from broadway.stats.describe import describe, plot_describe_figures
 from broadway.stats.robust import winsorize
 from broadway.training.optuna_worker import compose_db_url
 from broadway.utils import require_keys
+from project.working import MIN_TARGET_VALUE, TARGET_COL
 
 # Shared constants (identical across the merged scripts).
 ROOT = Path(__file__).resolve().parent
@@ -314,7 +315,7 @@ def render_describe(sample_df, out_dir) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     summary = describe(
         sample_df, GROUP_COLUMN, SOURCE_GROUP, GROUP_VALUES, TARGET,
-        str(SAMPLE), "taxi_diagnostic", "diagnostic",
+        str(SAMPLE), "canonical", "diagnostic",
     )
     plot_describe_figures(
         sample_df, SOURCE_GROUP, GROUP_COLUMN, GROUP_VALUES, TARGET, summary,
@@ -360,7 +361,7 @@ def validate_configs() -> list[str]:
     problems = []
     for name, keys in (
         ("multivariate.yaml", ["target", "categorical", "sample", "baseline"]),
-        ("working.yaml", ["parquet", "columns", "min_fare",
+        ("working.yaml", ["parquet", "columns", "min_target_value",
                           "max_duration_minutes", "time_buckets"]),
         ("mlflow.yaml", ["sample_size", "test_fraction", "seed",
                          "continuous_features", "categorical_features"]),
@@ -386,8 +387,8 @@ def check_univariate() -> list[str]:
     sample = common.load_metered()
     if sample.empty:
         problems.append("univariate: load_metered returned no rows")
-    if not (sample["fare_amount"] > common.MIN_FARE).all():
-        problems.append("univariate: min-fare filter not honored")
+    if not (sample[TARGET_COL] > MIN_TARGET_VALUE).all():
+        problems.append("univariate: min_target_value filter not honored")
     if not (sample["duration_minutes"] < common.MAX_DURATION_MINUTES).all():
         problems.append("univariate: max-duration filter not honored")
     if "trip_distance" not in sample.columns:

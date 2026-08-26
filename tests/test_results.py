@@ -102,8 +102,8 @@ def _posthoc_step() -> AnalysisStep:
                     "effect_size_note": "large",
                 },
                 {
-                    "a": "Queens",
-                    "b": "Bronx",
+                    "a": "downtown",
+                    "b": "suburbs",
                     "p_value": 0.01,
                     "cohens_d": 0.5,
                     "hedges_g": 0.49,
@@ -337,7 +337,7 @@ def test_posthoc_step_page_renders_significant_pairs() -> None:
     assert "2 of 3 pairs significant" in page
     assert "| Pair | p | Cohen's d | Hedges' g | Note |" in page
     assert "| downtown vs suburbs | < 0.001 | 1.23 | 1.24 | large |" in page
-    assert "| Queens vs Bronx | 0.010 | 0.5 | 0.49 | medium |" in page
+    assert "| downtown vs suburbs | 0.010 | 0.5 | 0.49 | medium |" in page
     assert "significant_pair_details" not in page
     assert "[{" not in page
 
@@ -376,4 +376,4 @@ def test_render_timeline_posthoc_bullet() -> None:
     timeline = render_timeline("test", seq, [_posthoc_step()], [])
     assert "2 of 3 pairs significant:" in timeline
     assert "downtown vs suburbs: p < 0.001, Cohen's d 1.23, Hedges' g 1.24" in timeline
-    assert "Queens vs Bronx: p 0.010, Cohen's d 0.5, Hedges' g 0.49" in timeline
+    assert "downtown vs suburbs: p 0.010, Cohen's d 0.5, Hedges' g 0.49" in timeline

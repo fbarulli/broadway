@@ -1,7 +1,7 @@
 """Shared setup for the mlflow model-battle experiment.
 
-Loads the SAME working dataset as the univariate experiment (ratecode1_sample
-with the same metered filters, owned by `project.working`) so results are
+Loads the SAME working dataset as the univariate experiment (same metered
+filters, owned by `project.working`) so results are
 comparable, then provides the seeded 1000-row sample, the 80/20 holdout, the
 sklearn pipeline factory (categorical branch ready for future steps), and the
 full metric suite. Run knobs (sample size, split, seed, features) come from
@@ -45,7 +45,7 @@ from broadway.training.mlflow_utils import log_model
 from broadway.training.models.registry import display_name, model_keys
 from broadway.training.trainer import build_model_pipeline
 from broadway.utils import require_keys
-from project.working import load_metered, time_bucket
+from project.working import PICKUP_DATETIME_COL, load_metered, time_bucket
 
 HERE = Path(__file__).resolve().parent
 RESULTS = HERE.parents[0] / "results" / "mlflow"   # experiments/results/mlflow
@@ -103,7 +103,7 @@ BONUS_MODELS = {
 def load_metered_with_features() -> pd.DataFrame:
     """Metered rows + pickup_hour + time_bucket columns (battle scope)."""
     df = load_metered()
-    df["pickup_hour"] = df["tpep_pickup_datetime"].dt.hour
+    df["pickup_hour"] = df[PICKUP_DATETIME_COL].dt.hour
     df["time_bucket"] = df["pickup_hour"].map(time_bucket)
     return df
 

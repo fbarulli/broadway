@@ -1,4 +1,4 @@
-"""Single project-level binding for the tutorial working dataset (ratecode1).
+"""Single project-level binding for the tutorial working dataset.
 
 One owner for the working dataset every tutorial experiment operates on:
 parquet path, column names, dataset-level filter knobs, the loaders, and the
@@ -22,16 +22,16 @@ from broadway.utils import require_keys
 ROOT = Path(__file__).resolve().parents[1]
 CONFIG = ROOT / "configs" / "experiments" / "working.yaml"
 _cfg = yaml.safe_load(CONFIG.read_text())
-require_keys(_cfg, ["parquet", "columns", "min_fare", "max_duration_minutes",
+require_keys(_cfg, ["parquet", "columns", "min_target_value", "max_duration_minutes",
                     "time_buckets", "time_bucket_default"], "working.yaml")
-require_keys(_cfg["columns"], ["fare", "pickup_datetime", "dropoff_datetime"],
+require_keys(_cfg["columns"], ["target", "pickup_datetime", "dropoff_datetime"],
              "working.yaml columns")
 
 WORKING_DATASET = ROOT / _cfg["parquet"]
-FARE_COL = _cfg["columns"]["fare"]
+TARGET_COL = _cfg["columns"]["target"]
 PICKUP_DATETIME_COL = _cfg["columns"]["pickup_datetime"]
 DROPOFF_DATETIME_COL = _cfg["columns"]["dropoff_datetime"]
-MIN_FARE = float(_cfg["min_fare"])
+MIN_TARGET_VALUE = float(_cfg["min_target_value"])
 MAX_DURATION_MINUTES = float(_cfg["max_duration_minutes"])
 
 
@@ -44,9 +44,9 @@ def time_bucket(hour: int) -> str:
 
 
 def load_working() -> pd.DataFrame:
-    """Working dataset (ratecode1) with dataset-level filters applied."""
+    """Working dataset with dataset-level filters applied."""
     df = pd.read_parquet(WORKING_DATASET)
-    return df[df[FARE_COL] > MIN_FARE]
+    return df[df[TARGET_COL] > MIN_TARGET_VALUE]
 
 
 def load_metered() -> pd.DataFrame:

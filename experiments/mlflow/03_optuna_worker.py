@@ -60,13 +60,13 @@ def load_dataset(cfg: dict) -> pd.DataFrame:
     """Metered trips from the config parquet with the config filters."""
     ds = cfg["dataset"]
     df = pd.read_parquet(ds["parquet"])
-    df = df[df["fare_amount"] > ds["min_fare"]]
+    df = df[df[ds["fare_column"]] > ds["min_fare"]]
     duration = ((df[ds["dropoff_datetime"]] - df[ds["pickup_datetime"]])
                 .dt.total_seconds() / 60)
     keep = (duration > 0) & (duration < ds["max_duration_minutes"])
     df = df[keep]
     df["duration_minutes"] = duration[keep]
-    df["pickup_hour"] = df[ds["pickup_datetime"]].dt.hour
+    df["hour"] = df[ds["pickup_datetime"]].dt.hour
     df["pickup_weekday"] = df[ds["pickup_datetime"]].dt.weekday
     return df
 

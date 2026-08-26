@@ -40,9 +40,9 @@ def _join_report(unmatched=0):
         joins=[
             JoinAudit(
                 lookup="location_id",
-                lookup_path="data/raw/test_zone_lookup.csv",
+                lookup_path="data/raw/test_lookup.csv",
                 left_key="location_id",
-                right_key="LocationID",
+                right_key="location_id",
                 rows_attempted=5,
                 matched=5 - unmatched,
                 unmatched=unmatched,
@@ -58,7 +58,7 @@ def _lookup_report(affected_rows=0):
         lookups=[
             LookupValueAudit(
                 lookup="location_id",
-                lookup_path="data/raw/test_zone_lookup.csv",
+                lookup_path="data/raw/test_lookup.csv",
                 matched=100,
                 na_values=[],
                 columns=[
@@ -109,9 +109,9 @@ def test_render_join_distinguishes_rows_from_events() -> None:
         joins=[
             JoinAudit(
                 lookup="location_id",
-                lookup_path="data/raw/test_zone_lookup.csv",
+                lookup_path="data/raw/test_lookup.csv",
                 left_key="location_id",
-                right_key="LocationID",
+                right_key="location_id",
                 rows_attempted=5,
                 matched=5,
                 unmatched=0,
@@ -120,9 +120,9 @@ def test_render_join_distinguishes_rows_from_events() -> None:
             ),
             JoinAudit(
                 lookup="location_id",
-                lookup_path="data/raw/test_zone_lookup.csv",
+                lookup_path="data/raw/test_lookup.csv",
                 left_key="location_id",
-                right_key="LocationID",
+                right_key="location_id",
                 rows_attempted=5,
                 matched=5,
                 unmatched=0,
@@ -142,9 +142,9 @@ def test_join_counts_raises_on_divergent_row_counts() -> None:
         joins=[
             JoinAudit(
                 lookup="location_id",
-                lookup_path="data/raw/test_zone_lookup.csv",
+                lookup_path="data/raw/test_lookup.csv",
                 left_key="location_id",
-                right_key="LocationID",
+                right_key="location_id",
                 rows_attempted=5,
                 matched=5,
                 unmatched=0,
@@ -153,9 +153,9 @@ def test_join_counts_raises_on_divergent_row_counts() -> None:
             ),
             JoinAudit(
                 lookup="location_id",
-                lookup_path="data/raw/test_zone_lookup.csv",
+                lookup_path="data/raw/test_lookup.csv",
                 left_key="location_id",
-                right_key="LocationID",
+                right_key="location_id",
                 rows_attempted=4,
                 matched=4,
                 unmatched=0,

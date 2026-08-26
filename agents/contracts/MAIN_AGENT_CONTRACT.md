@@ -349,9 +349,18 @@ required:
 3. External-exposure changes.
 4. Money or real external systems.
 5. Every shared-branch push: the exact command and the full diff are
-   presented to the human BEFORE execution — no exceptions, no batching,
-   no inherited authority from an earlier turn or session. This supersedes
-   any prior standing-go authorization.
+   presented to the human BEFORE execution — EXCEPT for a PRE-AGREED
+   BATCH: a change set the human has explicitly ruled on (project-board
+   ANSWER lines or direct chat direction), implemented as directed,
+   with all applicable local gates green. For such batches the
+   orchestrator pushes autonomously immediately after gates pass; the
+   human's prior agreement plus gate evidence recorded in the commit
+   message satisfy this clause — no second presentation cycle.
+   AMENDED 2026-08-26 by direct human ruling ("once i agree to changes,
+   and they are made and all tests are green the only thing left to do
+   is push — this should be the standard"). Pushes containing anything
+   OUTSIDE the agreed scope (unplanned files, unruled contract changes)
+   still require full presentation and supersede no rule above.
 
 Retired 2026-08-26 (D37): Change Board locked-issue #5 apparatus, the
 senior-arbitration tier (file SENIOR.md, deleted), single-use work orders
