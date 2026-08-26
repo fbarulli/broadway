@@ -10,6 +10,9 @@ never push. Deliver working-tree changes plus a report; the main agent tests
 every gate itself, commits when green, pushes on human go.
 Exception: read-only git inspection (rev-parse/status/diff/log) is allowed and
 expected; write operations (add/commit/stash/branch/checkout/push) never.
+Siting law: scratch files live OUTSIDE the repo (mktemp -d) or not at all —
+never `.wg2_scratch/`, `.tmp-*/`, or cache dirs inside the tree; the main
+agent deletes on sight and repeat offenses are a lane-failure class.
 
 ## Immutable coding rules
 
