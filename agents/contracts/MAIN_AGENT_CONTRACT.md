@@ -38,10 +38,10 @@ Working directory: `/home/opc/ONE/broad-way`.
 - **Main agent (orchestrator)** — plans, writes contracts, dispatches,
   verifies, commits, pushes. Does NOT implement.
 - **Sub-agents** — execute one contract against `WORKER_CONTRACT.md`.
-- **Senior arbitration stage** — read-only approach reviewer
-  (`agents/contracts/SENIOR.md`): rules on problem→solution pairs
-  (ADOPT/MODIFY/REJECT); verdicts land as rows on the Change Board
-  (§14) and execute later as worker contracts (D26).
+- **Adversarial reviewer** — read-only approach reviewer against the
+  working-tree delta (registered authority per EVENTS 39de4245; protocol:
+  `REVIEWER_CONTRACT.md`). Verdicts BLOCKER/SHOULD-FIX/NOTE land in the
+  session record; enforcement lives in gates, not in a review tier.
 
 The main agent does not decide unilaterally. Weigh tradeoffs → options +
 recommendation → wait. Honesty over agreement: flag problems early; "not being
@@ -91,8 +91,9 @@ more reading `parse_numeric` than any checklist produced).
 - **Step-0 hash gate (mandatory):** worker's first action is
   `git rev-parse --short HEAD` against the dispatch stamp; mismatch → STOP
   before reading further.
-- Stamp semantics (dispatch stamps are RELATIVE; absolute SHAs are
-  provenance anchors only): see MAC_APPENDIX.md.
+- Stamp semantics (dispatch stamps are RELATIVE — HEAD-at-dispatch-time,
+  never hardcoded absolute SHAs; absolute SHAs are provenance anchors
+  only). This line is the whole doctrine; no external appendix.
 - **Running ledger:** chained batches carry an actuals-only ledger in the
   governing index file; actual ≠ projected halts the queue until reconciled.
 
@@ -276,8 +277,9 @@ Immutable coding rules: `WORKER_CONTRACT.md`. Plots use seaborn unless stated.
 Docs updated in the SAME commit as any change (`README.md` current at ALL
 times: test counts, commands, paths; `dataflow.md`, `src/broadway/stats/API.md`,
 `tests/README.md`). Scratch docs are never touched (`01.md`, `agents/notes/TODO_*.md`,
-`GOALS.md`, `LEARN.md`, `trust.md`, `synth.md`, `SENIOR.md`, `project.md`,
-`FEEDBACK.md`, `DATA_VALIDATION.md`, `GENERAL_TODO.md`, `project/STATS.md`).
+`GOALS.md`, `LEARN.md`, `trust.md`, `synth.md`, `project.md`,
+`FEEDBACK.md`, `DATA_VALIDATION.md`, `GENERAL_TODO.md`, `project/STATS.md`;
+`SENIOR.md` retired from this list and from the tree 2026-08-26).
 `HANDOFF.md` is maintained on explicit user request.
 
 ## 12. Git & product policy
@@ -312,8 +314,9 @@ required:
    any prior standing-go authorization.
 
 Retired 2026-08-26 (D37): Change Board locked-issue #5 apparatus, the
-senior-arbitration tier (`SENIOR.md`), single-use work orders (`G0B.md`),
-and the board recipe appendix (`MAC_APPENDIX.md`). The surviving ENFORCED
+senior-arbitration tier (file SENIOR.md, deleted), single-use work orders
+(file G0B.md, deleted), and the board recipe appendix (file
+MAC_APPENDIX.md, deleted). The surviving ENFORCED
 register is `STATE.md ## EVENTS` (read by TIER-GATE and probe g).
 Historical rulings remain verbatim in DECISIONS.md and
 `agents/ledger/arbitration/**` as dated records.
@@ -459,5 +462,6 @@ was never required.
 4. **UPDATE IN PLACE** — the registry row travels in the SAME commit
    (owner line numbers, transforms, new pins), DIGEST.md re-rendered.
    A stale row is a doc-drift bug (HANDOFF rule).
-5. **RECORD** — material changes supersede their Change Board row
-   (`status:` landed) in the same landing touch.
+5. **RECORD** — material changes record their trigger + human
+   confirmation in the landing commit message itself; no board row exists
+   anymore (D37).

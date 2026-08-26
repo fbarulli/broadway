@@ -557,20 +557,20 @@ def test_classifier_cli_end_to_end() -> None:
 
 
 # --------------------------------------------------------------------------- #
-# Stamp-semantics tripwire (doctrine text lives in MAC_APPENDIX.md; the
-# MAIN_AGENT_CONTRACT.md §5 bullet is a pointer there since D32(6)):
+# Stamp-semantics tripwire (doctrine text lives IN MAIN_AGENT_CONTRACT.md §5
+# since the 2026-08-26 D37 retirement of MAC_APPENDIX.md):
 # standing contracts must
 # never encode absolute-SHA equality as an executable precondition ("must equal
 # <sha>"). Dispatch stamps are relative by law; absolute SHAs belong only to
-# immutable records as provenance anchors. G0B.md is the single frozen
-# completed-dispatch exception (archival note pending a separate decision) —
-# the baseline below pins it, so any NEW occurrence anywhere under
+# immutable records as provenance anchors. The single frozen completed-
+# dispatch exception (G0B.md) was retired WITH its file on 2026-08-26 —
+# the empty baseline below means ANY occurrence anywhere under
 # agents/contracts/ turns this probe RED.
 SHA_GATE_LINE = re.compile(
     r"rev-parse[^\n]*must\s+equal[^\n]*[0-9a-f]{6,40}",
     re.IGNORECASE,
 )
-SHA_GATE_BASELINE: dict[str, int] = {"G0B.md": 1}
+SHA_GATE_BASELINE: dict[str, int] = {}
 
 
 def test_no_new_absolute_sha_gates_in_contracts() -> None:
@@ -582,8 +582,7 @@ def test_no_new_absolute_sha_gates_in_contracts() -> None:
     assert hits == SHA_GATE_BASELINE, (
         f"absolute-sha equality gates changed under agents/contracts/: {hits} "
         f"(baseline {SHA_GATE_BASELINE}). Dispatch stamps must stay relative — "
-        "see MAC_APPENDIX.md Stamp semantics "
-        "(pointer at MAIN_AGENT_CONTRACT.md §5)."
+        "see MAIN_AGENT_CONTRACT.md §5 Stamp semantics."
     )
 
 
@@ -1126,8 +1125,6 @@ def test_probe_h_root_dot_dir_and_cache_ban_live_and_falsifiable() -> None:
 # exemption records is RED; expired rows fail loud (probe-e decay pattern).
 UV_CACHE_NEEDLE = "UV_CACHE_DIR="
 UV_CACHE_EXEMPTIONS: tuple[tuple[str, str, str], ...] = (
-    ("agents/contracts/G0B.md",
-     "archived completed-dispatch record (frozen G0B execution command)", "2026-09-08"),
     ("agents/ledger/DECISIONS.md",
      "historical D28/D32 measured-run records", "2026-09-08"),
     ("agents/ledger/STATE.md",
