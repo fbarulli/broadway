@@ -5,6 +5,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
+from broadway.stats.diagnostic_models import DiagnosticResult
+
 
 class StepStatus(str, Enum):
     COMPLETED = "completed"
@@ -45,6 +47,7 @@ class AnalysisStep(BaseModel):
     ramification: str
     decision_required: bool
     performed_at: str
+    diagnostic: DiagnosticResult | None = None
 
 
 class AnalysisDecision(BaseModel):

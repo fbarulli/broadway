@@ -216,6 +216,19 @@ def _render_step_page(seq_step, step: AnalysisStep) -> str:
         else:
             lines.append("none")
         lines.append("")
+    if step.diagnostic is not None:
+        lines.append("## Evidence")
+        lines.append("")
+        if step.diagnostic.evidence:
+            lines.extend(f"- {e}" for e in step.diagnostic.evidence)
+        else:
+            lines.append("- none recorded")
+        lines.append("")
+        if step.diagnostic.warnings:
+            lines.append("## Warnings")
+            lines.append("")
+            lines.extend(f"- {w}" for w in step.diagnostic.warnings)
+            lines.append("")
     if step.figures:
         lines.append("## Figures")
         lines.append("")

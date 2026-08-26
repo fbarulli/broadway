@@ -19,6 +19,7 @@ from broadway.reports.results import (
     write_results,
 )
 from broadway.reports.timeline import render_timeline
+from broadway.stats.diagnostic_models import DiagnosticResult
 from broadway.timeline.models import AnalysisStep, StepStatus
 from broadway.timeline.sequence import load_walkthrough_sequence
 
@@ -340,6 +341,33 @@ def test_posthoc_step_page_renders_significant_pairs() -> None:
     assert "| downtown vs suburbs | 0.010 | 0.5 | 0.49 | medium |" in page
     assert "significant_pair_details" not in page
     assert "[{" not in page
+
+
+def test_step_page_renders_diagnostic_evidence_section() -> None:
+    seq = load_walkthrough_sequence()
+    step = _step(
+        diagnostic=DiagnosticResult(
+            question="Is the mean relationship correctly specified?",
+            evidence=[
+                "residual-vs-fitted plot persisted at figures/residuals_vs_fitted.png"
+            ],
+            ramification="systematic residual structure suggests misspecification",
+            warnings=["small sample"],
+        )
+    )
+    page = render_results("test", seq, [step], [])["describe-groups.md"]
+    assert "## Evidence" in page
+    assert "- residual-vs-fitted plot persisted at figures/residuals_vs_fitted.png" in page
+    assert "## Warnings" in page
+    assert "- small sample" in page
+
+
+def test_step_page_without_diagnostic_omits_evidence_section() -> None:
+    seq = load_walkthrough_sequence()
+    step = _step()
+    page = render_results("test", seq, [step], [])["describe-groups.md"]
+    assert "## Evidence" not in page
+    assert "## Warnings" not in page
 
 
 def test_posthoc_step_page_zero_significant_pairs() -> None:
