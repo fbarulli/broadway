@@ -64,6 +64,28 @@ def mean_specification_diagnostic(model: object, out_path: str) -> DiagnosticRes
     )
 
 
+def _bp_statistics(model) -> tuple[float, float]:
+    return bp_test(model.resid, model.model.exog)
+
+
+def constant_variance_diagnostic(model: object, out_path: str) -> DiagnosticResult:
+    plot_residuals_vs_fitted(model, out_path)
+    statistic, p_value = _bp_statistics(model)
+    return DiagnosticResult(
+        question="Is the error variance constant?",
+        evidence=[
+            f"residual-vs-fitted plot persisted at {out_path}",
+            f"Breusch-Pagan statistic={statistic:.4f}, p={p_value:.4f}",
+        ],
+        ramification=(
+            "Heteroskedasticity does not bias OLS point estimates but invalidates "
+            "conventional standard errors, p-values, and confidence intervals; if "
+            "detected, refit with HC3 robust standard errors before trusting "
+            "inference on the coefficients."
+        ),
+    )
+
+
 def plot_residuals(model, out_path: str) -> None:
     resid = model.resid
 
