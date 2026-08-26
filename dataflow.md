@@ -193,7 +193,7 @@ broadway/
       post_hoc.py           # games_howell
       regression.py         # fit_ols, fit_robust, bp_jb
       diagnostic_models.py  # DiagnosticResult (question → evidence → ramification)
-      diagnostics.py        # bp_test, jb_test, durbin_watson, plot_residuals, plot_residuals_vs_fitted, mean_specification_diagnostic
+      diagnostics.py        # bp_test, jb_test, durbin_watson, plot_residuals, plot_residuals_vs_fitted/qq/histogram, plot_cooks_distance, mean_specification/constant_variance/influence/residual_distribution diagnostics
       time_series.py        # durbin_watson_test, plot_acf
       baseline.py           # train_lgbm, evaluate
       module.py             # pipeline step: build groups → run_anova → save_plan

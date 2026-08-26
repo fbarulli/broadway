@@ -7,6 +7,20 @@
 > instructions. Stale on arrival = STOP-and-report, never improvise.
 
 ## Last refreshed
+2026-08-26 (diagnostic-track session): two main-agent commits landed on
+origin/sklearn — `0ea2267` (timeline: `AnalysisStep.diagnostic:
+DiagnosticResult | None` + report renderer Evidence/Warnings sections) and
+`7c9627b` (stats: D3 `constant_variance_diagnostic` as typed
+`DiagnosticResult`). Both full local CI green (LOCAL-CI GREEN, 7 gates).
+Platform stays data-agnostic: no taxi literal introduced into src/.
+Notes `agents/notes/01.md` (D1 design + status addendum) and
+`agents/notes/02.md` (data-agnostic confirmation + status addendum) carry
+the post-landing reconciliation; D1/D3 landed, `plot_residuals()` Q-Q +
+histogram split and D4 (influence) remain open. Two read-only
+investigation lanes dispatched (plot-split, D4-influence); board cards
+mirroring this refresh posted per §6. STATE.md stays the primary record;
+git is authoritative for SHAs.
+
 2026-08-26 (human-directed governance session): the GROUND-TRUTH LAW clause
 landed in THREE contract files — MAIN_AGENT_CONTRACT §6 Verification +
 WORKER_CONTRACT Live-fact-checking duty + REVIEWER_CONTRACT §6 fabrication

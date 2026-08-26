@@ -86,19 +86,125 @@ def constant_variance_diagnostic(model: object, out_path: str) -> DiagnosticResu
     )
 
 
-def plot_residuals(model, out_path: str) -> None:
-    resid = model.resid
+def _influence_statistics(model) -> tuple[np.ndarray, np.ndarray]:
+    infl = model.get_influence()
+    cooks, _ = infl.cooks_distance
+    return cooks, infl.hat_matrix_diag
 
+
+def _plot_cooks_distance(ax, model) -> None:
+    cooks, _ = _influence_statistics(model)
+    threshold = 4 / len(cooks)
+    ax.axhline(threshold, color="red", linestyle="--", linewidth=1)
+    ax.scatter(
+        np.arange(len(cooks)),
+        cooks,
+        s=2,
+        alpha=0.15,
+        color=viz.palette_colors(1)[0],
+    )
+    ax.set_xlabel("Observation index")
+    ax.set_ylabel("Cook's distance")
+    ax.set_title("Cook's distance by observation")
+    viz.despine(ax)
+
+
+def plot_cooks_distance(model: object, out_path: str) -> None:
+    fig, ax = plt.subplots(figsize=(8, 5))
+    _plot_cooks_distance(ax, model)
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=150)
+    plt.close(fig)
+
+
+def influence_diagnostic(model: object, out_path: str) -> DiagnosticResult:
+    plot_cooks_distance(model, out_path)
+    cooks, hat = _influence_statistics(model)
+    n = len(cooks)
+    threshold = 4 / n
+    n_influential = int(np.sum(cooks > threshold))
+    return DiagnosticResult(
+        question="Is the result being driven by a few observations?",
+        evidence=[
+            f"Cook's-distance plot persisted at {out_path}",
+            (
+                f"max Cook's distance={float(np.max(cooks)):.4f}, "
+                f"{n_influential} of {n} observations exceed 4/n={threshold:.4f}, "
+                f"max leverage={float(np.max(hat)):.4f}"
+            ),
+        ],
+        ramification=(
+            "A few high-leverage or high-influence observations can dominate the "
+            "fit, so the reported results may not be robust; inspect the flagged "
+            "observations, and if the conclusions change when they are removed, "
+            "consider robust regression or report the sensitivity explicitly."
+        ),
+    )
+
+
+def _plot_residuals_qq(ax, model) -> None:
+    resid = model.resid
+    sm.qqplot(resid, line="45", ax=ax, markersize=2, alpha=0.15)
+    ax.set_title("Q-Q Plot of Residuals")
+    viz.despine(ax)
+
+
+def _plot_residuals_histogram(ax, model) -> None:
+    resid = model.resid
+    ax.hist(resid, bins=100, color=viz.palette_colors(1)[0])
+    ax.set_title("Residual Distribution")
+    ax.set_xlabel("Residual")
+    viz.despine(ax)
+
+
+def plot_residuals_qq(model: object, out_path: str) -> None:
+    fig, ax = plt.subplots(figsize=(8, 5))
+    _plot_residuals_qq(ax, model)
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=150)
+    plt.close(fig)
+
+
+def plot_residuals_histogram(model: object, out_path: str) -> None:
+    fig, ax = plt.subplots(figsize=(8, 5))
+    _plot_residuals_histogram(ax, model)
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=150)
+    plt.close(fig)
+
+
+def _jb_statistics(model) -> tuple[float, float, float, float]:
+    return jb_test(model.resid)
+
+
+def residual_distribution_diagnostic(model: object, out_path: str) -> DiagnosticResult:
+    plot_residuals_qq(model, out_path)
+    statistic, p_value, skew, kurtosis = _jb_statistics(model)
+    return DiagnosticResult(
+        question="Is residual non-normality problematic for inference?",
+        evidence=[
+            f"Q-Q plot of residuals persisted at {out_path}",
+            (
+                f"Jarque-Bera statistic={statistic:.4f}, p={p_value:.4f}, "
+                f"skew={skew:.4f}, kurtosis={kurtosis:.4f}"
+            ),
+        ],
+        ramification=(
+            "Residual non-normality is primarily a concern for small samples where "
+            "normal-theory inference is unreliable; if the sample is small and the "
+            "residuals depart substantially from normality, consider a "
+            "transformation, robust/nonparametric inference, or bootstrap-based "
+            "inference rather than relying on normal-theory p-values."
+        ),
+    )
+
+
+def plot_residuals(model, out_path: str) -> None:
     fig, axes = plt.subplots(1, 3, figsize=(18, 5))
 
     _plot_residuals_vs_fitted(axes[0], model)
-
-    sm.qqplot(resid, line="45", ax=axes[1], markersize=2, alpha=0.15)
-    axes[1].set_title("Q-Q Plot of Residuals")
-
-    axes[2].hist(resid, bins=100, color=viz.palette_colors(1)[0])
-    axes[2].set_title("Residual Distribution")
-    axes[2].set_xlabel("Residual")
+    _plot_residuals_qq(axes[1], model)
+    _plot_residuals_histogram(axes[2], model)
 
     for ax in axes:
         viz.despine(ax)

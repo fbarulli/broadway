@@ -80,8 +80,26 @@ def plot_residuals(model, out_path: str) -> None
 def plot_residuals_vs_fitted(model, out_path: str) -> None
     # residual-vs-fitted scatter only → save PNG
 
+def plot_residuals_qq(model, out_path: str) -> None
+    # Q-Q plot of residuals only → save PNG
+
+def plot_residuals_histogram(model, out_path: str) -> None
+    # residual histogram only → save PNG
+
+def plot_cooks_distance(model, out_path: str) -> None
+    # Cook's distance by observation index, 4/n threshold line → save PNG
+
 def mean_specification_diagnostic(model, out_path: str) -> DiagnosticResult
     # persists residual-vs-fitted plot, returns Question→Evidence→Ramification
+
+def constant_variance_diagnostic(model, out_path: str) -> DiagnosticResult
+    # persists residual-vs-fitted plot + Breusch-Pagan, returns typed result
+
+def influence_diagnostic(model, out_path: str) -> DiagnosticResult
+    # persists Cook's-distance plot + max/4-n summary, returns typed result
+
+def residual_distribution_diagnostic(model, out_path: str) -> DiagnosticResult
+    # persists Q-Q plot + Jarque-Bera, returns typed result
 ```
 
 ## diagnostic_models.py
