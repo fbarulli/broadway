@@ -395,7 +395,13 @@ configs, `k8s/`, `docker/`, `.github/workflows/`, `pyproject.toml`,
 `Dockerfile`, `docker-compose.yml`, `.gitignore`, `.dockerignore`, and the
 parity script itself — must be **byte-identical on both branches**. Anything
 not on that list is deliberately branch-specific (taxi-only content lives on
-`taxi`; `main` ships no taxi configs, no `experiments/`, no `project/`).
+`taxi`). `main` ships no taxi dataset content — no TLC schema pins, no raw
+trip data. Sanctioned exceptions, deliberately tracked on this branch:
+contract-mirror bindings (`project/`, `configs/experiments/working.yaml`)
+that bind the generic machinery to a demo schema, plus one synthetic-backed
+pinned evidence fixture
+(`experiments/results/univariate/fare_amount_trip_distance/ratecode1_sample.parquet`)
+whitelisted as a CI fixture. Governance pointers: `GOVERNANCE-POINTER.md`.
 
 ### Parity gate
 
