@@ -111,7 +111,7 @@ sync_to_main() {
 PARITY_ERA=dev                 # dev: sklearn active, main frozen | main: lockstep day
 PARITY_TRACK_BRANCH=sklearn    # active development line during dev era
 PARITY_ALLOWLIST=()            # SHARED paths exempt from custody; extend only by cited ruling
-PARITY_MAIN_ANCHOR=7136943ed3e3fd4498d2d4843ebceaf5af4a7e1a  # re-anchored 2026-08-26 at batch#2 landing (human-directed main updates: docs-gov 24e8e0a + de-taxi sweep 7136943, all gates green)
+PARITY_MAIN_ANCHOR=9a227d2c882313ddbcc5e02744bddcf1107b645e  # re-anchored 2026-08-29 at the human-directed public README + companion-guide landing, after protected CI passed
 
 # Preserved validations (D16 rider). The old ENV_FILE readability test,
 # `source`, ${VAR:?} trio, and declare -p existence check are DEAD here —
