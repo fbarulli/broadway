@@ -68,6 +68,8 @@ _TRAIN = {
 }
 
 _ETL = {
+    "ci_sample_size": 50000,
+    "max_drop_fraction": 0.1,
     "random_state": 42,
     "train_file": "train.parquet",
     "val_file": "val.parquet",
@@ -144,3 +146,33 @@ def test_missing_required_step_section_raises(
     message = str(exc_info.value)
     for section in missing:
         assert section in message, f"message must name missing section '{section}': {message}"
+
+
+def test_config_overlay_precedes_base_and_falls_back(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    base = tmp_path / "base"
+    overlay = tmp_path / "overlay"
+    _write_yaml(base / "environment" / "development.yaml", _ENVIRONMENT)
+    _write_yaml(base / "dataset" / "test.yaml", _DATASET)
+    _write_yaml(base / "experiment" / "baseline.yaml", _EXPERIMENT)
+    _write_yaml(base / "step" / "etl.yaml", _ETL)
+    overlay_dataset = {**_DATASET, "path": "overlay/demo.csv"}
+    _write_yaml(overlay / "dataset" / "test.yaml", overlay_dataset)
+
+    monkeypatch.setattr(loader, "CONFIGS_DIR", base)
+    monkeypatch.setenv(loader.CONFIG_OVERLAY_ENV, str(overlay))
+
+    assert loader.config_path("dataset/test.yaml") == overlay / "dataset" / "test.yaml"
+    assert loader.config_path("step/etl.yaml") == base / "step" / "etl.yaml"
+    assert load_config("etl", dataset="test", experiment="baseline").dataset.path == "overlay/demo.csv"
+
+
+def test_missing_config_overlay_fails_loudly(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    missing_overlay = tmp_path / "missing"
+    monkeypatch.setenv(loader.CONFIG_OVERLAY_ENV, str(missing_overlay))
+
+    with pytest.raises(FileNotFoundError, match="config overlay directory not found"):
+        loader.config_path("dataset/test.yaml")

@@ -6,18 +6,17 @@ Step 5: Check ANOVA's assumptions before trusting the last step's result.
 
 Run with: python project/scripts/05_anova_assumptions.py
 """
-from pathlib import Path
-
 import yaml
 
+from broadway.config.loader import config_path
 from broadway.stats import assumptions
 from broadway.utils import require_keys
 from project import data
 
 
 def _shapiro_seed() -> int:
-    """Seed from configs/project/taxi.yaml — this teaching layer's owning config."""
-    path = Path("configs/project/taxi.yaml")
+    """Seed from the project-owned taxi configuration."""
+    path = config_path("project/taxi.yaml")
     config = yaml.safe_load(path.read_text())
     require_keys(config, ["shapiro_seed"], path.name)
     return int(config["shapiro_seed"])

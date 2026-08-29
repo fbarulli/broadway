@@ -7,7 +7,7 @@ from broadway.lineage.models import SampleSpec
 
 
 def load_sample(name: str) -> SampleSpec:
-    path = loader.CONFIGS_DIR / "sample" / f"{name}.yaml"
+    path = loader.config_path(f"sample/{name}.yaml")
     if not path.exists():
         raise FileNotFoundError(f"sample config not found: {path}")
     with open(path, encoding="utf-8") as f:

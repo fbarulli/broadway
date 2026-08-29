@@ -447,8 +447,25 @@ def test_joined_loader_rejects_pre_existing_lookup_suffix_collision(
     deep failure the duplicate-label frame tripped inside ``audit_lookup_values``
     (measured pre-fix: ``ValueError: cannot reindex on an axis with duplicate
     labels`` on this exact shape)."""
-    cfg = load_config("etl", dataset="taxi", experiment="taxi")
-    ds = cfg.dataset
+    ds = DatasetContract(
+        name="collision",
+        path="unused.csv",
+        target="trip_duration_minutes",
+        task=TaskType.REGRESSION,
+        datetime_column="pickup_datetime",
+        columns={
+            "pickup_location_id": ColumnSchema(
+                dtype="int64", null_count=0, role=ColumnRole.FEATURE
+            ),
+            "pickup_datetime": ColumnSchema(
+                dtype="datetime64", null_count=0, role=ColumnRole.DATETIME
+            ),
+            "trip_duration_minutes": ColumnSchema(
+                dtype="float64", null_count=0, role=ColumnRole.TARGET
+            ),
+        },
+        lookup_tables={},
+    )
     frame = _contract_frame(ds)
     frame["pickup_datetime"] = pd.to_datetime("2024-01-01")  # contract datetime
     frame["Borough"] = "x"

@@ -1,18 +1,18 @@
 # broadway
 
-Generalized ML experimentation platform. Two surfaces: a pipeline CLI
-(`ds-pipeline`) and a set of numbered analysis scripts for the taxi dataset
-(`project/scripts/`). Full architecture map in `dataflow.md`; status
-snapshot in `agents/ledger/HANDOFF.md`.
+Generalized ML experimentation platform. The reusable surface is the pipeline
+CLI (`ds-pipeline`); dataset-specific experiments live under `project/` on the
+development line only. Full architecture map is in `dataflow.md`; current
+operational state is in `agents/ledger/STATE.md`.
 
 Branch model lives in `agents/contracts/MAIN_AGENT_CONTRACT.md` §2 — `sklearn` is the only active development line; `taxi` is a fast-forward pass-along; `main` is frozen until declared main-day.
 
 ## Install
 
 ```bash
-uv sync --extra dev        # install deps incl. dev toolchain (ruff/mypy/pytest-cov); add --extra spark only for genuinely large datasets
+bash scripts/uv.sh sync --extra dev        # install deps incl. dev toolchain (ruff/mypy/pytest-cov); add --extra spark only for genuinely large datasets
 docker compose up -d       # mlflow + postgres (optional; training logs runs + artifacts here)
-uv run mlflow server --backend-store-uri sqlite:///$(pwd)/.mlflow.db --artifacts-destination file://$(pwd)/mlruns   # no-docker local MLflow server (MLflow 3.x; listens on :5000; mlruns/ is gitignored)
+bash scripts/uv.sh run mlflow server --backend-store-uri sqlite:///$(pwd)/.mlflow.db --artifacts-destination file://$(pwd)/mlruns   # no-docker local MLflow server (MLflow 3.x; listens on :5000; mlruns/ is gitignored)
 rm -f .mlflow.db && rm -rf mlruns   # reset the demo registry when a stale champion skews promote/comparison between identical runs
 ```
 
@@ -25,18 +25,19 @@ End-to-end determinism between identical pipeline runs is enforced by
 `scripts/check_e2e_determinism.sh` (whitelist + exit-code bar documented in
 `SKLEARN_PIPELINES.md`, "End-to-end verification criteria").
 
-## Quick start (taxi)
+## Quick start (generic demo)
 
 ```bash
-# 1. build the mode-keyed sample cache (streams 8.6M rows, keeps small groups in full)
-DATA_MODE=dev uv run python -c "from project import data; data.generate_sample_cache()"
+# 1. infer a contract from generic demo input
+bash scripts/uv.sh run ds-pipeline discover --csv demo/demo.csv --target target --task regression
 
-# 2. run an analysis script
-DATA_MODE=dev uv run python -m project.scripts.04_anova_boroughs
+# 2. generate and validate an immutable generic named sample (output is ignored)
+bash scripts/uv.sh run python -c 'from broadway.samples import generate_sample, read_named_sample; generate_sample("demo"); read_named_sample("demo")'
 ```
 
-`dev` mode is the default (small sample, fast). Prefix any command with
-`DATA_MODE=live` for full-size results.
+The named-sample command fails if `data/samples/demo@v1.parquet` already
+exists; remove that ignored local artifact or bump the sample version before
+regenerating.
 
 ---
 
@@ -75,6 +76,19 @@ bare-model artifacts remain loadable via `ModelPyFunc`
 Pipelines are mode-specific; `full` is a dispatcher that reads
 `AnalysisContract.mode` and resolves the matching `configs/flow/{prediction,hypothesis,causal}.yaml`.
 
+## Deliverables
+
+| Audience | Deliverable | File types |
+|---|---|---|
+| DS | The story | `.md`, `.png`, `AnalysisPlan.json` |
+| Model | The weights | `model.pkl`, `.onnx` |
+| MLE | The serving bundle | `inference_schema.py`, `preprocessor.pkl`, `model_card.json` |
+| Data Team | The observability baseline | `reference_profile.json`, `data_contract.yaml` |
+
+The supporting artifact guide is [`read.md`](read.md): it expands the DS,
+serving, and data-tracking bundles without making the README a second source
+of truth.
+
 ---
 
 ## 1. Pipeline CLI — `ds-pipeline`
@@ -106,7 +120,7 @@ Every step except `discover` takes the same three flags.
 | init | `ds-pipeline init <csv> --name <n> …` | `configs/{dataset,analysis,experiment}/<n>.yaml` + `artifacts/discover/profile.json` + profile lineage sidecar | works (interactive or flag-driven) |
 | profile | `ds-pipeline profile --dataset <d>` | `artifacts/discover/profile.json` (re-profile observed facts) | works |
 | columns | `ds-pipeline columns --csv <path>` | prints `name: dtype` per source column (read-only) | works |
-| ingest | `ds-pipeline ingest --dataset <d>` | `data/processed/training_data.parquet` + `ingest:<d>` lineage record | works (Polars; CI-gated; contract-driven) |
+| ingest | `ds-pipeline ingest --dataset <d> --experiment <e>` | `data/processed/training_data.parquet` + `ingest:<d>` lineage record | works (generic ETL; CI-gated; contract-driven) |
 | etl | `ds-pipeline etl --dataset <d> --experiment <e>` | cleaned + split parquet + `JoinAudit`/`LookupValueAudit` (`join`/`lookup_value` lineage nodes) | works |
 | contracts | `ds-pipeline contracts …` | pass/fail validation | works |
 | features | `ds-pipeline features …` | fitted feature pipeline | works |
@@ -144,7 +158,7 @@ ds-pipeline lineage --analysis taxi --dataset taxi
 Each step writes a `LineageRecord` sidecar under `artifacts/lineage/records/`
 after saving its result; the `lineage` command assembles them into the chain
 `dataset → ingest → join → {etl, lookup_value} → analysis → baseline → … → decision`.
-`DatasetSlice`s are authored config (`configs/slice/`); `DecisionRecord`s are
+`DatasetSlice`s are authored project config (`project/config/slice/`); `DecisionRecord`s are
 runtime events (`artifacts/lineage/decisions/`).
 
 ### Results reports — `reports/`
@@ -269,13 +283,13 @@ remediation → non-linear baseline. Each is a thin wrapper over
 Run via module form (no `sys.path` hacks needed):
 
 ```bash
-uv run python -m project.scripts.NN_name
+bash scripts/uv.sh run python -m project.scripts.NN_name
 ```
 
 Build the cache first (needed by scripts 04-12):
 
 ```bash
-uv run python -c "from project import data; data.generate_sample_cache()"
+bash scripts/uv.sh run python -c "from project import data; data.generate_sample_cache()"
 ```
 
 | # | Module | What it does |
@@ -313,8 +327,8 @@ The OLS diagnostics surface is typed: `DiagnosticResult`
 - Two sampling strategies, both mode-aware: `load_stratified_sample()` (random, stratified — scripts 04-09, 11, 12) and `load_time_slice()` (contiguous, time-sorted, filter pushdown — script 10). Never randomly sample the time slice.
 
 ```bash
-DATA_MODE=dev  uv run python -m project.scripts.08_ols_residuals_diagnostics
-DATA_MODE=live uv run python -m project.scripts.12_lgbm_baseline
+DATA_MODE=dev  bash scripts/uv.sh run python -m project.scripts.08_ols_residuals_diagnostics
+DATA_MODE=live bash scripts/uv.sh run python -m project.scripts.12_lgbm_baseline
 ```
 
 ---
@@ -322,7 +336,7 @@ DATA_MODE=live uv run python -m project.scripts.12_lgbm_baseline
 ## 4. Tests
 
 ```bash
-uv run pytest              # library (synthetic) + data layer (real .head(1000)/cache); no count gate — enforcement is the ≥95% coverage floor on src/broadway via scripts/run_local_ci.sh (D17b SSOT) plus governance probes
+bash scripts/uv.sh run pytest              # library (synthetic) + data layer (real .head(1000)/cache); no count gate — enforcement is the ≥95% coverage floor on src/broadway via scripts/run_local_ci.sh (D17b SSOT) plus governance probes
 ```
 
 ---
@@ -331,23 +345,28 @@ uv run pytest              # library (synthetic) + data layer (real .head(1000)/
 
 ```
 configs/
-  dataset/<name>.yaml      # per-dataset schema (columns, dtypes, target, task)
-  experiment/<name>.yaml   # features (+ optional builder_params), model, split, metric
+  dataset/<name>.yaml      # generic/test schema (columns, dtypes, target, task)
+  experiment/<name>.yaml   # generic feature/model/split defaults
   environment/<name>.yaml  # development / staging / production
   step/<step>.yaml         # per-step knobs + stats/train/features SSOT
   flow/<mode>.yaml         # mode-specific step lists (prediction/hypothesis/causal)
   flow/stats_sequence.yaml # ordered stats-step list rendered into reports/index.md
-  sample/<name>.yaml       # SampleSpec (name, role, path, description, column_mapping) for `stats --sample`
-  analysis/<name>.yaml     # authored analytical intent (--analysis <name>)
-  project/<name>.yaml      # dataset ingest knobs (configs/project/taxi.yaml)
-  slice/<name>.yaml        # authored DatasetSlice (configs/slice/)
+  sample/<name>.yaml       # generic SampleSpec for `stats --sample`
+  analysis/<name>.yaml     # generic analytical intent (--analysis <name>)
+
+project/config/
+  dataset|analysis|experiment|project|sample|slice/<name>.yaml
+                            # project overlay; selected by project composition
 ```
 
-`configs/analysis/` holds one YAML per analytical use case (e.g. `taxi.yaml`,
-`taxi_hypothesis.yaml`, `taxi_causal.yaml`).
+`configs/analysis/` holds generic/test analytical use cases. The taxi development
+profile lives under `project/config/` and overlays only matching config names.
+Run project-bound platform commands through `uv run python -m project.cli` so
+the overlay is selected explicitly; `ds-pipeline` remains data-agnostic.
 
-`configs/sample/<name>.yaml` now declares versioned named samples too —
-seed/size/columns/filters/schema generate immutable artifacts under
+`configs/sample/<name>.yaml` declares versioned named samples —
+seed/size/columns/filters/schema generate immutable artifacts from a `.parquet`
+or `.csv` source under
 `data/samples/` (`<name>@v<N>.parquet` + provenance), validated by
 `read_named_sample` before steps consume them by name.
 
@@ -366,7 +385,8 @@ from pandas defaults.
 The raw feature schema comes from `configs/dataset/<name>.yaml`, not code:
 adding or removing a raw feature means editing that YAML (probe the source
 file's dtypes with `ds-pipeline columns --csv <path>`), then re-running
-`ds-pipeline ingest --dataset <name>` + `profile`. No code change required.
+`ds-pipeline ingest --dataset <name> --experiment <name>` + `profile`. No code
+change required.
 
 Typed step outputs follow `artifacts/<step>/` and reports follow
 `reports/`.
@@ -378,7 +398,7 @@ Typed step outputs follow `artifacts/<step>/` and reports follow
 | Concern | Location |
 |---------|----------|
 | Architecture map | `dataflow.md` |
-| Status / what works | `agents/ledger/HANDOFF.md` |
+| Status / current work | `agents/ledger/STATE.md` |
 | Stats library (agnostic) | `src/broadway/stats/` (+ `API.md` contract) |
 | Decision + lineage graph | `src/broadway/lineage/` (records/graph/mermaid/state) |
 | Dataset loaders + constants | `project/data.py` |
@@ -402,6 +422,6 @@ Branch model and parity workflow live in `agents/contracts/MAIN_AGENT_CONTRACT.m
 
 | Branch | Role | Contents |
 |--------|------|----------|
-| `sklearn` | active development line (MAIN_AGENT_CONTRACT.md §2) | platform + the NYC taxi demo (taxi configs, `experiments/`, `project/`, scratch docs, generated `reports/`) |
+| `sklearn` | active development line (MAIN_AGENT_CONTRACT.md §2) | platform + the NYC taxi demo (`project/`, scratch docs, generated `reports/`) |
 | `taxi` | pass-along mirror of sklearn | fast-forward copy of sklearn |
-| `main` | public platform | platform only — synthetic demo (`demo/demo.csv`, `configs/dataset/test.yaml`, `configs/experiment/{baseline,engineered,hyperopt}.yaml`, `configs/analysis/test*.yaml`) |
+| `main` | public platform | platform only — generic synthetic demo and `configs/sample/demo.yaml`; no `project/`, taxi config, or committed experiment output |

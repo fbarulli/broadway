@@ -1,16 +1,16 @@
-"""Config for project/etl/process.py — reads taxi knobs from configs/project/taxi.yaml
+"""Config for project/etl/process.py — reads taxi knobs from project/config/project/taxi.yaml
 and generic etl knobs from configs/step/etl.yaml."""
 
 import yaml
 
-from broadway.config.loader import CONFIGS_DIR
+from broadway.config.loader import config_path
 from broadway.config.schema import EtlStep
 from project.config import ProjectConfig
 
-_PROJECT_YAML = CONFIGS_DIR / "project" / "taxi.yaml"
+_PROJECT_YAML = config_path("project/taxi.yaml")
 _project = ProjectConfig(**yaml.safe_load(_PROJECT_YAML.read_text()))
 
-_ETL_YAML = CONFIGS_DIR / "step" / "etl.yaml"
+_ETL_YAML = config_path("step/etl.yaml")
 _etl = EtlStep(**yaml.safe_load(_ETL_YAML.read_text()))
 
 raw_dir: str = _project.raw_dir

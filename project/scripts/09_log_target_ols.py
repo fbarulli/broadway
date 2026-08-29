@@ -27,15 +27,14 @@ Two things are checked:
 
 import numpy as np
 
-from project import data
 from broadway.stats import regression
+from project import data
 
 
 def run_diagnostics(model: object, label: str) -> None:
     result = regression.bp_jb(model)
     bp_stat = result["bp_stat"]
     bp_pval = result["bp_pval"]
-    jb_stat = result["jb_stat"]
     jb_pval = result["jb_pval"]
     skew = result["skew"]
     kurtosis = result["kurtosis"]

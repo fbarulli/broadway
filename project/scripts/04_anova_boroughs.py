@@ -7,8 +7,8 @@ It does NOT tell you which one(s) - that needs a post-hoc test (next step).
 
 Run with: python project/scripts/04_anova_boroughs.py
 """
-from project import data
 from broadway.stats import anova
+from project import data
 
 
 def main() -> None:

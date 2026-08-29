@@ -11,8 +11,8 @@ Run with: python project/scripts/07_games_howell.py
 """
 import pandas as pd
 
-from project import data
 from broadway.stats import post_hoc
+from project import data
 
 
 def main() -> None:

@@ -3,31 +3,30 @@
 One owner for the working dataset every tutorial experiment operates on:
 parquet path, column names, dataset-level filter knobs, the loaders, and the
 NYC time-bucket mapping. Everything comes from
-`configs/experiments/working.yaml` — nothing hardcoded, nothing from env.
+`project/config/experiments/working.yaml` — nothing hardcoded, nothing from env.
 
-Consumed by `experiments/univariate/.../_common.py` (re-export),
-`experiments/multivariate/_setup.py`, and `experiments/mlflow/_common.py`,
+Consumed by `project/experiments/univariate/.../_common.py` (re-export),
+`project/experiments/multivariate/_setup.py`, and `project/experiments/mlflow/_common.py`,
 which is what kills the old importlib hack + the duplicated loaders.
 """
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import pandas as pd
 import yaml
 
 from broadway.utils import require_keys
+from project.paths import load_project_paths
 
-ROOT = Path(__file__).resolve().parents[1]
-CONFIG = ROOT / "configs" / "experiments" / "working.yaml"
+PATHS = load_project_paths()
+CONFIG = PATHS.experiment_configs / "working.yaml"
 _cfg = yaml.safe_load(CONFIG.read_text())
 require_keys(_cfg, ["parquet", "columns", "min_target_value", "max_duration_minutes",
                     "time_buckets", "time_bucket_default"], "working.yaml")
 require_keys(_cfg["columns"], ["target", "pickup_datetime", "dropoff_datetime"],
              "working.yaml columns")
 
-WORKING_DATASET = ROOT / _cfg["parquet"]
+WORKING_DATASET = PATHS.root / _cfg["parquet"]
 TARGET_COL = _cfg["columns"]["target"]
 PICKUP_DATETIME_COL = _cfg["columns"]["pickup_datetime"]
 DROPOFF_DATETIME_COL = _cfg["columns"]["dropoff_datetime"]

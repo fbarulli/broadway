@@ -37,7 +37,7 @@ jobs:
 
       # --frozen: fails if pyproject.toml and uv.lock have drifted.
       - name: Install
-        run: uv sync --all-extras --frozen
+        run: bash scripts/uv.sh sync --all-extras --frozen
 
       # Platform gates — SINGLE SOURCE OF TRUTH: this job runs
       # scripts/run_local_ci.sh (branch parity era-aware, ruff, mypy,
@@ -107,7 +107,7 @@ jobs:
 
           mkdir -p "${RUNNER_TEMP}/jobs"
 
-          uv run python k8s/optuna/render_worker_jobs.py \
+          bash scripts/uv.sh run python k8s/optuna/render_worker_jobs.py \
             --image broadway-optuna-worker:ci \
             > "${RUNNER_TEMP}/jobs/jobs.yaml"
 
@@ -123,11 +123,11 @@ jobs:
             /work/jobs.yaml
 
       # CI-only — named in scripts/run_local_ci.sh header.
-      - name: Experiment smoke (taxi branch only — experiments.py)
+      - name: Experiment smoke (taxi branch only — project dispatcher)
         if: github.ref == 'refs/heads/taxi' || (github.event_name == 'pull_request' && github.base_ref == 'taxi')
         env:
           MPLCONFIGDIR: "${{ runner.temp }}/mplconfig"
-        run: uv run python experiments.py verify
+        run: bash scripts/uv.sh run python project/experiments.py verify
 
   # CI-only — named in scripts/run_local_ci.sh header.
   # Build & Boot — structural determinism of the deployment images WITHOUT a
@@ -237,7 +237,7 @@ jobs:
       # HPO_CONFIG_PATH via parents[] at the mirrored pod path, parses the HPO
       # spec and builds CLI choices. Catches the layout/import bug class.
       - name: Boot — worker imports + CLI
-        run: docker run --rm broadway-optuna-worker:${{ github.sha }} python /app/experiments/mlflow/03_optuna_worker.py --help
+        run: docker run --rm broadway-optuna-worker:${{ github.sha }} python /app/project/experiments/mlflow/03_optuna_worker.py --help
 
       # Config-load simulation with the committed fixture: verifies the
       # configmap structure + the HPO spec both parse inside the pod layout.
@@ -252,7 +252,7 @@ jobs:
           cfg = yaml.safe_load(Path('/etc/broadway/config.yaml').read_text())
           assert {'dataset','databases','mlflow'} <= set(cfg), 'configmap structure'
           hpo = HPOConfig(**yaml.safe_load(
-              Path('/app/configs/experiments/mlflow.yaml').read_text())['hpo'])
+              Path('/app/project/config/experiments/mlflow.yaml').read_text())['hpo'])
           print('config load OK — models:', [m.name for m in hpo.models])"
 
       - name: Boot — mlflow image health

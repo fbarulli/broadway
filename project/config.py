@@ -3,7 +3,7 @@
 Lives in ``project/`` (not ``src/broadway/``) because it is dataset-specific:
 the generic platform never needs to know about borough lookups or rush-hour
 windows. The generic core reads the shared steps from ``configs/step/*.yaml``;
-this model parses ``configs/project/taxi.yaml``.
+this model parses ``project/config/project/taxi.yaml`` through project composition.
 """
 
 from __future__ import annotations

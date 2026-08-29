@@ -15,7 +15,7 @@
 : - GATE-STATS-42
 --force flag:
 - GATE-TLINE-54
-? '25-entry SHARED surface: src/ tests/ demo/ configs/dataset/test.yaml configs/experiment/{baseline,engineered,hyperopt}.yaml configs/analysis/{test,test_hypothesis,test_causal}.yaml configs/step/{causal,etl}.yaml configs/environment/ configs/flow/ k8s/ docker/ .github/workflows/ pyproject.toml Dockerfile docker-compose.yml .gitignore .dockerignore README.md scripts/ experiments/more_modeling/'
+? '24-entry SHARED surface: src/ tests/ demo/ configs/dataset/test.yaml configs/experiment/{baseline,engineered,hyperopt}.yaml configs/analysis/{test,test_hypothesis,test_causal}.yaml configs/step/{causal,etl}.yaml configs/environment/ configs/flow/ k8s/ docker/ .github/workflows/ pyproject.toml Dockerfile docker-compose.yml .gitignore .dockerignore README.md scripts/'
 : - GATE-INFRA-93
 <dataset>_join_audit.json:
 - GATE-SURF-63
@@ -161,7 +161,7 @@ CI cache key family (broadway-base hashFiles key):
 - GATE-INFRA-143
 CMD ["ds-pipeline"] default entrypoint (:19):
 - GATE-INFRA-127
-CMD ["python", "/app/experiments/mlflow/03_optuna_worker.py"] — what EVERY Job runs:
+CMD ["python", "/app/project/experiments/mlflow/03_optuna_worker.py"] — what EVERY Job runs:
 - GATE-INFRA-126
 CV folds via cross_validate (src/broadway/evaluate/validation.py:42):
 - GATE-TRAIN-36
@@ -206,9 +206,13 @@ FrozenTrial states/values/user attrs from the optimize callbacks hook:
 - GATE-HPO-83
 GITHUB_REF_NAME else `git rev-parse --abbrev-ref HEAD` (:187):
 - GATE-INFRA-94
+GitHub Project:
+- GATE-INFRA-148
 GroupSummary from stats.describe:
 - GATE-TLINE-56
 - GATE-SURF-65
+HOME/XDG_CACHE_HOME/TMPDIR/UV_CACHE_DIR environment:
+- GATE-INFRA-146
 ? HTTP GET /health POST /predict GET /metrics bound 0.0.0.0:8000 — or loud CrashLoopBackOff with named cause on every replica
 : - GATE-SURF-100
 JSON leaves after canonical sorted-keys re-dump:
@@ -229,8 +233,6 @@ ModelHPOSpec search space via _trial_objective (hpo.py:99):
 - GATE-HPO-80
 ModelHPOSpec.name registry key:
 - GATE-HPO-81
-ONE sanctioned uv cache root; deterministic matplotlib font-cache location:
-- GATE-INFRA-146
 Objective(params[, trial]) -> float closure; per-trial 'broadway_metrics' user attr:
 - GATE-HPO-81
 PARITY OK (era=… branch=…) | FATAL anchor shape/resolution errors | TAXI DRIFT | FORK | REFUSED (--sync off-era):
@@ -241,7 +243,7 @@ PARITY_ALLOWLIST=() prefix skips (:168-177):
 - GATE-INFRA-95
 PARITY_MAIN_ANCHOR=18607091ddbb2602ad4475341ad377bafee5ec4b (:114):
 - GATE-INFRA-95
-PASS/FAIL ruff|mypy|configs|shell-scripts|pytest|project-tests banners + 40-line tails:
+PASS/FAIL ruff|mypy|configs|project-paths|shell-scripts|vulture|pytest|project-tests banners + 40-line tails:
 - GATE-INFRA-92
 PipelineConfig (cfg.dataset + cfg.etl + cfg.experiment):
 - GATE-ETL-10
@@ -277,9 +279,11 @@ QqOverview/DatasetProfile/JoinAuditReport/LookupValueAuditReport/StructuralClean
 - GATE-INFRA-95
 'SHIP OK | SHIP REFUSED: LOCAL-CI RED … exit 1':
 - GATE-INFRA-96
+STATE CURRENT record github_item and lifecycle fields:
+- GATE-INFRA-148
 SampleSpec REQUIRED (no canonical leg, unlike GATE-STATS-41):
 - GATE-STATS-49
-SampleSpec definition:
+SampleSpec definition + source file (.parquet or .csv):
 - GATE-ETL-116
 ? SampleSpec.schema block from configs/sample/*.yaml (e.g. configs/sample/fare_prediction_1m.yaml:29-36 dtype/nullable/checks)
 : - GATE-CFG-79
@@ -357,7 +361,7 @@ and the decision allowlists/parent sets used by GATE-TLINE-52/-54/-55:
 - GATE-TLINE-57
 any FITTED statsmodels regression results object:
 - GATE-TRAIN-38
-any experiments/** script invoked as __main__:
+any project/experiments/** script invoked as __main__:
 - GATE-INFRA-129
 api workload metrics:
 - GATE-INFRA-131
@@ -391,7 +395,7 @@ banner FAST-GREEN | LOCAL-CI GREEN | LOCAL-CI RED:
 - GATE-INFRA-90
 bash scripts/run_local_ci.sh (no args ⇒ full tier):
 - GATE-INFRA-99
-? behavior prefixes src/ tests/ project/ experiments/ scripts/ .github/ k8s/ + pyproject.toml uv.lock *.sh docker* + configs/*.yaml (:40-43)
+? behavior prefixes src/ tests/ project/ scripts/ .github/ k8s/ + pyproject.toml uv.lock *.sh docker* + configs/*.yaml (:40-43)
 : - GATE-INFRA-98
 between:
 - GATE-STATS-47
@@ -440,7 +444,7 @@ coef/HC3_SE/CI_low/CI_high DataFrame:
 - GATE-TRAIN-38
 coerce=False strict dtypes:
 - GATE-CFG-75
-'column_mapping block + analysis group_column (configs/analysis/taxi_hypothesis.yaml:13 group_column: Borough)':
+'column_mapping block + analysis group_column (project/config/analysis/taxi_hypothesis.yaml:13 group_column: Borough)':
 - GATE-CFG-112
 compose stack definition:
 - GATE-INFRA-128
@@ -451,12 +455,12 @@ conditional champion promotion (:181-194):
 - GATE-TRAIN-35
 config-load pass:
 - GATE-CFG-77
+config-relative path via CONFIGS_DIR plus optional BROADWAY_CONFIG_OVERLAY_DIR:
+- GATE-CFG-70
 configs dataset/analysis/experiment YAMLs + profile JSON + 1 lineage record (write call :302):
 - GATE-CFG-105
 configs/ tree:
 - GATE-SURF-64
-configs/** relative path via CONFIGS_DIR (loader.py:34, overridable by env BROADWAY_CONFIGS_DIR):
-- GATE-CFG-70
 ? 'configs/dataset/*.yaml (column pins: dtype/null_count/role per column, e.g. configs/dataset/taxi.yaml:1-29; lookup_tables with value_policies/sentinel_values taxi.yaml:31-59)'
 : - GATE-CFG-74
 configs/experiment/*.yaml (data_source/features/model/split/hpo/preprocessing):
@@ -473,8 +477,6 @@ configs/project/taxi.yaml knobs:
 : - GATE-SURF-66
 ? configs/step/walkthrough.yaml (skew/kurtosis/shapiro/imbalance/significance thresholds, max_qq_groups, decisions.{omnibus,posthoc}.{methods,parents})
 : - GATE-TLINE-57
-configs/{dataset,project}/ trees:
-- GATE-CFG-104
 consumed by pandera_dtype/build_raw_schema and every loader:
 - GATE-CFG-74
 contract exclude_from_profiling list:
@@ -489,7 +491,7 @@ dangling-symlink-aware loud pre-merge error NAMING the bootstrap step:
 - GATE-CFG-107
 dashboard series endpoints served by the FastAPI app object:
 - GATE-SURF-102
-dashboard server (uvicorn.run(app, host="127.0.0.1", port=8000) :894):
+dashboard server (uvicorn.run(app, host="127.0.0.1", port=8000) :19):
 - GATE-INFRA-123
 data/processed/deadcode_census.md suspicion report (gitignored sink); stdout default:
 - GATE-INFRA-147
@@ -561,20 +563,12 @@ exit 0 green / 1 red / 2 usage:
 - GATE-INFRA-90
 ? 'experiment created/reopened ONLY within lawful namespaces: ratecode1_model_battle family ∪ dataset-name experiments; orphans refused loudly'
 : - GATE-CUST-150
-experiment script outputs written ad hoc, e.g. experiments/fare_prediction/02_filtered_profile.py:46 desc.to_csv(CSV_OUT):
+experiment script outputs written ad hoc under project/experiments/:
 - GATE-SURF-68
 experiment+etl config sections:
 - GATE-TRAIN-30
 experiment_name argument at setup time:
 - GATE-CUST-150
-experiments results CSVs:
-- GATE-SURF-102
-experiments/mlflow/_common.py:51 RESULTS = experiments/results/mlflow convention:
-- GATE-SURF-68
-experiments/results/**/*.csv (tracked):
-- GATE-SURF-68
-experiments/results/univariate/fare_amount_trip_distance/ratecode1_sample.parquet|.json (pinned, tracked):
-- GATE-SURF-68
 ? explained row total subtracted from dropped_total → TransformAudit.rows_dropped_unexplained (process.py:183-187; module.py:115)
 : - GATE-ETL-18
 ? 'extra_builders dict merged over BUILDERS inside build_derived (builders.py:115-117); raise sites: unimportable module ⇒ ValueError (builders.py:82)'
@@ -730,6 +724,8 @@ omnibus.json (runners.py:324):
 - GATE-TLINE-56
 ? omnibus/posthoc/conclusion AnalysisStep records; effect-size ramification text; artifacts/timeline/<analysis>/evidence/omnibus.json (runners.py:324) and posthoc.json (runners.py:413); conclusion consumes prior steps' result_summary (runners.py:462-512) rather than recomputing
 : - GATE-TLINE-55
+one current draft issue updated in place, or one new draft issue for a pending record:
+- GATE-INFRA-148
 one pa.Column per contract entry:
 - GATE-CFG-75
 one save-site per key family; size-budget watch; purge as invoked workflow step:
@@ -813,8 +809,6 @@ pingouin pairwise_gameshowell frame augmented with cohens_d / hedges_g / effect_
 - GATE-STATS-47
 platform job verdict (parity+ruff+mypy+configs+shell-scripts+pytest+cov≥95+project-tests via SSOT script):
 - GATE-INFRA-99
-plots/results CSVs/verification JSON (self-auditing verify subcommand):
-- GATE-INFRA-122
 post-merge df:
 - GATE-ETL-14
 postgres manifest apply:
@@ -825,6 +819,28 @@ posthoc.json (runners.py:413):
 - GATE-TLINE-55
 pre-merge df.columns:
 - GATE-ETL-12
+project-owned plots/results CSVs/verification JSON (self-auditing verify subcommand):
+- GATE-INFRA-122
+project-provided experiment results CSVs via BROADWAY_EXPERIMENTS_ROOT:
+- GATE-SURF-102
+project/config/ (project-owned layout, experiment, and taxi config-overlay SSOT):
+- GATE-INFRA-92
+project/config/{dataset,analysis,project}/ taxi overlay plus generic base configs:
+- GATE-CFG-104
+project/experiments/mlflow/_common.py RESULTS convention:
+- GATE-SURF-68
+project/experiments/more_modeling/:
+- GATE-INFRA-129
+project/experiments/multivariate/:
+- GATE-INFRA-129
+project/experiments/polynomial_regression_et_all/:
+- GATE-INFRA-129
+project/experiments/results/**/*.csv (tracked):
+- GATE-SURF-68
+project/experiments/results/univariate/fare_amount_trip_distance/ratecode1_sample.parquet|.json (pinned, tracked):
+- GATE-SURF-68
+project/experiments/univariate/fare_amount_trip_distance/:
+- GATE-INFRA-129
 'project/tests/** (project-tests: full tier only, -q --dist worksteal, NO coverage flags)':
 - GATE-INFRA-92
 provenance JSON sidecar:
@@ -963,8 +979,6 @@ seven module-level config singletons resolved at import (_contract/_project/_etl
 - GATE-CFG-104
 sha-tagged images built/boot-tested; CD publishes bit-for-bit verified tarball to GHCR on main/taxi pushes only (:290-376):
 - GATE-INFRA-99
-ship-path shell session environment:
-- GATE-INFRA-146
 silent return 0 via shortcut when main==anchor:
 - GATE-INFRA-95
 single git push invocation → one hook gate (:25):
@@ -987,8 +1001,10 @@ small_n default 30 (:11); SOLE production caller timeline/runners.py:396 passes 
 - GATE-STATS-47
 source_group_column:
 - GATE-STATS-42
-? src/** tests/** experiments/mlflow experiments/fare_prediction experiments.py experiments_ui.py project/working.py project/data.py scripts/ (ruff)
+? src/** tests/test_project_paths.py project/experiments/** project/experiments.py project/dashboard.py project/paths.py project/working.py project/data.py scripts/check_project_paths.py scripts/ (ruff)
 : - GATE-INFRA-92
+src/broadway project scripts via Vulture --min-confidence 95 (vulture):
+- GATE-INFRA-92
 src/broadway/** (mypy):
 - GATE-INFRA-92
 stats run|describe --sample (cli.py:80-84); console-script entry ds-pipeline = broadway.cli:main (pyproject.toml:53-54):
@@ -1038,7 +1054,7 @@ tests/** (pytest -n 4 --dist worksteal, --cov-fail-under=95):
 threshold flags:
 - GATE-TLINE-56
 - GATE-TLINE-57
-tracked *.py corpus via git ls-files (src/project/experiments/tests/scripts):
+tracked *.py corpus via git ls-files (src/project/tests/scripts):
 - GATE-INFRA-147
 tracking URI:
 - GATE-TRAIN-120
@@ -1092,6 +1108,8 @@ winsorize(cap_quantile) :25:
 - GATE-STATS-48
 working-tree snapshot/restore of artifacts/ + reports/ around test runs:
 - GATE-INFRA-138
+writable host-local uv cache or loud nonzero failure:
+- GATE-INFRA-146
 ? written index=False at module.py:98; plus split pair train/val or flat training_data parquet; out_dir mkdir(parents=True, exist_ok=True)
 : - GATE-ETL-16
 y_true/y_pred arrays from holdout predict:

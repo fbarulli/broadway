@@ -3,7 +3,7 @@
 # injected as env vars. Optuna and mlflow MUST use separate databases: both use
 # Alembic's `alembic_version` table, which would otherwise clash in a shared DB.
 # The HPO spec (search spaces + trial budgets) lives in
-# configs/experiments/mlflow.yaml (`hpo:`) — the worker reads it from there and
+# project/config/experiments/mlflow.yaml (`hpo:`) — the worker reads it from there and
 # only injects the RDB storage_url at runtime.
 apiVersion: v1
 kind: ConfigMap
@@ -13,7 +13,7 @@ data:
   config.yaml: |
     dataset:
       name: sample_evidence
-      parquet: /app/experiments/results/univariate/sample_evidence/sample_evidence.parquet
+      parquet: /app/project/experiments/results/univariate/sample_evidence/sample_evidence.parquet
       target: target
       fare_column: target
       min_fare: 2.5

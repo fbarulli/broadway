@@ -21,8 +21,8 @@ if there's an hourly/daily cycle, DW can look fine while short-range
 autocorrelation is still very real).
 """
 
-from project import data
 from broadway.stats import regression, time_series
+from project import data
 
 
 def main() -> None:

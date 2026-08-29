@@ -8,7 +8,7 @@ fails loudly the moment a platform test regresses:
 * imports the project layer (``project.*``),
 * reads a REAL data file — a ``read_parquet``/``read_csv`` whose path is not
   tmp-generated (``tmp_path``/``tmp_``/monkeypatched),
-* references project configs (``configs/project/``).
+* references project configs (``configs/project/`` or ``project/config/``).
 
 Dataset-demo tests live under ``project/tests/`` and are exempt (they test
 the dataset layer with generated data). If you need a fixture, generate
@@ -29,6 +29,7 @@ TESTS_DIR = REPO_ROOT / "tests"
 # Project config references — always forbidden in platform tests.
 _FORBIDDEN_CONFIG = [
     re.compile(r'configs/project/'),
+    re.compile(r'project/config/'),
     re.compile(r'dataset="project"'),
     re.compile(r'experiment="project"'),
 ]
@@ -53,7 +54,7 @@ def _snippet(text: str, start: int) -> str:
 
 @pytest.mark.parametrize("path", _platform_test_files(), ids=lambda p: p.name)
 def test_platform_test_has_no_project_coupling(path: Path) -> None:
-    if path.name == "test_platform_hygiene.py":
+    if path.name in {"test_platform_hygiene.py", "test_project_paths.py"}:
         return
     text = path.read_text()
     hits: list[str] = []

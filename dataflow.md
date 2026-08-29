@@ -409,7 +409,7 @@ validates: artifact sha256 == provenance.artifact_sha256  (integrity)
            row count == provenance.row_count
            pandera schema built from spec.schema (dtype + nullable + op checks)
         ▼
-Sample(df, spec, provenance)  →  steps consume by name (e.g. experiments/fare_prediction)
+Sample(df, spec, provenance)  →  steps consume by name (e.g. project/experiments/fare_prediction)
 ```
 
 Regenerating a changed definition requires bumping `version` in the config —
@@ -448,7 +448,7 @@ artifact, and provenance.
 - `DatasetContract` carries no `row_count` — observed counts live in `DatasetProfile` (discover) and `TransformAudit` (etl lineage). Datetime dtypes are normalized to canonical `datetime64` (`schema.py::normalize_dtype`).
 - Lookup ingestion reads lookups with `keep_default_na=False` plus a per-lookup `na_values` policy, so nulls are attributable to the authored config. `JoinAudit` measures key completeness, while `LookupValueAudit` measures matched-value quality and records the `na_values` evidence.
 - `broadway/data/loader.py::read_sample(dataset, sample, seed, columns, *, full)` is a seeded random draw of the dataset's raw parquet (lazy scan → optional column pruning → sample) — a fast experiment path that is NOT `DATA_MODE`-aware; the caller supplies `seed`. `project/data.py::read_training_sample` wraps it with the taxi `_contract` and `RANDOM_STATE`.
-- Experiment layout: scripts live under `experiments/<category>/<name>/`; `experiments/results/` CSV outputs are tracked (`.gitignore` negates `!experiments/results/**/*.csv`), non-CSV outputs stay ignored. Root-level `experiment_*.py` / `*_experiment/` dirs predating this convention are grandfathered (forward-only).
+- Experiment layout: scripts live under `project/experiments/<category>/<name>/`; `project/experiments/results/` CSV outputs are tracked (`.gitignore` negates `!project/experiments/results/**/*.csv`), non-CSV outputs stay ignored. Root-level `experiment_*.py` / `*_experiment/` dirs predating this convention are grandfathered (forward-only).
 
 ## Mode enforcement
 

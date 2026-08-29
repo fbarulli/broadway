@@ -33,8 +33,8 @@ variance structure we're testing for) capped at SAMPLE_SIZE.
 
 import pandas as pd
 
-from project import data
 from broadway.stats import diagnostics, regression
+from project import data
 
 
 def run_formal_tests(model: object, df: pd.DataFrame) -> None:

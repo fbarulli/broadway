@@ -227,7 +227,7 @@ def test_hpo_configs_parse() -> None:
 
     for path in (
         Path(__file__).resolve().parents[1] / "configs" / "experiment" / "hyperopt.yaml",
-        Path(__file__).resolve().parents[1] / "configs" / "experiments" / "mlflow.yaml",
+        Path(__file__).resolve().parents[1] / "project" / "config" / "experiments" / "mlflow.yaml",
     ):
         raw = yaml.safe_load(path.read_text())
         assert "hpo" in raw, f"{path.name} missing hpo block"

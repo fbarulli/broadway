@@ -1,0 +1,16 @@
+name: demo
+role: estimation
+version: "v1"
+path: data/samples/demo@v1.parquet
+description: Deterministic generic sample generated from the public demo fixture.
+source:
+  name: demo_fixture
+  path: demo/demo.csv
+seed: 17
+size: 20
+columns: [feature_1, feature_2, feature_3, target]
+schema:
+  feature_1: {dtype: int64, nullable: false}
+  feature_2: {dtype: int64, nullable: false}
+  feature_3: {dtype: object, nullable: false}
+  target: {dtype: int64, nullable: false, checks: [{op: ">", value: 0.0}]}

@@ -3,18 +3,18 @@ import os
 import re
 from pathlib import Path
 
-import pandera as pa
 import pandas as pd
+import pandera as pa
 import polars as pl
 import yaml
 
-from broadway.config.loader import CONFIGS_DIR
+from broadway.config.loader import config_path
 from broadway.config.schema import DatasetContract
 from broadway.contracts.pandera import build_raw_schema, pandera_dtype
-from project.etl import process_config as cfg
 from broadway.lineage.ids import node_id
 from broadway.lineage.models import TransformAudit
 from broadway.lineage.records import write_record
+from project.etl import process_config as cfg
 
 logger = logging.getLogger(__name__)
 
@@ -138,7 +138,7 @@ def save_processed_data(df: pd.DataFrame) -> None:
 
 
 def _load_contract(dataset: str) -> DatasetContract:
-    path = CONFIGS_DIR / "dataset" / f"{dataset}.yaml"
+    path = config_path(f"dataset/{dataset}.yaml")
     return DatasetContract(**yaml.safe_load(path.read_text()))
 
 

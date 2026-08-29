@@ -26,8 +26,8 @@ borough its own slope AND its own intercept. Compare:
 
 from statsmodels.stats.anova import anova_lm
 
-from project import data
 from broadway.stats import regression
+from project import data
 
 
 def main() -> None:
@@ -71,7 +71,6 @@ def main() -> None:
     print("\n=== Residual diagnostics (interaction model) ===")
     result = regression.bp_jb(interaction)
     bp_pval = result["bp_pval"]
-    jb_stat = result["jb_stat"]
     jb_pval = result["jb_pval"]
     skew = result["skew"]
     kurtosis = result["kurtosis"]

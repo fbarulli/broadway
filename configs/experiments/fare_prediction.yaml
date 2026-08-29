@@ -1,6 +1,0 @@
-# fare_prediction experiment scripts — run knobs (single source of truth).
-# Loaded by experiments/fare_prediction/_common.py via require_keys; no seed
-# literal stays in the step scripts (determinism ledger item f). Sample
-# shape/filters remain owned by the sample registry
-# (configs/sample/fare_prediction_1m.yaml).
-seed: 42

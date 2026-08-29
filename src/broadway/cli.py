@@ -54,7 +54,7 @@ def _build_parser() -> argparse.ArgumentParser:
     audit.add_argument("--environment", type=str, default=DEFAULT_ENVIRONMENT)
 
     ingest = sub.add_parser("ingest")
-    ingest.add_argument("--dataset", type=str, required=True)
+    _add_step_args(ingest)
 
     init = sub.add_parser("init")
     init.add_argument("csv")
@@ -141,9 +141,16 @@ def main() -> None:
 
         audit_run(args.dataset, args.analysis, args.environment)
     elif args.step == "ingest":
-        from project.etl.process import process_data
+        from broadway.etl.module import run as etl_run
 
-        process_data(args.dataset)
+        cfg = load_config(
+            step="etl",
+            dataset=args.dataset,
+            experiment=args.experiment,
+            analysis=args.analysis,
+            environment=args.environment,
+        )
+        etl_run(cfg)
     elif args.step == "init":
         from broadway.onboard.module import init
 

@@ -519,7 +519,7 @@ def test_classifier_governance_file_forces_full() -> None:
 
 def test_classifier_behavior_surface_full() -> None:
     for path in ["src/broadway/x.py", "tests/test_x.py", "docker-compose.yml", "Dockerfile",
-                 "configs/experiment/taxi.yaml", "k8s/deploy.yaml", "tools/run.sh", "uv.lock"]:
+                 "configs/experiment/baseline.yaml", "k8s/deploy.yaml", "tools/run.sh", "uv.lock"]:
         result = classify([path], [])
         assert result["tier"] == FULL, path
         assert "behavior surface" in result["reasons"]
@@ -596,12 +596,12 @@ def test_no_new_absolute_sha_gates_in_contracts() -> None:
 # strings — NEVER from transforms:/findings:/touched_by:/validated_by:/
 # if_changed: free text — and directory/glob declarations must name a
 # SUBSURFACE (>=2 path segments): a bare 'src/' mid-sentence grants nothing,
-# while 'experiments/results/' and 'k8s/optuna/**' register their subtree.
+# while 'project/experiments/results/' and 'k8s/optuna/**' register their subtree.
 # Pure classification lives in the functions below; the single test node
 # carries the LIVE half plus in-process falsifiability proofs against the
 # LIVE registry shape (no git writes, no tree mutation — fixture law).
 # --------------------------------------------------------------------------- #
-TRIPWIRE_SURFACES = ("src", "scripts", "k8s", "experiments", "project", "tests")
+TRIPWIRE_SURFACES = ("src", "scripts", "k8s", "project", "tests")
 BRACED_PATH = re.compile(r"((?:[\w.-]+/)+)\{([^{}]+)\}([\w./-]*)")
 SURFACE_PATH_TOKEN = re.compile(r"(?:[\w.-]+/)+[\w.*-]*")
 OWNER_LINE_REF = re.compile(r":\d[\d-]*$")
@@ -612,24 +612,9 @@ NEW_SURFACE_EXEMPTS: dict[str, str] = {
 }
 # (path-or-prefix, reason, review-date ISO) — path = a file or a directory
 # prefix (trailing slash optional); entries past their review date fail loud
-# ('allowlist entry expired'). Seeded from the strict-grammar sweep at
-# meta.head=1cf33b5: the four prefixes below are genuinely uncovered because
-# their ownership prose lives in grammar-excluded fields.
-NEW_SURFACE_ALLOWLIST: tuple[tuple[str, str, str], ...] = (
-    ("experiments/multivariate/",
-     ("family custody lives only in GATE-INFRA-129 transform prose "
-      "(SPLIT-OWNER sublanes), excluded from declarations; promote to an "
-      "inputs/outputs entry or dedicated row"), "2026-09-08"),
-    ("experiments/polynomial_regression_et_all/",
-     ("same GATE-INFRA-129 transform-prose custody, excluded from "
-      "declarations; promote to an inputs/outputs entry"), "2026-09-08"),
-    ("experiments/univariate/fare_amount_trip_distance/",
-     ("subdir named only in excluded free text; parent "
-      "experiments/univariate remains registry-covered"), "2026-09-08"),
-    ("project/tests/",
-     ("ingest-gate pins ride findings/validated_by fields, excluded from "
-      "declarations; promote the pins to inputs/outputs"), "2026-09-08"),
-)
+# ('allowlist entry expired'). The strict-grammar sweep is fully represented
+# by accepted registry declarations; temporary exemptions are empty.
+NEW_SURFACE_ALLOWLIST: tuple[tuple[str, str, str], ...] = ()
 
 
 def _today() -> date:
@@ -777,7 +762,7 @@ def probe_new_surfaces_registered(
     count: exact file paths bearing a basename extension (Dockerfile-style
     names included), trailing-slash directory tokens, ``k8s/optuna/
     **``-style globs (prefix before the first ``*``), and brace-expanded
-    ``experiments/{a,b}/`` lists; a yielded token that nonetheless resolves
+    ``project/experiments/{a,b}/`` lists; a yielded token that nonetheless resolves
     to a live tree directory lands in the declared tier. Directory power additionally requires a SUBSURFACE
     (>=2 path segments): a bare root token ('src/', 'tests/') mid-entry names
     the governed tree itself and declares nothing. Three coverage tiers —
@@ -797,13 +782,9 @@ def probe_new_surfaces_registered(
     hygiene bullet + 00-resolutions.md §6 addendum) — deliberately not an ad
     hoc allowlist row. ``NEW_SURFACE_ALLOWLIST`` is the dated escape hatch;
     entries strictly past their review date fail loud (decay by design).
-    Seeded NON-EMPTY from the strict sweep at meta.head=1cf33b5: exactly four
-    genuinely uncovered prefixes remain (experiments/multivariate/,
-    experiments/polynomial_regression_et_all/,
-    experiments/univariate/fare_amount_trip_distance/, project/tests/) because
-    their ownership lives in grammar-excluded fields; each seed states its
-    promotion path and reviews 2026-09-08. The experiments/more_modeling
-    batch stays registered by GATE-INFRA-93's amended parity input string.
+    The strict-grammar sweep is represented by accepted registry declarations:
+    GATE-INFRA-129 names the experiment subtrees and GATE-INFRA-92 names
+    project/tests/**. Temporary allowlist entries are therefore empty.
     """
     exemptions = NEW_SURFACE_EXEMPTS if exemptions is None else dict(exemptions)
     failures = [
@@ -836,12 +817,13 @@ def test_probe_e_new_surface_tripwire_live_and_falsifiable() -> None:
     doc = yaml.safe_load((ROOT / "agents/ledger/gates.yaml").read_text(encoding="utf-8"))
     live_rows: list[dict[str, object]] = doc["gates"]
     tracked = subprocess.run(
-        ["git", "ls-files", "--", *TRIPWIRE_SURFACES],
+        ["git", "ls-files", "-co", "--exclude-standard", "--", *TRIPWIRE_SURFACES],
         capture_output=True, text=True, cwd=ROOT, check=True,
     ).stdout.splitlines()
+    tracked = [path for path in tracked if (ROOT / path).is_file()]
     coverage = parse_surface_coverage(live_rows, ROOT)
     probe_new_surfaces_registered(tracked, live_rows, today=_today())
-    # Six-ghost negative controls — one synthetic file under EACH governed
+    # Five-ghost negative controls — one synthetic file under EACH governed
     # root, judged against the FULL LIVE registry shape (nothing stripped):
     # each must be classified uncovered and each must turn the probe RED.
     for root_name in TRIPWIRE_SURFACES:
@@ -880,7 +862,7 @@ def test_probe_e_new_surface_tripwire_live_and_falsifiable() -> None:
     survivors = [r for r in live_rows
                  if not any("experiments" in t for t in _declaration_texts(r))]
     assert survivors != live_rows  # real rows do declare the tree
-    batch = [p for p in tracked if p.startswith("experiments/")]
+    batch = [p for p in tracked if p.startswith("project/experiments/")]
     assert batch
     with pytest.raises(AssertionError, match="unregistered tracked file"):
         probe_new_surfaces_registered(
@@ -888,14 +870,14 @@ def test_probe_e_new_surface_tripwire_live_and_falsifiable() -> None:
         )
     # Decay proof — an expired entry fails loud; the same entry unexpired
     # registers an otherwise-uncovered path.
-    stale = (("experiments/legacy_one_off.py", "intentional one-off", "2026-01-01"),)
-    fresh = (("experiments/legacy_one_off.py", "intentional one-off", "2999-01-01"),)
+    stale = (("project/experiments/legacy_one_off.py", "intentional one-off", "2026-01-01"),)
+    fresh = (("project/experiments/legacy_one_off.py", "intentional one-off", "2999-01-01"),)
     with pytest.raises(AssertionError, match="allowlist entry expired"):
         probe_new_surfaces_registered(
-            ["experiments/legacy_one_off.py"], [], today=_today(), allowlist=stale,
+            ["project/experiments/legacy_one_off.py"], [], today=_today(), allowlist=stale,
         )
     probe_new_surfaces_registered(
-        ["experiments/legacy_one_off.py"], [], today=_today(), allowlist=fresh,
+        ["project/experiments/legacy_one_off.py"], [], today=_today(), allowlist=fresh,
     )
     # Exemption proof — project/scripts passes BY CITATION, not by allowlist.
     probe_new_surfaces_registered(
@@ -1119,11 +1101,12 @@ def test_probe_h_root_dot_dir_and_cache_ban_live_and_falsifiable() -> None:
     assert_root_hygiene([], [])
 
 
-# --- Probe (i): UV_CACHE_DIR export ban (L10, single sanctioned root) ----- #
-# Creation-time law (arbitration row 146 / D32): $HOME/.cache/uv is the ONLY
-# uv cache root. Any tracked-file mention of UV_CACHE_DIR= outside DATED
-# exemption records is RED; expired rows fail loud (probe-e decay pattern).
+# --- Probe (i): UV cache wrapper ownership (L10, fail-loud fallback) ------ #
+# Creation-time law (arbitration row 146 / D32): only scripts/uv.sh may select
+# UV_CACHE_DIR. It must choose a host-local cache and fail loud if unavailable.
+# Any other tracked mention outside dated historical records is RED.
 UV_CACHE_NEEDLE = "UV_CACHE_DIR="
+UV_CACHE_RUNTIME_OWNER = "scripts/uv.sh"
 UV_CACHE_EXEMPTIONS: tuple[tuple[str, str, str], ...] = (
     ("agents/ledger/DECISIONS.md",
      "historical D28/D32 measured-run records", "2026-09-08"),
@@ -1159,7 +1142,8 @@ def unexempted_uv_cache_hits(
 ) -> list[str]:
     """Hits whose path carries no ACTIVE dated exemption."""
     active = {path for path, _reason, review in exemptions if date.fromisoformat(review) >= today}
-    return [f"{path}:{no}" for path, no in hits if path not in active]
+    allowed = active | {UV_CACHE_RUNTIME_OWNER}
+    return [f"{path}:{no}" for path, no in hits if path not in allowed]
 
 
 def probe_uv_cache_export_ban(
@@ -1169,7 +1153,7 @@ def probe_uv_cache_export_ban(
     exemptions: Sequence[tuple[str, str, str]] = UV_CACHE_EXEMPTIONS,
     source: str = "git grep UV_CACHE_DIR=",
 ) -> None:
-    """Single-sanctioned-root enforcement over tracked UV_CACHE_DIR= mentions."""
+    """Only the fail-loud wrapper may select a runtime uv cache."""
     failures = [
         f"exemption entry expired: {entry}"
         for entry in expired_allowlist_entries(exemptions, today)
@@ -1178,15 +1162,15 @@ def probe_uv_cache_export_ban(
     if offenders:
         failures.append(
             f"UV_CACHE_DIR= outside dated exemption records: {offenders} — "
-            "$HOME/.cache/uv is the single sanctioned root; remove the override "
+            "only scripts/uv.sh may select the host-local cache; remove the override "
             "or add a dated UV_CACHE_EXEMPTIONS row with a stated reason"
         )
     if failures:
         raise AssertionError(f"{source}: " + "; ".join(failures))
 
 
-def test_probe_i_uv_cache_ban_live_and_falsifiable() -> None:
-    """LIVE green post-SENIOR-fix; the pre-fix instruction line goes RED."""
+def test_probe_i_uv_cache_wrapper_owner_live_and_falsifiable() -> None:
+    """LIVE green; any cache selector outside the wrapper goes RED."""
     payload = subprocess.run(
         ["git", "grep", "-n", UV_CACHE_NEEDLE],
         capture_output=True, text=True, cwd=ROOT, check=False,
@@ -1196,10 +1180,12 @@ def test_probe_i_uv_cache_ban_live_and_falsifiable() -> None:
         if path not in UV_CACHE_SELF_SCAN_PATHS  # this module's own fixture quotes
     ]
     probe_uv_cache_export_ban(hits, today=_today())
-    # Negative control grounded in this lane's own repair: yesterday's
-    # SENIOR.md instruction line must classify RED...
+    # The wrapper is the sole live selector.
+    probe_uv_cache_export_ban([("scripts/uv.sh", 22)], today=_today())
+    # Negative control grounded in this lane's own repair: a ship-path
+    # override must classify RED...
     with pytest.raises(AssertionError, match="outside dated exemption"):
-        probe_uv_cache_export_ban([("agents/contracts/SENIOR.md", 111)], today=_today())
+        probe_uv_cache_export_ban([("scripts/ship.sh", 10)], today=_today())
     # ...an exempted historical record stays GREEN...
     probe_uv_cache_export_ban([("agents/ledger/DECISIONS.md", 367)], today=_today())
     # ...an expired exemption fails loud...
@@ -1229,7 +1215,10 @@ TOKEN_FLOOR = frozenset({
 TOKEN_BASELINE = frozenset({
     "set", "for", "do", "done", "if", "fi", "gzip", "import", "from", "cfg",
     "hpo", "assert", "print('config", 'ref="${{', 'registry="ghcr.io/${{',
-    "Path('/app/configs/experiments/mlflow.yaml').read_text())['hpo'])",
+    (
+        "Path('/app/project/"
+        "config/experiments/mlflow.yaml').read_text())['hpo'])"
+    ),
 })
 
 

@@ -1,6 +1,6 @@
 # Gate registry SSOT — hand-maintained; the {01..09} gate fragments it consolidated predate git custody.
 meta:
-  head: 22f33b3
+  head: c4f120a
   assembled: '2026-08-24'
   source_fragments:
   - agents/ledger/gates/01-ingest.md
@@ -14,9 +14,9 @@ meta:
   - agents/ledger/gates/09-infra.md
   - agents/ledger/gates/80-hpo-optuna.md
   counts:
-    total: 142
-    gates_with_findings: 85
-    finding_strings: 110
+    total: 143
+    gates_with_findings: 84
+    finding_strings: 109
     by_band:
       01-ingest:
         gates: 9
@@ -48,14 +48,14 @@ meta:
         finding_strings: 1
       08-config:
         gates: 17
-        flagged: 12
-        finding_strings: 15
+        flagged: 11
+        finding_strings: 14
       80-hpo-optuna:
         gates: 10
         flagged: 9
         finding_strings: 13
       09-infra:
-        gates: 30
+        gates: 31
         flagged: 17
         finding_strings: 25
       81-object-custody:
@@ -338,6 +338,7 @@ gates:
   - lineage records node_id("etl")
   transforms:
   - loader guard _assert_data_source_supported() rejects non raw-ingest loaders (named_sample/pinned) and missing experiment binding
+  - 'ds-pipeline ingest resolves the generic etl config and dispatches here; it never imports the project layer (cli.py:143-155)'
   - 'CI-gated sampling appends ''CI sampling: -N rows'' reason'
   - canonicalize() numeric/datetime/missing repair with coercions collector
   - pre-write contract validation build_raw_schema(dataset).validate(df)
@@ -367,6 +368,7 @@ gates:
   - tests/test_structural_cleaning.py::test_etl_ci_sampling_gated
   - tests/test_structural_cleaning.py::test_etl_parent_defaults_to_dataset
   - tests/test_structural_cleaning.py::test_etl_parent_ingest_when_present
+  - tests/test_cli_dispatch.py::test_cli_ingest_dispatches_generic_etl
   if_changed:
   - EtlStep schema keys
   - step-module registry mapping "etl"→broadway.etl.module (src/broadway/config/loader.py:52)
@@ -669,27 +671,29 @@ gates:
   - configs/project/taxi.yaml keys consumed by process_config
   - processed_file name
   - node_id('ingest') parents ([node_id('dataset')])
-  - CLI wiring src/broadway/cli.py:144-146
   findings:
   - the ingest path NEVER calls enforce_drop_fraction — repo-wide the only callers are etl (module.py:127) and features (features/module.py:68); process_data persists rows_dropped_unexplained on the ingest record with no max_drop_fraction enforcement, so unexplained loss at the project ingest boundary is recorded but never loud.
 - id: GATE-ETL-116
   phase: etl-lookup
   order: 20
-  owner: 'src/broadway/samples/generate.py:95 generate_sample()'
+  owner: 'src/broadway/samples/generate.py:106 generate_sample()'
   inputs:
-  - SampleSpec definition
+  - 'SampleSpec definition + source file (.parquet or .csv)'
   outputs:
   - '<name>@<version>.parquet + provenance json {artifact_sha256, definition_sha256, row_count}'
   transforms:
   - 'immutable-artifact producer with provenance sha256 pair: "definition_sha256": _canonical_spec_sha256(spec) (:144, canonical model-dump digest :32-39) + "artifact_sha256": _file_sha256(artifact) (:145)'
-  - 'symbol repair per packet F #25: producer is generate_sample SINGULAR (:95) — no generate_samples exists; slate owner string corrected'
+  - 'source-format gate: _read_source permits .parquet or .csv and rejects every other suffix loudly (:50-57)'
+  - 'symbol repair per packet F #25: producer is generate_sample SINGULAR (:106) — no generate_samples exists; slate owner string corrected'
   touched_by:
   - pandas
   - pydantic
   validated_by:
   - tests/test_sample.py::test_load_sample_round_trip
+  - tests/test_samples.py::test_generate_from_csv_source
   if_changed:
   - provenance json schema consumed at sample load time
+  - supported named-sample source suffixes
   findings: []
 - id: GATE-ETL-117
   phase: etl-lookup
@@ -2362,18 +2366,18 @@ gates:
 - id: GATE-SURF-68
   phase: surfaces
   order: 75
-  owner: '.gitignore:17-19  # experiments/results tracking convention (negation triad), pinned-sample negations :21-22'
+  owner: '.gitignore:17-19  # project/experiments/results tracking convention (negation triad), pinned-sample negations :21-22'
   inputs:
-  - experiment script outputs written ad hoc, e.g. experiments/fare_prediction/02_filtered_profile.py:46 desc.to_csv(CSV_OUT)
-  - experiments/mlflow/_common.py:51 RESULTS = experiments/results/mlflow convention
+  - experiment script outputs written ad hoc under project/experiments/
+  - project/experiments/mlflow/_common.py RESULTS convention
   outputs:
-  - experiments/results/**/*.csv (tracked)
-  - experiments/results/univariate/fare_amount_trip_distance/ratecode1_sample.parquet|.json (pinned, tracked)
+  - project/experiments/results/**/*.csv (tracked)
+  - project/experiments/results/univariate/fare_amount_trip_distance/ratecode1_sample.parquet|.json (pinned, tracked)
   transforms:
-  - ignore everything under experiments/results/** (:17)
+  - ignore everything under project/experiments/results/** (:17)
   - negate directories so traversal works (!…/**/ :18)
   - negate CSVs only (!…/**/*.csv :19)
-  - global *.png ignore (:23) keeps experiment PNGs (e.g. experiments/results/univariate/**/01_*.png …) UNTRACKED; only !reports/figures/*.png (:24) is exempted
+  - global *.png ignore (:23) keeps experiment PNGs under project/experiments/results UNTRACKED; only !reports/figures/*.png (:24) is exempted
   touched_by:
   - ad-hoc experiment scripts only; NO broadway/src writer, NO test
   validated_by:
@@ -2443,34 +2447,38 @@ gates:
 - id: GATE-SURF-102
   phase: surfaces
   order: 79
-  owner: 'experiments_ui.py:56 FastAPI app custody (dashboard series endpoints)'
+  owner: 'src/broadway/reports/experiments_dashboard.py:56 FastAPI app custody (generic dashboard series endpoints)'
   inputs:
-  - experiments results CSVs
+  - project-provided experiment results CSVs via BROADWAY_EXPERIMENTS_ROOT
   outputs:
   - dashboard series endpoints served by the FastAPI app object
   transforms:
   - 'app = FastAPI() module-level custody (:56); app-body aspect of the dashboard surface'
   - 'co-tenancy with GATE-INFRA-123 declared LEGAL (packet H #123): entry (__main__ uvicorn.run) vs app-body aspects of one file'
   touched_by: []
-  validated_by: []
+  validated_by:
+  - tests/test_experiments_ui.py::test_default_focus_uses_first_discovered_series
+  - tests/test_experiments_ui.py::test_dashboard_helpers_cover_discovery_rendering_and_renumbering
+  - tests/test_experiments_ui.py::test_dashboard_routes_validate_and_persist_real_files
   if_changed:
   - dashboard endpoint contract consumed by GATE-INFRA-123 server entry
   findings: []
 - id: GATE-CFG-70
   phase: config-schema
   order: 80
-  owner: src/broadway/config/loader.py:91 _load_yaml()
+  owner: src/broadway/config/loader.py:92 config_path() + :102 _load_yaml()
   inputs:
-  - configs/** relative path via CONFIGS_DIR (loader.py:34, overridable by env BROADWAY_CONFIGS_DIR)
+  - config-relative path via CONFIGS_DIR plus optional BROADWAY_CONFIG_OVERLAY_DIR
   - yaml.safe_load stream
   outputs:
   - raw dict[Any, Any] section payload
   - or raised gate failure
   transforms:
-  - 'existence gate: FileNotFoundError naming absolute path (:94)'
-  - 'empty-document gate: ValueError ''config file is empty'' (:98)'
-  - 'shape gate: non-mapping document rejected ''must be a mapping'' (:100)'
-  - utf-8 strict open (:95)
+  - 'overlay precedence: matching overlay file wins; base CONFIGS_DIR remains the fallback (:92-99)'
+  - 'existence gate: FileNotFoundError naming resolved path (:104)'
+  - 'empty-document gate: ValueError ''config file is empty'' (:108)'
+  - 'shape gate: non-mapping document rejected ''must be a mapping'' (:110)'
+  - utf-8 strict open (:105)
   touched_by:
   - _merge_section (loader.py:109)
   - _missing_step_sections (loader.py:119)
@@ -2483,6 +2491,8 @@ gates:
   - tests/test_config.py::test_missing_experiment_raises
   - tests/test_full_dispatch.py::test_full_dispatch_missing_flow_file_raises
   - tests/test_reports.py::test_stats_sequence_bad_yaml_raises
+  - tests/test_loader.py::test_config_overlay_precedes_base_and_falls_back
+  - tests/test_loader.py::test_missing_config_overlay_fails_loudly
   if_changed:
   - src/broadway/config/loader.py
   - pyproject dependency yaml
@@ -2808,21 +2818,25 @@ gates:
 - id: GATE-CFG-104
   phase: config-schema
   order: 91
-  owner: 'project/data.py:31-47 configs-root resolution block'
+  owner: 'project/data.py:32-48 composed project-config resolution block'
   inputs:
-  - 'configs/{dataset,project}/ trees'
+  - 'project/config/{dataset,analysis,project}/ taxi overlay plus generic base configs'
   outputs:
   - seven module-level config singletons resolved at import (_contract/_project/_etl/_features and siblings)
   transforms:
-  - 'seven configs resolved by CWD-relative Path literals: _DATASET_YAML = Path("configs/dataset/taxi.yaml") (:31) … _FEATURES_YAML = Path("configs/step/features.yaml") (:46-47)'
-  - 'platform dialect is env-aware CONFIGS_DIR = Path(os.getenv("BROADWAY_CONFIGS_DIR") or "configs") (src/broadway/config/loader.py:34) — already imported by project/etl/process_config.py:6,10 while data.py hardcodes relative Paths: the split-brain, verified worse than stated (packet F #13)'
+  - 'seven configs resolve through config_path(): project overlay wins by name; generic step configs fall back to CONFIGS_DIR (:32-48)'
+  - 'project/__init__.py and project.cli activate BROADWAY_CONFIG_OVERLAY_DIR from ProjectPaths.config, so reusable source stays project-agnostic'
   - 'file-shared/symbol-disjoint CO-TENANCY declared with GATE-TRAIN-32 (owner read_training_sample() project/data.py:166) — closes the PROPOSE-GH3-02 OVERLAP-PATH flag'
   touched_by: []
-  validated_by: []
+  validated_by:
+  - tests/test_loader.py::test_config_overlay_precedes_base_and_falls_back
+  - project/tests/test_process_config.py::test_project_config_matches_process_constants
+  - project/tests/test_process.py::test_process_data_writes_ingest_lineage
+  - tests/test_experiments_dispatcher.py::test_project_cli_activates_the_project_config_overlay
   if_changed:
-  - configs-root dialect shared with project/etl/process_config.py (GATE-ETL-117 rider)
-  findings:
-  - 'FINDING root (packet F #13): single configs-root owner demanded to kill the project-plane split-brain; validated_by [] lawful under the FINDING/root rule.'
+  - project/config/
+  - config_path consumers in project/etl/process.py and project/etl/process_config.py
+  findings: []
 - id: GATE-CFG-105
   phase: config-schema
   order: 92
@@ -2873,26 +2887,27 @@ gates:
 - id: GATE-CFG-111
   phase: config-schema
   order: 95
-  owner: 'experiments/mlflow/_common.py:60 CONFIG_PATH BROADWAY_MLFLOW_CONFIG resolution + experiments/mlflow/03_optuna_worker.py:46-49 HPO_CONFIG_PATH env branch'
+  owner: 'project/experiments/mlflow/_common.py:60 CONFIG_PATH BROADWAY_MLFLOW_CONFIG resolution + project/experiments/mlflow/03_optuna_worker.py:46-49 HPO_CONFIG_PATH env branch'
   inputs:
   - BROADWAY_MLFLOW_CONFIG env var
   outputs:
   - single resolution dialect for the MLflow/HPO config path
   transforms:
-  - '_common.py falls back to repo default configs/experiments/mlflow.yaml when env unset (:58-61); worker branches on env presence with parents[2] repo fallback (:46-49) — TWO styles today, one dialect demanded'
+  - '_common.py falls back through ProjectPaths.experiment_configs when env unset (:60); worker branches on env presence with a project-relative fallback (:46-49)'
   - k8s render_worker_jobs.py:48 injects the env into worker pods (injection site rides the same dialect)
   touched_by: []
   validated_by: []
   if_changed:
   - worker-image config mounting contract
+  - project/config/layout.yaml experiment_configs path
   findings:
   - 'slate attributed the owner to training/mlflow_utils.py — corrected during landing to the REAL resolution sites after existence verification (packet F #20 routed note); BROADWAY_MLFLOW_CONFIG never appears in mlflow_utils.'
 - id: GATE-CFG-112
   phase: config-schema
   order: 96
-  owner: 'src/broadway/lineage/models.py:37 SampleSpec.column_mapping + configs/sample/taxi_diagnostic.yaml:5 (+ consumers stats/module.py:42, stats/describe.py:132, timeline/runners.py:100)'
+  owner: 'src/broadway/lineage/models.py:37 SampleSpec.column_mapping + project/config/sample/taxi_diagnostic.yaml:5 (+ consumers stats/module.py:42, stats/describe.py:132, timeline/runners.py:100)'
   inputs:
-  - 'column_mapping block + analysis group_column (configs/analysis/taxi_hypothesis.yaml:13 group_column: Borough)'
+  - 'column_mapping block + analysis group_column (project/config/analysis/taxi_hypothesis.yaml:13 group_column: Borough)'
   outputs:
   - 'validated mapping direction (logical→source); load-time existence validation of mapped values against the sample artifact'
   transforms:
@@ -3279,41 +3294,50 @@ gates:
 - id: GATE-INFRA-92
   phase: infra-meta
   order: 109
-  owner: scripts/run_local_ci.sh:81 gate battery (ruff :81-84 incl. scripts/, mypy :85, configs :86-90, shell-scripts :91-93 both dirs, pytest+cov floor=95 :95-96, project-tests :97)
+  owner: scripts/run_local_ci.sh:81 gate battery (ruff, mypy, configs, shell-scripts, Vulture, pytest+cov floor=95, project-tests)
   inputs:
-  - src/** tests/** experiments/mlflow experiments/fare_prediction experiments.py experiments_ui.py project/working.py project/data.py scripts/ (ruff)
+  - src/** tests/test_project_paths.py project/experiments/** project/experiments.py project/dashboard.py project/paths.py project/working.py project/data.py scripts/check_project_paths.py scripts/ (ruff)
+  - project/config/ (project-owned layout, experiment, and taxi config-overlay SSOT)
   - src/broadway/** (mypy)
   - configs/experiment/*.yaml via load_config(dataset='test') (configs)
   - k8s/optuna/*.sh + scripts/*.sh via sh -n + shellcheck (shell-scripts)
+  - src/broadway project scripts via Vulture --min-confidence 95 (vulture)
   - tests/** (pytest -n 4 --dist worksteal, --cov-fail-under=95)
   - 'project/tests/** (project-tests: full tier only, -q --dist worksteal, NO coverage flags)'
   outputs:
-  - PASS/FAIL ruff|mypy|configs|shell-scripts|pytest|project-tests banners + 40-line tails
+  - PASS/FAIL ruff|mypy|configs|project-paths|shell-scripts|vulture|pytest|project-tests banners + 40-line tails
   - cov floor breach ⇒ FAIL pytest
   transforms:
   - ruff/mypy/configs/shell-scripts run in EVERY tier incl. fast/static
   - 'shell-scripts widened to BOTH glob dirs (:93) — sh -n + shellcheck over k8s/optuna/*.sh AND scripts/*.sh, command-identical to ci.yml ''Shell scripts'' step (gate-divergence law comment :91)'
+  - 'Vulture is fail-closed at 95% confidence through scripts/check_vulture.sh: a finding is printed and exits 1; its 60% queue remains review evidence, not an allowlist'
   - 'project-tests step (:97, full-tier-only): uv run pytest project/tests -q --dist worksteal with NO coverage flags — the >=95 floor deliberately stays on tests/ (header :7-8); closes the data-gate hole (human ruling): 26 tests / 6 files collected+passing at HEAD eb9ea18'
   - coverage floor value 95 owned here; docs must quote it identically
   - configs gate asserts non-empty glob then loads every experiment config
+  - project-paths fails if a runtime surface or file restores retired root experiment/taxi config paths, or the project layout is incomplete
   touched_by:
   - agents/ledger/DECISIONS.md D26 (senior adoption makes gate-list edits executable)
   - tests/test_governance_probes.py:287 probe_coverage_floor (floor-quote SSOT check)
   validated_by:
   - tests/test_governance_probes.py::test_probe_d_live_floor_quotes_match_gate_script
   - tests/test_governance_probes.py::test_probe_d_red_stale_floor_quote
+  - tests/test_vulture_gate.py::test_vulture_gate_fails_loudly_when_vulture_reports_a_finding
+  - tests/test_project_paths.py::test_path_checker_detects_a_retired_taxi_config
   if_changed:
   - src/
   - tests/
   - project/working.py
   - project/data.py
-  - experiments.py
-  - experiments_ui.py
-  - experiments/mlflow/
-  - experiments/fare_prediction/
+  - project/experiments.py
+  - project/dashboard.py
+  - project/paths.py
+  - project/config/
+  - project/experiments/
+  - scripts/check_project_paths.py
   - configs/experiment/
   - configs/dataset/test.yaml
   - scripts/
+  - scripts/check_vulture.sh
   findings:
   - mypy covers src/broadway ONLY; ruff covers just two project/ files — project/etl/process.py etc. lint/type-check in NO tier.
   - data-gate hole CLOSED at this landing: project/tests executes via project-tests in every FULL tier incl. CI (ci.yml:47 invokes the bare SSOT script); fast/static tiers still skip it by design.
@@ -3323,7 +3347,7 @@ gates:
   order: 110
   owner: scripts/check_branch_parity.sh:71 check() (SHARED lockstep, list at :43-69) + sync_to_main() :89
   inputs:
-  - '25-entry SHARED surface: src/ tests/ demo/ configs/dataset/test.yaml configs/experiment/{baseline,engineered,hyperopt}.yaml configs/analysis/{test,test_hypothesis,test_causal}.yaml configs/step/{causal,etl}.yaml configs/environment/ configs/flow/ k8s/ docker/ .github/workflows/ pyproject.toml Dockerfile docker-compose.yml .gitignore .dockerignore README.md scripts/ experiments/more_modeling/'
+  - '24-entry SHARED surface: src/ tests/ demo/ configs/dataset/test.yaml configs/experiment/{baseline,engineered,hyperopt}.yaml configs/analysis/{test,test_hypothesis,test_causal}.yaml configs/step/{causal,etl}.yaml configs/environment/ configs/flow/ k8s/ docker/ .github/workflows/ pyproject.toml Dockerfile docker-compose.yml .gitignore .dockerignore README.md scripts/'
   - origin/main vs origin/taxi tips
   outputs:
   - 'PARITY OK | DRIFT: <path> differs … PARITY FAILED — run $0 --sync'
@@ -3332,7 +3356,7 @@ gates:
   - byte-identical git diff --exit-code per SHARED path, deletions included (:77)
   - anything NOT listed is deliberately single-branch (:39-41)
   - --sync refused outside main era (dev dispatch :202-205)
-  - 'RGC-1 custody flip (gap-foreign ratification checklist): experiments/more_modeling/ JOINED the declared surface — the {16..22} batch landed by human ruling, so its directory is no longer foreign-by-omission; gate met: checker passes WITH the entry (dev-era custody anchor-diff green; origin/main sits at PARITY_MAIN_ANCHOR)'
+  - project/ is deliberately excluded from branch parity because it is the project-specific development surface
   touched_by:
   - scripts/run_local_ci.sh:30 (consumes pinned copy of THIS file)
   - tests/test_branch_parity_scripts.py:66 (parses SHARED array)
@@ -3340,12 +3364,13 @@ gates:
   validated_by:
   - tests/test_branch_parity_scripts.py::test_parity_surface_includes_scripts
   - tests/test_branch_parity_scripts.py::test_scripts_diff_empty_vs_main
+  - tests/test_project_paths.py::test_main_day_sync_removes_project_surfaces_and_keeps_generic_sample
   if_changed:
   - any SHARED[] path
   - refs origin/main, origin/taxi
   findings:
   - test_scripts_diff_empty_vs_main is era-gated and SKIPS during dev era — the stock check() comparison path never executes in dev-era CI; only the SHARED-array text shape is tested.
-  - sync_to_main() (checkout/rm/deletion-mirror machinery) has zero test coverage anywhere.
+  - sync_to_main() is still not executed against a disposable main worktree; its project-removal and generic-sample projection are statically pinned by tests/test_project_paths.py.
 - id: GATE-INFRA-94
   phase: infra-meta
   order: 111
@@ -3471,7 +3496,7 @@ gates:
   inputs:
   - git-diff payload on stdin (files + added lines)
   - governance basenames {CONTRACT_TEMPLATE,WORKER_CONTRACT,MAIN_AGENT_CONTRACT,DECISIONS,FIXES}.md + agents/ledger/STATE.md (:34-37)
-  - behavior prefixes src/ tests/ project/ experiments/ scripts/ .github/ k8s/ + pyproject.toml uv.lock *.sh docker* + configs/*.yaml (:40-43)
+  - behavior prefixes src/ tests/ project/ scripts/ .github/ k8s/ + pyproject.toml uv.lock *.sh docker* + configs/*.yaml (:40-43)
   outputs:
   - '{"tier": FULL|CHECKLIST, "reasons": [...]} JSON'
   transforms:
@@ -3546,30 +3571,36 @@ gates:
 - id: GATE-INFRA-122
   phase: infra-meta
   order: 117
-  owner: 'experiments.py:495 main argparse dispatcher (ols|diagnostics|qq_legend|verify)'
+  owner: 'project/experiments.py:496 main argparse dispatcher (ols|diagnostics|qq_legend|verify)'
   inputs:
   - argv subcommand
   outputs:
-  - plots/results CSVs/verification JSON (self-auditing verify subcommand)
+  - project-owned plots/results CSVs/verification JSON (self-auditing verify subcommand)
   transforms:
-  - 'root experiments CLI dispatcher custody: add_parser ols/:495 diagnostics/:497 qq_legend/:499 verify/:501 (verified live, packet H #122) — real write-surface, zero coverage elsewhere'
+  - 'project dispatcher custody: add_parser ols/:498 diagnostics/:500 qq_legend/:502 verify/:504; taxi inputs come from project config and outputs use PATHS.results'
   touched_by: []
-  validated_by: []
+  validated_by:
+  - tests/test_experiments_dispatcher.py::test_help_lists_exact_dispatcher_commands
+  - tests/test_experiments_dispatcher.py::test_dispatcher_uses_project_configured_data_and_results_paths
+  - tests/test_project_paths.py::test_ci_smoke_uses_the_moved_project_dispatcher
+  - tests/test_project_paths.py::test_reusable_source_never_imports_the_project_layer
   if_changed:
-  - subcommand result-file layout under experiments/results/
+  - subcommand result-file layout under project/experiments/results/
+  - CI smoke command path
   findings: []
 - id: GATE-INFRA-123
   phase: infra-meta
   order: 118
-  owner: 'experiments_ui.py:893 __main__ uvicorn.run entry'
+  owner: 'project/dashboard.py:15 main() project composition entry'
   inputs:
   - host/port argv
   outputs:
-  - 'dashboard server (uvicorn.run(app, host="127.0.0.1", port=8000) :894)'
+  - 'dashboard server (uvicorn.run(app, host="127.0.0.1", port=8000) :19)'
   transforms:
   - 'server-entry custody verified (packet H #123); co-tenancy with GATE-SURF-102 (FastAPI app custody) legal: entry vs app-body aspects'
   touched_by: []
-  validated_by: []
+  validated_by:
+  - project/tests/test_dashboard.py::test_main_wires_project_paths_into_generic_dashboard
   if_changed:
   - bind host/port defaults consumed by dashboard users
   findings: []
@@ -3613,7 +3644,7 @@ gates:
   inputs:
   - published worker image
   outputs:
-  - 'CMD ["python", "/app/experiments/mlflow/03_optuna_worker.py"] — what EVERY Job runs'
+  - 'CMD ["python", "/app/project/experiments/mlflow/03_optuna_worker.py"] — what EVERY Job runs'
   transforms:
   - 'entrypoint custody: CI builds worker at $sha (ci.yml:178-179) and CD pushes it; the CMD decides what every Job runs yet had no owner (packet H #126)'
   touched_by: []
@@ -3656,13 +3687,17 @@ gates:
 - id: GATE-INFRA-129
   phase: infra-meta
   order: 124
-  owner: 'experiments/mlflow/03_optuna_worker.py:106 optuna-worker __main__ sublane exemplar (three named sublanes enumerated in transforms)'
+  owner: 'project/experiments/mlflow/03_optuna_worker.py:106 optuna-worker __main__ sublane exemplar (three named sublanes enumerated in transforms)'
   inputs:
-  - any experiments/** script invoked as __main__
+  - any project/experiments/** script invoked as __main__
+  - project/experiments/multivariate/
+  - project/experiments/polynomial_regression_et_all/
+  - project/experiments/univariate/fare_amount_trip_distance/
+  - project/experiments/more_modeling/
   outputs:
   - per-sublane classification records owed per resolution #6
   transforms:
-  - 'SPLIT-OWNER ratified WITH mandatory named sublanes (packet H #129 — a gate whose owner is "~60 runnable scripts" violates precise-owners): teaching-surface = experiments/{univariate,multivariate,polynomial_regression_et_all,fare_prediction,more_modeling}/ __main__ scripts · model-battle = experiments/mlflow/01_model_battle_mlflow.py + 02_explainability.py · optuna-worker = experiments/mlflow/03_optuna_worker.py'
+  - 'SPLIT-OWNER ratified WITH mandatory named sublanes: teaching-surface = project/experiments/{univariate,multivariate,polynomial_regression_et_all,fare_prediction,more_modeling}/ __main__ scripts · model-battle = project/experiments/mlflow/01_model_battle_mlflow.py + 02_explainability.py · optuna-worker = project/experiments/mlflow/03_optuna_worker.py'
   - 'resolution #6 forces the intentional-record-free classification to be WRITTEN DOWN per sublane at attach time — this row IS the attach record; per-sublane intentional notes remain owed'
   touched_by: []
   validated_by: []
@@ -3837,26 +3872,29 @@ gates:
 - id: GATE-INFRA-146
   phase: infra-meta
   order: 135
-  owner: 'scripts/ship.sh:13 MPLCONFIGDIR cache-root export — sole surviving export; the UV_CACHE_DIR half is DELETED per the single-sanctioned-root law below'
+  owner: 'scripts/uv.sh:1 host-local cache selector — the sole UV_CACHE_DIR runtime owner'
   inputs:
-  - ship-path shell session environment
+  - HOME/XDG_CACHE_HOME/TMPDIR/UV_CACHE_DIR environment
   outputs:
-  - ONE sanctioned uv cache root; deterministic matplotlib font-cache location
+  - writable host-local uv cache or loud nonzero failure
   transforms:
-  - 'HISTORY (fork site of the 11.45 G second cache root, packet H #146): export UV_CACHE_DIR="${UV_CACHE_DIR:-$PWD/.uv-cache}" MPLCONFIGDIR=… stood at :10 until the cache-root law landed — HEAD carries NO UV_CACHE_DIR export anywhere in ship.sh (prohibition prose :10-12)'
-  - 'LAW LANDED: one sanctioned uv cache root ($HOME/.cache/uv), a repo-local UV_CACHE_DIR export PROHIBITED (MAIN_AGENT_CONTRACT ledger & artifact hygiene); the fix WAS the deletion of the UV_CACHE_DIR export (deletion-first satisfied); MPLCONFIGDIR STAYS — export MPLCONFIGDIR="${MPLCONFIGDIR:-$PWD/.mplconfig}" at :13 (HEAD-verified), matplotlib font-cache determinism; /tmp variant documented run_local_ci.sh:18; §14 EXCEPTION (2026-08-25, eight-packet batch ruling #7): repo-root .mplconfig is the SANCTIONED MPLCONFIGDIR target — the SOLE permitted repo-local cache, per the contract sentence'
-  - 'object deleted @ hygiene-exec, creator site persists ⇒ CREATION-TIME LAW: YES — repo-root .uv-cache/.mplconfig absent at ruling time (packet H DRIFT #2/#3); home-side ~/.cache/uv persists'
+  - 'prefers ${XDG_CACHE_HOME:-$HOME/.cache}/uv when writable; otherwise uses ${TMPDIR:-/tmp}/broadway-uv-cache; never selects a repo-local cache'
+  - 'an explicit UV_CACHE_DIR must be writable; an unusable preferred and fallback path exits 1 with UV CACHE ERROR; fallback emits UV CACHE NOTICE to stderr'
+  - 'governance probe permits UV_CACHE_DIR selection only in this wrapper; tests/test_uv_wrapper.py pins fallback and explicit-cache failure'
   touched_by: []
-  validated_by: []
+  validated_by:
+  - tests/test_uv_wrapper.py::test_wrapper_falls_back_outside_repo_when_home_cache_is_unusable
+  - tests/test_uv_wrapper.py::test_wrapper_fails_loudly_for_an_explicit_unwritable_cache
   if_changed:
-  - cache-root export vocabulary
+  - scripts/uv.sh
+  - cache-root selection vocabulary
   findings: []
 - id: GATE-INFRA-147
   phase: infra-meta
   order: 136
   owner: 'scripts/deadcode_census.py:1 module — teeth ⑥ DEADCODE-CENSUS advisory engine'
   inputs:
-  - tracked *.py corpus via git ls-files (src/project/experiments/tests/scripts)
+  - tracked *.py corpus via git ls-files (src/project/tests/scripts)
   - pyproject [project.scripts] entrypoint table
   outputs:
   - data/processed/deadcode_census.md suspicion report (gitignored sink); stdout default
@@ -3869,10 +3907,32 @@ gates:
   if_changed:
   - deadcode census vocabulary
   findings: []
+- id: GATE-INFRA-148
+  phase: infra-meta
+  order: 137
+  owner: agents/tools/state_records.py:command_sync()
+  inputs:
+  - STATE CURRENT record github_item and lifecycle fields
+  - GitHub Project #4 ProjectV2 draft issue
+  outputs:
+  - one current draft issue updated in place, or one new draft issue for a pending record
+  transforms:
+  - existing github_item is preserved across a local update, then resolved from ProjectV2Item to DraftIssue before updateProjectV2DraftIssue
+  - pending is the sole create condition; an existing non-draft item raises STATE ERROR rather than creating a duplicate
+  - record update test pins both the retained Project item id and the absence of addProjectV2DraftIssue
+  touched_by: []
+  validated_by:
+  - tests/test_state_records.py::test_sync_updates_an_existing_github_mirror
+  - tests/test_state_records.py::test_record_update_updates_its_existing_mirror_without_creating_a_card
+  if_changed:
+  - agents/tools/state_records.py
+  - tests/test_state_records.py
+  - GitHub Project #4 draft-issue lifecycle
+  findings: []
 # --- BAND 81-OBJECT-CUSTODY (minted per slate §0; header law above) ------
 - id: GATE-CUST-147
   phase: object-custody
-  order: 137
+  order: 138
   owner: 'src/broadway/training/mlflow_utils.py:162 promote_candidate()'
   inputs:
   - 'model_uri + alias="champion"'
@@ -3891,7 +3951,7 @@ gates:
   findings: []
 - id: GATE-CUST-148
   phase: object-custody
-  order: 138
+  order: 139
   owner: 'src/broadway/training/mlflow_utils.py:163 register_model call sites'
   inputs:
   - candidate model_uri + dataset name
@@ -3907,8 +3967,8 @@ gates:
   findings: []
 - id: GATE-CUST-149
   phase: object-custody
-  order: 139
-  owner: 'experiments/mlflow/03_optuna_worker.py:111 set_tag trio (model/study/seed) + hpo callback tags + battle writers'
+  order: 140
+  owner: 'project/experiments/mlflow/03_optuna_worker.py:111 set_tag trio (model/study/seed) + hpo callback tags + battle writers'
   inputs:
   - every mlflow.set_tag call across the independent writer sites
   outputs:
@@ -3924,7 +3984,7 @@ gates:
   findings: []
 - id: GATE-CUST-150
   phase: object-custody
-  order: 140
+  order: 141
   owner: 'src/broadway/training/mlflow_utils.py:59 set_experiment auto-create chokepoint (inside setup_mlflow :54-63)'
   inputs:
   - experiment_name argument at setup time
@@ -3939,7 +3999,7 @@ gates:
   findings: []
 - id: GATE-CUST-151
   phase: object-custody
-  order: 141
+  order: 142
   owner: 'k8s/optuna/lifecycle.sh:149 dump_state() snapshot generations (keep-N cap) + training-plane registry-prune policy (non-champion versions)'
   inputs:
   - registry versions + $BACKUP_DIR snapshot generations
@@ -3956,8 +4016,8 @@ gates:
   findings: []
 - id: GATE-CUST-152
   phase: object-custody
-  order: 142
-  owner: 'experiments/mlflow/03_optuna_worker.py:106 optuna_{model} run-name convention (+ {study} trial {n}, battle names)'
+  order: 143
+  owner: 'project/experiments/mlflow/03_optuna_worker.py:106 optuna_{model} run-name convention (+ {study} trial {n}, battle names)'
   inputs:
   - every run-name emission across optuna/battle/callback writers
   outputs:

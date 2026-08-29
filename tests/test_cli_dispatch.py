@@ -176,16 +176,30 @@ def test_cli_init_forwards_all_flags(monkeypatch: pytest.MonkeyPatch) -> None:
     )]
 
 
-# NOTE: the CLI "ingest" arm dispatches into project.etl.process. Platform
-# tests may not import project.* (test_platform_hygiene enforces this), so
-# that single dispatch branch is verified only by tests/test_cli.py's
-# end-to-end subprocess runs, never in-process.
-
-
 def _fake_cfg(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
     cfg = SimpleNamespace(full=False)
     _patch(monkeypatch, cli, "load_config", Spy(ret=cfg))
     return cfg
+
+
+def test_cli_ingest_dispatches_generic_etl(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from broadway.etl import module as etl_module
+
+    cfg = _fake_cfg(monkeypatch)
+    run_spy = Spy()
+    _patch(monkeypatch, etl_module, "run", run_spy)
+    _main(monkeypatch, "ingest", "--dataset", "test", "--experiment", "baseline")
+
+    assert run_spy.calls == [(cfg,)]
+    assert cli.load_config.kwargs_calls == [{
+        "step": "etl",
+        "dataset": "test",
+        "experiment": "baseline",
+        "analysis": None,
+        "environment": "development",
+    }]
 
 
 def test_cli_stats_run_dispatches_with_sample(

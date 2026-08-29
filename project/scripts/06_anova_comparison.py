@@ -9,8 +9,8 @@ given that we found unequal variance AND non-normal data.
 
 Run with: python project/scripts/06_anova_comparison.py
 """
-from project import data
 from broadway.stats import anova
+from project import data
 
 
 def main() -> None:

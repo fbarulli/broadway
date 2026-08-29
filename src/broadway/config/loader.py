@@ -32,6 +32,7 @@ from broadway.features.recipe import validate_preprocessing_columns
 logger = logging.getLogger(__name__)
 
 CONFIGS_DIR = Path(os.getenv("BROADWAY_CONFIGS_DIR") or "configs")
+CONFIG_OVERLAY_ENV = "BROADWAY_CONFIG_OVERLAY_DIR"
 DEFAULT_ENVIRONMENT = "development"
 
 STEP_MODELS = {
@@ -88,8 +89,21 @@ def _deep_merge(base: dict, override: dict) -> dict:
     return result
 
 
+def config_path(relative_path: str) -> Path:
+    """Resolve a config through an optional composition overlay, then the base tree."""
+    overlay_dir = os.getenv(CONFIG_OVERLAY_ENV)
+    if overlay_dir:
+        overlay_root = Path(overlay_dir)
+        if not overlay_root.is_dir():
+            raise FileNotFoundError(f"config overlay directory not found: {overlay_root}")
+        overlay_path = overlay_root / relative_path
+        if overlay_path.exists():
+            return overlay_path
+    return CONFIGS_DIR / relative_path
+
+
 def _load_yaml(relative_path: str) -> Any:
-    path = CONFIGS_DIR / relative_path
+    path = config_path(relative_path)
     if not path.exists():
         raise FileNotFoundError(f"config file not found: {path}")
     with open(path, encoding="utf-8") as f:
@@ -116,7 +130,7 @@ def _missing_step_sections(step: str) -> list[str]:
     for section in _STEP_SECTION_REQUIREMENTS.get(step, ()):
         if section in _TOP_LEVEL_SECTIONS or section == step:
             continue
-        if not (CONFIGS_DIR / "step" / f"{section}.yaml").exists():
+        if not config_path(f"step/{section}.yaml").exists():
             missing.append(section)
     return missing
 

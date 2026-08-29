@@ -47,6 +47,16 @@ def _file_sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _read_source(path: Path) -> pd.DataFrame:
+    """Read a supported named-sample source, failing loudly otherwise."""
+    suffix = path.suffix.lower()
+    if suffix == ".parquet":
+        return pd.read_parquet(path)
+    if suffix == ".csv":
+        return pd.read_csv(path)
+    raise ValueError(f"sample source must be a .parquet or .csv file, got: {path}")
+
+
 def _apply_filters(df: pd.DataFrame, filters: list[FilterSpec]) -> pd.DataFrame:
     """Apply FilterSpec masks; all filters AND together."""
     mask = pd.Series(True, index=df.index)
@@ -113,7 +123,7 @@ def generate_sample(name: str, samples_dir: Path | None = None) -> Path:
         )
 
     source_path = (Path(CONFIGS_DIR).parent / spec.source.path).resolve()
-    df = pd.read_parquet(source_path)
+    df = _read_source(source_path)
     if spec.columns is not None:
         df = df[spec.columns]
     df = df.sample(n=spec.size, random_state=spec.seed)

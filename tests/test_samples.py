@@ -113,6 +113,23 @@ def test_read_named_sample_round_trip(
     assert sample.provenance["name"] == "roundtrip"
 
 
+def test_generate_from_csv_source(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "source.csv"
+    pd.DataFrame(
+        {"a": [float(value) for value in range(50)], "b": [float(value) for value in range(50)]}
+    ).to_csv(source, index=False)
+    _write_config(tmp_path, "csv_source", source)
+
+    samples_dir = _generated(tmp_path, monkeypatch, "csv_source", source)
+    sample = read_named_sample("csv_source", samples_dir=samples_dir)
+
+    assert 0 < len(sample.df) <= 30
+    assert (sample.df["a"] > 0.0).all()
+    assert list(sample.df.columns) == ["a", "b"]
+
+
 def test_regenerating_same_version_raises(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, synthetic_source: Path
 ) -> None:

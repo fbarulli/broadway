@@ -15,6 +15,7 @@ import pyarrow.parquet as pq
 import yaml
 
 from broadway.analysis.contracts import AnalysisContract
+from broadway.config.loader import config_path
 from broadway.config.schema import (
     DatasetContract,
     FeaturesStep,
@@ -25,25 +26,29 @@ from broadway.contracts.pandera import build_raw_schema
 from broadway.data import loader as _loader
 from broadway.stats.effect_size import group_imbalance
 from project.config import ProjectConfig
+from project.paths import load_project_paths
 
 logger = logging.getLogger(__name__)
 
-_DATASET_YAML = Path("configs/dataset/taxi.yaml")
+PATHS = load_project_paths()
+REPO_ROOT = PATHS.root.parent
+
+_DATASET_YAML = config_path("dataset/taxi.yaml")
 _contract = DatasetContract(**yaml.safe_load(_DATASET_YAML.read_text()))
 
-_ANALYSIS_YAML = Path("configs/analysis/taxi_hypothesis.yaml")
+_ANALYSIS_YAML = config_path("analysis/taxi_hypothesis.yaml")
 _analysis = AnalysisContract(**yaml.safe_load(_ANALYSIS_YAML.read_text()))
 
-_STATS_YAML = Path("configs/step/stats.yaml")
+_STATS_YAML = config_path("step/stats.yaml")
 _stats = StatsStep(**yaml.safe_load(_STATS_YAML.read_text()))
 
-_TRAIN_YAML = Path("configs/step/train.yaml")
+_TRAIN_YAML = config_path("step/train.yaml")
 _train = TrainStep(**yaml.safe_load(_TRAIN_YAML.read_text()))
 
-_PROJECT_YAML = Path("configs/project/taxi.yaml")
+_PROJECT_YAML = config_path("project/taxi.yaml")
 _project = ProjectConfig(**yaml.safe_load(_PROJECT_YAML.read_text()))
 
-_FEATURES_YAML = Path("configs/step/features.yaml")
+_FEATURES_YAML = config_path("step/features.yaml")
 _features = FeaturesStep(**yaml.safe_load(_FEATURES_YAML.read_text()))
 
 _hypothesis = _analysis.hypothesis
@@ -55,15 +60,15 @@ def _lookup_path(contract: DatasetContract) -> Path:
     return Path(next(iter(contract.lookup_tables.values())).path)
 
 
-DATA_PATH = Path(_contract.path)
-LOOKUP_PATH = Path(_lookup_path(_contract))
+DATA_PATH = (REPO_ROOT / _contract.path).resolve()
+LOOKUP_PATH = (REPO_ROOT / _lookup_path(_contract)).resolve()
 BOROUGHS = _hypothesis.group_values
 MIN_ROWS_FOR_SAMPLING = _stats.min_rows_for_sampling
 SAMPLE_FRACTION = _stats.per_group_sample_fraction
 TIME_SPLIT_CUTOFF = _stats.time_split_cutoff
 ACF_LAGS = _stats.acf_lags
 
-FEATURE_LOOKUP_PATH = _project.lookup_path
+FEATURE_LOOKUP_PATH = str((REPO_ROOT / _project.lookup_path).resolve())
 FEATURE_ENCODING_SMOOTHING = _features.encoding_smoothing
 FEATURE_FREQUENCY_FILL = _features.frequency_fill
 FEATURE_RUSH_HOUR_MORNING_START = _project.rush_hour_morning_start
@@ -123,7 +128,7 @@ TARGET_COL = _contract.target
 PICKUP_BOROUGH_COL = "pickup_borough"
 DURATION_COL = "trip_duration_minutes"
 
-RESULTS_DIR = Path("data/processed")
+RESULTS_DIR = (REPO_ROOT / _project.processed_dir).resolve()
 
 
 def _quality_report_path() -> Path:
