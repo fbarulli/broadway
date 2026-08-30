@@ -63,5 +63,5 @@ every src change, fail loud, one logical change per commit).
   `diagnostics_experiment/` + `legend_experiment/` are gitignored references.
 - Test gate: full `pytest` only when `src/`/`configs/`/`project/`/`tests/`
   change; live counts: DECISIONS.md D28.
-- `uv` needs `UV_CACHE_DIR` inside the workspace (sandbox); matplotlib needs
+- `uv` uses a writable host-local `UV_CACHE_DIR`; matplotlib needs
   `MPLCONFIGDIR` (`.mplconfig/`).

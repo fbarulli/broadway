@@ -1,6 +1,6 @@
 # DIGEST.md — rendered from agents/ledger/gates.yaml · NEVER HAND-EDIT ·
 
-> 143 gates · rendered 2026-08-30 @ HEAD 7dcb34f · load THIS into context;
+> 143 gates · rendered 2026-08-30 @ HEAD d09d1fb · load THIS into context;
 > gates.yaml is the sole SSOT; the retired GATES.md/gates/*.md markdown world survives in agents/ledger/arbitration/2026-08-24/surface-and-analysis-preservation.md.
 
 | band | phase | gates | findings |
@@ -263,7 +263,7 @@
   [argv[1] ∈ {unset, --static, --tier=fast, --tier=full, --clean-lint} (else usage exit 2), sub-gate verdicts via run() <name> <cmd...>] → [banner FAST-GREEN | LOCAL-CI GREEN | LOCAL-CI RED, exit 0 green / 1 red / 2 usage] · pins: none direct
 - **GATE-INFRA-91** `scripts/run_local_ci.sh:30 gate_parity() (F1b pin-guard, wired at :43)` ⚠FINDING
   [refs/remotes/origin/sklearn:scripts/check_branch_parity.sh via `git show` (:33)] → [parity sub-verdict to run() aggregator, FAIL parity (F1b): origin/sklearn unavailable | legacy pre-D16 checker on track ref] · pins: 3
-- **GATE-INFRA-92** `scripts/run_local_ci.sh:81 gate battery (ruff, mypy, configs, shell-scripts, Vulture, pytest+cov floor=95, project-tests)` ⚠FINDING
+- **GATE-INFRA-92** `scripts/run_local_ci.sh:102 gate battery (ruff, mypy, Vulture, configs, shell-scripts, pytest+cov floor=95, project-tests)` ⚠FINDING
   [src/** tests/test_project_paths.py project/experiments/** project/experiments.py project/dashboard.py project/paths.py project/working.py project/data.py scripts/check_project_paths.py scripts/ (ruff), project/config/ (project-owned layout, experiment, and taxi config-overlay SSOT), src/broadway/** (mypy), configs/experiment/*.yaml via load_config(dataset='test') (configs), k8s/optuna/*.sh + scripts/*.sh via sh -n + shellcheck (shell-scripts), src/broadway project scripts via Vulture --min-confidence 95 (vulture), tests/** (pytest -n 4 --dist worksteal, --cov-fail-under=95), project/tests/** (project-tests: full tier only, -q --dist worksteal, NO coverage flags)] → [PASS/FAIL ruff|mypy|configs|project-paths|shell-scripts|vulture|pytest|project-tests banners + 40-line tails, cov floor breach ⇒ FAIL pytest] · pins: 4
 - **GATE-INFRA-93** `scripts/check_branch_parity.sh:71 check() (SHARED lockstep, list at :43-69) + sync_to_main() :89` ⚠FINDING
   [24-entry SHARED surface: src/ tests/ demo/ configs/dataset/test.yaml configs/experiment/{baseline,engineered,hyperopt}.yaml configs/analysis/{test,test_hypothesis,test_causal}.yaml configs/step/{causal,etl}.yaml configs/environment/ configs/flow/ k8s/ docker/ .github/workflows/ pyproject.toml Dockerfile docker-compose.yml .gitignore .dockerignore README.md scripts/, origin/main vs origin/taxi tips] → [PARITY OK | DRIFT: <path> differs … PARITY FAILED — run $0 --sync, sync mode: taxi→main checkout + deletion mirror (:89-103)] · pins: 3
@@ -316,7 +316,7 @@
 - **GATE-INFRA-145** `k8s/optuna/teardown.sh teardown zero-footprint creation-time law (HEAD has ZERO rmi/residual lines; codified shape = WIP worktree :63-73)` ⚠FINDING
   [teardown invocation after cluster/image-producing lanes] → [host returned to ZERO project containers/images/volumes, FAILING LOUD otherwise] · pins: none direct
 - **GATE-INFRA-146** `scripts/uv.sh:1 host-local cache selector — the sole UV_CACHE_DIR runtime owner`
-  [HOME/XDG_CACHE_HOME/TMPDIR/UV_CACHE_DIR environment] → [writable host-local uv cache or loud nonzero failure] · pins: 2
+  [HOME/XDG_CACHE_HOME/TMPDIR/UV_CACHE_DIR environment] → [writable host-local uv cache or loud nonzero failure] · pins: 3
 - **GATE-INFRA-147** `scripts/deadcode_census.py:1 module — teeth ⑥ DEADCODE-CENSUS advisory engine`
   [tracked *.py corpus via git ls-files (src/project/tests/scripts), pyproject [project.scripts] entrypoint table] → [data/processed/deadcode_census.md suspicion report (gitignored sink); stdout default] · pins: none direct
 - **GATE-INFRA-148** `agents/tools/state_records.py sync()`

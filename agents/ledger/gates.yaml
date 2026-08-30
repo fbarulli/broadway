@@ -1,6 +1,6 @@
 # Gate registry SSOT — hand-maintained; the {01..09} gate fragments it consolidated predate git custody.
 meta:
-  head: 7dcb34f
+  head: d09d1fb
   assembled: '2026-08-24'
   source_fragments:
   - agents/ledger/gates/01-ingest.md
@@ -3294,7 +3294,7 @@ gates:
 - id: GATE-INFRA-92
   phase: infra-meta
   order: 109
-  owner: scripts/run_local_ci.sh:81 gate battery (ruff, mypy, configs, shell-scripts, Vulture, pytest+cov floor=95, project-tests)
+  owner: scripts/run_local_ci.sh:102 gate battery (ruff, mypy, Vulture, configs, shell-scripts, pytest+cov floor=95, project-tests)
   inputs:
   - src/** tests/test_project_paths.py project/experiments/** project/experiments.py project/dashboard.py project/paths.py project/working.py project/data.py scripts/check_project_paths.py scripts/ (ruff)
   - project/config/ (project-owned layout, experiment, and taxi config-overlay SSOT)
@@ -3308,9 +3308,9 @@ gates:
   - PASS/FAIL ruff|mypy|configs|project-paths|shell-scripts|vulture|pytest|project-tests banners + 40-line tails
   - cov floor breach ⇒ FAIL pytest
   transforms:
-  - ruff/mypy/configs/shell-scripts run in EVERY tier incl. fast/static
+  - ruff/mypy/Vulture/configs/shell-scripts run in EVERY tier incl. fast/static
   - 'shell-scripts widened to BOTH glob dirs (:93) — sh -n + shellcheck over k8s/optuna/*.sh AND scripts/*.sh, command-identical to ci.yml ''Shell scripts'' step (gate-divergence law comment :91)'
-  - 'Vulture is fail-closed at 95% confidence through scripts/check_vulture.sh: a finding is printed and exits 1; its 60% queue remains review evidence, not an allowlist'
+  - 'Vulture is fail-closed at 95% confidence through the direct scripts/uv.sh invocation: a finding is printed and exits non-zero; no allowlist or wrapper exists'
   - 'project-tests step (:97, full-tier-only): uv run pytest project/tests -q --dist worksteal with NO coverage flags — the >=95 floor deliberately stays on tests/ (header :7-8); closes the data-gate hole (human ruling): 26 tests / 6 files collected+passing at HEAD eb9ea18'
   - coverage floor value 95 owned here; docs must quote it identically
   - configs gate asserts non-empty glob then loads every experiment config
@@ -3321,7 +3321,7 @@ gates:
   validated_by:
   - tests/test_governance_probes.py::test_probe_d_live_floor_quotes_match_gate_script
   - tests/test_governance_probes.py::test_probe_d_red_stale_floor_quote
-  - tests/test_vulture_gate.py::test_vulture_gate_fails_loudly_when_vulture_reports_a_finding
+  - tests/test_ci_control_plane.py::test_vulture_finding_makes_static_ci_red
   - tests/test_project_paths.py::test_path_checker_detects_a_retired_taxi_config
   if_changed:
   - src/
@@ -3337,7 +3337,7 @@ gates:
   - configs/experiment/
   - configs/dataset/test.yaml
   - scripts/
-  - scripts/check_vulture.sh
+  - tests/test_ci_control_plane.py
   findings:
   - mypy covers src/broadway ONLY; ruff covers just two project/ files — project/etl/process.py etc. lint/type-check in NO tier.
   - data-gate hole CLOSED at this landing: project/tests executes via project-tests in every FULL tier incl. CI (ci.yml:47 invokes the bare SSOT script); fast/static tiers still skip it by design.
@@ -3885,6 +3885,7 @@ gates:
   validated_by:
   - tests/test_uv_wrapper.py::test_wrapper_falls_back_outside_repo_when_home_cache_is_unusable
   - tests/test_uv_wrapper.py::test_wrapper_fails_loudly_for_an_explicit_unwritable_cache
+  - tests/test_uv_wrapper.py::test_wrapper_fails_loudly_when_no_default_or_fallback_cache_is_usable
   if_changed:
   - scripts/uv.sh
   - cache-root selection vocabulary

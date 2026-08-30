@@ -37,7 +37,7 @@ for arg in "$@"; do
       if [[ $SEEN_STATIC -eq 1 ]]; then
         echo "REFUSED: $arg conflicts with already-parsed --static" >&2; usage >&2; exit 2
       fi
-      TIER="${arg#--tier=}"; SEEN_TIER=1 ;;    # fast: parity+ruff+mypy+configs+shell (<30s) / full: +pytest+cov>=95 + project-tests
+      TIER="${arg#--tier=}"; SEEN_TIER=1 ;;    # fast: parity+ruff+mypy+vulture+configs+shell (<30s) / full: +pytest+cov>=95 + project-tests
     --clean-lint) CLEAN_LINT=1 ;;              # ruff+mypy vs pristine HEAD snapshot (teeth 5)
     *) echo "unknown argument: '$arg'" >&2; usage >&2; exit 2 ;;
   esac
@@ -100,11 +100,12 @@ gate_parity() {
   return "$rc"
 }
 run parity gate_parity
-run ruff    dispatch uv run ruff check src tests experiments/mlflow \
-            experiments/fare_prediction experiments_ui.py \
+run ruff    dispatch uv run ruff check src tests project/experiments \
+            project/experiments.py \
             project/working.py project/data.py \
             scripts
 run mypy    dispatch uv run mypy src/broadway
+run vulture dispatch bash scripts/uv.sh run vulture src/broadway project scripts --min-confidence 95
 run configs uv run python -c "
 from pathlib import Path
 from broadway.config.loader import load_config
@@ -121,7 +122,7 @@ fi
 if [[ $fail -eq 0 ]]; then
   CL_NOTE=""
   [[ $CLEAN_LINT -eq 1 ]] && CL_NOTE=" + clean-lint(ruff+mypy@HEAD-snapshot)"
-  [[ $TIER == "fast" ]] && echo "$FAST_BANNERS (tiers: parity/ruff/mypy/configs/shell-scripts)$CL_NOTE" \
+  [[ $TIER == "fast" ]] && echo "$FAST_BANNERS (tiers: parity/ruff/mypy/vulture/configs/shell-scripts)$CL_NOTE" \
                         || echo "$FULL_BANNERS$CL_NOTE"
 else
   echo "LOCAL-CI RED — fix above before commit/push"
