@@ -28,11 +28,11 @@ import os
 import re
 import subprocess
 import sys
-from collections.abc import Callable, Iterator, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from datetime import UTC, date, datetime
 from functools import cache, lru_cache
 from pathlib import Path
-from typing import Mapping, NamedTuple
+from typing import NamedTuple
 
 import pytest
 import yaml
