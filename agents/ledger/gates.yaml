@@ -1,6 +1,6 @@
 # Gate registry SSOT — hand-maintained; the {01..09} gate fragments it consolidated predate git custody.
 meta:
-  head: c4f120a
+  head: 7dcb34f
   assembled: '2026-08-24'
   source_fragments:
   - agents/ledger/gates/01-ingest.md
@@ -3910,20 +3910,18 @@ gates:
 - id: GATE-INFRA-148
   phase: infra-meta
   order: 137
-  owner: agents/tools/state_records.py:command_sync()
+  owner: agents/tools/state_records.py sync()
   inputs:
-  - STATE CURRENT record github_item and lifecycle fields
-  - GitHub Project #4 ProjectV2 draft issue
+  - STATE CURRENT record and immutable EVENTS section
+  - GitHub Project #4 DraftIssue mirror
   outputs:
-  - one current draft issue updated in place, or one new draft issue for a pending record
+  - pending CURRENT intent followed by one synced mirror item
   transforms:
-  - existing github_item is preserved across a local update, then resolved from ProjectV2Item to DraftIssue before updateProjectV2DraftIssue
-  - pending is the sole create condition; an existing non-draft item raises STATE ERROR rather than creating a duplicate
-  - record update test pins both the retained Project item id and the absence of addProjectV2DraftIssue
+  - Project item pagination keeps pageInfo outside nodes; null and non-DraftIssue content are skipped
+  - local pending state is persisted before mirror I/O and retry uses the same id
   touched_by: []
   validated_by:
-  - tests/test_state_records.py::test_sync_updates_an_existing_github_mirror
-  - tests/test_state_records.py::test_record_update_updates_its_existing_mirror_without_creating_a_card
+  - tests/test_state_records.py::test_sync_paginates_skips_non_draft_and_preserves_events
   if_changed:
   - agents/tools/state_records.py
   - tests/test_state_records.py

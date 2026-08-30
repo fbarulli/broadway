@@ -32,7 +32,7 @@ from collections.abc import Callable, Iterator, Sequence
 from datetime import UTC, date, datetime
 from functools import cache, lru_cache
 from pathlib import Path
-from typing import NamedTuple
+from typing import Mapping, NamedTuple
 
 import pytest
 import yaml
@@ -906,15 +906,16 @@ CI_WORKFLOW = ".github/workflows/ci.yml"
 # Law derived from precedent (abcb729 stamped its parent; b06bdd2-era held
 # too): meta.head records the FIRST PARENT of the last commit touching
 # gates.yaml. A registry edit must re-stamp; anything else drifts.
-META_HEAD_LINE = re.compile(r"^  head:\s*(\S+)\s*$", re.MULTILINE)
-
-
 def parse_meta_head(registry_text: str, source: str = GATES_REGISTRY) -> str:
     """The short-sha stamp under the gate registry's meta: block."""
-    found = META_HEAD_LINE.search(registry_text)
-    if not found:
+    try:
+        document = yaml.safe_load(registry_text)
+    except yaml.YAMLError as error:
+        raise AssertionError(f"{source}: invalid YAML registry") from error
+    meta = document.get("meta") if isinstance(document, Mapping) else None
+    if not isinstance(meta, Mapping) or not isinstance(meta.get("head"), str):
         raise AssertionError(f"{source}: no `head:` stamp under the meta: block")
-    return found.group(1)
+    return meta["head"]
 
 
 def assert_parent_stamp(actual: str, required: str, source: str = GATES_REGISTRY) -> None:
@@ -925,6 +926,18 @@ def assert_parent_stamp(actual: str, required: str, source: str = GATES_REGISTRY
             f"{required!r} (first parent of the last commit touching {GATES_REGISTRY}); "
             "re-stamp meta.head with every registry edit (precedent abcb729)"
         )
+
+
+def required_meta_head(parent: str, head: str, dirty: bool) -> str:
+    """Dirty registry content is stamped for its prospective parent."""
+    return head if dirty else parent
+
+
+def registry_is_dirty(path: str) -> bool:
+    """Use HEAD as the comparison point for a registry edit."""
+    return bool(subprocess.run(
+        ["git", "diff", "--quiet", "HEAD", "--", path], cwd=ROOT, check=False,
+    ).returncode)
 
 
 @cache
@@ -964,14 +977,22 @@ def test_probe_f_meta_head_parent_stamp_live_and_falsifiable() -> None:
         # Root-commit edge: nothing precedes the toucher, no stamp can exist.
         print(f"[P1] SKIP-WITH-PASS: {toucher} ({GATES_REGISTRY} toucher) is the root commit")
         pytest.skip("gates.yaml toucher is the root commit — no parent stamp derivable")
-    print(f"[P1] meta.head parent-stamp: required={parent} actual={actual} match={actual == parent}")
-    assert_parent_stamp(actual, parent)
+    dirty = registry_is_dirty(GATES_REGISTRY)
+    head = subprocess.run(
+        ["git", "rev-parse", "--short=7", "HEAD"],
+        capture_output=True, text=True, cwd=ROOT, check=True,
+    ).stdout.strip()
+    required = required_meta_head(parent, head, dirty)
+    print(f"[P1] meta.head parent-stamp: dirty={dirty} required={required} actual={actual} match={actual == required}")
+    assert_parent_stamp(actual, required)
     # Negative control — a synthetic wrong stamp through the pure helper.
     with pytest.raises(AssertionError, match="violates the parent-stamp law"):
-        assert_parent_stamp("0badf00d", parent, source="synthetic-gates")
-    assert_parent_stamp(parent, parent, source="synthetic-gates")  # positive twin
+        assert_parent_stamp("0badf00d", required, source="synthetic-gates")
+    assert_parent_stamp(required, required, source="synthetic-gates")  # positive twin
+    assert required_meta_head(parent, head, True) == head
     with pytest.raises(AssertionError, match="no `head:` stamp"):  # parser fails loud
         parse_meta_head("meta:\n  assembled: '2026-08-24'\n", source="synthetic-gates")
+    assert parse_meta_head("x:\n  head: wrong\nmeta:\n  head: right\n") == "right"
 
 
 # --- Probe (g): EVENTS tamper-lock (D31(2)) ------------------------------- #

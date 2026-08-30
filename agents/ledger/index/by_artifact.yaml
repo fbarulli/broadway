@@ -279,7 +279,7 @@ QqOverview/DatasetProfile/JoinAuditReport/LookupValueAuditReport/StructuralClean
 - GATE-INFRA-95
 'SHIP OK | SHIP REFUSED: LOCAL-CI RED … exit 1':
 - GATE-INFRA-96
-STATE CURRENT record github_item and lifecycle fields:
+STATE CURRENT record and immutable EVENTS section:
 - GATE-INFRA-148
 SampleSpec REQUIRED (no canonical leg, unlike GATE-STATS-41):
 - GATE-STATS-49
@@ -724,8 +724,6 @@ omnibus.json (runners.py:324):
 - GATE-TLINE-56
 ? omnibus/posthoc/conclusion AnalysisStep records; effect-size ramification text; artifacts/timeline/<analysis>/evidence/omnibus.json (runners.py:324) and posthoc.json (runners.py:413); conclusion consumes prior steps' result_summary (runners.py:462-512) rather than recomputing
 : - GATE-TLINE-55
-one current draft issue updated in place, or one new draft issue for a pending record:
-- GATE-INFRA-148
 one pa.Column per contract entry:
 - GATE-CFG-75
 one save-site per key family; size-budget watch; purge as invoked workflow step:
@@ -786,6 +784,8 @@ parquet artifact:
 - GATE-CFG-79
 pd.Series:
 - GATE-ETL-15
+pending CURRENT intent followed by one synced mirror item:
+- GATE-INFRA-148
 ? per-group {skew, kurtosis, shapiro_p} (:31-35); levene {statistic, p_value} (:15-16); ValueError "normality checks require non-constant groups" (:23-24); ValueError "Levene's test requires non-zero variance in every group" (:13-14)
 : - GATE-STATS-46
 ? per-order executor dispatch through _STEP_RUNNERS (walkthrough.py:281-288); step JSONs saved (walkthrough.py:384); DECISION REQUIRED console panels (walkthrough.py:138-189); reports regenerated via _write_timeline (walkthrough.py:71-91 -> reports/timeline.md, reports/index.md, reports/results/*); stale-decision warnings (walkthrough.py:192-201)

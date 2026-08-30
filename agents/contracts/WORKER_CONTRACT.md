@@ -84,21 +84,9 @@ not substitute.
 
 ## Live ops board (GitHub Projects)
 
-The session mirrors operational state to GitHub Project #4 "Broadway Ops
-Board" (owner `fbarulli`, https://github.com/users/fbarulli/projects/4) —
-an AVAILABILITY layer that survives local loss or connection death.
-
-- It is NEVER a primary record: card bodies are pointers; every fact
-  resolves against `STATE.md` / git (Ground-truth law above).
-- Step-0 reads it alongside `STATE.md`; a card contradicting either is
-  echoed stale-on-arrival, never improvised around.
-- You write cards ONLY when your contract directs a checkpoint (lane
-  dispatch/settle, long-dispatch heartbeat). One card per material
-  event; title prefixed with your role + lane id; body cites the primary
-  record row it mirrors. Mutation mechanics live in
-  MAIN_AGENT_CONTRACT §6 (draft-issue GraphQL mutation, Status options).
-- Never flip or edit a card you did not create without recording who
-  changed it and why in the mirrored STATE.md row.
+Project #4 is an availability mirror, not evidence. Workers and reviewers
+never mutate it. The main agent alone uses the private `state_records.py`
+CURRENT lifecycle; it writes local pending intent before mirror I/O.
 
 ## Report format (every dispatch)
 

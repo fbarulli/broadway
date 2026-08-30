@@ -1,6 +1,6 @@
 # DIGEST.md — rendered from agents/ledger/gates.yaml · NEVER HAND-EDIT ·
 
-> 143 gates · rendered 2026-08-29 @ HEAD c4f120a · load THIS into context;
+> 143 gates · rendered 2026-08-30 @ HEAD 7dcb34f · load THIS into context;
 > gates.yaml is the sole SSOT; the retired GATES.md/gates/*.md markdown world survives in agents/ledger/arbitration/2026-08-24/surface-and-analysis-preservation.md.
 
 | band | phase | gates | findings |
@@ -319,8 +319,8 @@
   [HOME/XDG_CACHE_HOME/TMPDIR/UV_CACHE_DIR environment] → [writable host-local uv cache or loud nonzero failure] · pins: 2
 - **GATE-INFRA-147** `scripts/deadcode_census.py:1 module — teeth ⑥ DEADCODE-CENSUS advisory engine`
   [tracked *.py corpus via git ls-files (src/project/tests/scripts), pyproject [project.scripts] entrypoint table] → [data/processed/deadcode_census.md suspicion report (gitignored sink); stdout default] · pins: none direct
-- **GATE-INFRA-148** `agents/tools/state_records.py:command_sync()`
-  [STATE CURRENT record github_item and lifecycle fields, GitHub Project] → [one current draft issue updated in place, or one new draft issue for a pending record] · pins: 2
+- **GATE-INFRA-148** `agents/tools/state_records.py sync()`
+  [STATE CURRENT record and immutable EVENTS section, GitHub Project] → [pending CURRENT intent followed by one synced mirror item] · pins: 1
 
 ### 81-object-custody — object-custody
 

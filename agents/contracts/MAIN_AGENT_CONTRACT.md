@@ -212,13 +212,16 @@ more reading `parse_numeric` than any checklist produced).
   superseding arbitration/push-only); a dispatch without a CONTEXT block
   is incomplete.
 
-- **Live ops board (GitHub Projects, ratified 2026-08-26):** the
+- **Live ops board (GitHub Projects):** the
   AVAILABILITY layer for lane/checkpoint state — survives local loss and
   session death; STATE.md stays the PRIMARY record and every card body
   points back to it. Project: #4 "Broadway Ops Board", owner `fbarulli`,
   project node id `PVT_kwHOAZFnCc4Bhhjq`,
   https://github.com/users/fbarulli/projects/4 . Update it at EVERY
   material event — same triggers as the STATE.md checkpoint discipline.
+  The main agent alone invokes the private `agents/tools/state_records.py`
+  lifecycle; workers and reviewers report only. It persists CURRENT intent
+  before attempting its mirror, so `pending` is retryable.
   Mechanics (figured out live 2026-08-26; gh ≥2.96 behavior):
   * Auth once: `gh auth refresh --hostname github.com -s read:project,project`
     (device flow; plain tokens lack project scopes).
