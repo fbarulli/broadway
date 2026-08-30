@@ -14,7 +14,7 @@ Broadway produces three audience-specific bundles:
 
 ## 1. MLE Bundle: Serving & Infrastructure
 
-The MLE does not care about AUC or feature importance charts. They need a deterministic, containerizable package that will not crash the API.
+The MLE needs a deterministic, containerizable package that will not crash the API.
 
 **Location:** `artifacts/serving/`
 
