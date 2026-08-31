@@ -20,30 +20,28 @@ Working directory: `/home/opc/ONE/broad-way`.
 
 ## 2. Branches
 
-**DOCTRINE (human ruling 2026-08-26, verbatim): "main = data agnostic
-and fully 'working' meaning only clean updates from dev / taxi = up to
-date use case, fully green / all other branches are dev." Earlier phras-
-ing: "taxi is to forever be taxi, it serves as an example of that the
-project does. main is the blank slate used for all other datasets."
+**DOCTRINE (human ruling 2026-08-31):** `main` is the data-agnostic,
+fully working clean slate. `sklearn` is the active development/project line.
+All other branch refs are development or parked legacy context, not a second
+source of platform policy unless the human explicitly reactivates them.
 
-- **`sklearn`** — dev line and project home. All code work happens here.
-- **`taxi`** — THE use case: stays up to date with dev (fast-forwarded to
-  `sklearn`'s tip after each green push) and fully green — it showcases,
-  end to end, what the platform does on a real dataset. Never frozen;
-  never diverges.
-- **`main`** — the blank slate: data-agnostic public line that is always
-  "working". Receives ONLY clean updates from dev — human-directed
-  batches or main-day syncs; between updates it holds its last ratified
-  state (era machinery in `scripts/check_branch_parity.sh`, D16/D21,
-  unchanged).
-- **`broadway`** — stale/legacy. Do not touch.
+- **`main`** — the clean, data-agnostic shared platform and only canonical
+  publication boundary once its GitHub protection is established. It receives
+  deliberate clean updates; it must stay usable without a dataset-specific
+  branch.
+- **`sklearn`** — active development line and current project home.
+- **Other refs** — parked development/legacy context. Preserve unless the
+  human requests deletion, but do not use them as parity or release authority.
 
-Doctrine consequence recorded 2026-08-26: because `taxi` remains the
-living use case while `main` stays agnostic, shared-surface files whose
-VALUES encode dataset truth (e.g. k8s dataset bindings) are structurally
-torn between two legitimate truths; resolution options (un-share /
-template / per-env overlay) are tracked as an open board item, not
-silently decided.
+**Composition target (migration, not a grandfathered exception):** after the
+main-baseline migration, every persistent development branch may differ from
+`main` only under `project/**`. `src/`, generic tests, workflows, Docker/K8s
+templates, scripts, governance, packaging, and root documentation remain
+shared. Project-specific configuration, experiments, reports, docs, and
+binding tests belong under `project/`. Do not enforce this invariant until
+the branches have been re-rooted on the shared baseline; do not encode the
+current drift in a permanent allowlist. The main agent records each migration
+slice on the board and uses a direct diff invariant after re-rooting.
 
 ## 3. Roles
 

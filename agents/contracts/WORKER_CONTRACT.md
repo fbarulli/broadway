@@ -27,6 +27,18 @@ agent deletes on sight and repeat offenses are a lane-failure class.
   tree/records at render time. The platform derives; it does not store
   derived state.
 
+## Branch-composition boundary
+
+`main` is the data-agnostic shared platform; `sklearn` is the active project
+line. The migration target is that a development branch's only tracked-tree
+delta from `main` is `project/**`: project-specific configs, experiments,
+reports, docs, and binding tests live there. `src/`, generic tests, CI,
+Docker/K8s templates, scripts, governance, packaging, and root docs are
+shared-platform surfaces. Until the main-baseline migration and re-rooting
+are complete, do not invent path exceptions or claim the invariant already
+holds. Report any project-specific surface found outside `project/` as a
+migration finding; do not move it without an explicit contract.
+
 ## Live fact-checking duty
 
 Facts stated in a brief are hypotheses conditioned on the tree it was written
