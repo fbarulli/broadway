@@ -1133,6 +1133,8 @@ UV_CACHE_EXEMPTIONS: tuple[tuple[str, str, str], ...] = (
      "historical D28/D32 measured-run records", "2026-09-08"),
     ("agents/ledger/STATE.md",
      "courtesy D28 suite-tail baseline command", "2026-09-08"),
+    ("agents/ledger/archive/2026-08.md",
+     "historical D28 suite-tail baseline command", "2026-09-08"),
     ("agents/audits/B-TRUTH-ENFORCEMENT.md",
      "audit prose quoting an in-venv run observation", "2026-09-08"),
     ("agents/ledger/arbitration/2026-08-24/H-infra-custody-verdicts.md",

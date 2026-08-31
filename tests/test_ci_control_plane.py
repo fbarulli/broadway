@@ -17,7 +17,7 @@ def test_vulture_finding_makes_static_ci_red(tmp_path: Path) -> None:
     shim = tmp_path / "uv"
     shim.write_text(
         "#!/usr/bin/env bash\n"
-        'if [[ "$1 $2" == "run vulture" ]]; then\n'
+        'if [[ "$1 $2 $3 $4" == "run --extra dev vulture" ]]; then\n'
         '  printf "%s\\n" "src/example.py:1: unused function\\n"\n'
         "  exit 3\n"
         "fi\n"

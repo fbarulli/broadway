@@ -100,13 +100,13 @@ gate_parity() {
   return "$rc"
 }
 run parity gate_parity
-run ruff    dispatch uv run ruff check src tests project/experiments \
+run ruff    dispatch bash scripts/uv.sh run --extra dev ruff check src tests project/experiments \
             project/experiments.py \
             project/working.py project/data.py \
             scripts
-run mypy    dispatch uv run mypy src/broadway
-run vulture dispatch bash scripts/uv.sh run vulture src/broadway project scripts --min-confidence 95
-run configs uv run python -c "
+run mypy    dispatch bash scripts/uv.sh run --extra dev mypy src/broadway
+run vulture dispatch bash scripts/uv.sh run --extra dev vulture src/broadway project scripts --min-confidence 95
+run configs bash scripts/uv.sh run --extra dev python -c "
 from pathlib import Path
 from broadway.config.loader import load_config
 ps = sorted(Path('configs/experiment').glob('*.yaml')); assert ps, 'no configs'
@@ -115,9 +115,9 @@ ps = sorted(Path('configs/experiment').glob('*.yaml')); assert ps, 'no configs'
 # shellcheck disable=SC2016  # single quotes intended: globs must expand under bash -c
 run shell-scripts bash -c 'for f in k8s/optuna/*.sh scripts/*.sh; do bash -n "$f"; done; shellcheck k8s/optuna/*.sh scripts/*.sh'
 if [[ $STATIC -eq 0 && $TIER == "full" ]]; then
-  run pytest uv run pytest tests/ -n 4 --dist worksteal \
+  run pytest bash scripts/uv.sh run --extra dev pytest tests/ -n 4 --dist worksteal \
              --cov=src/broadway --cov-report=term-missing --cov-fail-under=95
-  run project-tests uv run pytest project/tests -q --dist worksteal
+  run project-tests bash scripts/uv.sh run --extra dev pytest project/tests -q --dist worksteal
 fi
 if [[ $fail -eq 0 ]]; then
   CL_NOTE=""
