@@ -6,7 +6,7 @@ import pytest
 import yaml
 from pydantic import ValidationError
 
-from broadway.config.loader import load_config
+from broadway.config.loader import CONFIGS_DIR, config_path, load_config
 from broadway.config.schema import (
     ExperimentConfig,
     FeatureConfig,
@@ -69,6 +69,31 @@ def test_missing_dataset_raises() -> None:
 def test_missing_experiment_raises() -> None:
     with pytest.raises(FileNotFoundError):
         load_config("full", dataset="test", experiment="nonexistent")
+
+
+def test_config_overlay_takes_priority_and_falls_back_to_base(tmp_path, monkeypatch) -> None:
+    overlay = tmp_path / "configs"
+    overlay_step = overlay / "step" / "train.yaml"
+    overlay_step.parent.mkdir(parents=True)
+    overlay_step.write_text("source: overlay\n")
+    monkeypatch.setenv("BROADWAY_CONFIG_OVERLAY_DIR", str(overlay))
+
+    assert config_path("step/train.yaml") == overlay_step
+    assert config_path("environment/development.yaml") == CONFIGS_DIR / "environment/development.yaml"
+
+
+def test_missing_config_overlay_raises(tmp_path, monkeypatch) -> None:
+    missing_overlay = tmp_path / "missing"
+    monkeypatch.setenv("BROADWAY_CONFIG_OVERLAY_DIR", str(missing_overlay))
+
+    with pytest.raises(FileNotFoundError, match="config overlay directory not found"):
+        config_path("step/train.yaml")
+
+
+@pytest.mark.parametrize("relative_path", ["/etc/passwd", "../step/train.yaml"])
+def test_config_path_rejects_unsafe_relative_paths(relative_path) -> None:
+    with pytest.raises(ValueError, match="must be relative"):
+        config_path(relative_path)
 
 
 def test_invalid_step_raises() -> None:

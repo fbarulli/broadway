@@ -69,8 +69,24 @@ def _deep_merge(base: dict, override: dict) -> dict:
     return result
 
 
+def config_path(relative_path: str) -> Path:
+    """Resolve a config file, preferring an optional project overlay."""
+    relative = Path(relative_path)
+    if relative.is_absolute() or ".." in relative.parts:
+        raise ValueError(f"config path must be relative and cannot traverse parents: {relative_path}")
+    overlay = os.getenv("BROADWAY_CONFIG_OVERLAY_DIR")
+    if overlay:
+        overlay_dir = Path(overlay)
+        if not overlay_dir.is_dir():
+            raise FileNotFoundError(f"config overlay directory not found: {overlay_dir}")
+        overlay_path = overlay_dir / relative
+        if overlay_path.is_file():
+            return overlay_path
+    return CONFIGS_DIR / relative
+
+
 def _load_yaml(relative_path: str) -> Any:
-    path = CONFIGS_DIR / relative_path
+    path = config_path(relative_path)
     if not path.exists():
         raise FileNotFoundError(f"config file not found: {path}")
     with open(path, encoding="utf-8") as f:
