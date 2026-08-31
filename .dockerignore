@@ -10,8 +10,8 @@ node_modules/
 .pytest_cache/
 diagnostics_experiment/
 legend_experiment/
-experiments/results/*
-!experiments/results/univariate/
-!experiments/results/univariate/sample_evidence/
-!experiments/results/univariate/sample_evidence/sample_evidence.parquet
-!experiments/results/univariate/sample_evidence/sample_evidence.json
+project/experiments/results/*
+!project/experiments/results/univariate/
+!project/experiments/results/univariate/sample_evidence/
+!project/experiments/results/univariate/sample_evidence/sample_evidence.parquet
+!project/experiments/results/univariate/sample_evidence/sample_evidence.json

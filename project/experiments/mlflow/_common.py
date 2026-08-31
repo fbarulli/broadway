@@ -1,10 +1,7 @@
 """Shared setup for the mlflow demo battle (main branch).
 
-Mirror of the taxi branch's ``experiments/mlflow/_common.py`` contract —
-same import surface (``project.working`` bindings, config-driven knobs,
-``MODEL_KEYS`` derived from the registry) so the shared worker image and
-its CI boot checks resolve identically on main. Backed by the synthetic
-demo dataset; no taxi content.
+The project-owned worker binds its project config and sample evidence while
+using the shared platform model registry.
 """
 
 from __future__ import annotations
@@ -20,16 +17,12 @@ from broadway.utils import require_keys
 from project.working import load_metered, time_bucket
 
 HERE = Path(__file__).resolve().parent
-RESULTS = HERE.parents[0] / "results" / "mlflow"   # experiments/results/mlflow
-# Repo root; in the k8s worker image the script lives at /app/_common.py
-# (depth 1), so fall back to HERE when parents[1] does not exist.
-REPO = HERE.parents[1] if len(HERE.parents) > 1 else HERE
-MLRUNS = REPO / "mlruns"
+PROJECT_ROOT = HERE.parents[1]
+RESULTS = HERE.parents[0] / "results" / "mlflow"
+MLRUNS = PROJECT_ROOT / "mlruns"
 
-# Config path is env-overridable (the k8s worker image sets
-# BROADWAY_MLFLOW_CONFIG to its mounted location; local default = repo path).
 CONFIG_PATH = Path(
-    os.environ.get("BROADWAY_MLFLOW_CONFIG", REPO / "configs" / "experiments" / "mlflow.yaml")
+    os.environ.get("BROADWAY_MLFLOW_CONFIG", PROJECT_ROOT / "config" / "experiments" / "mlflow.yaml")
 )
 
 _cfg = yaml.safe_load(CONFIG_PATH.read_text())
@@ -42,21 +35,12 @@ SEED = int(_cfg["seed"])
 CONTINUOUS_FEATURES = list(_cfg["continuous_features"])
 CATEGORICAL_FEATURES = list(_cfg["categorical_features"])
 
-# Display alias -> registry key, DERIVED from the registry (single source of
-# truth: MODEL_META's display names). Exists only so the battle keeps its
-# historical display names on the CLI and in labels (01/03); it carries NO
-# params — comparison fits use get_model(key), which applies the registry's
-# default params.
 MODEL_KEYS = {display_name(key): key for key in model_keys()}
 
 
 def load_metered_with_features() -> pd.DataFrame:
     """Metered rows + hour + time_bucket columns (battle scope)."""
     df = load_metered()
-    # SSOT: the literal "pickup_datetime" here mirrors working.yaml's
-    # columns.pickup_datetime binding (project.working.PICKUP_DATETIME_COL) —
-    # the binding, not this literal, is the single source of truth for the
-    # column name; they coincide on main by construction.
     df["hour"] = df["pickup_datetime"].dt.hour
     df["time_bucket"] = df["hour"].map(time_bucket)
     return df

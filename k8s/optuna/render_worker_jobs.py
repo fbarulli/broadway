@@ -1,6 +1,6 @@
 """Render the optuna worker Jobs for the HPO spec's models.
 
-The HPO spec (configs/experiments/mlflow.yaml -> `hpo.models`) is the single
+The HPO spec (project/config/experiments/mlflow.yaml -> `hpo.models`) is the single
 source for WHICH models get worker Jobs; the registry provides the display
 names the worker CLI accepts. `lifecycle.sh train` pipes this output into
 `kubectl apply -f -` — it is the ONLY generator of the Job manifests (the
@@ -42,11 +42,11 @@ def render_jobs(hpo: HPOConfig, image: str) -> list[dict]:
                             "name": "worker",
                             "image": image,
                             "imagePullPolicy": "IfNotPresent",
-                            "command": ["python", "/app/experiments/mlflow/03_optuna_worker.py"],
+                            "command": ["python", "/app/project/experiments/mlflow/03_optuna_worker.py"],
                             "args": ["--model", name],
                             "env": [
                                 {"name": "BROADWAY_MLFLOW_CONFIG",
-                                 "value": "/app/configs/experiments/mlflow.yaml"},
+                                 "value": "/app/project/config/experiments/mlflow.yaml"},
                             ],
                             "volumeMounts": [
                                 {"name": "config", "mountPath": "/etc/broadway/config.yaml",
@@ -71,7 +71,7 @@ def main() -> None:
     parser.add_argument("--image", default="broadway-optuna-worker:latest")
     parser.add_argument(
         "--hpo-config",
-        default=str(ROOT / "configs" / "experiments" / "mlflow.yaml"),
+        default=str(ROOT / "project" / "config" / "experiments" / "mlflow.yaml"),
     )
     args = parser.parse_args()
     hpo = HPOConfig(**yaml.safe_load(Path(args.hpo_config).read_text())["hpo"])

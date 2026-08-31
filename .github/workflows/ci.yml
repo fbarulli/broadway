@@ -38,13 +38,12 @@ jobs:
       - name: Branch parity (main vs taxi)
         run: bash scripts/check_branch_parity.sh
 
-      # Lint the actively maintained surfaces (src, tests, experiments/mlflow,
-      # fare_prediction, the root scripts, the project bindings). The legacy
-      # experiments tree is intentionally excluded (scratch).
+      # Lint the maintained platform and project MLOps surfaces. Other
+      # project experiments are intentionally excluded as scratch work.
       - name: Lint (ruff)
         run: >
-          uv run ruff check src tests experiments/mlflow experiments/fare_prediction
-          experiments_ui.py project/working.py project/data.py
+          uv run ruff check src tests project/experiments/mlflow
+          project/working.py project/data.py
 
       - name: Type check (mypy)
         run: uv run mypy src/broadway
@@ -62,8 +61,10 @@ jobs:
       # Manifests must be structurally valid Kubernetes (no cluster needed).
       - name: Manifests (kubeconform)
         run: |
+          set -o pipefail
           docker run --rm -v "$PWD":/work -w /work ghcr.io/yannh/kubeconform:v0.6.7 \
-            -strict -summary -ignore-filename-pattern "kind-config\\.yaml" k8s/optuna/ 2>&1 | tail -3
+            -strict -summary -ignore-filename-pattern "kind-config\\.yaml" \
+            k8s/optuna/ project/k8s/optuna/configmap.yaml 2>&1 | tail -3
 
       # Every REAL experiment config must parse against the config schema —
       # a config that fails to load breaks the build.
@@ -83,6 +84,7 @@ jobs:
       # and assert they are valid Kubernetes with the right image/env/args.
       - name: Orchestrator dry-run (render worker jobs)
         run: |
+          set -o pipefail
           mkdir -p /tmp/jobs
           uv run python k8s/optuna/render_worker_jobs.py --image broadway-optuna-worker:ci > /tmp/jobs/jobs.yaml
           grep -q "broadway-optuna-worker:ci" /tmp/jobs/jobs.yaml
@@ -148,7 +150,7 @@ jobs:
       # HPO_CONFIG_PATH via parents[] at the mirrored pod path, parses the HPO
       # spec and builds CLI choices. Catches the layout/import bug class.
       - name: Boot — worker imports + CLI
-        run: docker run --rm broadway-optuna-worker:test python /app/experiments/mlflow/03_optuna_worker.py --help
+        run: docker run --rm broadway-optuna-worker:test python /app/project/experiments/mlflow/03_optuna_worker.py --help
 
       # Config-load simulation with the committed fixture: verifies the
       # configmap structure + the HPO spec both parse inside the pod layout.
@@ -163,7 +165,7 @@ jobs:
           cfg = yaml.safe_load(Path('/etc/broadway/config.yaml').read_text())
           assert {'dataset','databases','mlflow'} <= set(cfg), 'configmap structure'
           hpo = HPOConfig(**yaml.safe_load(
-              Path('/app/configs/experiments/mlflow.yaml').read_text())['hpo'])
+              Path('/app/project/config/experiments/mlflow.yaml').read_text())['hpo'])
           print('config load OK — models:', [m.name for m in hpo.models])"
 
       - name: Boot — mlflow image health

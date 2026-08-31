@@ -15,15 +15,15 @@ import yaml
 
 from broadway.utils import require_keys
 
-ROOT = Path(__file__).resolve().parents[1]
-CONFIG = ROOT / "configs" / "experiments" / "working.yaml"
+PROJECT_ROOT = Path(__file__).resolve().parent
+CONFIG = PROJECT_ROOT / "config" / "experiments" / "working.yaml"
 _cfg = yaml.safe_load(CONFIG.read_text())
 require_keys(_cfg, ["parquet", "columns", "min_target_value", "max_duration_minutes",
                     "time_buckets", "time_bucket_default"], "working.yaml")
 require_keys(_cfg["columns"], ["target", "pickup_datetime", "dropoff_datetime"],
              "working.yaml columns")
 
-WORKING_DATASET = ROOT / _cfg["parquet"]
+WORKING_DATASET = PROJECT_ROOT / _cfg["parquet"]
 TARGET_COL = _cfg["columns"]["target"]
 PICKUP_DATETIME_COL = _cfg["columns"]["pickup_datetime"]
 DROPOFF_DATETIME_COL = _cfg["columns"]["dropoff_datetime"]

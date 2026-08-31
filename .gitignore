@@ -14,12 +14,12 @@ data/processed/
 data/samples/
 artifacts/
 /results/
-experiments/results/**
-!experiments/results/**/
-!experiments/results/**/*.csv
+project/experiments/results/**
+!project/experiments/results/**/
+!project/experiments/results/**/*.csv
 # Pinned sample + evidence (single source of truth — committed on purpose)
-!experiments/results/univariate/sample_evidence/sample_evidence.parquet
-!experiments/results/univariate/sample_evidence/sample_evidence.json
+!project/experiments/results/univariate/sample_evidence/sample_evidence.parquet
+!project/experiments/results/univariate/sample_evidence/sample_evidence.json
 *.png
 !reports/figures/*.png
 graphify-out/

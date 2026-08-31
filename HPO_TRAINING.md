@@ -1,14 +1,14 @@
 # HPO Training — how it works & how to view results
 
 Broadway's hyperparameter optimization is **one config-driven API** shared by the
-platform `train` step, the model battle, and the distributed k8s workers — with an
+platform `train` step and the distributed k8s workers — with an
 **on-demand lifecycle**: the cluster exists only while training runs, snapshots the
 results on finish, and restores them on the next call.
 
 ## 1. The model of HPO
 
 ```
-configs/experiments/mlflow.yaml (hpo block)
+project/config/experiments/mlflow.yaml (hpo block)
         │  search spaces + budgets
         ▼
 src/broadway/training/hpo.py  (the unified API)
@@ -30,10 +30,10 @@ src/broadway/training/hpo.py  (the unified API)
 
 | Concern | Location |
 |---|---|
-| Search spaces + budgets (k8s / battle) | `configs/experiments/mlflow.yaml` → `hpo:` (models, spaces, `total_trials`, `initial_trials_per_model`, `top_k`, `target_metric`) |
+| Search spaces + budgets (k8s workers) | `project/config/experiments/mlflow.yaml` → `hpo:` (models, spaces, `total_trials`, `initial_trials_per_model`, `top_k`, `target_metric`) |
 | Search spaces (platform `train`) | `configs/experiment/hyperopt.yaml` → `hpo:` |
 | Allowed params + base defaults per model | `src/broadway/training/models/registry.py` (`MODEL_META`) |
-| k8s infra only (DB URLs, mlflow URI, dataset path) | `k8s/optuna/configmap.yaml` |
+| k8s infra only (DB URLs, mlflow URI, dataset path) | `project/k8s/optuna/configmap.yaml` |
 
 A model's HPO block looks like:
 
@@ -62,8 +62,7 @@ Model names are **registry keys** (`linear`, `lgbm`, `xgb`, `rf`); display label
 | Path | Command | Storage |
 |---|---|---|
 | Platform `train` + HPO | `uv run ds-pipeline train --dataset … --experiment hyperopt` | in-memory |
-| Model battle (bandit demo) | `uv run python experiments/mlflow/01_model_battle_mlflow.py` | in-memory |
-| Distributed worker (one study per model) | `uv run python experiments/mlflow/03_optuna_worker.py --model {lgbm,ols,xgb} --config …` | shared Postgres (k8s) or `sqlite:///…` locally |
+| Distributed worker (one study per model) | `uv run python project/experiments/mlflow/03_optuna_worker.py --model {lgbm,ols,xgb} --config …` | shared Postgres (k8s) or `sqlite:///…` locally |
 
 ## 4. The on-demand lifecycle
 
@@ -150,15 +149,12 @@ kubectl logs job/optuna-lgbm | grep DONE
 # [worker] DONE model=lgbm best_mae=2.0041 params={...}
 ```
 
-**Committed evidence** — the model battle writes a metrics CSV + leaderboard to
-`experiments/results/mlflow/` (tracked).
-
 ## 6. Tuning a model
 
-1. Edit the search space in the `hpo:` block (`configs/experiments/mlflow.yaml` or
+1. Edit the search space in the `hpo:` block (`project/config/experiments/mlflow.yaml` or
    `configs/experiment/hyperopt.yaml`).
-2. Run the path you want (local battle, `train`, or `lifecycle.sh train`).
-3. Read the leaderboard / UI; the bandit already shifted budget to the leaders.
+2. Run the path you want (`train` or `lifecycle.sh train`).
+3. Inspect the worker logs and MLflow runs.
 
 Parameter names must be in the model's `allowed_params` (registry) or the config
 fails validation.

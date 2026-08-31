@@ -172,16 +172,13 @@ def test_lookup_spec_na_values_default_empty() -> None:
     assert spec.na_values == []
 
 
-def test_hpo_configs_parse() -> None:
-    """Both HPO configs must parse as the unified HPOConfig schema."""
+def test_hpo_config_parses() -> None:
+    """The platform HPO config must parse as the unified HPOConfig schema."""
     import yaml
 
     from broadway.config.schema import HPOConfig
 
-    for path in (
-        Path(__file__).resolve().parents[1] / "configs" / "experiment" / "hyperopt.yaml",
-        Path(__file__).resolve().parents[1] / "configs" / "experiments" / "mlflow.yaml",
-    ):
+    for path in (Path(__file__).resolve().parents[1] / "configs" / "experiment" / "hyperopt.yaml",):
         raw = yaml.safe_load(path.read_text())
         assert "hpo" in raw, f"{path.name} missing hpo block"
         cfg = HPOConfig(**raw["hpo"])

@@ -36,7 +36,7 @@ cluster_up() {
   log "loading images"
   kind load docker-image broadway-base broadway-optuna-worker mlflow-server --name "$NAME"
   log "applying manifests"
-  kubectl apply -f "$DIR/secret.yaml" -f "$DIR/configmap.yaml" \
+  kubectl apply -f "$DIR/secret.yaml" -f "$ROOT/project/k8s/optuna/configmap.yaml" \
     -f "$DIR/postgres.yaml" -f "$DIR/mlflow.yaml" -f "$DIR/optuna-init.yaml" >/dev/null
 }
 

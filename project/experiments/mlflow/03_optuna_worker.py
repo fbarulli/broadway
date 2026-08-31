@@ -1,12 +1,8 @@
 """03: kubernetes optuna worker — per-model phase-1 study (main branch demo).
 
-Mirror of the taxi branch's ``03_optuna_worker.py``: reads the mounted
-ConfigMap (`/etc/broadway/config.yaml`) for dataset/DB/MLflow infra and the
-unified HPO spec from `configs/experiments/mlflow.yaml`, composes the RDB URL
-via `broadway.training.optuna_worker.compose_db_url`, and runs the requested
-model's study via `broadway.training.hpo.run_model_study`. Backed by the
-synthetic demo dataset; no taxi content. The CI boot gate runs `--help`
-(argparse exits before any config/data read).
+Reads the mounted ConfigMap for dataset/DB/MLflow infra and the project-owned
+HPO spec, then runs the requested model's study through the shared platform
+HPO API. The CI boot gate runs ``--help`` before config or data access.
 """
 
 import argparse
@@ -33,15 +29,10 @@ from broadway.training.mlflow_utils import (
 from broadway.training.models.registry import display_name
 from broadway.training.optuna_worker import compose_db_url
 
-# HPO search spaces + budgets (configs/experiments/mlflow.yaml -> `hpo`).
-# Env-overridable: the k8s worker image sets BROADWAY_MLFLOW_CONFIG to its
-# mounted location; local default = repo path. Branch on env presence —
-# os.environ.get(default) evaluates the default eagerly, and the parents[2]
-# fallback raises at pod depth (/app/worker.py has only two parents).
 if "BROADWAY_MLFLOW_CONFIG" in os.environ:
     HPO_CONFIG_PATH = Path(os.environ["BROADWAY_MLFLOW_CONFIG"])
 else:
-    HPO_CONFIG_PATH = Path(__file__).resolve().parents[2] / "configs" / "experiments" / "mlflow.yaml"
+    HPO_CONFIG_PATH = Path(__file__).resolve().parents[2] / "config" / "experiments" / "mlflow.yaml"
 
 
 def load_secret(secret_dir: str) -> dict:
@@ -84,9 +75,6 @@ def log_endpoints(model_name: str, cfg: dict, db_url: str) -> None:
 def main() -> None:
     mlflow_cfg = yaml.safe_load(HPO_CONFIG_PATH.read_text())
     hpo_cfg = HPOConfig(**mlflow_cfg["hpo"])
-    # CLI choices come from the HPO spec (single source) as REGISTRY DISPLAY
-    # names (registry is the single source for ols<->linear); no hardcoded
-    # model list.
     available = {display_name(m.name) for m in hpo_cfg.models}
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", default="ols", choices=sorted(available))
@@ -118,16 +106,12 @@ def main() -> None:
     X = df[ds["features"]]
     X_train, X_val, y_train, y_val = train_test_split(
         X, df[ds["target"]], test_size=test_fraction, random_state=seed)
-    # Resolve the display alias to the registry key — the spec lookup and the
-    # objective MUST use the canonical key (the config's hpo.models are keys).
     key = MODEL_KEYS[args.model]
     spec = next(s for s in hpo_cfg.models if s.name == key)
     objective = hpo.make_objective(
         model_type=key, target_metric=hpo_cfg.target_metric,
         X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val)
     study_name = f"hpo-{key}"
-    # Point the per-trial callback at the configmap tracking store + experiment
-    # (same setup the final best run uses) before the study runs.
     setup_mlflow(cfg["mlflow"]["tracking_uri"], cfg["mlflow"]["experiment"])
     study = hpo.run_model_study(
         spec, objective, n_trials=hpo_cfg.initial_trials_per_model,
