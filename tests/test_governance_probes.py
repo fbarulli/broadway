@@ -596,7 +596,7 @@ def test_no_new_absolute_sha_gates_in_contracts() -> None:
 # strings — NEVER from transforms:/findings:/touched_by:/validated_by:/
 # if_changed: free text — and directory/glob declarations must name a
 # SUBSURFACE (>=2 path segments): a bare 'src/' mid-sentence grants nothing,
-# while 'project/experiments/results/' and 'k8s/optuna/**' register their subtree.
+# while 'project/experiments/results/' and 'project/k8s/optuna/**' register their subtree.
 # Pure classification lives in the functions below; the single test node
 # carries the LIVE half plus in-process falsifiability proofs against the
 # LIVE registry shape (no git writes, no tree mutation — fixture law).

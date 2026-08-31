@@ -529,7 +529,7 @@ direction:
 - GATE-HPO-86
 dispatch into timeline.walkthrough.run (cli.py:166-173):
 - GATE-TLINE-59
-? 'docker-only verdicts: sh -n + shellcheck k8s/optuna/*.sh AND scripts/*.sh (:57-66), kubeconform -strict k8s/optuna/ minus kind-config.yaml (:79), orchestrator dry-run render+kubeconform (:104)'
+? 'docker-only verdicts: sh -n + shellcheck k8s/optuna/*.sh AND scripts/*.sh (:57-66), kubeconform -strict k8s/optuna/ plus project/k8s/optuna/configmap.yaml minus kind-config.yaml (:79), orchestrator dry-run render+kubeconform (:104)'
 : - GATE-INFRA-99
 documented CLOSED VOCABULARY {model, study, seed}:
 - GATE-CUST-149
@@ -623,6 +623,8 @@ init-job manifest apply:
 - GATE-INFRA-125
 inline constants (no env dialect, D21):
 - GATE-INFRA-94
+k8s/optuna/ + project/k8s/optuna/configmap.yaml (Kubernetes manifest inputs):
+- GATE-INFRA-99
 k8s/optuna/*.sh + scripts/*.sh via sh -n + shellcheck (shell-scripts):
 - GATE-INFRA-92
 kind:

@@ -1,6 +1,6 @@
 # Gate registry SSOT — hand-maintained; the {01..09} gate fragments it consolidated predate git custody.
 meta:
-  head: 'afe9cf2'
+  head: '26723d2'
   assembled: '2026-08-24'
   source_fragments:
   - agents/ledger/gates/01-ingest.md
@@ -3162,7 +3162,7 @@ gates:
   - 'mounts: configMap optuna-config → /etc/broadway/config.yaml subPath readOnly (:52-53); Secret optuna-db → /etc/broadway/secret readOnly (:54-55) — FILE-based credentials, NEVER env vars (module docstring :3-5); load_secret reads DB_USER/DB_PASSWORD/DB_NAME files (03_optuna_worker.py:52-56)'
   - 'Job semantics: restartPolicy Never, backoffLimit 2, ttlSecondsAfterFinished 120 (:36-40); init-Job twin ttl 600 with args [--init-only] materializing empty studies via _dummy_objective returning 0.0 (k8s/optuna/optuna-init.yaml:10-20; 03_optuna_worker.py:74-76, :165-171)'
   - image tag injectable --image for CD pinning (:71; consumed via OPTUNA_WORKER_IMAGE at lifecycle.sh:135-137)
-  - 'image plane: Dockerfile.worker mirrors the repo layout and sets PYTHONPATH=/app/src:/app (:13-16), BAKES the dataset parquet (:11-12) plus configs/experiments/{mlflow,working}.yaml (:9-10); base image uv sync --frozen (Dockerfile.base:10)'
+  - 'image plane: Dockerfile.worker mirrors the repo layout and sets PYTHONPATH=/app/src:/app (:13-16), BAKES the dataset parquet (:11-12) plus project/config/experiments/{mlflow,working}.yaml (:9-10); base image uv sync --frozen (Dockerfile.base:10)'
   - 'preflight loud-exit: SQLAlchemy connect + MlflowClient().search_experiments BEFORE any trial, sys.exit(1) with FATAL banner on either failure (03_optuna_worker.py:118-138)'
   - 'orchestration: lifecycle.sh pipes renderer | kubectl apply (:136-138), waits condition=complete per job with 1200 s timeout, FAILED → job-log tail + exit 1 (:140-145); separate optuna/mlflow databases mandated because both use Alembic''s alembic_version (configmap.yaml:3-4, postgres.yaml:1-3)'
   - kubeconform scope hole (k8s/optuna/-only) is GATE-INFRA-99's existing finding — referenced, NOT re-found
@@ -3178,7 +3178,7 @@ gates:
   - CI docker-only verdicts (scripts/run_local_ci.sh:57-104)
   findings:
   - 'the ENTIRE worker SCRIPT plane has zero pytest coverage — render_worker_jobs.py, 03_optuna_worker.py main/preflight/load_dataset/log_to_mlflow, and lifecycle.sh are exercised only by CI shell syntax checks + kubeconform shape validation; the LIBRARY functions beneath them (compose_db_url, run_worker, run_model_study, run_study_rdb) ARE pinned, so regressions in script wiring (arg names, env var names, mount paths, endpoint printing) land green. root: k8s/optuna/render_worker_jobs.py:69 main()'
-  - 'worker pods hold FULL MLflow write power — configmap tracking_uri http://mlflow:5000 plus allowed_hosts ''*'' (k8s/optuna/configmap.yaml:27, :29) hands every optuna worker ambient write access to the whole tracking store INCLUDING the champion alias, so any compromised/buggy pod can move production custody; single-writer custody for the champion alias is ALREADY PROPOSED upstream (cross-ref GH-5 / PROPOSE-GH5-01, agents/ledger/arbitration/2026-08-24/gap-cd-mlflow.md:108 — cited, not re-found). root: k8s/optuna/configmap.yaml:27'
+  - 'worker pods hold FULL MLflow write power — configmap tracking_uri http://mlflow:5000 plus allowed_hosts ''*'' (project/k8s/optuna/configmap.yaml:28, :30) hands every optuna worker ambient write access to the whole tracking store INCLUDING the champion alias, so any compromised/buggy pod can move production custody; single-writer custody for the champion alias is ALREADY PROPOSED upstream (cross-ref GH-5 / PROPOSE-GH5-01, agents/ledger/arbitration/2026-08-24/gap-cd-mlflow.md:108 — cited, not re-found). root: project/k8s/optuna/configmap.yaml:28'
 - id: GATE-HPO-88
   phase: hpo-optuna
   order: 105
@@ -3528,9 +3528,10 @@ gates:
   - fetch-depth 0 for parity tips (:28)
   - uv sync --all-extras --frozen (:40)
   - bash scripts/run_local_ci.sh (no args ⇒ full tier)
+  - k8s/optuna/ + project/k8s/optuna/configmap.yaml (Kubernetes manifest inputs)
   outputs:
   - platform job verdict (parity+ruff+mypy+configs+shell-scripts+pytest+cov≥95+project-tests via SSOT script)
-  - 'docker-only verdicts: sh -n + shellcheck k8s/optuna/*.sh AND scripts/*.sh (:57-66), kubeconform -strict k8s/optuna/ minus kind-config.yaml (:79), orchestrator dry-run render+kubeconform (:104)'
+  - 'docker-only verdicts: sh -n + shellcheck k8s/optuna/*.sh AND scripts/*.sh (:57-66), kubeconform -strict k8s/optuna/ plus project/k8s/optuna/configmap.yaml minus kind-config.yaml (:79), orchestrator dry-run render+kubeconform (:104)'
   - sha-tagged images built/boot-tested; CD publishes bit-for-bit verified tarball to GHCR on main/taxi pushes only (:290-376)
   transforms:
   - gate list lives in the SCRIPT — editing YAML alone reopens two-source drift (D16d C7 rejection, header :3-4)

@@ -1,6 +1,6 @@
 # DIGEST.md — rendered from agents/ledger/gates.yaml · NEVER HAND-EDIT ·
 
-> 143 gates · rendered 2026-09-01 @ HEAD afe9cf2 · load THIS into context;
+> 143 gates · rendered 2026-09-01 @ HEAD 26723d2 · load THIS into context;
 > gates.yaml is the sole SSOT; the retired GATES.md/gates/*.md markdown world survives in agents/ledger/arbitration/2026-08-24/surface-and-analysis-preservation.md.
 
 | band | phase | gates | findings |
@@ -278,7 +278,7 @@
 - **GATE-INFRA-98** `scripts/tier_classifier.py:104 classify() (triggers :51-64, parse_diff_payload :138, CLI main :162)` ⚠FINDING
   [git-diff payload on stdin (files + added lines), governance basenames {CONTRACT_TEMPLATE,WORKER_CONTRACT,MAIN_AGENT_CONTRACT,DECISIONS,FIXES}.md + agents/ledger/STATE.md (:34-37), behavior prefixes src/ tests/ project/ scripts/ .github/ k8s/ + pyproject.toml uv.lock *.sh docker* + configs/*.yaml (:40-43)] → [{"tier": FULL|CHECKLIST, "reasons": [...]} JSON] · pins: 7
 - **GATE-INFRA-99** `.github/workflows/ci.yml:47 platform job step "Platform gates (SSOT)" (delegation law :42-46; docker-only checks :51-66; build-and-boot :151; CD job :310; concurrency :11-13)` ⚠FINDING
-  [push/PR to main|taxi|sklearn (:3-7), fetch-depth 0 for parity tips (:28), uv sync --all-extras --frozen (:40), bash scripts/run_local_ci.sh (no args ⇒ full tier)] → [platform job verdict (parity+ruff+mypy+configs+shell-scripts+pytest+cov≥95+project-tests via SSOT script), docker-only verdicts: sh -n + shellcheck k8s/optuna/*.sh AND scripts/*.sh (:57-66), kubeconform -strict k8s/optuna/ minus kind-config.yaml (:79), orchestrator dry-run render+kubeconform (:104), sha-tagged images built/boot-tested; CD publishes bit-for-bit verified tarball to GHCR on main/taxi pushes only (:290-376)] · pins: none direct
+  [push/PR to main|taxi|sklearn (:3-7), fetch-depth 0 for parity tips (:28), uv sync --all-extras --frozen (:40), bash scripts/run_local_ci.sh (no args ⇒ full tier), k8s/optuna/ + project/k8s/optuna/configmap.yaml (Kubernetes manifest inputs)] → [platform job verdict (parity+ruff+mypy+configs+shell-scripts+pytest+cov≥95+project-tests via SSOT script), docker-only verdicts: sh -n + shellcheck k8s/optuna/*.sh AND scripts/*.sh (:57-66), kubeconform -strict k8s/optuna/ plus project/k8s/optuna/configmap.yaml minus kind-config.yaml (:79), orchestrator dry-run render+kubeconform (:104), sha-tagged images built/boot-tested; CD publishes bit-for-bit verified tarball to GHCR on main/taxi pushes only (:290-376)] · pins: none direct
 - **GATE-INFRA-122** `project/experiments.py:496 main argparse dispatcher (ols|diagnostics|qq_legend|verify)`
   [argv subcommand] → [project-owned plots/results CSVs/verification JSON (self-auditing verify subcommand)] · pins: 4
 - **GATE-INFRA-123** `project/dashboard.py:15 main() project composition entry`

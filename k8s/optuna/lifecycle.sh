@@ -101,7 +101,7 @@ cluster_up() {
   log "applying manifests"
   emit_secret_manifest "$DB_USER" "$DB_PASSWORD" "$DB_NAME" \
     | kubectl apply -f - >/dev/null
-  kubectl apply -f "$DIR/configmap.yaml" -f "$DIR/postgres.yaml" \
+  kubectl apply -f "$ROOT/project/k8s/optuna/configmap.yaml" -f "$DIR/postgres.yaml" \
     -f "$DIR/mlflow.yaml" -f "$DIR/optuna-init.yaml" >/dev/null
 }
 

@@ -33,7 +33,7 @@ src/broadway/training/hpo.py  (the unified API)
 | Search spaces + budgets (k8s / battle) | `configs/experiments/mlflow.yaml` → `hpo:` (models, spaces, `total_trials`, `initial_trials_per_model`, `top_k`, `target_metric`) |
 | Search spaces (platform `train`) | `configs/experiment/hyperopt.yaml` → `hpo:` |
 | Allowed params + base defaults per model | `src/broadway/training/models/registry.py` (`MODEL_META`) |
-| k8s infra only (DB URLs, mlflow URI, dataset path) | `k8s/optuna/configmap.yaml` |
+| k8s infra only (DB URLs, mlflow URI, dataset path) | `project/k8s/optuna/configmap.yaml` |
 
 A model's HPO block looks like:
 

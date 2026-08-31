@@ -93,6 +93,7 @@ jobs:
             -summary \
             -ignore-filename-pattern "kind-config\\.yaml" \
             k8s/optuna/ \
+            project/k8s/optuna/configmap.yaml \
             k8s/api-deployment.yaml \
             k8s/mlflow-deployment.yaml \
             k8s/postgres-deployment.yaml \

@@ -374,7 +374,7 @@ def validate_configs() -> list[str]:
             require_keys(cfg, keys, name)
         except ValueError as exc:
             problems.append(str(exc))
-    k8s_cfg = yaml.safe_load((REPO / "k8s" / "optuna" / "configmap.yaml")
+    k8s_cfg = yaml.safe_load((REPO / "project" / "k8s" / "optuna" / "configmap.yaml")
                              .read_text())["data"]["config.yaml"]
     try:
         require_keys(yaml.safe_load(k8s_cfg), K8S_CONFIG_KEYS, "k8s config.yaml")
