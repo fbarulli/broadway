@@ -56,6 +56,29 @@ def test_load_sample_round_trip(
     assert spec.description == "a diagnostic sample"
 
 
+def test_load_sample_prefers_project_overlay_and_falls_back_to_base(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    base_sample_dir = tmp_path / "base" / "sample"
+    overlay_sample_dir = tmp_path / "overlay" / "sample"
+    base_sample_dir.mkdir(parents=True)
+    overlay_sample_dir.mkdir(parents=True)
+    (base_sample_dir / "foo.yaml").write_text(
+        "name: foo\nrole: diagnostic\npath: results/base-foo.parquet\n", encoding="utf-8"
+    )
+    (base_sample_dir / "base_only.yaml").write_text(
+        "name: base_only\nrole: diagnostic\npath: results/base-only.parquet\n", encoding="utf-8"
+    )
+    (overlay_sample_dir / "foo.yaml").write_text(
+        "name: foo\nrole: diagnostic\npath: results/overlay-foo.parquet\n", encoding="utf-8"
+    )
+    monkeypatch.setattr(loader, "CONFIGS_DIR", tmp_path / "base")
+    monkeypatch.setenv("BROADWAY_CONFIG_OVERLAY_DIR", str(tmp_path / "overlay"))
+
+    assert load_sample("foo").path == "results/overlay-foo.parquet"
+    assert load_sample("base_only").path == "results/base-only.parquet"
+
+
 def test_load_sample_column_mapping_round_trip(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
