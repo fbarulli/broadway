@@ -13,8 +13,8 @@ comparable. The payload is title | brand | category. Cross-encoders are out of
 scope here (they are the two-stage rerank, a different objective).
 
 Writes (RESULTS = project/experiments/results/euromonitor/):
-  07_nlp_hpo_benchmark.csv   per-model AUC / recall@5%FPR / encode latency
-  07_nlp_hpo_pareto.png      AUC vs encode-seconds (the Pareto frontier)
+  07_nlp_hpo_benchmark.csv   per-model AUC / PR-AUC / recall@5%FPR / precision@90%recall / F1 / encode latency
+  07_nlp_hpo_pareto.png      PR-AUC vs encode-seconds (the Pareto frontier)
 MLflow runs (nested per trial) land in the ambient tracking store via the
 shared hpo callback when mlflow_tracking is enabled.
 """
@@ -98,13 +98,16 @@ def main() -> None:
             # single AUC source: the rounded per-trial metric (best_value is
             # the same objective value pre-rounding, used only for selection).
             "auc": m.get("auc", summary["best_value"]),
+            "average_precision": m.get("average_precision"),
             "recall_at_5pct_fpr": m.get("recall_at_5pct_fpr"),
+            "precision_at_90pct_recall": m.get("precision_at_90pct_recall"),
+            "f1_at_5pct_fpr": m.get("f1_at_5pct_fpr"),
             "encode_s": m.get("encode_s"),
             "pos_median": m.get("pos_median"),
             "neg_p90": m.get("neg_p90"),
             "n_trials": summary["n_trials"],
         })
-    frame = pd.DataFrame(rows).sort_values("auc", ascending=False).reset_index(drop=True)
+    frame = pd.DataFrame(rows).sort_values("average_precision", ascending=False).reset_index(drop=True)
     frame.to_csv(CSV_BENCH, index=False)
     print(f"\nwrote {CSV_BENCH} (display table, {len(frame)} rows)")
 
@@ -112,7 +115,9 @@ def main() -> None:
     checks = [
         ("S1 every model produced a valid trial",
          len(result["models"]) == len(cfg.hpo.models)),
-        ("S2 every AUC is a probability", bool(frame["auc"].between(0.0, 1.0).all())),
+        ("S2 every AUC/AP is a probability",
+         bool(frame["auc"].between(0.0, 1.0).all())
+         and bool(frame["average_precision"].between(0.0, 1.0).all())),
         ("S3 every encode latency is positive", bool((frame["encode_s"] > 0).all())),
         ("S4 a best model was selected", result["best_model"] in result["models"]),
     ]
@@ -122,13 +127,13 @@ def main() -> None:
 
     # ---- Pareto frontier -------------------------------------------------------
     fig, ax = plt.subplots(figsize=(8.5, 5), constrained_layout=True)
-    ax.scatter(frame["encode_s"], frame["auc"], s=70, color="#4C72B0", zorder=3)
+    ax.scatter(frame["encode_s"], frame["average_precision"], s=70, color="#4C72B0", zorder=3)
     for _, r in frame.iterrows():
-        ax.annotate(r["model"], (r["encode_s"], r["auc"]),
+        ax.annotate(r["model"], (r["encode_s"], r["average_precision"]),
                     fontsize=8, xytext=(4, 3), textcoords="offset points")
     ax.set_xlabel("encode time (s, full corpus)")
-    ax.set_ylabel("ROC AUC")
-    ax.set_title("Embedding model zoo — AUC vs encode latency (Pareto frontier)")
+    ax.set_ylabel("average precision (PR-AUC)")
+    ax.set_title("Embedding model zoo — PR-AUC vs encode latency (Pareto frontier)")
     ax.set_xlim(0, frame["encode_s"].max() * 1.15)
     ax.set_ylim(0, 1.0)
     fig.savefig(PNG_PARETO, dpi=150)
