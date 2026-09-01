@@ -29,8 +29,8 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 from _common import RESULTS, SEED, load_dataset
+from _matching import build_vectorizer
 from sklearn.decomposition import TruncatedSVD
-from sklearn.feature_extraction.text import TfidfVectorizer
 
 PNG_COLUMN = RESULTS / "01b_column_scatter.png"
 PNG_SPACE = RESULTS / "01b_product_space.png"
@@ -86,8 +86,7 @@ def compute_product_space(df: pd.DataFrame) -> pd.DataFrame:
     text = (
         df["title"].fillna("") + " " + df["brand"].fillna("")
         + " " + df["category"].fillna(""))
-    vectorizer = TfidfVectorizer(
-        max_features=2000, stop_words="english", lowercase=True, sublinear_tf=True)
+    vectorizer = build_vectorizer()
     X = vectorizer.fit_transform(text)
     embedding = TruncatedSVD(n_components=2, random_state=SEED).fit_transform(X)
     top_cats = df["category"].value_counts().nlargest(8).index

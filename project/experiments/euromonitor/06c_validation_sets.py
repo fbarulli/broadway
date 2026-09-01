@@ -62,18 +62,19 @@ def main() -> None:
     hard_pos = [(a, b, c) for (a, b), c in zip(pairs, pos_cos) if (c >= LOW and c < HIGH)]
     print(f"true pairs: {len(pairs):,}  in hard band: {int(band.sum()):,}")
 
-    # hard negatives: sampled cross-barcode pairs in the same band
-    barcodes = df["barcode"].fillna("").astype(str)
-    hard_neg = []
-    attempts = 0
-    while len(hard_neg) < 3000 and attempts < N_NEG * 8:
-        attempts += 1
-        a, b = rng.choice(len(df), 2, replace=False)
-        if barcodes.iloc[a] and barcodes.iloc[a] != barcodes.iloc[b] \
-                and titles[a] != titles[b]:
-            c = float(score_pairs(X, np.array([a]), np.array([b]))[0])
-            if LOW <= c < HIGH:
-                hard_neg.append((a, b, c))
+    # hard negatives: sampled cross-barcode pairs in the same band, scored in
+    # ONE vectorized bulk pass (no per-attempt Python loop).
+    bc = df["barcode"].fillna("").astype(str).to_numpy()
+    tt = np.array(titles)
+    n = len(df)
+    a = rng.integers(0, n, size=N_NEG * 8)
+    b = rng.integers(0, n, size=N_NEG * 8)
+    mask = (a != b) & (bc[a] != "") & (bc[a] != bc[b]) & (tt[a] != tt[b])
+    cand_a, cand_b = a[mask], b[mask]
+    cos = np.array(score_pairs(X, cand_a, cand_b))
+    band_mask = (cos >= LOW) & (cos < HIGH)
+    hard_neg = [(int(cand_a[k]), int(cand_b[k]), float(cos[k]))
+                for k in np.flatnonzero(band_mask)[:3000]]
     print(f"hard negatives sampled in band: {len(hard_neg):,}")
 
     rows = ([{"title_a": titles[a], "title_b": titles[b], "cosine": round(c, 4),

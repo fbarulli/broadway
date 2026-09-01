@@ -21,16 +21,14 @@ shared hpo callback when mlflow_tracking is enabled.
 
 from __future__ import annotations
 
-from itertools import combinations
-
 import matplotlib
 
 matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
 import yaml
+from _blocking import build_pairs
 from _common import PATHS, RESULTS, load_dataset
 
 from broadway.config.schema import NLPConfig
@@ -49,54 +47,6 @@ EXPERIMENT = "euromonitor_nlp"
 PAYLOAD_SEP = " | "
 
 
-def _build_pairs(
-    df: pd.DataFrame,
-    seed: int,
-    max_pos_per_group: int,
-    n_neg: int,
-) -> tuple[np.ndarray, np.ndarray]:
-    """Ground-truth pair indices (same population as step 04, row-indexed).
-
-    positives: title pairs inside the same multi-retailer barcode group, built
-    from the group's OWN row indices (one row per unique stripped title within
-    the group), capped at max_pos_per_group per group. negatives: cross-barcode
-    pairs with different title text, sampled in one vectorized bulk pass (no
-    per-attempt Python loop). Returns (pos_pairs, neg_pairs) as (N, 2) int.
-    """
-    barcodes = df["barcode"].fillna("").astype(str)
-    titles = df["title"].fillna("").str.strip()
-    rng = np.random.default_rng(seed)
-
-    known = df[barcodes.str.len() > 0]
-    multi = known[known.groupby("barcode")["retailer"].transform("nunique") > 1]
-    pos_i, pos_j = [], []
-    for _, g in multi.groupby("barcode"):
-        sub = g.assign(_t=titles.loc[g.index])
-        rows = sub[sub["_t"] != ""].drop_duplicates("_t").index.tolist()
-        combos = list(combinations(rows, 2))
-        if len(combos) > max_pos_per_group:
-            chosen = rng.choice(len(combos), max_pos_per_group, replace=False)
-            combos = [combos[k] for k in chosen]
-        for a, b in combos:
-            pos_i.append(a)
-            pos_j.append(b)
-
-    # ---- negative pairs: one vectorized bulk sample --------------------------
-    n = len(df)
-    bc = barcodes.to_numpy()
-    tt = titles.to_numpy()
-    a = rng.integers(0, n, size=n_neg * 60)
-    b = rng.integers(0, n, size=n_neg * 60)
-    mask = (a != b) & (bc[a] != bc[b]) & (tt[a] != tt[b])
-    if int(mask.sum()) < n_neg:
-        raise RuntimeError(f"only {int(mask.sum())} valid negative pairs sampled (need {n_neg})")
-
-    return (
-        np.column_stack([pos_i, pos_j]).astype(int),
-        np.column_stack([a[mask][:n_neg], b[mask][:n_neg]]).astype(int),
-    )
-
-
 def main() -> None:
     RESULTS.mkdir(parents=True, exist_ok=True)
     cfg = NLPConfig(**yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8")))
@@ -111,7 +61,7 @@ def main() -> None:
             df["title"].fillna("") + PAYLOAD_SEP + df["brand"].fillna("") + PAYLOAD_SEP + df["category"].fillna("")
         ).tolist()
     with report.record("pair_build"):
-        pos_pairs, neg_pairs = _build_pairs(df, cfg.seed, MAX_POS_PAIRS_PER_GROUP, N_NEG_PAIRS)
+        pos_pairs, neg_pairs = build_pairs(df, cfg.seed, MAX_POS_PAIRS_PER_GROUP, N_NEG_PAIRS)
     print(f"payload: {len(payload):,} rows | "
           f"positive pairs: {len(pos_pairs):,} | negative pairs: {len(neg_pairs):,}")
 

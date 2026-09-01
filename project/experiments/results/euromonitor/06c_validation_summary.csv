@@ -1,5 +1,5 @@
 metric,value
 calibration_positives,5443
 hard_positive_pairs,15674
-hard_negative_pairs,356
+hard_negative_pairs,381
 band,0.3-0.8 (TF-IDF cosine)

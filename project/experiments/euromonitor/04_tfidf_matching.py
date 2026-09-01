@@ -24,8 +24,6 @@ Writes (RESULTS = project/experiments/results/euromonitor/):
   04_tfidf_threshold.png    recall/fpr sweep curve
 """
 
-from itertools import combinations
-
 import matplotlib
 
 matplotlib.use("Agg")
@@ -33,6 +31,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from _blocking import build_pairs
 from _common import RESULTS, SEED, load_dataset
 from _matching import build_vectorizer, score_pairs
 from sklearn.metrics.pairwise import cosine_similarity
@@ -56,39 +55,14 @@ def main() -> None:
     df = load_dataset()
     titles = df["title"].fillna("").str.strip().tolist()
     title_to_idx = {t: i for i, t in enumerate(titles)}
-    barcodes = df["barcode"].fillna("").astype(str)
-    rng = np.random.default_rng(SEED)
 
     vectorizer = build_vectorizer()
     X = vectorizer.fit_transform(titles)
     print(f"vectorizer: {X.shape[1]:,} features over {X.shape[0]:,} titles")
 
-    # ---- positive pairs: titles inside the same multi-retailer barcode -------
-    known = df[barcodes.str.len() > 0]
-    multi = known[known.groupby("barcode")["retailer"].transform("nunique") > 1]
-    pos_i, pos_j = [], []
-    for _, g in multi.groupby("barcode"):
-        uniq = [t for t in g["title"].dropna().str.strip().unique().tolist() if t]
-        combos = list(combinations(range(len(uniq)), 2))
-        if len(combos) > MAX_POS_PAIRS_PER_GROUP:
-            chosen = rng.choice(len(combos), MAX_POS_PAIRS_PER_GROUP, replace=False)
-            combos = [combos[k] for k in chosen]
-        for a, b in combos:
-            pos_i.append(title_to_idx[uniq[a]])
-            pos_j.append(title_to_idx[uniq[b]])
-
-    # ---- negative pairs: different barcodes AND different title text ----------
-    neg_i, neg_j = [], []
-    attempts = 0
-    while len(neg_i) < N_NEG_PAIRS and attempts < N_NEG_PAIRS * 60:
-        attempts += 1
-        a, b = rng.choice(len(df), 2, replace=False)
-        if barcodes.iloc[a] != barcodes.iloc[b] and titles[a] != titles[b]:
-            neg_i.append(a)
-            neg_j.append(b)
-
-    pos_scores = np.array(score_pairs(X, np.array(pos_i), np.array(pos_j)))
-    neg_scores = np.array(score_pairs(X, np.array(neg_i), np.array(neg_j)))
+    pos_pairs, neg_pairs = build_pairs(df, SEED, MAX_POS_PAIRS_PER_GROUP, N_NEG_PAIRS)
+    pos_scores = np.array(score_pairs(X, pos_pairs[:, 0], pos_pairs[:, 1]))
+    neg_scores = np.array(score_pairs(X, neg_pairs[:, 0], neg_pairs[:, 1]))
 
     # ---- separation + threshold sweep -----------------------------------------
     sub, subn = min(5000, len(pos_scores)), min(5000, len(neg_scores))

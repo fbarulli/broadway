@@ -28,8 +28,6 @@ Outputs (RESULTS = project/experiments/results/euromonitor/):
   04b_category_audit.png   match rates + MI bars (data-derived limits)
 """
 
-from itertools import combinations
-
 import matplotlib
 
 matplotlib.use("Agg")
@@ -37,6 +35,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from _blocking import build_pairs
 from _common import RESULTS, SEED, load_dataset
 from _text import MACRO_MAP
 from scipy.stats import chi2_contingency
@@ -67,33 +66,11 @@ def main() -> None:
     RESULTS.mkdir(parents=True, exist_ok=True)
     df = load_dataset()
     df["macro_category"] = df["category"].map(MACRO_MAP)
-    rng = np.random.default_rng(SEED)
 
     # ---- label pairs: positive = same barcode, negative = cross barcode ------
-    # NOTE: keep the ORIGINAL df index (no reset_index!) so group indices map
-    # straight back into df.loc for brand/category reads.
-    barcodes = df["barcode"].fillna("").astype(str)
-    titles = df["title"].fillna("").astype(str)
-    known = df[barcodes.str.len() > 0]
-    multi = known[known.groupby("barcode")["retailer"].transform("nunique") > 1]
-    pos = []
-    for _, g in multi.groupby("barcode"):
-        idx = g.index.tolist()
-        combos = list(combinations(idx, 2))
-        if len(combos) > MAX_POS_PAIRS_PER_GROUP:
-            chosen = rng.choice(len(combos), MAX_POS_PAIRS_PER_GROUP, replace=False)
-            combos = [combos[k] for k in chosen]
-        pos.extend(combos)
-    pos = [(int(a), int(b)) for a, b in pos]
-
-    neg, attempts = [], 0
-    all_idx = df.index.tolist()
-    while len(neg) < N_NEG_PAIRS and attempts < N_NEG_PAIRS * 60:
-        attempts += 1
-        a, b = rng.choice(all_idx, 2, replace=False)
-        if (barcodes.iloc[a] and barcodes.iloc[a] != barcodes.iloc[b]
-                and titles.iloc[a] != titles.iloc[b]):
-            neg.append((int(a), int(b)))
+    pos_pairs, neg_pairs = build_pairs(df, SEED, MAX_POS_PAIRS_PER_GROUP, N_NEG_PAIRS)
+    pos = [(int(a), int(b)) for a, b in pos_pairs]
+    neg = [(int(a), int(b)) for a, b in neg_pairs]
 
     rows = []
     for a, b in pos:
