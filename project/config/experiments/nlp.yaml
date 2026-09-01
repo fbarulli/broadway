@@ -1,0 +1,56 @@
+# NLP entity-resolution HPO config — the euromonitor embedding-model zoo SSOT.
+#
+# Reuses the optuna bandit pipeline (broadway.training.hpo.run_hpo_bandit) with
+# direction: maximize (ROC AUC). `model_zoo` maps HPO short names to HF repo
+# ids; `hpo.models` declares the per-model search space. An EMPTY search_space
+# is the zero-shot benchmark (one trial: load -> encode -> score). To switch a
+# model to a contrastive fine-tune (MultipleNegativesRankingLoss), give it
+# search-space params from {epochs, learning_rate, warmup_steps, batch_size}
+# and raise total_trials above initial_trials_per_model * n_models so the
+# bandit has budget to allocate.
+#
+# Cross-encoders for the two-stage rerank live in the same catalog but are NOT
+# part of this bi-encoder HPO (different objective and O(pairs) inference):
+#   cross-encoder/ms-marco-TinyBERT-L-2-v2
+#   cross-encoder/ms-marco-MiniLM-L-6-v2
+#   BAAI/bge-reranker-v2-m3
+seed: 42
+target_metric: auc
+device: cpu
+batch_size: 256
+max_seq_length: 128
+# Encode-once/score-many embedding cache (one .npz per model+payload); relative
+# to the repo root. Set to null to disable. Populated only for zero-shot models.
+cache_dir: data/euromonitor/embeddings_cache
+
+model_zoo:
+  minilm_l6: sentence-transformers/all-MiniLM-L6-v2
+  bge_small: BAAI/bge-small-en-v1.5
+  e5_small: intfloat/e5-small-v2
+  minilm_l12: sentence-transformers/all-MiniLM-L12-v2
+  mpnet_base: sentence-transformers/all-mpnet-base-v2
+  mm_minilm: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+  mxbai_large: mixedbread-ai/mxbai-embed-large-v1
+
+hpo:
+  engine: optuna
+  direction: maximize
+  target_metric: auc
+  total_trials: 7            # zero-shot benchmark: one trial per model, no bandit round
+  initial_trials_per_model: 1
+  top_k: 2
+  models:
+    - name: minilm_l6
+      search_space: {}
+    - name: bge_small
+      search_space: {}
+    - name: e5_small
+      search_space: {}
+    - name: minilm_l12
+      search_space: {}
+    - name: mpnet_base
+      search_space: {}
+    - name: mm_minilm
+      search_space: {}
+    - name: mxbai_large
+      search_space: {}

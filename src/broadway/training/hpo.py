@@ -181,18 +181,22 @@ def bandit_allocate(
     leaderboard: dict[str, float],
     remaining: int,
     top_k: int,
+    direction: str = "minimize",
 ) -> dict[str, int]:
-    """Allocate the remaining trial budget to the top-k models (minimize).
+    """Allocate the remaining trial budget to the top-k models.
 
-    Pure function: leaderboard maps model name to best objective value (lower
-    is better). The budget is split evenly across the top-k, with the remainder
-    going to the best model; models outside the top-k get no allocation.
+    Pure function: leaderboard maps model name to best objective value. The
+    budget is split evenly across the top-k, with the remainder going to the
+    best model; models outside the top-k get no allocation. ``direction``
+    selects which models count as best: "minimize" (lower is better) sorts
+    ascending, "maximize" (higher is better) sorts descending.
     Guards: top_k >= len selects everyone, remaining <= 0 or an empty
     leaderboard yields an empty allocation.
     """
     if remaining <= 0 or not leaderboard or top_k <= 0:
         return {}
-    ranked = [name for name, _ in sorted(leaderboard.items(), key=lambda item: item[1])]
+    reverse = direction == "maximize"
+    ranked = [name for name, _ in sorted(leaderboard.items(), key=lambda item: item[1], reverse=reverse)]
     selected = ranked[: min(top_k, len(ranked))]
     base, remainder = divmod(remaining, len(selected))
     allocation = {name: base for name in selected}
@@ -207,8 +211,13 @@ def _initial_round(
     random_state: int,
     mlflow_tracking: bool = False,
     mlflow_tags: dict[str, str] | None = None,
-) -> dict[str, optuna.Study]:
-    """Run initial_trials_per_model per model in parallel, seeded per model."""
+) -> tuple[dict[str, optuna.Study], dict[str, str]]:
+    """Run initial_trials_per_model per model in parallel, seeded per model.
+
+    One model's failure does not abort the round: each future is collected
+    individually, failed models land in a {name: error} dict (surfaced in the
+    result), and successful studies are returned separately.
+    """
     specs = {spec.name: spec for spec in hpo.models}
     with ThreadPoolExecutor(max_workers=len(specs)) as pool:
         futures = {}
@@ -226,7 +235,14 @@ def _initial_round(
                 mlflow_tracking,
                 tags,
             )
-        return {name: future.result() for name, future in futures.items()}
+        studies: dict[str, optuna.Study] = {}
+        failures: dict[str, str] = {}
+        for name, future in futures.items():
+            try:
+                studies[name] = future.result()
+            except Exception as exc:  # collect per-model, report at end
+                failures[name] = f"{type(exc).__name__}: {exc}"
+        return studies, failures
 
 
 def _bandit_round(
@@ -236,9 +252,14 @@ def _bandit_round(
     allocation: dict[str, int],
     mlflow_tracking: bool = False,
     mlflow_tags: dict[str, str] | None = None,
-) -> None:
-    """Append the bandit-allocated trials to the selected models' studies."""
+) -> dict[str, str]:
+    """Append the bandit-allocated trials to the selected models' studies.
+
+    Returns {name: error} for any continuation that raised; a failing
+    continuation does not abort the round.
+    """
     specs = {spec.name: spec for spec in hpo.models}
+    failures: dict[str, str] = {}
     with ThreadPoolExecutor(max_workers=len(allocation)) as pool:
         futures = {}
         for name, trials in allocation.items():
@@ -253,8 +274,12 @@ def _bandit_round(
                 mlflow_tracking,
                 tags,
             )
-        for future in futures.values():
-            future.result()
+        for name, future in futures.items():
+            try:
+                future.result()
+            except Exception as exc:  # collect per-model, report at end
+                failures[name] = f"{type(exc).__name__}: {exc}"
+    return failures
 
 
 def _leaderboard(studies: dict[str, optuna.Study]) -> dict[str, float]:
@@ -268,6 +293,74 @@ def _leaderboard(studies: dict[str, optuna.Study]) -> dict[str, float]:
     return best
 
 
+def run_hpo_bandit(
+    objectives: dict[str, Objective],
+    hpo: HPOConfig,
+    random_state: int,
+    mlflow_tracking: bool = False,
+    mlflow_tags: dict[str, str] | None = None,
+    return_studies: bool = False,
+) -> dict:
+    """Run the two-round bandit over pre-built objectives and return results.
+
+    Direction-aware generic core shared by run_hpo (sklearn objectives built
+    from a PipelineConfig) and broadway.training.nlp.run_nlp_hpo (NLP
+    objectives built from an embedding model zoo). Round 1 gives every model
+    initial_trials_per_model trials in parallel (seeds random_state +
+    model_index); round 2 allocates the remaining budget to the top-k models
+    via bandit_allocate and appends their trials. Returns {"models": {name:
+    {best_params, best_value, n_trials}}, "best_model", "best_params",
+    "best_value"}; models without a valid trial are omitted, and any model whose
+    study raised is reported under a "failed" {name: error} key rather than
+    aborting the round. The leaderboard
+    and bandit allocation honor hpo.direction (minimize by default, maximize
+    for higher-is-better objectives such as NLP AUC). With mlflow_tracking,
+    every COMPLETE trial across both rounds is logged as a nested mlflow run
+    tagged with the model plus the caller's mlflow_tags. When return_studies is
+    true, the live optuna Study objects are also returned under "studies"
+    (for callers that must read per-trial user attrs) — off by default so the
+    plain result stays JSON-safe.
+    """
+    if not hpo.models:
+        raise ValueError("hpo requires at least one model in `models`")
+    if set(objectives) != {spec.name for spec in hpo.models}:
+        raise ValueError("objectives must map every hpo.models name (and only those)")
+    studies, failures = _initial_round(hpo, objectives, random_state, mlflow_tracking, mlflow_tags)
+    leaderboard = _leaderboard(studies)
+    remaining = hpo.total_trials - hpo.initial_trials_per_model * len(hpo.models)
+    allocation = bandit_allocate(leaderboard, remaining, hpo.top_k, direction=hpo.direction)
+    if allocation:
+        failures.update(_bandit_round(hpo, objectives, studies, allocation, mlflow_tracking, mlflow_tags))
+    if not leaderboard:
+        detail = "; ".join(f"{name}: {err}" for name, err in sorted(failures.items()))
+        raise ValueError(
+            "hpo produced no valid trial for any model"
+            + (f" ({detail})" if detail else "")
+        )
+    models = {
+        name: {
+            "best_params": dict(study.best_params),
+            "best_value": float(study.best_value),
+            "n_trials": len(study.trials),
+        }
+        for name, study in studies.items()
+        if name in leaderboard
+    }
+    best = (max if hpo.direction == "maximize" else min)
+    best_model = best(leaderboard, key=lambda name: leaderboard[name])
+    result = {
+        "models": models,
+        "best_model": best_model,
+        "best_params": dict(studies[best_model].best_params),
+        "best_value": float(studies[best_model].best_value),
+    }
+    if failures:
+        result["failed"] = failures
+    if return_studies:
+        result["studies"] = studies
+    return result
+
+
 def run_hpo(
     cfg: PipelineConfig,
     hpo: HPOConfig,
@@ -279,45 +372,17 @@ def run_hpo(
     mlflow_tracking: bool = False,
     mlflow_tags: dict[str, str] | None = None,
 ) -> dict:
-    """Run the two-round bandit HPO and return per-model results and the best.
+    """Run the two-round bandit HPO over sklearn objectives and return results.
 
-    Round 1 gives every model initial_trials_per_model trials in parallel
-    (seeds random_state + model_index); round 2 allocates the remaining budget
-    to the top-k models via bandit_allocate and appends their trials. Returns
-    {"models": {name: {best_params, best_value, n_trials}}, "best_model",
-    "best_params", "best_value"}; models without a valid trial are omitted.
-    The leaderboard and bandit allocation assume the minimize direction.
-    With mlflow_tracking, every COMPLETE trial across both rounds is logged as
-    a nested mlflow run tagged with the model plus the caller's mlflow_tags
-    (e.g. {"experiment": ...}); the tracking URI stays ambient.
+    Builds one objective per model via make_objective (fit the composed
+    Pipeline, score on val) and delegates the bandit to run_hpo_bandit. The
+    leaderboard and bandit allocation honor hpo.direction (minimize by
+    default). With mlflow_tracking, every COMPLETE trial across both rounds is
+    logged as a nested mlflow run tagged with the model plus the caller's
+    mlflow_tags; the tracking URI stays ambient.
     """
-    if not hpo.models:
-        raise ValueError("hpo requires at least one model in `models`")
     objectives = {
         spec.name: make_objective(cfg, spec.name, hpo.target_metric, X_train, y_train, X_val, y_val)
         for spec in hpo.models
     }
-    studies = _initial_round(hpo, objectives, random_state, mlflow_tracking, mlflow_tags)
-    leaderboard = _leaderboard(studies)
-    remaining = hpo.total_trials - hpo.initial_trials_per_model * len(hpo.models)
-    allocation = bandit_allocate(leaderboard, remaining, hpo.top_k)
-    if allocation:
-        _bandit_round(hpo, objectives, studies, allocation, mlflow_tracking, mlflow_tags)
-    if not leaderboard:
-        raise ValueError("hpo produced no valid trial for any model")
-    models = {
-        name: {
-            "best_params": dict(study.best_params),
-            "best_value": float(study.best_value),
-            "n_trials": len(study.trials),
-        }
-        for name, study in studies.items()
-        if name in leaderboard
-    }
-    best_model = min(leaderboard, key=lambda name: leaderboard[name])
-    return {
-        "models": models,
-        "best_model": best_model,
-        "best_params": dict(studies[best_model].best_params),
-        "best_value": float(studies[best_model].best_value),
-    }
+    return run_hpo_bandit(objectives, hpo, random_state, mlflow_tracking, mlflow_tags)

@@ -39,6 +39,7 @@ from broadway.training.hpo import (
     bandit_allocate,
     make_objective,
     run_hpo,
+    run_hpo_bandit,
     run_model_study,
 )
 from broadway.training.mlflow_utils import setup_mlflow
@@ -164,6 +165,21 @@ def test_bandit_allocate_zero_top_k() -> None:
     assert bandit_allocate({"a": 1.0}, 10, 0) == {}
 
 
+def test_bandit_allocate_maximize_top_k() -> None:
+    # maximize: higher is better -> "c" (3.0) and "b" (2.0) are selected
+    assert bandit_allocate({"a": 1.0, "b": 2.0, "c": 3.0}, 9, 2, direction="maximize") == {
+        "c": 5,
+        "b": 4,
+    }
+
+
+def test_bandit_allocate_maximize_remainder_to_best() -> None:
+    assert bandit_allocate({"a": 1.0, "b": 2.0}, 5, 2, direction="maximize") == {
+        "b": 3,
+        "a": 2,
+    }
+
+
 # --- make_objective ----------------------------------------------------------
 
 
@@ -273,6 +289,23 @@ def test_run_hpo_no_valid_trial_raises(tiny_data, monkeypatch: pytest.MonkeyPatc
     X_train, y_train, X_val, y_val = tiny_data
     with pytest.raises(ValueError, match="no valid trial"):
         run_hpo(_pipeline_config(), _hpo_config(), X_train, y_train, X_val, y_val, random_state=1)
+
+
+def test_run_hpo_bandit_isolates_failed_model() -> None:
+    """One model's objective raising must not abort the other model's study."""
+    def _raising(params: dict[str, float | int], trial=None) -> float:
+        del params, trial
+        raise RuntimeError("boom")
+
+    result = run_hpo_bandit(
+        {"m0": _parabola, "m1": _raising},
+        _hpo_config(n_models=2),
+        random_state=42,
+    )
+    assert result["best_model"] == "m0"
+    assert set(result["models"]) == {"m0"}
+    assert set(result["failed"]) == {"m1"}
+    assert "boom" in result["failed"]["m1"]
 
 
 # --- mlflow tracking (hermetic tmp file store, no server) -------------------
