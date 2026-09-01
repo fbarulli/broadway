@@ -128,7 +128,8 @@ Generalized ML experimentation platform. The reusable surface is the pipeline
 
 CLI (`ds-pipeline`); dataset-specific experiments live under `project/` on the
 
-development line only. Full architecture map is in `dataflow.md`; current
+development line only. Structural mapping uses the codebase knowledge graph
+(`graphify`) and the lineage graph (`reports/lineage/graph.json`); current
 
 operational state is in `agents/ledger/STATE.md`.
 
@@ -744,7 +745,7 @@ Typed step outputs follow `artifacts/<step>/` and reports follow
 
 |---------|----------|
 
-| Architecture map | `dataflow.md` |
+| Architecture map | `graphify` knowledge graph + `reports/lineage/graph.json` |
 
 | Status / current work | `agents/ledger/STATE.md` |
 
@@ -770,7 +771,7 @@ Typed step outputs follow `artifacts/<step>/` and reports follow
 
 2. Shared functions live in one place and are imported, never duplicated.
 
-3. The agent making a change updates `dataflow.md` in the same commit.
+3. The agent making a change updates structural maps (`graphify` knowledge graph, `reports/lineage/graph.json`) in the same commit when the change alters the structure.
 
 ---
 

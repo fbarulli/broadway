@@ -37,6 +37,7 @@ dependencies = [
     "psycopg2-binary>=2.9",
     "fastapi>=0.141.1",
     "uvicorn>=0.52.1",
+    "graphifyy",
 ]
 
 [project.optional-dependencies]
@@ -90,3 +91,6 @@ ignore = ["B017", "BLE001", "TRY004"]
 
 [tool.pytest.ini_options]
 addopts = "--ignore=deepseek-harness"
+
+[tool.uv.sources]
+graphifyy = { git = "https://github.com/Graphify-Labs/graphify.git" }

@@ -81,7 +81,7 @@ platform adopts this pattern; experiments stop being ahead of it.
 - Tests: champion predict path on raw input frame; signature mismatch at
   predict fails loud (wrong column set / wrong dtype); manifest check returns
   the champion/path listing (asserted structure).
-- Acceptance: full suite green; README + dataflow.md updated in same commit
+- Acceptance: full suite green; README + structural maps updated in same commit
   (inference section); manifest-check output pasted.
 
 ## Decision 5 — column selection philosophy (RATIFIED 2026-08-22 — Contract C/D spec)

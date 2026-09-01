@@ -1,6 +1,6 @@
 # Gate registry SSOT — hand-maintained; the {01..09} gate fragments it consolidated predate git custody.
 meta:
-  head: '26723d2'
+  head: 'd36f1d8'
   assembled: '2026-08-24'
   source_fragments:
   - agents/ledger/gates/01-ingest.md
@@ -1123,7 +1123,7 @@ gates:
   transforms:
   - 'thin glue: _loader.read_sample(_contract, sample, seed=seed, columns, full) with seed DEFAULTING to RANDOM_STATE pinned from configs/step/train.yaml (:106, :168, delegate :173-175)'
   - 'loader guard: sample=None without full=True → ValueError ''pass sample=<n>, or full=True'' (src/broadway/data/loader.py:168-169)'
-  - polars lazy scan → optional column pruning → df.sample(n, seed=seed passthrough) → to_pandas (loader.py:170-176); NOT DATA_MODE-aware by design (dataflow.md:450)
+  - polars lazy scan → optional column pruning → df.sample(n, seed=seed passthrough) → to_pandas (loader.py:170-176); NOT DATA_MODE-aware by design
   touched_by:
   - numpy@2.5.2
   - pandas@2.3.3
