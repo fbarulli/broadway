@@ -255,7 +255,7 @@ Pipelines are mode-specific; `full` is a dispatcher that reads
 
 | Data Team | The observability baseline | `reference_profile.json`, `data_contract.yaml` |
 
-The supporting artifact guide is [`read.md`](read.md): it expands the DS,
+The supporting artifact guide is [`read.md`](scratch/read.md): it expands the DS,
 
 serving, and data-tracking bundles without making the README a second source
 
@@ -759,7 +759,7 @@ Typed step outputs follow `artifacts/<step>/` and reports follow
 
 | Config schema | `src/broadway/config/schema.py` |
 
-| HPO / Optuna training + mlflow viewing | `HPO_TRAINING.md` |
+| HPO / Optuna training + mlflow viewing | `scratch/HPO_TRAINING.md` |
 
 | Tests | `tests/` |
 
