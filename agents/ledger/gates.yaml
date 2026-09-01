@@ -1,6 +1,6 @@
 # Gate registry SSOT — hand-maintained; the {01..09} gate fragments it consolidated predate git custody.
 meta:
-  head: '46e2135'
+  head: '033c338'
   counts:
     total: 145
     gates_with_findings: 84
@@ -3262,8 +3262,9 @@ gates:
 - id: GATE-HPO-154
   phase: hpo-optuna
   order: 108
-  owner: src/broadway/training/nlp.py:98 make_objective() + :147 run_nlp_hpo()
+  owner: src/broadway/training/nlp.py:144 make_objective() + :191 run_nlp_hpo() + :248 run_nlp()
   inputs:
+  - 'src/broadway/config/schema.py:135 NLPConfig (typed data-agnostic config: model_zoo + hpo + knobs)'
   - 'project/config/experiments/nlp.yaml model_zoo + hpo: block (bi-encoder zoo SSOT, direction: maximize)'
   - sentence-transformers bi-encoders resolved via model_zoo (zero-shot; optional contrastive fine-tune examples)
   - project/experiments/euromonitor/07_nlp_hpo.py pair construction (same 12,038 pos / 10,000 neg population as step 04)
@@ -3272,6 +3273,7 @@ gates:
   - 'bandit result {models, best_model, best_params, best_value, metrics} (direction: maximize, reused run_hpo_bandit)'
   transforms:
   - 'adapts the sklearn bandit to NLP: each HPO model is a bi-encoder, objective = ROC AUC on title-pair ground truth (maximize), corpus encode latency recorded per trial'
+  - 'run_nlp(cfg, payload, pos_pairs, neg_pairs) is the data-agnostic entry point (parallel to broadway.training.module.run): the typed NLPConfig carries the zoo + bandit spec, the caller supplies payload/pairs'
   - 'zero-shot when search_space is empty (one trial); contrastive fine-tune (MultipleNegativesRankingLoss) when params carry epochs/learning_rate/warmup_steps/batch_size'
   - 'model_zoo name resolution is loud — unknown hpo.models names raise ValueError (nlp.py:166-167)'
   touched_by:
@@ -3282,6 +3284,7 @@ gates:
   - tests/test_nlp.py::test_entity_resolution_metrics_perfect_separation
   - tests/test_nlp.py::test_make_objective_returns_auc_and_attaches_metrics
   - tests/test_nlp.py::test_run_nlp_hpo_maximize_selects_best_model
+  - tests/test_nlp.py::test_run_nlp_typed_config_entry
   - tests/test_nlp.py::test_run_nlp_hpo_unknown_model_raises
   if_changed:
   - project/config/experiments/nlp.yaml

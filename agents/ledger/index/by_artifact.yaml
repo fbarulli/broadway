@@ -1025,6 +1025,8 @@ src/broadway project scripts via Vulture --min-confidence 95 (vulture):
 - GATE-INFRA-92
 src/broadway/** (mypy):
 - GATE-INFRA-92
+'src/broadway/config/schema.py:135 NLPConfig (typed data-agnostic config: model_zoo + hpo + knobs)':
+- GATE-HPO-154
 stats run|describe --sample (cli.py:80-84); console-script entry ds-pipeline = broadway.cli:main (pyproject.toml:53-54):
 - GATE-TLINE-59
 status pinned to Literal["resolved"]:
