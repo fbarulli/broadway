@@ -215,6 +215,29 @@ def test_finetune_without_learning_rate_omits_optimizer_params(
     assert captured["epochs"] == 1
 
 
+def test_encode_payload_cache_roundtrip(tmp_path) -> None:
+    """Encode-once/score-many: a warm re-run reads the .npz and keeps encode_s."""
+    from broadway.training.nlp import _embedding_cache_path, _encode_payload
+
+    class _Encoder:
+        def encode(self, payload, **kwargs):
+            del kwargs
+            emb = np.random.default_rng(0).normal(size=(len(payload), 3))
+            return emb / np.linalg.norm(emb, axis=1, keepdims=True)
+
+    payload = [f"s{i}" for i in range(8)]
+    cache_path = _embedding_cache_path(str(tmp_path), "model/x", payload, 128, 32)
+    assert cache_path is not None and not cache_path.exists()
+
+    model = _Encoder()
+    emb1, s1 = _encode_payload(model, payload, 32, cache_path)
+    assert cache_path.exists()
+    emb2, s2 = _encode_payload(model, payload, 32, cache_path)
+    assert s2 == s1  # cached latency preserved, not reset to 0
+    assert np.allclose(emb1, emb2)
+    assert _embedding_cache_path(None, "m", payload, 128, 32) is None
+
+
 def test_run_nlp_hpo_unknown_model_raises(monkeypatch: pytest.MonkeyPatch) -> None:
     _install_fake_sentence_transformers(monkeypatch, {})
     hpo_cfg = HPOConfig(
