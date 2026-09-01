@@ -12,13 +12,15 @@ from __future__ import annotations
 
 import sys
 import types
+from pathlib import Path
 
 import numpy as np
 import pytest
+import yaml
 
 from broadway.config.schema import HPOConfig, ModelHPOSpec, NLPConfig
 from broadway.training import nlp
-from broadway.training.nlp import entity_resolution_metrics
+from broadway.training.nlp import entity_resolution_metrics, load_pairs_csv
 
 
 def _install_fake_sentence_transformers(monkeypatch: pytest.MonkeyPatch, noise_map: dict) -> None:
@@ -281,3 +283,24 @@ def test_run_nlp_hpo_unknown_model_raises(monkeypatch: pytest.MonkeyPatch) -> No
     neg = np.array([[0, 1]])
     with pytest.raises(ValueError, match="missing from model_zoo"):
         nlp.run_nlp_hpo({}, hpo_cfg, payload, pos, neg, seed=1)
+
+
+def test_run_nlp_end_to_end_generic_fixture(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Config-driven smoke: configs/nlp.yaml + demo/nlp_pairs.csv -> run_nlp.
+
+    Mirrors the tabular configs gate (load a data-agnostic config against a
+    generic fixture) but as a hermetic pytest: the encoder is stubbed so no
+    torch weights or network are needed. Asserts the pipeline runs end-to-end
+    and returns a result for every model in the zoo.
+    """
+    root = Path(__file__).resolve().parents[1]
+    cfg = NLPConfig(**yaml.safe_load((root / "configs" / "nlp.yaml").read_text(encoding="utf-8")))
+    payload, pos, neg = load_pairs_csv(str(root / "demo" / "nlp_pairs.csv"))
+    assert payload and len(pos) > 0 and len(neg) > 0
+
+    _install_fake_sentence_transformers(monkeypatch, {repo: 0.0 for repo in cfg.model_zoo.values()})
+    result = nlp.run_nlp(cfg, payload, pos, neg)
+    assert set(result["models"]) == set(cfg.model_zoo)
+    assert result["best_model"] in cfg.model_zoo
+    assert set(result["metrics"]) == set(cfg.model_zoo)
+    assert all("auc" in m and "encode_s" in m for m in result["metrics"].values())

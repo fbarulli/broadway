@@ -278,3 +278,26 @@ def run_nlp(
         mlflow_tracking=mlflow_tracking,
         mlflow_tags=mlflow_tags,
     )
+
+
+def load_pairs_csv(path: str | Path) -> tuple[list[str], np.ndarray, np.ndarray]:
+    """Load a generic pairs CSV (title_a, title_b, label) into NLP inputs.
+
+    Data-agnostic loader, the NLP analogue of demo/demo.csv: dedupes all titles
+    into a payload and maps each row to payload indices; label == 1 rows become
+    positive (match) pairs and label == 0 rows become negative (non-match)
+    pairs. Empty title cells and non-numeric labels degrade to ""/0.
+    """
+    import pandas as pd
+
+    frame = pd.read_csv(path)
+    a = frame["title_a"].fillna("").astype(str).str.strip().tolist()
+    b = frame["title_b"].fillna("").astype(str).str.strip().tolist()
+    labels = pd.to_numeric(frame["label"], errors="coerce").fillna(0).astype(int).tolist()
+    payload = list(dict.fromkeys(a + b))
+    index = {text: i for i, text in enumerate(payload)}
+    pos = [[index[x], index[y]] for x, y, lab in zip(a, b, labels) if lab == 1]
+    neg = [[index[x], index[y]] for x, y, lab in zip(a, b, labels) if lab == 0]
+    pos_arr = np.array(pos, dtype=int).reshape(-1, 2) if pos else np.zeros((0, 2), dtype=int)
+    neg_arr = np.array(neg, dtype=int).reshape(-1, 2) if neg else np.zeros((0, 2), dtype=int)
+    return payload, pos_arr, neg_arr

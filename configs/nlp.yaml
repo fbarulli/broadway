@@ -1,0 +1,26 @@
+# Data-agnostic NLP HPO config — the generic analogue of
+# configs/experiment/hyperopt.yaml. model_zoo maps short names to HF repo ids;
+# hpo is the shared bandit spec (direction: maximize for ROC AUC). The payload
+# and ground-truth pairs are supplied by the caller (broadway.training.nlp
+# run_nlp / load_pairs_csv), so this config carries no dataset-specific fields.
+seed: 42
+target_metric: auc
+device: cpu
+batch_size: 32
+max_seq_length: 64
+cache_dir: null
+model_zoo:
+  minilm_l6: sentence-transformers/all-MiniLM-L6-v2
+  bge_small: BAAI/bge-small-en-v1.5
+hpo:
+  engine: optuna
+  direction: maximize
+  target_metric: auc
+  total_trials: 2
+  initial_trials_per_model: 1
+  top_k: 1
+  models:
+    - name: minilm_l6
+      search_space: {}
+    - name: bge_small
+      search_space: {}
