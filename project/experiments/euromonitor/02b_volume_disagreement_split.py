@@ -22,13 +22,9 @@ oz", "0.2 l glass", "dilute in 9 volumes") injects systematic false volumes
 flagged). Description stays an explicit low-confidence feature, never folded in.
 """
 
-from importlib import import_module
-
 import pandas as pd
 from _common import RESULTS, load_euromonitor
-
-# reuse extractor from 02 rather than redefining (the committed fixed point)
-step02 = import_module("02_volume_normalize")
+from _text import extract_volume_ml
 
 NEAR_MISS_THRESHOLD = 1.05  # <5% relative diff treated as noise, not a real gap
 
@@ -77,14 +73,14 @@ def main() -> None:
 
     # canonical volume from title ONLY (validated v2; see module docstring)
     df["canonical_volume_ml"], df["canonical_volume_ambiguous"] = zip(
-        *df["title"].map(step02.extract_volume_ml)
+        *df["title"].map(extract_volume_ml)
     )
 
     # Description-derived volume kept as a SEPARATE low-confidence signal only
     # (e.g. for future tie-breaking or coverage backfill review) — never
     # merged into canonical_volume_ml, and not used in this split.
     df["description_volume_ml"], df["description_volume_ambiguous"] = zip(
-        *df["description"].map(step02.extract_volume_ml)
+        *df["description"].map(extract_volume_ml)
     )
 
     agree = build_barcode_agreement(df)

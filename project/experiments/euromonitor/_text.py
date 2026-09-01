@@ -111,7 +111,7 @@ _TO_ML = {
     "gal": 3785.41, "gallon": 3785.41, "gallons": 3785.41,
     "qt": 946.353, "quart": 946.353, "quarts": 946.353,
     "pt": 473.176, "pint": 473.176, "pints": 473.176,
-    "fl oz": 29.5735, "fl.oz": 29.5735, "fl-oz": 29.5735, "floz": 29.5735,
+    "fl oz": 29.5735, "floz": 29.5735,
     "fluid ounce": 29.5735, "fluid ounces": 29.5735,
     "oz": 29.5735, "ounce": 29.5735, "ounces": 29.5735,
 }
@@ -121,7 +121,7 @@ def norm_unit(token: str) -> str:
     """Normalize a unit token to a _TO_ML key (tolerates spacing/punct)."""
     t = re.sub(r"[.\-\s]", " ", token.lower()).strip()
     t = re.sub(r"\s+", " ", t)
-    if t in {"floz", "fl.oz", "fl-oz"}:
+    if t == "floz":
         return "fl oz"
     return t
 

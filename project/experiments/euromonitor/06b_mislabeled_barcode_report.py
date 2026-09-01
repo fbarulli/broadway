@@ -22,13 +22,11 @@ CSV_SUMMARY = RESULTS / "06b_conflicting_summary.csv"
 def main() -> None:
     RESULTS.mkdir(parents=True, exist_ok=True)
     df = load_dataset()
-    has_bc = df["barcode"].fillna("").astype(str).str.len() > 0
 
     cb = (
         df.groupby(["title", "brand"], dropna=False)
           .agg(
               n_retailers=("retailer", "nunique"),
-              n_barcodes=("barcode", lambda s: int(s[has_bc.reindex(s.index)].nunique())),
               barcodes=("barcode", lambda s: sorted({
                   str(x) for x in s.dropna() if str(x)})),
               retailers=("retailer", lambda s: sorted(set(s.dropna()))),

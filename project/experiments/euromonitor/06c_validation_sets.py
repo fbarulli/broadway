@@ -18,13 +18,12 @@ Writes:
 import numpy as np
 import pandas as pd
 from _blocking import build_true_pairs
-from _common import RESULTS, load_dataset
+from _common import RESULTS, SEED, load_dataset
 from _matching import build_vectorizer, score_pairs
 
 CSV_SUMMARY = RESULTS / "06c_validation_summary.csv"
 CSV_HARD = RESULTS / "06c_hard_validation_pairs.csv"
 
-SEED = 42
 LOW, HIGH = 0.3, 0.8  # the hard band: moderate similarity
 N_NEG = 20_000
 

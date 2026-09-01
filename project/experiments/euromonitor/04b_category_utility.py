@@ -37,7 +37,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from _common import RESULTS, load_dataset
+from _common import RESULTS, SEED, load_dataset
 from _text import MACRO_MAP
 from scipy.stats import chi2_contingency
 from sklearn.metrics import mutual_info_score
@@ -46,7 +46,6 @@ CSV_MAPPING = RESULTS / "04b_macro_mapping.csv"
 CSV_AUDIT = RESULTS / "04b_category_audit.csv"
 PNG_AUDIT = RESULTS / "04b_category_audit.png"
 
-SEED = 42
 MAX_POS_PAIRS_PER_GROUP = 4
 N_NEG_PAIRS = 10_000
 

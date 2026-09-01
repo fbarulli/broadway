@@ -28,7 +28,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from _common import RESULTS, load_dataset
+from _common import RESULTS, SEED, load_dataset
 from sklearn.decomposition import TruncatedSVD
 from sklearn.feature_extraction.text import TfidfVectorizer
 
@@ -37,8 +37,6 @@ PNG_SPACE = RESULTS / "01b_product_space.png"
 PNG_PRICE = RESULTS / "01b_price_strip.png"
 CSV_SPACE = RESULTS / "01b_product_space.csv"
 CSV_PLOT_DATA = RESULTS / "01b_product_space_plot_data.csv"
-
-SEED = 42
 
 
 def plot_column_scatter(dtype_info: pd.DataFrame, out_path: Path) -> None:

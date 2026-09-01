@@ -25,13 +25,10 @@ from __future__ import annotations
 
 import ast
 import re
-import sys
-from pathlib import Path
 
 import pandas as pd
+from _common import RESULTS, load_euromonitor
 
-REPO = Path(__file__).resolve().parents[3]
-RESULTS = REPO / "project" / "experiments" / "results" / "euromonitor"
 CSV_IN = RESULTS / "03_pack_reconcile.csv"
 CSV_OUT = RESULTS / "03b_disposition.csv"
 
@@ -99,8 +96,6 @@ def classify_row(row: pd.Series, full_names: list[str]) -> tuple[str, str]:
 def main() -> None:
     df = pd.read_csv(CSV_IN)
     # full listing text per BARCODE from the raw dataset (not the 5-name sample)
-    sys.path.insert(0, str(REPO / "project/experiments/euromonitor"))
-    from _common import load_euromonitor
     raw = load_euromonitor().reset_index(drop=True)
     raw["barcode_s"] = raw["barcode"].fillna("").astype(str)
 

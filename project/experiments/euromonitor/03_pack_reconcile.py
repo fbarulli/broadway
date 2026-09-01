@@ -12,13 +12,11 @@ Independent of VOLUME_RE — works on raw listing text (full names per BARCODE).
 from __future__ import annotations
 
 import ast
-from pathlib import Path
 
 import pandas as pd
+from _common import RESULTS
 from _text import is_pack_multiple
 
-REPO = Path(__file__).resolve().parents[3]
-RESULTS = REPO / "project" / "experiments" / "results" / "euromonitor"
 CSV_IN = RESULTS / "02b_volume_disagreement_split.csv"
 CSV_OUT = RESULTS / "03_pack_reconcile.csv"
 

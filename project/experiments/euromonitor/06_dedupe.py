@@ -52,10 +52,16 @@ def main() -> None:
 
     summary = []
 
-    # T1: retailer+barcode -> one row (ground-truth identity)
-    t1 = keep_best(["retailer", "barcode"], ["_nonnull", "_price"], [False, True])
-    dropped1 = work.index.difference(t1.index)
-    work = work.drop(dropped1)
+    # T1: retailer+barcode -> one row (ground-truth identity), ONLY for rows
+    # that actually have a barcode. Rows with a MISSING barcode are NOT
+    # collapsed ("no barcode" is not "same barcode").
+    with_bc = work[work["_has_bc"] == 1]
+    no_bc = work[work["_has_bc"] == 0]
+    t1 = (with_bc.sort_values(["_nonnull", "_price"], ascending=[False, True],
+                              na_position="last")
+               .drop_duplicates(["retailer", "barcode"], keep="first"))
+    dropped1 = with_bc.index.difference(t1.index)
+    work = pd.concat([t1, no_bc])
     summary.append({"tier": "T1 retailer+barcode",
                     "dropped_rows": len(dropped1)})
 

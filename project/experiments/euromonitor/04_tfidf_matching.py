@@ -33,7 +33,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from _common import RESULTS, load_dataset
+from _common import RESULTS, SEED, load_dataset
 from _matching import build_vectorizer, score_pairs
 from sklearn.metrics.pairwise import cosine_similarity
 
@@ -42,7 +42,6 @@ CSV_THRESHOLD = RESULTS / "04_tfidf_threshold.csv"
 PNG_SCORES = RESULTS / "04_tfidf_scores.png"
 PNG_THRESHOLD = RESULTS / "04_tfidf_threshold.png"
 
-SEED = 42
 MAX_POS_PAIRS_PER_GROUP = 4
 N_NEG_PAIRS = 10_000
 

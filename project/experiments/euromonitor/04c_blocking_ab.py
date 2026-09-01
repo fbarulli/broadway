@@ -38,6 +38,7 @@ PNG_BLOCKING = RESULTS / "04c_blocking_ab.png"
 
 NO_BRAND = "NO_BRAND"
 NO_VOL = "NO_VOL"
+NO_CATEGORY = "NO_CATEGORY"
 
 
 def main() -> None:
@@ -49,7 +50,7 @@ def main() -> None:
     vol_ml = df["title"].fillna("").map(extract_volume_ml).map(lambda t: t[0])
     vol = vol_ml.fillna(NO_VOL).astype(str)
     brand = df["brand"].fillna("").str.strip().replace("", NO_BRAND)
-    strict = df["category"].fillna("").str.strip()
+    strict = df["category"].fillna("").str.strip().replace("", NO_CATEGORY)
     macro = strict.map(MACRO_MAP).fillna("UNKNOWN")
 
     # ---- ground truth: ALL true pairs (same barcode, multi-retailer) ---------

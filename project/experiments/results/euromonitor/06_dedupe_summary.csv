@@ -1,6 +1,6 @@
 tier,dropped_rows
-T1 retailer+barcode,43461
-T2 retailer+title+price,158
-T3 retailer+title (price-aggregation),1006
-TOTAL dropped,44625
-TOTAL remaining,26998
+T1 retailer+barcode,2154
+T2 retailer+title+price,2557
+T3 retailer+title (price-aggregation),5508
+TOTAL dropped,10219
+TOTAL remaining,61404
