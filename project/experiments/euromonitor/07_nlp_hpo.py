@@ -33,7 +33,7 @@ import pandas as pd
 import yaml
 from _common import PATHS, RESULTS, load_dataset
 
-from broadway.config.schema import HPOConfig
+from broadway.config.schema import NLPConfig
 from broadway.timing import TimingReport
 from broadway.training import nlp
 from broadway.training.mlflow_utils import setup_mlflow
@@ -99,16 +99,9 @@ def _build_pairs(
 
 def main() -> None:
     RESULTS.mkdir(parents=True, exist_ok=True)
-    cfg = yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8"))
-    seed = int(cfg["seed"])
-    model_zoo = dict(cfg["model_zoo"])
-    hpo_cfg = HPOConfig(**cfg["hpo"])
-    batch_size = int(cfg["batch_size"])
-    max_seq_length = int(cfg["max_seq_length"])
-    device = cfg["device"]
-    cache_dir = cfg.get("cache_dir")
-    if cache_dir:
-        cache_dir = str(PATHS.experiments.parent / cache_dir)
+    cfg = NLPConfig(**yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8")))
+    if cfg.cache_dir:
+        cfg = cfg.model_copy(update={"cache_dir": str(PATHS.experiments.parent / cfg.cache_dir)})
 
     report = TimingReport()
     with report.record("data_load"):
@@ -118,25 +111,19 @@ def main() -> None:
             df["title"].fillna("") + PAYLOAD_SEP + df["brand"].fillna("") + PAYLOAD_SEP + df["category"].fillna("")
         ).tolist()
     with report.record("pair_build"):
-        pos_pairs, neg_pairs = _build_pairs(df, seed, MAX_POS_PAIRS_PER_GROUP, N_NEG_PAIRS)
+        pos_pairs, neg_pairs = _build_pairs(df, cfg.seed, MAX_POS_PAIRS_PER_GROUP, N_NEG_PAIRS)
     print(f"payload: {len(payload):,} rows | "
           f"positive pairs: {len(pos_pairs):,} | negative pairs: {len(neg_pairs):,}")
 
     setup_mlflow(str(PATHS.root / "mlruns"), EXPERIMENT)
     with report.record("hpo_benchmark"):
-        result = nlp.run_nlp_hpo(
-            model_zoo,
-            hpo_cfg,
+        result = nlp.run_nlp(
+            cfg,
             payload,
             pos_pairs,
             neg_pairs,
-            seed=seed,
-            device=device,
-            batch_size=batch_size,
-            max_seq_length=max_seq_length,
-            cache_dir=cache_dir,
             mlflow_tracking=True,
-            mlflow_tags={"experiment": EXPERIMENT, "seed": str(seed)},
+            mlflow_tags={"experiment": EXPERIMENT, "seed": str(cfg.seed)},
         )
 
     timing_frame = pd.DataFrame(
@@ -171,7 +158,7 @@ def main() -> None:
     # ---- sanity (fail loudly) -------------------------------------------------
     checks = [
         ("S1 every model produced a valid trial",
-         len(result["models"]) == len(hpo_cfg.models)),
+         len(result["models"]) == len(cfg.hpo.models)),
         ("S2 every AUC is a probability", bool(frame["auc"].between(0.0, 1.0).all())),
         ("S3 every encode latency is positive", bool((frame["encode_s"] > 0).all())),
         ("S4 a best model was selected", result["best_model"] in result["models"]),

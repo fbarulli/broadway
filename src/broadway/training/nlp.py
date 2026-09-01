@@ -25,7 +25,8 @@ from pathlib import Path
 
 import numpy as np
 
-from broadway.training.hpo import HPOConfig, Objective, run_hpo_bandit
+from broadway.config.schema import HPOConfig, NLPConfig
+from broadway.training.hpo import Objective, run_hpo_bandit
 
 # Fine-tune params that, when present in a trial's search space, switch the
 # objective from zero-shot scoring to a contrastive fine-tune. Names match the
@@ -242,3 +243,38 @@ def run_nlp_hpo(
         if name in result["models"]
     }
     return result
+
+
+def run_nlp(
+    cfg: NLPConfig,
+    payload: list[str],
+    pos_pairs: np.ndarray,
+    neg_pairs: np.ndarray,
+    *,
+    finetune_examples=None,
+    mlflow_tracking: bool = False,
+    mlflow_tags: dict[str, str] | None = None,
+) -> dict:
+    """Run the NLP HPO bandit from a typed config (data-agnostic entry point).
+
+    Parallel to broadway.training.module.run: the typed NLPConfig carries the
+    model zoo + bandit spec + encode knobs, and the caller supplies the payload
+    and ground-truth pair indices, so this module stays dataset-agnostic. Returns
+    the plain-data result ({models, best_model, best_params, best_value,
+    metrics, and a failed map when some model raised}).
+    """
+    return run_nlp_hpo(
+        cfg.model_zoo,
+        cfg.hpo,
+        payload,
+        pos_pairs,
+        neg_pairs,
+        seed=cfg.seed,
+        finetune_examples=finetune_examples,
+        device=cfg.device,
+        batch_size=cfg.batch_size,
+        max_seq_length=cfg.max_seq_length,
+        cache_dir=cfg.cache_dir,
+        mlflow_tracking=mlflow_tracking,
+        mlflow_tags=mlflow_tags,
+    )

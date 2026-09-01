@@ -16,7 +16,7 @@ import types
 import numpy as np
 import pytest
 
-from broadway.config.schema import HPOConfig, ModelHPOSpec
+from broadway.config.schema import HPOConfig, ModelHPOSpec, NLPConfig
 from broadway.training import nlp
 from broadway.training.nlp import entity_resolution_metrics
 
@@ -112,6 +112,33 @@ def test_run_nlp_hpo_maximize_selects_best_model(monkeypatch: pytest.MonkeyPatch
     # encode_s is a wall-clock reading; the fake encoder is instant, so only
     # assert presence + non-negativity (real models yield positive values).
     assert all("encode_s" in m and m["encode_s"] >= 0 for m in result["metrics"].values())
+
+
+def test_run_nlp_typed_config_entry(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The data-agnostic entry point (run_nlp + NLPConfig) drives the bandit."""
+    _install_fake_sentence_transformers(monkeypatch, {"good": 0.0, "bad": 5.0})
+    payload = [f"s{i}" for i in range(20)]
+    pos = np.array([[i, i + 1] for i in range(0, 18, 2)])
+    neg = np.array([[i, i + 10] for i in range(10)])
+    cfg = NLPConfig(
+        seed=42,
+        model_zoo={"good": "good", "bad": "bad"},
+        hpo=HPOConfig(
+            engine="optuna",
+            direction="maximize",
+            target_metric="auc",
+            total_trials=2,
+            initial_trials_per_model=1,
+            top_k=2,
+            models=[
+                ModelHPOSpec(name="good", search_space={}),
+                ModelHPOSpec(name="bad", search_space={}),
+            ],
+        ),
+    )
+    result = nlp.run_nlp(cfg, payload, pos, neg)
+    assert result["best_model"] == "good"
+    assert set(result["models"]) == {"good", "bad"}
 
 
 def _install_fake_finetune_modules(monkeypatch: pytest.MonkeyPatch) -> None:
