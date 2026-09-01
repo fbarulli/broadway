@@ -9,15 +9,10 @@ show over/under-representation directly.
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-
 import numpy as np
 import pandas as pd
-from _common import load_dataset
-from _text import MACRO_MAP, extract_volume_ml
+from _common import canonical_volume, has_barcode, load_dataset
+from _text import MACRO_MAP
 from scipy.stats import chi2_contingency, mannwhitneyu, pointbiserialr
 from sklearn.metrics import normalized_mutual_info_score
 
@@ -39,10 +34,9 @@ def cohens_d(a, b) -> float:
 
 def main() -> None:
     df = load_dataset()
-    bc = df["barcode"].fillna("").astype(str)
-    df["has_bc"] = bc.str.len().gt(0).astype(int)
+    df["has_bc"] = has_barcode(df).astype(int)
     df["macro"] = df["category"].fillna("").map(lambda c: MACRO_MAP.get(c, "OTHER"))
-    df["vol"] = df["title"].fillna("").map(extract_volume_ml).map(lambda t: t[0])
+    df["vol"] = canonical_volume(df["title"])["canonical_volume_ml"]
     df["price_num"] = pd.to_numeric(df["price"], errors="coerce")
 
     overall = df["has_bc"].mean()
@@ -62,10 +56,17 @@ def main() -> None:
     for col in ["price_num", "vol"]:
         a = df.loc[df["has_bc"] == 1, col].dropna()
         b = df.loc[df["has_bc"] == 0, col].dropna()
-        r = pointbiserialr(df["has_bc"], df[col].notna().astype(int) if col == "vol" else df[col])[0]
+        # value-based association: has_bc (0/1) vs the actual value (rows where
+        # the value exists) — consistent with the MWU / Cohen's d below.
+        vals = df[col].dropna()
+        mask = df.loc[vals.index, "has_bc"]
+        r_value = pointbiserialr(mask, vals)[0]
+        # presence-based association: has_bc (0/1) vs "is the value present?"
+        r_presence = pointbiserialr(df["has_bc"], df[col].notna().astype(int))[0]
         u_p = mannwhitneyu(a, b, alternative="two-sided").pvalue
         d = cohens_d(a, b)
-        print(f"{col:<12} point-biserial r={r:+.3f}  MWU p={u_p:.3e}  Cohen's d={d:+.3f}")
+        print(f"{col:<12} r_value={r_value:+.3f}  r_presence={r_presence:+.3f}  "
+              f"MWU p={u_p:.3e}  Cohen's d={d:+.3f}")
 
     print("\n=== selection ratio (segment coverage / overall) — most extreme ===")
     for col in ["country", "macro"]:

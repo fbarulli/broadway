@@ -16,7 +16,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
-from _common import RESULTS, load_euromonitor
+from _common import RESULTS, column_profile, has_barcode, load_euromonitor
 from _text import attributes_keys
 
 CSV_DESCRIBE = RESULTS / "01_eda_describe.csv"
@@ -41,7 +41,7 @@ def plot_barcode_coverage(df: pd.DataFrame, out_path: Path) -> None:
     Shows which BARCODEs give real cross-retailer matching signal (multi-
     retailer) vs single-retailer ones that only help validation.
     """
-    known = df.loc[df["barcode"].fillna("").str.len() > 0]
+    known = df.loc[has_barcode(df)]
     per_retailer_count = known.groupby("barcode")["retailer"].nunique()
     sku_count = known.groupby("barcode").size()
     multi = per_retailer_count > 1
@@ -126,7 +126,7 @@ def main() -> None:
     print(f"wrote {CSV_DESCRIBE}")
 
     # ---- BARCODE coverage CSV
-    known = df["barcode"].fillna("").str.len() > 0
+    known = has_barcode(df)
     per = df.loc[known, "barcode"].value_counts()
     multi_by_barcode = df.loc[known].groupby("barcode")["retailer"].nunique()
     # DISPLAY TABLE ONLY: top-25 BARCODEs + aggregate summary, never the full 15K list.
@@ -147,22 +147,10 @@ def main() -> None:
     # ---- dtypes CSV (display table). Loader reads dtype=str, so the stored
     # dtype is "object" everywhere — the numeric_like hint shows the real
     # content signal (fraction of non-null values that parse as a number).
-    dtypes = []
-    for col in df.columns:
-        non_null = int(df[col].notna().sum())
-        numeric_like = 0.0
-        if non_null:
-            sample = df[col].dropna().head(5000)
-            numeric_like = round(
-                float(pd.to_numeric(sample, errors="coerce").notna().mean()), 4)
-        dtypes.append({
-            "column": col,
-            "stored_dtype": str(df[col].dtype),
-            "non_null": non_null,
-            "numeric_like": numeric_like,
-        })
-    dtype_frame = pd.DataFrame(dtypes)
-    dtype_frame.to_csv(CSV_DTYPES, index=False)
+    # Single source: the shared column_profile helper (also used by 01b).
+    dtype_frame = column_profile(df)
+    dtype_frame[["column", "stored_dtype", "non_null", "numeric_like"]].to_csv(
+        CSV_DTYPES, index=False)
     print(f"wrote {CSV_DTYPES} (display table, {len(dtype_frame)} rows)")
     for _, r in dtype_frame.iterrows():
         print(f"  {r['column']:<22} dtype={r['stored_dtype']:<8} "

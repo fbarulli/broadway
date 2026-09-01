@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import sys
 import time
-from collections import defaultdict
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -24,75 +23,68 @@ matplotlib.use("Agg")
 import numpy as np
 from _blocking import build_pairs
 from _common import PATHS, SEED, load_dataset_deduped
-from _hard_negatives import mine_hard_negatives
+from _hard_negatives import build_triplets, mine_hard_negatives, pairs_in_set, split_barcodes
 from sklearn.metrics import roc_auc_score
 
-from broadway.training.nlp import encode_corpus, precision_at_recall
+from broadway.training.nlp import _cosine, encode_corpus, precision_at_recall
 
 MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 LOSS = "triplet"
 CACHE = str(PATHS.experiments.parent / "data" / "euromonitor" / "embeddings_cache")
-RESULTS = PATHS.experiments / "results" / "euromonitor"
 EPOCHS = 1
 BATCH_SIZE = 32
 LR = 2e-5
 MAX_TRIPLES = 5_000
 
 
+def _auc(pos_s: np.ndarray, neg_s: np.ndarray) -> float:
+    """ROC AUC of a held-out pos/neg pair score population (NaN if a side is empty)."""
+    if len(pos_s) == 0 or len(neg_s) == 0:
+        return float("nan")
+    return float(roc_auc_score(
+        np.r_[np.ones(len(pos_s)), np.zeros(len(neg_s))],
+        np.r_[pos_s, neg_s]))
+
+
 def main() -> None:
     t0 = time.perf_counter()
     df = load_dataset_deduped()
     payload = (df["title"].fillna("") + " | " + df["brand"].fillna("") + " | " + df["category"].fillna("")).tolist()
-    barcodes = df["barcode"].fillna("").astype(str)
-    row_bc = barcodes.to_numpy()
+    row_bc = df["barcode"].fillna("").astype(str).to_numpy()
 
     # ---- barcode-level 70/15/15 split (no same-product leakage) ----
-    known = df[barcodes.str.len() > 0]
-    multi = known[known.groupby("barcode")["retailer"].transform("nunique") > 1]
-    bcs = np.array(sorted(multi["barcode"].unique()))
-    perm = np.random.default_rng(SEED).permutation(len(bcs))
-    tr, va = int(0.70 * len(bcs)), int(0.85 * len(bcs))
-    split_bc = {
-        "train": set(bcs[perm[:tr]]),
-        "val": set(bcs[perm[tr:va]]),
-        "test": set(bcs[perm[va:]]),
-    }
-    print(f"entities: train {len(split_bc['train']):,} | val {len(split_bc['val']):,} | test {len(split_bc['test']):,}", flush=True)
+    split_bc = split_barcodes(df, SEED)
+    train_bc, val_bc, test_bc = split_bc["train"], split_bc["val"], split_bc["test"]
+    print(f"entities: train {len(train_bc):,} | val {len(val_bc):,} | test {len(test_bc):,}",
+          flush=True)
 
     pos, neg = build_pairs(df, SEED, 4, 10_000)
-    train_mask = np.isin(row_bc[pos[:, 0]], list(split_bc["train"])) & np.isin(row_bc[pos[:, 1]], list(split_bc["train"]))
-    test_mask = np.isin(row_bc[pos[:, 0]], list(split_bc["test"])) & np.isin(row_bc[pos[:, 1]], list(split_bc["test"]))
-    train_pos = pos[train_mask]
-    test_pos = pos[test_mask]
-    print(f"train positives {len(train_pos):,} | test positives {len(test_pos):,}", flush=True)
+    train_pos = pos[pairs_in_set(pos, row_bc, train_bc)]
+    val_pos = pos[pairs_in_set(pos, row_bc, val_bc)]
+    test_pos = pos[pairs_in_set(pos, row_bc, test_bc)]
+    # Held-out negatives: both endpoints must live in the SAME split, so the
+    # eval population shares no entity with training.
+    val_neg = neg[pairs_in_set(neg, row_bc, val_bc)]
+    test_neg = neg[pairs_in_set(neg, row_bc, test_bc)]
+    print(f"positives  train {len(train_pos):,} | val {len(val_pos):,} | test {len(test_pos):,}",
+          flush=True)
+    print(f"held-out negatives  val {len(val_neg):,} | test {len(test_neg):,}", flush=True)
 
     # ---- zero-shot embeddings (cached) for mining + baseline ----
     emb0, _ = encode_corpus(MODEL, payload, batch_size=256, max_seq_length=128, cache_dir=CACHE)
 
-    # ---- mine hard negatives, then keep only train-barcode anchors ----
-    hard_pairs, hard_cos = mine_hard_negatives(df, emb0, n_target=10_000)
-    hn_train_mask = np.isin(row_bc[hard_pairs[:, 0]], list(split_bc["train"]))
-    hard_pairs = hard_pairs[hn_train_mask]
-    hard_cos = hard_cos[hn_train_mask]
-    print(f"hard negatives (train anchors) {len(hard_pairs):,}", flush=True)
+    # ---- mine hard negatives, then split so BOTH endpoints are held in the
+    # same split (no train entity leaks into val/test, and vice versa) ----
+    hard_pairs, _ = mine_hard_negatives(df, emb0, n_target=10_000)
+    hard_train = hard_pairs[pairs_in_set(hard_pairs, row_bc, train_bc)]
+    hard_val = hard_pairs[pairs_in_set(hard_pairs, row_bc, val_bc)]
+    hard_test = hard_pairs[pairs_in_set(hard_pairs, row_bc, test_bc)]
+    print(f"hard negatives  train {len(hard_train):,} | val {len(hard_val):,} | "
+          f"test {len(hard_test):,}", flush=True)
 
-    # anchor -> list of hard-negative partners
-    hn_map: dict[int, list[int]] = defaultdict(list)
-    for (a, b), s in zip(hard_pairs, hard_cos):
-        hn_map[int(a)].append(int(b))
-
-    # ---- build triples: (anchor, positive, hard-negative) ----
-    from sentence_transformers import InputExample
-    rng = np.random.default_rng(SEED)
-    triples: list[InputExample] = []
-    for a, b in train_pos:
-        partners = hn_map.get(int(a)) or hn_map.get(int(b))
-        if not partners:
-            continue
-        c = int(partners[rng.integers(len(partners))])
-        triples.append(InputExample(texts=[payload[a], payload[b], payload[c]]))
-        if len(triples) >= MAX_TRIPLES:
-            break
+    triples = build_triplets(train_pos, hard_train, payload, seed=SEED, max_triples=MAX_TRIPLES)
+    if not triples:
+        raise RuntimeError("no training triples built (empty train hard-negative set)")
     print(f"training triples {len(triples):,} (loss={LOSS})", flush=True)
 
     # ---- fine-tune ----
@@ -105,23 +97,18 @@ def main() -> None:
     _finetune(model, params, triples, 128, loss=LOSS)
     print(f"fine-tuned in {time.perf_counter()-t0:.0f}s", flush=True)
 
-    # ---- encode full corpus with fine-tuned weights, score test pairs ----
+    # ---- encode full corpus with fine-tuned weights, score the held-out sets ----
     emb = model.encode(payload, batch_size=256, normalize_embeddings=True, show_progress_bar=False)
-    def cos(pairs):
-        return (emb[pairs[:, 0]] * emb[pairs[:, 1]]).sum(axis=1)
-    test_neg = neg  # random negatives for AUC; hard band scored separately
-    pos_s = cos(test_pos)
-    neg_s = cos(test_neg)
-    auc = roc_auc_score(np.r_[np.ones(len(pos_s)), np.zeros(len(neg_s))], np.r_[pos_s, neg_s])
-    print(f"fine-tuned AUC (test pos vs random neg): {auc:.4f}", flush=True)
 
-    # hard-band precision@recall (test pos vs hard negatives)
-    hn_test_mask = np.isin(row_bc[hard_pairs[:, 0]], list(split_bc["test"])) | np.isin(row_bc[hard_pairs[:, 1]], list(split_bc["test"]))
-    htp = hard_pairs[hn_test_mask]
-    hn_s = cos(htp) if len(htp) else np.array([])
-    p_at_r = precision_at_recall(pos_s, hn_s, target_recall=0.90)
-    print(f"hard-band pairs scored: {len(hn_s):,}", flush=True)
-    print(f"precision@90pct-recall on hard band: {p_at_r:.4f}", flush=True)
+    val_auc = _auc(_cosine(emb, val_pos), _cosine(emb, val_neg))
+    test_auc = _auc(_cosine(emb, test_pos), _cosine(emb, test_neg))
+    print(f"val AUC {val_auc:.4f} | test AUC {test_auc:.4f} (held-out pos vs random neg)",
+          flush=True)
+
+    val_p = precision_at_recall(_cosine(emb, val_pos), _cosine(emb, hard_val), target_recall=0.90)
+    test_p = precision_at_recall(_cosine(emb, test_pos), _cosine(emb, hard_test), target_recall=0.90)
+    print(f"precision@90pct-recall on hard band  val {val_p:.4f} | test {test_p:.4f}",
+          flush=True)
     print(f"TOTAL {time.perf_counter()-t0:.0f}s", flush=True)
 
 

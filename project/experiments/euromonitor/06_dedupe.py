@@ -20,6 +20,7 @@ stays the source of truth (load_dataset unchanged).
 
 Writes:
   project/data/euromonitor/dataset_deduped.csv   deduped dataset (pipeline input)
+  project/data/euromonitor/sku_to_rep.csv        raw SKU (product_id) -> rep_id
   results/06_dedupe_summary.csv                  per-tier counts (display table)
   results/06_ambiguous_offer_groups.csv          retailer+title with >1 price
 """
@@ -30,6 +31,7 @@ from _common import DATA_PATH, RESULTS, load_dataset
 CSV_SUMMARY = RESULTS / "06_dedupe_summary.csv"
 CSV_OFFERS = RESULTS / "06_ambiguous_offer_groups.csv"
 DEDUPED_PATH = DATA_PATH.with_name("dataset_deduped.csv")
+SKU_TO_REP_PATH = DATA_PATH.with_name("sku_to_rep.csv")
 
 HELPERS = ["_price", "_nonnull", "_has_bc"]
 
@@ -44,11 +46,27 @@ def main() -> None:
         _has_bc=(df["barcode"].fillna("").str.len() > 0).astype(int),
     )
 
-    def keep_best(groups: list[str], sort_cols: list[str],
-                  ascending: list[bool]) -> pd.DataFrame:
-        return (work.sort_values(sort_cols, ascending=ascending,
-                                 na_position="last")
-                    .drop_duplicates(groups, keep="first"))
+    # parent[i] = original row index of the surviving representative for row i.
+    # Updated per tier and resolved transitively at the end (a T1 survivor may
+    # itself be collapsed by T2/T3).
+    parent = {i: i for i in work.index}
+
+    def collapse(frame: pd.DataFrame, groups: list[str], sort_cols: list[str],
+                 ascending: list[bool]) -> tuple[pd.DataFrame, pd.Index]:
+        """Collapse each group to one representative; record the mapping.
+
+        Uses the SAME sort + first-of-group semantics as drop_duplicates
+        (groupby dropna=False so NaN==NaN grouping matches drop_duplicates).
+        """
+        ordered = frame.sort_values(sort_cols, ascending=ascending,
+                                    na_position="last")
+        survivors = ordered.drop_duplicates(groups, keep="first")
+        for _, grp in ordered.groupby(groups, sort=False, dropna=False):
+            rep = grp.index[0]
+            for idx in grp.index:
+                parent[idx] = rep
+        dropped = frame.index.difference(survivors.index)
+        return survivors, dropped
 
     summary = []
 
@@ -57,19 +75,20 @@ def main() -> None:
     # collapsed ("no barcode" is not "same barcode").
     with_bc = work[work["_has_bc"] == 1]
     no_bc = work[work["_has_bc"] == 0]
-    t1 = (with_bc.sort_values(["_nonnull", "_price"], ascending=[False, True],
-                              na_position="last")
-               .drop_duplicates(["retailer", "barcode"], keep="first"))
-    dropped1 = with_bc.index.difference(t1.index)
+    t1, dropped1 = collapse(with_bc, ["retailer", "barcode"],
+                            ["_nonnull", "_price"], [False, True])
     work = pd.concat([t1, no_bc])
     summary.append({"tier": "T1 retailer+barcode",
                     "dropped_rows": len(dropped1)})
 
-    # T2: retailer+title+price -> one row (lossless)
-    t2 = keep_best(["retailer", "title", "price"], ["_nonnull", "_price"],
-                   [False, True])
-    dropped2 = work.index.difference(t2.index)
-    work = work.drop(dropped2)
+    # T2: retailer+title+price -> one row (lossless), ONLY for rows that HAVE
+    # a price. NaN != NaN in the real world, so two missing-price rows are not
+    # "identical everything" and must flow to T3's auditable price-aggregation.
+    with_price = work[work["_price"].notna()]
+    no_price = work[work["_price"].isna()]
+    t2, dropped2 = collapse(with_price, ["retailer", "title", "price"],
+                            ["_nonnull", "_price"], [False, True])
+    work = pd.concat([t2, no_price])
     summary.append({"tier": "T2 retailer+title+price",
                     "dropped_rows": len(dropped2)})
 
@@ -77,23 +96,42 @@ def main() -> None:
     pv = work.groupby(["retailer", "title"])["_price"].agg(
         ["count", "nunique", "min", "max"])
     ambiguous = pv[(pv["count"] > 1) & (pv["nunique"] > 1)]
-    t3 = keep_best(["retailer", "title"], ["_has_bc", "_nonnull", "_price"],
-                   [False, False, True])
-    dropped3 = work.index.difference(t3.index)
-    work = work.drop(dropped3)
+    t3, dropped3 = collapse(work, ["retailer", "title"],
+                            ["_has_bc", "_nonnull", "_price"], [False, False, True])
+    work = t3
     summary.append({"tier": "T3 retailer+title (price-aggregation)",
                     "dropped_rows": len(dropped3)})
 
     # ---- outputs --------------------------------------------------------------
+    # Resolve representative pointers transitively (T1/T2 survivors may be
+    # dropped by a later tier), then emit the raw-SKU -> rep mapping so the
+    # deliverable notebook derives ITEM_ID from this step instead of re-deduping.
+    for i in df.index:
+        while parent[parent[i]] != parent[i]:
+            parent[i] = parent[parent[i]]
+
     deduped = work.drop(columns=HELPERS).reset_index(drop=True)
     deduped.to_csv(DEDUPED_PATH, index=False)
     print(f"wrote {DEDUPED_PATH} ({len(deduped):,} rows)")
 
-    # sanity: no (retailer,title) duplicates may remain
+    rep_pos = {idx: pos for pos, idx in enumerate(work.index)}
+    sku_to_rep = pd.DataFrame({
+        "product_id": df["product_id"].to_numpy(),
+        "rep_id": [rep_pos[parent[i]] for i in df.index],
+    })
+    sku_to_rep.to_csv(SKU_TO_REP_PATH, index=False)
+    print(f"wrote {SKU_TO_REP_PATH} ({len(sku_to_rep):,} rows)")
+
+    # sanity: no (retailer,title) duplicates may remain, and every raw SKU
+    # resolves to a valid representative.
     dups = int(deduped.duplicated(subset=["retailer", "title"]).sum())
     if dups:
         raise AssertionError(f"sanity FAILED: {dups} retailer+title dupes remain")
-    print("  [PASS] no retailer+title duplicates remain")
+    if sku_to_rep["rep_id"].isna().any():
+        raise AssertionError("sanity FAILED: some SKUs map to no representative")
+    if set(sku_to_rep["rep_id"].unique()) != set(range(len(deduped))):
+        raise AssertionError("sanity FAILED: rep_id coverage is not 0..n-1")
+    print("  [PASS] no retailer+title duplicates remain; SKU->rep mapping complete")
 
     summary.append({"tier": "TOTAL dropped", "dropped_rows": n0 - len(deduped)})
     summary.append({"tier": "TOTAL remaining", "dropped_rows": len(deduped)})

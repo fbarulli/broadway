@@ -58,7 +58,7 @@ CSV_SANITY = RESULTS / "02d_sanity_checks.csv"
 CSV_FLAGGED = RESULTS / "02d_flagged_examples.csv"
 PNG_STATUS = RESULTS / "02d_measurement_status.png"
 
-PINIED_WEIGHT_ROWS = 1644  # re-measured after mg + zero-claim fixes (was 1,932)
+PINNED_WEIGHT_ROWS = 1644  # re-measured after mg + zero-claim fixes (was 1,932)
 
 
 def main() -> None:
@@ -108,7 +108,7 @@ def main() -> None:
         ("S5 counts sum to full row count",
          n_missing + n_flagged + n_valid == len(df)),
         ("S6 weight_hint rows == 01c weight_unit_rows (re-pinned)",
-         n_weight_hint == PINIED_WEIGHT_ROWS),
+         n_weight_hint == PINNED_WEIGHT_ROWS),
     ]
     for name, ok in checks:
         if not ok:

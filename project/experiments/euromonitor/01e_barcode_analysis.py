@@ -9,11 +9,6 @@ evaluation is itself biased.
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-
 import matplotlib
 
 matplotlib.use("Agg")
@@ -21,20 +16,18 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from _common import PATHS, load_dataset
-from _text import MACRO_MAP, extract_volume_ml
-
-RESULTS = PATHS.experiments / "results" / "euromonitor"
+from _common import RESULTS, canonical_volume, has_barcode, load_dataset
+from _text import MACRO_MAP
 
 
 def main() -> None:
     RESULTS.mkdir(parents=True, exist_ok=True)
     df = load_dataset()
     bc = df["barcode"].fillna("").astype(str)
-    df["has_bc"] = bc.str.len().gt(0)
+    df["has_bc"] = has_barcode(df)
     df["bc_len"] = bc.str.len()
     df["macro"] = df["category"].fillna("").map(lambda c: MACRO_MAP.get(c, "OTHER"))
-    df["vol"] = df["title"].fillna("").map(extract_volume_ml).map(lambda t: t[0])
+    df["vol"] = canonical_volume(df["title"])["canonical_volume_ml"]
     df["price_num"] = pd.to_numeric(df["price"], errors="coerce")
 
     print(f"barcode coverage: {df['has_bc'].mean():.1%}")

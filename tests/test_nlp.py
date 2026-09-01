@@ -375,3 +375,28 @@ def test_run_nlp_end_to_end_generic_fixture(monkeypatch: pytest.MonkeyPatch) -> 
     assert result["best_model"] in cfg.model_zoo
     assert set(result["metrics"]) == set(cfg.model_zoo)
     assert all("auc" in m and "encode_s" in m for m in result["metrics"].values())
+
+
+def test_precision_at_recall_empty_negatives_returns_nan() -> None:
+    """An empty negative population must yield NaN, not a spuriously-perfect 1.0."""
+    from broadway.training.nlp import precision_at_recall
+
+    assert np.isnan(precision_at_recall(np.array([0.6, 0.7, 0.8]), np.array([])))
+
+
+def test_precision_at_recall_empty_positives_returns_nan() -> None:
+    """An empty positive population has no threshold to define -> NaN."""
+    from broadway.training.nlp import precision_at_recall
+
+    assert np.isnan(precision_at_recall(np.array([]), np.array([0.1, 0.2])))
+
+
+def test_cosine_shared_scorer() -> None:
+    """The shared _cosine scorer equals the per-pair dot product on unit vectors."""
+    from broadway.training.nlp import _cosine
+
+    emb = np.array([[1.0, 0.0], [0.0, 1.0], [1.0, 0.0]])
+    pairs = np.array([[0, 1], [0, 2]])
+    scores = _cosine(emb, pairs)
+    assert scores[0] == pytest.approx(0.0)
+    assert scores[1] == pytest.approx(1.0)

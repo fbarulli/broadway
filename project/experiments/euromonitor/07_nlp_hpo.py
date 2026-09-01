@@ -7,7 +7,7 @@ resolution (same-barcode positives vs cross-barcode negatives) as ROC AUC
 (maximize), and every trial records the corpus encode latency. The bandit,
 seeded TPE, mlflow per-trial callback, and RDB contract are reused unchanged.
 
-Ground truth is the SAME 12,038 positive / 10,000 negative pair population as
+Ground truth is the SAME 10,891 positive / 10,000 negative pair population as
 step 04 (the TF-IDF baseline), so the two scoring layers are directly
 comparable. The payload is title | brand | category. Cross-encoders are out of
 scope here (they are the two-stage rerank, a different objective).

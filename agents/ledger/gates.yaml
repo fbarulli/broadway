@@ -1,6 +1,6 @@
 # Gate registry SSOT — hand-maintained; the {01..09} gate fragments it consolidated predate git custody.
 meta:
-  head: '61252d3'
+  head: '6e967d3'
   counts:
     total: 134
     gates_with_findings: 78
@@ -2326,7 +2326,7 @@ gates:
   - project/data/euromonitor/eda.parquet (evidence)
   transforms:
   - 'series rooted at project/experiments/euromonitor/; UI served via experiments_ui.py (BROADWAY_EXPERIMENTS_ROOT pin)'
-  - 'raw dataset 198K rows x 13 cols (42% GTIN coverage); attribute column is ";"-delimited key:value string'
+  - 'raw dataset 71,623 rows (42% barcode coverage); attribute column is ";"-delimited key:value string'
   touched_by:
   - pandas@2.3.3
   validated_by:
@@ -3076,12 +3076,12 @@ gates:
 - id: GATE-HPO-154
   phase: hpo-optuna
   order: 101
-  owner: src/broadway/training/nlp.py:144 make_objective() + :191 run_nlp_hpo() + :248 run_nlp()
+  owner: src/broadway/training/nlp.py:226 make_objective() + :286 run_nlp_hpo() + :340 run_nlp()
   inputs:
   - 'src/broadway/config/schema.py:135 NLPConfig (typed data-agnostic config: model_zoo + hpo + knobs)'
   - 'project/config/experiments/nlp.yaml model_zoo + hpo: block (bi-encoder zoo SSOT, direction: maximize)'
   - sentence-transformers bi-encoders resolved via model_zoo (zero-shot; optional contrastive fine-tune examples)
-  - project/experiments/euromonitor/07_nlp_hpo.py pair construction (same 12,038 pos / 10,000 neg population as step 04)
+  - project/experiments/euromonitor/07_nlp_hpo.py pair construction (same 10,891 pos / 10,000 neg population as step 04)
   outputs:
   - 'per-model entity-resolution metrics (auc, recall_at_5pct_fpr, pos_median, neg_p90, encode_s) via trial broadway_metrics user attr'
   - 'bandit result {models, best_model, best_params, best_value, metrics} (direction: maximize, reused run_hpo_bandit)'

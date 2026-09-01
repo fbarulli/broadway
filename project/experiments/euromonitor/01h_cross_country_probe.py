@@ -11,11 +11,6 @@ cross-country pairs for manual labeling.
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-
 import matplotlib
 
 matplotlib.use("Agg")
@@ -24,21 +19,20 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from _blocking import build_pairs
-from _common import PATHS, SEED, load_dataset_deduped
-from _text import MACRO_MAP, extract_volume_ml
+from _common import PATHS, RESULTS, SEED, canonical_volume, load_dataset_deduped
+from _text import MACRO_MAP
 
 from broadway.training.nlp import encode_corpus
 
 MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 CACHE = str(PATHS.experiments.parent / "data" / "euromonitor" / "embeddings_cache")
-RESULTS = PATHS.experiments / "results" / "euromonitor"
 
 
 def main() -> None:
     RESULTS.mkdir(parents=True, exist_ok=True)
     df = load_dataset_deduped().reset_index(drop=True)
     df["macro"] = df["category"].fillna("").map(lambda c: MACRO_MAP.get(c, "OTHER"))
-    df["vol"] = df["title"].fillna("").map(extract_volume_ml).map(lambda t: t[0])
+    df["vol"] = canonical_volume(df["title"])["canonical_volume_ml"]
 
     payload = (df["title"].fillna("") + " | " + df["brand"].fillna("") + " | " + df["category"].fillna("")).tolist()
     emb, _ = encode_corpus(MODEL, payload, batch_size=256, max_seq_length=128, cache_dir=CACHE)

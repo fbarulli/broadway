@@ -22,7 +22,7 @@ matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
 import pandas as pd
-from _common import RESULTS, load_dataset
+from _common import RESULTS, has_barcode, load_dataset
 
 CSV_MISSING = RESULTS / "01d_description_missing.csv"
 PNG_CATEGORY = RESULTS / "01d_missing_by_category.png"
@@ -57,12 +57,12 @@ def main() -> None:
             add(dim, str(key), int(r["rows"]), int(r["miss"]))
 
     # ---- barcode correlation: is the gap shared with the other hole? ---------
-    has_barcode = df["barcode"].fillna("").str.len() > 0
-    add("barcode", "has_barcode", int(has_barcode.sum()),
-        int(missing[has_barcode].sum()))
-    add("barcode", "no_barcode", int((~has_barcode).sum()),
-        int(missing[~has_barcode].sum()))
-    double_missing = int((missing & ~has_barcode).sum())
+    known_bc = has_barcode(df)
+    add("barcode", "has_barcode", int(known_bc.sum()),
+        int(missing[known_bc].sum()))
+    add("barcode", "no_barcode", int((~known_bc).sum()),
+        int(missing[~known_bc].sum()))
+    double_missing = int((missing & ~known_bc).sum())
     print(f"  rows missing BOTH description and barcode: {double_missing:,} "
           f"({double_missing / n_total:.1%})")
 

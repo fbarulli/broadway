@@ -32,9 +32,9 @@ The naive approach — compare every SKU to every other SKU — is ~2.6 **billio
 2. **Score** each blocked pair with a **bi-encoder** (sentence-transformers `all-MiniLM-L6-v2`) cosine similarity. It beats TF-IDF (AUC 0.9993 vs 0.983) because it is *semantic*: `"Coca-Cola 500ml"` and `"Coca Cola 0.5 L"` are seen as the same product despite different words.
 3. **Link** with two rules:
    - **hard link** — identical non-empty **barcode** (GTIN) ⇒ same ITEM (ground-truth identity),
-   - **soft link** — cosine ≥ 0.55 (the 5%-FPR operating point) ⇒ same ITEM.
+   - **soft link** — same brand + same volume + cosine ≥ 0.85 ⇒ same ITEM (the tighter constraint that stops cross-variant chain-merging).
 4. **Transitive closure** (connected components) turns pairwise links into ITEM clusters, so A≈B and B≈C ⇒ A,B,C are one ITEM.
-5. **Dedupe first** — within-retailer marketplace listings (one title listed 143× on Gittigidiyor) are collapsed to a representative *before* matching, so we cluster products, not listings.
+5. **Dedupe first** — within-retailer marketplace listings (one title listed 143× on Gittigidiyor) were collapsed to a representative by `06_dedupe.py` *before* matching; this notebook consumes that deduped output.
 """),
 
     md("""## 2. Setup"""),
@@ -57,14 +57,15 @@ ROOT = Path.cwd()
 SERIES = ROOT / "project" / "experiments" / "euromonitor"
 sys.path.insert(0, str(SERIES))
 
-from _common import PATHS, SEED, load_dataset
+from _common import PATHS, SEED, load_dataset, load_dataset_deduped
 from _text import MACRO_MAP, extract_volume_ml
 
-from broadway.training.nlp import encode_corpus, entity_resolution_metrics
+from broadway.training.nlp import _cosine, encode_corpus, entity_resolution_metrics
 
 MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 CACHE = str(PATHS.experiments.parent / "data" / "euromonitor" / "embeddings_cache")
-THRESHOLD = 0.55   # bi-encoder operating point (5% false-positive rate)
+DATA_DIR = PATHS.experiments.parent / "data" / "euromonitor"
+SKU_TO_REP = DATA_DIR / "sku_to_rep.csv"   # written by 06_dedupe.py
 print("setup ok")"""),
 
     md("""## 3. Exploratory data analysis"""),
@@ -108,39 +109,28 @@ plt.show()"""),
 
     md("""## 4. Feature engineering
 
-Three cheap, high-signal features are engineered per SKU:
+Three cheap, high-signal features are engineered per representative SKU:
 - **canonical volume** (ml) parsed from the title (regex extractor, `_text.py`),
 - **macro category** (24 Euromonitor categories → 6 coarse buckets, for blocking),
-- **dedup key** (retailer, title) to collapse marketplace listings."""),
+- **barcode flag** — whether the representative carries a hard-link GTIN."""),
 
-    code("""df = raw.copy()
-df["canonical_volume_ml"] = df["title"].fillna("").map(extract_volume_ml).map(lambda t: t[0])
-df["macro_category"] = df["category"].fillna("").map(lambda c: MACRO_MAP.get(c, "OTHER"))
-df["has_barcode"] = df["barcode"].fillna("").str.len().gt(0)
-print(f"volume extracted: {df['canonical_volume_ml'].notna().mean():.1%}  |  macro buckets: {df['macro_category'].nunique()}")
-df[["title", "brand", "macro_category", "canonical_volume_ml", "has_barcode"]].head(3)"""),
+    code("""reps = load_dataset_deduped()   # step 06's tiered dedupe output (matching input)
+reps["canonical_volume_ml"] = reps["title"].fillna("").map(extract_volume_ml).map(lambda t: t[0])
+reps["macro_category"] = reps["category"].fillna("").map(lambda c: MACRO_MAP.get(c, "OTHER"))
+reps["has_barcode"] = reps["barcode"].fillna("").str.len().gt(0)
+print(f"representatives: {len(reps):,}  |  volume extracted: {reps['canonical_volume_ml'].notna().mean():.1%}  |  macro buckets: {reps['macro_category'].nunique()}")
+reps[["title", "brand", "macro_category", "canonical_volume_ml", "has_barcode"]].head(3)"""),
 
-    md("""## 5. Dedupe — collapse marketplace listings to a representative
+    md("""## 5. Dedupe — already applied by 06_dedupe.py
 
-Within a retailer, many sellers list the same product (one title listed 143×). We keep **one representative per (retailer, title)** — preferring a row that has a barcode, else the most complete, else the lowest price — and remember which SKUs map to which representative."""),
+`06_dedupe.py` collapsed the within-retailer marketplace listings (tiered: retailer+barcode → retailer+title+price → retailer+title) into `dataset_deduped.csv` and wrote `sku_to_rep.csv` mapping every raw SKU to its representative. We load that mapping here so the final ITEM_ID derives from step 06's single source of truth instead of a notebook re-implementation."""),
 
-    code("""# collapse within-retailer marketplace listings: one representative per (retailer, title).
-# Representative rule: prefer a row with a barcode, then the most complete row, then lowest price.
-raw["_price"] = pd.to_numeric(raw["price"], errors="coerce")
-raw["_has_bc"] = raw["barcode"].fillna("").str.len().gt(0).astype(int)
-raw["_nonnull"] = raw.notna().sum(axis=1)
-raw["_rank"] = raw["_has_bc"] * 1e12 + raw["_nonnull"] * 1e6 - raw["_price"].fillna(1e9)
-
-# NaN-safe dedup key (empty title/retailer become "", so dict lookups cannot miss)
-raw["_title"] = raw["title"].fillna("")
-raw["_retailer"] = raw["retailer"].fillna("")
-rep_pos = raw.groupby(["_retailer", "_title"], sort=False)["_rank"].idxmax()
-reps = raw.loc[rep_pos.values].reset_index(drop=True)
-
-# exact SKU -> representative mapping (same source frame, so it cannot miss)
-key_to_rep = {(r, t): i for i, (r, t) in enumerate(zip(reps["_retailer"], reps["_title"]))}
-raw["rep_id"] = [key_to_rep[(r, t)] for r, t in zip(raw["_retailer"], raw["_title"])]
-print(f"representatives: {len(reps):,}  (from {len(raw):,} SKUs; dropped {len(raw) - len(reps):,} duplicates)")"""),
+    code("""# every raw SKU -> its deduped representative id (positional index into `reps`)
+sku_to_rep = pd.read_csv(SKU_TO_REP, dtype=str)
+print(f"SKU -> representative mapping: {len(sku_to_rep):,} rows")
+assert len(sku_to_rep) == len(raw), "sku_to_rep.csv does not cover every raw SKU"
+assert set(sku_to_rep["product_id"]) == set(raw["product_id"]), "product_id mismatch vs raw"
+"""),
 
     md("""## 6. Embed the representatives
 
@@ -203,8 +193,9 @@ n_items, rep_item = connected_components(graph, directed=False)
 print(f"ITEMs (clusters): {n_items:,}  from {n:,} representatives")
 print(f"sizes: median {np.median(np.bincount(rep_item)):.0f}, max {np.bincount(rep_item).max():,}")"""),
 
-    code("""# map every SKU to its ITEM_ID, and write the deliverable
-raw["ITEM_ID"] = [rep_item[int(i)] for i in raw["rep_id"]]
+    code("""# map every SKU to its ITEM_ID via 06's representative, and write the deliverable
+rep_of = dict(zip(sku_to_rep["product_id"], sku_to_rep["rep_id"].astype(int)))
+raw["ITEM_ID"] = [rep_item[rep_of[pid]] for pid in raw["product_id"]]
 out = raw[["product_id", "ITEM_ID"]].rename(columns={"product_id": "SKU_ID"})
 out_path = PATHS.experiments / "results" / "euromonitor" / "sku_to_item.csv"
 out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -219,8 +210,8 @@ Barcode gives us an **independent** ground truth: two listings with the same non
     code("""from _blocking import build_pairs
 
 pos, neg = build_pairs(reps, SEED, 4, 10_000)   # same-barcode / cross-barcode
-pos_s = (emb[pos[:, 0]] * emb[pos[:, 1]]).sum(axis=1)
-neg_s = (emb[neg[:, 0]] * emb[neg[:, 1]]).sum(axis=1)
+pos_s = _cosine(emb, pos)
+neg_s = _cosine(emb, neg)
 m = entity_resolution_metrics(pos_s, neg_s)
 pd.DataFrame([{"metric": k, "value": v} for k, v in m.items()])"""),
 

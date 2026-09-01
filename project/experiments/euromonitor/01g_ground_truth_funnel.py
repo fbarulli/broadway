@@ -9,26 +9,19 @@ and shows where the usable labels live geographically.
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-
 import matplotlib
 
 matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
-from _common import PATHS, load_dataset
-
-RESULTS = PATHS.experiments / "results" / "euromonitor"
+from _blocking import build_pairs
+from _common import RESULTS, SEED, has_barcode, load_dataset
 
 
 def main() -> None:
     RESULTS.mkdir(parents=True, exist_ok=True)
     df = load_dataset()
-    bc = df["barcode"].fillna("").astype(str)
-    has_bc = bc.str.len() > 0
+    has_bc = has_barcode(df)
 
     n_total = len(df)
     n_barcoded = int(has_bc.sum())
@@ -42,12 +35,16 @@ def main() -> None:
     # conflicting-barcode groups (same title+brand, >1 unique barcode) = mislabeled -> exclude
     conf = multi.groupby(["title", "brand"])["barcode"].nunique()
     conflicting = conf[conf > 1]
-    n_conf_rows = int(multi.set_index(["title", "brand"]).index.isin(conflicting.index).sum())
+    conflict_mask = multi.set_index(["title", "brand"]).index.isin(conflicting.index)
+    n_conf_rows = int(conflict_mask.sum())
     n_clean_rows = n_multi_rows - n_conf_rows
 
-    # usable positive pairs (title-deduped within each clean multi-retailer group, cap 4)
-    from _blocking import build_pairs
-    pos, _ = build_pairs(df, 42, 4, 10_000)  # title-deduped positives (cap 4)
+    # usable positive pairs (title-deduped within each clean multi-retailer group, cap 4).
+    # The SAME conflict exclusion as the "clean" stage is applied BEFORE pair
+    # building so the funnel is monotonic (usable pairs <= clean rows). Seed comes
+    # from _common (config SSOT), not a hardcoded 42.
+    clean_multi = multi.loc[~conflict_mask].reset_index(drop=True)
+    pos, _ = build_pairs(clean_multi, SEED, 4, 10_000)
     n_pos = len(pos)
 
     print(f"total SKUs:              {n_total:,}")
