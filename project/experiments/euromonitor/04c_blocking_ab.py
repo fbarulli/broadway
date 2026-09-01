@@ -30,7 +30,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pandas as pd
 from _blocking import build_true_pairs, eval_blocking
-from _common import RESULTS, load_dataset
+from _common import RESULTS, load_dataset_deduped
 from _text import MACRO_MAP, extract_volume_ml
 
 CSV_BLOCKING = RESULTS / "04c_blocking_ab.csv"
@@ -43,7 +43,7 @@ NO_CATEGORY = "NO_CATEGORY"
 
 def main() -> None:
     RESULTS.mkdir(parents=True, exist_ok=True)
-    df = load_dataset()
+    df = load_dataset_deduped()
     # canonical volume per row (02's name-only extractor, already bucketed).
     # vol_ml stays numeric (NaN = missing) for the loss decomposition; the
     # blocking key uses the NO_VOL sentinel so missing values are explicit.

@@ -29,7 +29,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import yaml
 from _blocking import build_pairs
-from _common import PATHS, RESULTS, load_dataset
+from _common import PATHS, RESULTS, load_dataset_deduped
 
 from broadway.config.schema import NLPConfig
 from broadway.timing import TimingReport
@@ -55,7 +55,7 @@ def main() -> None:
 
     report = TimingReport()
     with report.record("data_load"):
-        df = load_dataset()
+        df = load_dataset_deduped()
     with report.record("payload_build"):
         payload = (
             df["title"].fillna("") + PAYLOAD_SEP + df["brand"].fillna("") + PAYLOAD_SEP + df["category"].fillna("")

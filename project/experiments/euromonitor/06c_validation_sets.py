@@ -18,7 +18,7 @@ Writes:
 import numpy as np
 import pandas as pd
 from _blocking import build_true_pairs
-from _common import RESULTS, SEED, load_dataset
+from _common import RESULTS, SEED, load_dataset_deduped
 from _matching import build_vectorizer, score_pairs
 
 CSV_SUMMARY = RESULTS / "06c_validation_summary.csv"
@@ -30,7 +30,7 @@ N_NEG = 20_000
 
 def main() -> None:
     RESULTS.mkdir(parents=True, exist_ok=True)
-    df = load_dataset()
+    df = load_dataset_deduped()
     titles = df["title"].fillna("").str.strip().tolist()
     rng = np.random.default_rng(SEED)
 

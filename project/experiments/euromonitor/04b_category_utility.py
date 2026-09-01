@@ -36,7 +36,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from _blocking import build_pairs
-from _common import RESULTS, SEED, load_dataset
+from _common import RESULTS, SEED, load_dataset_deduped
 from _text import MACRO_MAP
 from scipy.stats import chi2_contingency
 from sklearn.metrics import mutual_info_score
@@ -64,7 +64,7 @@ def cramers_v(x: pd.Series, y: pd.Series) -> float:
 
 def main() -> None:
     RESULTS.mkdir(parents=True, exist_ok=True)
-    df = load_dataset()
+    df = load_dataset_deduped()
     df["macro_category"] = df["category"].map(MACRO_MAP)
 
     # ---- label pairs: positive = same barcode, negative = cross barcode ------

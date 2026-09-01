@@ -32,7 +32,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from _blocking import build_pairs
-from _common import RESULTS, SEED, load_dataset
+from _common import RESULTS, SEED, load_dataset_deduped
 from _matching import build_vectorizer, score_pairs
 from sklearn.metrics.pairwise import cosine_similarity
 
@@ -52,7 +52,7 @@ DEMO_BARCODE = "5021554989646"
 
 def main() -> None:
     RESULTS.mkdir(parents=True, exist_ok=True)
-    df = load_dataset()
+    df = load_dataset_deduped()
     titles = df["title"].fillna("").str.strip().tolist()
     title_to_idx = {t: i for i, t in enumerate(titles)}
 

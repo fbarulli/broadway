@@ -36,7 +36,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from _blocking import build_true_pairs, eval_blocking
-from _common import RESULTS, load_dataset
+from _common import RESULTS, load_dataset_deduped
 from _text import MACRO_MAP, extract_pack_counts, extract_volume_ml, flavor_from_name
 
 CSV_AUDIT = RESULTS / "05_blocking_feature_audit.csv"
@@ -58,7 +58,7 @@ def agree_when_both(raw: pd.Series, pairs) -> float | None:
 
 def main() -> None:
     RESULTS.mkdir(parents=True, exist_ok=True)
-    df = load_dataset()
+    df = load_dataset_deduped()
     pairs = build_true_pairs(df)
     print(f"true pairs: {len(pairs):,}")
 
