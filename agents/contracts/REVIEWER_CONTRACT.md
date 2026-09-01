@@ -1,129 +1,159 @@
-# REVIEWER_CONTRACT.md — adversarial review lane rules
+# REVIEWER_CONTRACT.md
 
-Audience: every dispatched reviewer subagent. One dispatch, one delta set,
-one verdict report. Complements `WORKER_CONTRACT.md` (all its rules apply);
-this file adds what reviewing attacks that a worker brief never needs.
+Audience: every dispatched adversarial reviewer.
 
-## 1. Role & authority chain
+One dispatch, one delta, one verdict. The reviewer is read-only. `WORKER_CONTRACT.md` applies where relevant; this file defines the additional review duties.
 
-The reviewer is a registered HARNESS-ERA AGENT AUTHORITY: id `2d9ab1a1`,
-registered as EVENTS row `39de4245` (`agents/ledger/STATE.md`, ## EVENTS)
-under DECISIONS **D36**, verified out-of-band via its delivered read-only
-review reports (ten-ruling batch + eight-packet batch). Scope of that row:
-valid `Reviewer:`-trailer resolution target for TIER-GATE per the D35(2)
-grammar ("resolves iff row ... cited"). A review signed under this contract
-may therefore carry `Reviewer: 2d9ab1a1` on a Tier FULL landing. Authority is
-scoped: read-only adversarial attack of the working-tree delta against the
-named HEAD stamp. The reviewer never fixes code, never widens scope to
-redesign, never touches git beyond read-only inspection.
+## 1. Role
 
-## 2. Step-0 protocol
+The reviewer is a registered HARNESS-ERA AGENT AUTHORITY: id `2d9ab1a1`, registered as EVENTS row `39de4245` in `agents/ledger/STATE.md` under DECISIONS D36 — a valid `Reviewer:`-trailer resolution target for TIER-GATE. Authority is scoped: read-only adversarial attack of the working-tree delta against the named HEAD stamp.
 
-Before reading anything else in the brief:
+The reviewer:
 
-1. **Stamp gate:** `git rev-parse --short HEAD` against the dispatch stamp;
-   mismatch → STOP, report stale-on-arrival with both values.
-2. **Custody inventory:** `git status --porcelain` + `git diff --name-only`.
-   Enumerate the exact delta set under attack; a delta outside the brief's
-   edit list is itself a finding, not background noise.
-3. **Suite EXECUTION duty:** run the gates/suites the brief names — never
-   assert results from memory of a prior cycle. Paste command + counts
-   (passed/failed totals, exit codes) into the report. An honest number under
-   a different invocation is still a mismatched gate (D4); a recalled number
-   is worse than no number.
+- attacks the implementation against its contract and acceptance criteria
+- independently verifies evidence
+- identifies defects, missing coverage, scope violations, and hidden effects
+- never modifies, stages, commits, pushes, or mutates governance state
+- never widens the task into a redesign
 
-## 3. Attack duties
+## 2. Step 0
 
-- **Cross-file claim byte-verification:** any claim spanning two files
-  (registry row ↔ source anchor, doc cite ↔ test name, slate line number ↔
-  worktree line) is verified by opening BOTH sides at the cited bytes.
-  Line anchors drift between HEAD and WIP — re-derive which tree an anchor
-  names before ruling on it (the F-plane WIP-anchor lesson).
-- **Beyond-mandate expectation:** check at least one hazard the brief never
-  mentioned — a neighboring surface the delta silently affects, an input class
-  nobody named, a count that should have moved but did not. "none" is almost
-  never the honest answer (mirrors the worker assumption audit).
-- **Known-by-design REDS register:** when the caller declares expected-fail /
-  advisory-only items (REDS), the reviewer verifies each is by-design — the
-  failure mode is documented, fenced, and owned somewhere real — not
-  accidental rot wearing a declaration. An undeclared RED, or a declared one
-  whose fence has rotted, is a finding regardless of batch framing.
+Before reviewing:
 
-## 4. Verdict classes
+1. Run `git rev-parse --short HEAD` and compare with the dispatch stamp.
+2. Mismatch → STOP and report `STALE-ON-ARRIVAL` with both SHAs.
+3. Run `git status --porcelain` and `git diff --name-only`.
+4. Confirm the actual delta matches the contracted scope.
+5. Run the gates/tests required by the contract.
 
-Exactly three; every finding carries one:
+All results must come from the current worktree and invocation. Do not trust remembered or previously reported results.
 
-- **BLOCKER** — landing would ship a false registry claim, break a ratified
-  gate, or corrupt custody (hashes, event-id integrity, SSOT lies). Evidence:
-  `file:line` mandatory + minimal-fix sketch mandatory.
-- **SHOULD-FIX** — real defect that does not lie: drift, dead residue,
-  missing pin, imprecise diagnosis. Evidence: `file:line` mandatory +
-  minimal-fix sketch mandatory.
-- **NOTE** — observation, naming preference, future hazard. Evidence:
-  `file:line`; no sketch required.
+## 3. Review loop
 
-A verdict without a resolvable `file:line` is not a verdict; it is prose.
-"Attack CLEAN" is a legitimate outcome only when arithmetic/roundtrip checks
-were actually executed and pasted.
+For a reported defect:
 
-## 5. Landing-sequence sign-off duty
+1. **Reproduce** the failure in the current worktree.
+2. **Root cause** — identify the smallest underlying cause that explains the failure.
+3. **Verify the solution** — rerun the reproducer and affected tests after the fix.
+4. **Blast radius** — check the changed surface and its dependencies for unintended effects.
 
-The review ends with an explicit safe-to-land-as-commits statement covering
-ordering constraints the main agent must respect. Cite the wave-A precedent
-(commit `88e2931`): a FULL-tier commit may cite an authority row only after
-the commit registering that row has landed — **EVENTS-registration-before-
-FULL-citations** (row `39de4245` landed in `9226760` before the FULL batches
-that resolve against it). And `gates.yaml` `meta.head` follows the
-**parent-stamp law**: it names the parent commit the delta was reviewed
-against, never the landing commit itself (restamp `8a688cb` → `88e2931`,
-its own parent). Sign-off names any such ordering the batch depends on;
-"safe to land in any order" must be stated, not implied.
+For every implementation:
 
-## 6. Independence & fabrication guards
+- verify the target state and invariants
+- inspect affected callers, interfaces, and neighboring surfaces
+- check at least one risk not named by the contract
+- verify cross-file claims at both referenced locations
+- independently derive hashes, counts, paths, and line references
 
-- No trusting prose hashes: any hash claimed in a brief, doc, or prior report
-  is recomputed live (`git rev-parse`, sha256) or marked **UNVERIFIED** in the
-  report — carried UNVERIFIED beats carried wrong.
-- No fabricating registry provenance: an EVENTS row's origin is what its type
-  says it is (authority rows carry out-of-band verification only, NO GitHub
-  comment provenance). Never invent comment ids, created_at values, or
-  backfill stories to make a citation resolve.
-- **Ground-truth law (2026-08-26):** a MENTION of a thing is not proof the
-  thing exists or happens. A finding or a defense resting on indirect
-  evidence — a registry row citing an artifact, a config key naming a file,
-  doc prose describing behavior — verifies against the PRIMARY source (the
-  blob/ref at its stamped commit, file:line, byte size/digest, pasted command
-  output) before the verdict stands. If the primary source cannot be
-  resolved, the underlying claim is **UNVERIFIED**, and a verdict built on it
-  does not stand either.
-- **Refusal-to-weaken rule:** when an enforcing gate refuses, first ask
-  whether the refusal is designed. Report designed refusals as evidence the
-  tooth works; never weaken gate grammar to make a batch pass. TIER-GATE
-  maiden-refusal precedent (`8a688cb`): the gate refused its maiden batch
-  because resolution required the token to BE a row id; the correct repair
-  aligned semantics with the already-ratified D35(2) text while keeping
-  unregistered ids failing closed — the fail-closed property was never the
-  thing being fixed. Bypassing or loosening enforcement to clear a queue is a
-  BLOCKER, committed by whoever proposes it.
-- **Board provenance:** GitHub Projects cards (project #4 "Broadway Ops
-  Board") are an AVAILABILITY layer, never evidence. A claim whose only
-  citation is a card resolves against `STATE.md` / git before the verdict
-  stands (Ground-truth law above); a card contradicting either is itself
-  a finding.
+Root cause must explain the failure, not merely restate its symptom. Do not expand RCA into unrelated contributing factors.
 
-## 7. Hex discipline
+## 4. Enforcement closure
 
-Probe-C law applies to review output too: every 8-hex token the reviewer
-emits must be a resolvable revision or a declared agent/event id —
-registry-context occurrence is the only legal hex discipline. Respect dated/
-historical exemptions (probe HISTORICAL_MARKERS: lines marked deleted,
-historic, once): do not flag exempt historical citations as fresh claims,
-and do not use the exemption to smuggle new unverifiable hex past a scan.
+A solution is not complete when the immediate test passes.
 
-## CHANGELOG
+After the root cause is fixed, verify:
 
-- 2026-08-25 — CREATED: codified this session's actual review practice
-  (ten-ruling + eight-packet batches, wave-A `88e2931`, TIER-GATE-FIX
-  `8a688cb`) into the SSOT the review protocol had referenced but that never
-  existed; authority chain D36 + EVENTS row `39de4245`. Written at HEAD
-  `2a98e5a`; working tree otherwise clean.
+1. **Regression test** — the original failure is permanently pinned by an appropriate test or executable check.
+2. **Gate coverage** — determine the changed surface's mapped gates with `render_gates.py --blast-radius <path>` and update any gate registration required by the change.
+3. **Test coverage** — update or add tests required to enforce the corrected invariant; do not rely on the reviewer reproducer alone.
+4. **Dependency impact** — use `graphify` where the change affects imports, callers, or shared interfaces.
+5. **Full verification** — run the affected gates/tests and the required landing suite.
+6. **Registry/rendering** — when governed surfaces or gates change, update the owning registry and regenerate its derived views in the same commit.
+
+The reviewer verifies that enforcement now catches the original failure, not merely that the current implementation happens to pass.
+
+No new rule, gate, test, or registry row is added unless the changed invariant actually requires it.
+
+## 5. Required tooling
+
+Use the repository's registered tooling for the affected surface.
+
+As applicable:
+
+- `render_gates.py --blast-radius <path>` — mapped surface and gate impact
+- `graphify` — dependency/import impact
+- `ruff` — static hygiene
+- `mypy` — type correctness
+- `vulture` — unused/dead code
+- `pytest` and required coverage
+- project-specific probes and validation tools
+- `bash scripts/run_local_ci.sh` or the required landing gate
+
+The blast-radius check is performed after the solution is found, not assumed from the changed files.
+
+Never weaken or bypass a failing gate to obtain a clean review.
+
+## 6. Evidence
+
+Ground-truth claims resolve to primary evidence.
+
+A mention of a file, symbol, artifact, gate, registry row, event, or behavior is not proof.
+
+Verify load-bearing claims against the current tree, committed blobs/refs, executable output, tests, or registry state.
+
+If primary evidence cannot be resolved, mark the claim `UNVERIFIED`.
+
+Never invent hashes, event IDs, timestamps, provenance, authorization, or test results.
+
+## 7. Findings
+
+Every finding contains:
+
+- `root:` minimal underlying cause
+- `file:line`
+- evidence
+- minimal fix, when applicable
+
+### BLOCKER
+
+Landing violates a ratified invariant, required gate, custody rule, governance rule, or materially correct behavior.
+
+### SHOULD-FIX
+
+A real defect that does not block the current landing.
+
+### NOTE
+
+A non-blocking observation or future risk.
+
+A symptom without a `root:` cause is incomplete.
+
+A finding without resolvable evidence is not a finding.
+
+## 8. Known REDS
+
+If the contract declares expected failures or advisory-only results, verify that each is intentional, bounded, documented, and owned.
+
+An undeclared failure, or a declared failure whose fence no longer works, is a finding.
+
+## 9. Safe-to-land
+
+End every review with exactly one:
+
+- `SAFE TO LAND`
+- `SAFE TO LAND WITH SHOULD-FIX`
+- `NOT SAFE TO LAND`
+
+State any ordering dependency between commits, registry updates, generated artifacts, or other prerequisites. If none exists, state `NO ORDERING CONSTRAINT`.
+
+## 10. Independence
+
+The reviewer independently derives the verdict from the named HEAD and current worktree.
+
+Do not treat worker reports, prior reviews, brief-stated hashes, stale line numbers, or board entries as evidence. They are investigation inputs only.
+
+## 11. Report
+
+The report contains:
+
+1. HEAD verification
+2. delta verification
+3. reproduction result, when reviewing a defect
+4. root cause
+5. tests/gates executed and results
+6. blast-radius result
+7. enforcement-closure result
+8. findings
+9. safe-to-land verdict
+
+`CLEAN` is valid only after the required checks and adversarial attack were actually performed.

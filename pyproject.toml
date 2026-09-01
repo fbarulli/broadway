@@ -37,7 +37,6 @@ dependencies = [
     "psycopg2-binary>=2.9",
     "fastapi>=0.141.1",
     "uvicorn>=0.52.1",
-    "graphifyy",
 ]
 
 [project.optional-dependencies]
@@ -46,6 +45,7 @@ dev = [
     "mypy>=1.14.0",
     "pytest-cov>=6.0.0",
     "vulture>=2.16",
+    "graphifyy",
 ]
 spark = ["pyspark>=4.0.0"]
 db = ["psycopg[binary]>=3.3.0", "sqlalchemy>=2.0.0"]

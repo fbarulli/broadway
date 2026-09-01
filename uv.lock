@@ -268,7 +268,6 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "fastapi" },
-    { name = "graphifyy" },
     { name = "joblib" },
     { name = "kubernetes" },
     { name = "lightgbm" },
@@ -303,6 +302,7 @@ dependencies = [
 
 [package.optional-dependencies]
 all = [
+    { name = "graphifyy" },
     { name = "kubernetes" },
     { name = "mypy" },
     { name = "psycopg", extra = ["binary"] },
@@ -317,6 +317,7 @@ db = [
     { name = "sqlalchemy" },
 ]
 dev = [
+    { name = "graphifyy" },
     { name = "mypy" },
     { name = "pytest-cov" },
     { name = "ruff" },
@@ -333,7 +334,7 @@ spark = [
 requires-dist = [
     { name = "broadway", extras = ["spark", "db", "k8s", "dev"], marker = "extra == 'all'" },
     { name = "fastapi", specifier = ">=0.141.1" },
-    { name = "graphifyy", git = "https://github.com/Graphify-Labs/graphify.git" },
+    { name = "graphifyy", marker = "extra == 'dev'", git = "https://github.com/Graphify-Labs/graphify.git" },
     { name = "joblib", specifier = ">=1.5.0" },
     { name = "kubernetes", specifier = ">=32.0.0" },
     { name = "kubernetes", marker = "extra == 'k8s'", specifier = ">=32.0.0" },
