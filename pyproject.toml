@@ -50,7 +50,11 @@ dev = [
 spark = ["pyspark>=4.0.0"]
 db = ["psycopg[binary]>=3.3.0", "sqlalchemy>=2.0.0"]
 k8s = ["kubernetes>=32.0.0"]
-all = ["broadway[spark,db,k8s,dev]"]
+# NLP entity-resolution runtime (bi-encoder encode + optional fine-tune).
+# Lazy-imported by broadway.training.nlp; kept optional because torch is a
+# heavy dependency and the nlp tests are hermetic (no weights loaded).
+nlp = ["sentence-transformers>=6.0.1", "torch>=2.13.0"]
+all = ["broadway[spark,db,k8s,dev,nlp]"]
 
 [project.scripts]
 ds-pipeline = "broadway.cli:main"

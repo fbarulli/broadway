@@ -3,8 +3,8 @@
 The sklearn HPO pipeline (broadway.training.hpo) treats each model as a
 sklearn Pipeline built from a PipelineConfig and minimizes a regression metric.
 This module adapts the SAME bandit machinery to NLP: each HPO "model" is a
-bi-encoder (sentence-transformers), the objective scores title-pair entity
-resolution (same-barcode positives vs cross-barcode negatives) as ROC AUC and
+bi-encoder (sentence-transformers), the objective scores text-pair entity
+resolution (positive pairs vs negative pairs) as ROC AUC and
 RECORDS the corpus encode latency, and the direction is "maximize" (higher AUC
 is better). The bandit allocation, seeded TPE, mlflow per-trial callback, and
 RDB storage contract are all reused unchanged from hpo.py / optuna.py.
@@ -47,8 +47,8 @@ def entity_resolution_metrics(
 ) -> dict[str, float]:
     """Ranking metrics for a bi-encoder's pos-vs-neg score populations.
 
-    pos_scores are true-pair (same-barcode) cosine similarities, neg_scores are
-    cross-barcode non-pairs. Returns AUC (probability a random positive outscores
+    pos_scores are true-pair similarities, neg_scores are non-pair
+    similarities. Returns AUC (probability a random positive outscores
     a random negative) plus the recall at a fixed false-positive budget and the
     score-distribution summaries used for the threshold trade-off.
     """
@@ -114,6 +114,36 @@ def _encode_payload(
         cache_path.parent.mkdir(parents=True, exist_ok=True)
         np.savez(cache_path, emb=emb, encode_s=encode_s)
     return emb, encode_s
+
+
+def encode_corpus(
+    model_id: str,
+    payload: list[str],
+    *,
+    device: str = "cpu",
+    batch_size: int = 256,
+    max_seq_length: int = 128,
+    cache_dir: str | None = None,
+    prompt: str | None = None,
+) -> tuple[np.ndarray, float]:
+    """Encode a corpus once; reuse the .npz cache. Returns (emb, encode_s).
+
+    The reusable, non-HPO entry point for the encode-once/score-many path that
+    ``make_objective`` uses internally: load one bi-encoder, encode the payload,
+    and return ``(embeddings, encode_seconds)``. With ``cache_dir`` set, a warm
+    call returns the cached matrix (same payload + knobs) without re-encoding,
+    while still reporting the original encode wall-time. Callers can persist the
+    returned matrix as a first-class artifact and pass it to downstream scoring
+    instead of re-encoding per experiment.
+    """
+    from sentence_transformers import SentenceTransformer
+
+    model = SentenceTransformer(model_id, device=device)
+    model.max_seq_length = max_seq_length
+    cache_path = _embedding_cache_path(
+        cache_dir, model_id, payload, max_seq_length, batch_size, prompt
+    )
+    return _encode_payload(model, payload, batch_size, cache_path, prompt)
 
 
 def _finetune(model, params: dict[str, float | int], examples, max_seq_length: int) -> None:

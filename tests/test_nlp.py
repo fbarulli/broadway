@@ -303,6 +303,36 @@ def test_encode_payload_cache_roundtrip(tmp_path) -> None:
     assert _embedding_cache_path(None, "m", payload, 128, 32) is None
 
 
+def test_encode_corpus_returns_embeddings_and_reuses_cache(
+    tmp_path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """encode_corpus is the reusable non-HPO encode entry point."""
+    from broadway.training.nlp import encode_corpus
+
+    st = types.ModuleType("sentence_transformers")
+
+    class _Model:
+        def __init__(self, model_id: str, device: str = "cpu") -> None:
+            self.model_id = model_id
+            self.max_seq_length = None
+
+        def encode(self, payload, **kwargs):
+            del kwargs
+            emb = np.random.default_rng(0).normal(size=(len(payload), 3))
+            return emb / np.linalg.norm(emb, axis=1, keepdims=True)
+
+    st.SentenceTransformer = _Model
+    monkeypatch.setitem(sys.modules, "sentence_transformers", st)
+
+    payload = [f"s{i}" for i in range(8)]
+    emb1, s1 = encode_corpus("m", payload, cache_dir=str(tmp_path), batch_size=32)
+    assert emb1.shape == (8, 3)
+    assert s1 >= 0
+    emb2, s2 = encode_corpus("m", payload, cache_dir=str(tmp_path), batch_size=32)
+    assert s2 == s1  # cached latency preserved, not reset to 0
+    assert np.allclose(emb1, emb2)
+
+
 def test_run_nlp_hpo_unknown_model_raises(monkeypatch: pytest.MonkeyPatch) -> None:
     _install_fake_sentence_transformers(monkeypatch, {})
     hpo_cfg = HPOConfig(
