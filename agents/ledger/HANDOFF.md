@@ -17,11 +17,40 @@ If you catch yourself writing `if feature == "tip_amount"`, or "monetary feature
 
 The platform provides generic machinery. The dataset and the analyst provide the specifics.
 
+## Branch doctrine (main is the clean slate)
+
+`main` is the clean, data-agnostic platform baseline. Project-specific
+implementation, configuration, fixtures, datasets, and other project-specific
+material belong under the permitted `project/` surface. Development branches
+may contain project-specific material; they are not required to be
+byte-identical to `main`.
+
+- `main` — clean platform baseline. Receives only deliberate, whitelist-based
+  promotions of the data-agnostic portion (never a whole-branch merge).
+- Dev branches (`sklearn`, others) — platform + project-specific work. Free to
+  diverge; project material lives under `project/`.
+- The invariant is **main is clean**, not "main == dev". `main` containing
+  dataset-specific material outside `project/` is a violation regardless of
+  other green gates. Nothing here is an allowlist to grow — fix at the locus.
+
+The ONLY sanctioned path for dev → main is selective promotion
+(`scripts/main_day_sync.sh`): copy the shared platform surface from the dev
+tip, remove dev-only material (`project/` dataset bindings, `experiments/`,
+`configs/project/`, `configs/experiments/`, `experiments.py`,
+`experiments_ui.py`), restore main's own slate (`README.md`,
+`GOVERNANCE-POINTER.md`), verify the invariant + full ladder, land one atomic
+commit that also moves `PARITY_MAIN_ANCHOR` to the new main tip (D16c).
+
+Enforcement: `scripts/check_project_paths.py` understands both contexts —
+`--context dev` fails when dev references retired root-scoped project paths;
+`--context main` fails when main's tree carries dataset-specific material
+outside the permitted `project/` surface. `scripts/run_local_ci.sh` invokes
+the branch-appropriate context.
+
 ## The three layers
 
 - `src/broadway/` — data-agnostic platform machinery. Reusable on any dataset: sampling, structural cleaning, splits, lookup joins, stats, renderers, lineage. Test: could this run on another dataset with zero code changes? If not, it does not belong in `src`. No column names, thresholds, or dataset terms.
-- `project/` — dataset binding: config plus thin glue. Contains the dataset contract, feature registry, and thin wrappers binding `src` machinery to this dataset, e.g. `read_training_sample = read_sample(_contract, seed=RANDOM_STATE)`. No new platform logic.
-- `experiments/` — analysis scratch space. Specific questions, domain-specific filters, plots, and one-off exploration. Promote a pattern to `src` only after repeated concrete use.
+- `project/` — dataset binding: config plus thin glue. Contains the dataset contract, feature registry, and thin wrappers binding `src` machinery to this dataset, e.g. `read_training_sample = read_sample(_contract, seed=RANDOM_STATE)`. No new platform logic. Analysis scratch lives under `project/experiments/`; `experiments/` at the repo root is retired (dev-line only, deleted by promotion).
 - Tiebreaker: if it names a column or hardcodes a threshold, it is not `src`. It belongs in `project/` config or an experiment.
 
 ## Architectural principles

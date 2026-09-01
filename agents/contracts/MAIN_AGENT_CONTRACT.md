@@ -33,15 +33,24 @@ source of platform policy unless the human explicitly reactivates them.
 - **Other refs** — parked development/legacy context. Preserve unless the
   human requests deletion, but do not use them as parity or release authority.
 
-**Composition target (migration, not a grandfathered exception):** after the
-main-baseline migration, every persistent development branch may differ from
-`main` only under `project/**`. `src/`, generic tests, workflows, Docker/K8s
-templates, scripts, governance, packaging, and root documentation remain
-shared. Project-specific configuration, experiments, reports, docs, and
-binding tests belong under `project/`. Do not enforce this invariant until
-the branches have been re-rooted on the shared baseline; do not encode the
-current drift in a permanent allowlist. The main agent records each migration
-slice on the board and uses a direct diff invariant after re-rooting.
+**Composition target (normative, per `agents/ledger/HANDOFF.md`):** `main`
+is the clean, data-agnostic platform baseline. Project-specific
+implementation, configuration, fixtures, datasets, and other project-specific
+material belong under the permitted `project/` surface; dev branches may
+contain project-specific material and are not required to be byte-identical
+to `main`. The invariant is **main is clean**, never "main == dev":
+`src/`, generic tests, workflows, Docker/K8s templates, scripts, packaging,
+and root documentation are shared-platform surfaces that must stay
+data-agnostic (no column names, thresholds, or dataset terms); project-
+specific configuration, experiments, reports, docs, and binding tests belong
+under `project/`. A `main` tree containing dataset-specific material outside
+the permitted `project/` surface is a violation regardless of other green
+gates; the ONLY sanctioned path for dev → main is selective whitelist
+promotion (`scripts/main_day_sync.sh`), and the promotion commit also moves
+`PARITY_MAIN_ANCHOR` to the new main tip (D16c). Enforcement:
+`scripts/check_project_paths.py --context main` on `main` (invoked by
+`scripts/run_local_ci.sh`); the dev context scan keeps failing closed on
+retired root-scoped project paths.
 
 ## 3. Roles
 
