@@ -14,7 +14,11 @@ from pathlib import Path
 import pytest
 
 REPO = Path(__file__).resolve().parents[2]
-EXTRACTOR = REPO / "project" / "experiments" / "euromonitor" / "02_volume_normalize.py"
+# Load the extractor from _text.py directly (not 02_volume_normalize.py): the
+# latter exec's `from _common import ...`, whose bare module name collides with
+# other experiments' _common.py when the FULL suite runs (sys.modules caching).
+# _text.py has no _common/broadway/project imports, so it is collision-free.
+EXTRACTOR = REPO / "project" / "experiments" / "euromonitor" / "_text.py"
 
 
 def _load_extractor():
