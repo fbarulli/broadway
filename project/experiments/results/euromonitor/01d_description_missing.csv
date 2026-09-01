@@ -1,0 +1,68 @@
+dimension,key,rows,missing,missing_rate
+retailer,Gittigidiyor,2695,1931,0.7165
+retailer,amazon,15950,1534,0.0962
+retailer,Voila,752,501,0.6662
+retailer,safeway,1007,423,0.4201
+retailer,jet.com,419,380,0.9069
+retailer,K Ruoka,706,353,0.5
+retailer,Walmart,6022,351,0.0583
+retailer,Kroger,1014,337,0.3323
+retailer,Hipercor,670,309,0.4612
+retailer,Coop,1362,301,0.221
+retailer,Voilà,786,293,0.3728
+retailer,Carrefour,1230,286,0.2325
+retailer,IGA,234,234,1.0
+retailer,Carethy,463,173,0.3737
+retailer,Courses U,291,172,0.5911
+country,USA,22905,2747,0.1199
+country,Turkey,4878,2237,0.4586
+country,Canada,4444,1453,0.327
+country,Spain,4554,1123,0.2466
+country,France,5815,973,0.1673
+country,Sweden,4344,771,0.1775
+country,Germany,6252,703,0.1124
+country,United Kingdom,5259,536,0.1019
+country,Finland,3090,465,0.1505
+country,Netherlands,3594,331,0.0921
+country,Italy,1869,206,0.1102
+country,Norway,872,180,0.2064
+country,Belgium,778,172,0.2211
+country,Greece,761,62,0.0815
+country,Switzerland,754,48,0.0637
+category,Not from Concentrate 100% Juice,10111,1794,0.1774
+category,Other Non-Cola Carbonates,6573,1138,0.1731
+category,Liquid Concentrates,5490,1000,0.1821
+category,Juice Drinks (up to 24% Juice),4646,910,0.1959
+category,Energy Drinks,5156,747,0.1449
+category,Nectars,2691,656,0.2438
+category,Powder Concentrates,3652,644,0.1763
+category,Still Bottled Water,3218,590,0.1833
+category,Sparkling Flavoured Bottled Water,2674,521,0.1948
+category,Still RTD Tea,2946,505,0.1714
+category,Functional Bottled Water,4362,498,0.1142
+category,RTD Coffee,4146,484,0.1167
+category,Carbonated Bottled Water,2184,399,0.1827
+category,Carbonated RTD Tea and Kombucha,1856,362,0.195
+category,Coconut and Other Plant Waters,2440,334,0.1369
+brand,Oze,222,207,0.9324
+brand,Kayseri Pazarı,233,148,0.6352
+brand,Aksu Vital,171,129,0.7544
+brand,Koza,181,122,0.674
+brand,Mahbuba,133,98,0.7368
+brand,Nazo,101,88,0.8713
+brand,Kizilay,117,86,0.735
+brand,Günbak,144,84,0.5833
+brand,Peapod,180,81,0.45
+brand,Cemilefendi,110,78,0.7091
+brand,Big 8,104,77,0.7404
+brand,Tradition,106,74,0.6981
+brand,Marli,294,69,0.2347
+brand,Albi,115,68,0.5913
+brand,Zumosol,161,66,0.4099
+barcode,has_barcode,30078,4303,0.1431
+barcode,no_barcode,41545,7760,0.1868
+missing_rows_profile,title,12063,6,0.0005
+missing_rows_profile,brand,12063,0,0.0
+missing_rows_profile,category,12063,0,0.0
+missing_rows_profile,price,12063,475,0.0394
+missing_rows_profile,barcode,12063,7760,0.6433

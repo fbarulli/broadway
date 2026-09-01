@@ -1,0 +1,5 @@
+metric,value
+total_flagged_groups,57.0
+near_miss_count,10.0
+likely_variant_or_error_count,47.0
+near_miss_threshold_ratio,1.05

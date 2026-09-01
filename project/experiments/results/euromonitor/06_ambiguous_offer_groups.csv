@@ -1,0 +1,693 @@
+retailer,title,rows,distinct_prices,min,max
+Albert Heijn,Sisi Mango no bubbles zero sugar,2,2,1.25,2.59
+Albert Heijn,Sisi Orange no bubbles zero sugar,2,2,1.25,2.59
+Albert Heijn,bar-le- Duc natural mineral water,3,3,0.55,0.99
+Albert Heijn,cool best fruit breakfast orange strawberry,3,3,1.68,2.39
+Albert Heijn,double frisss 1 kcal apple & peach,2,2,0.99,2.69
+Aldi,Vive Low Calorie Indian Tonic Water 1l,2,2,0.35,0.55
+Alnatura,organic cranberry direct juice,2,2,2.97,6.99
+Alnatura,pomegranate direct juice,2,2,3.99,6.37
+Asda,Cloudy Apple Fruit Juice,2,2,1.92,3.33
+Asda,Copella Cloudy Apple Juice,2,2,2.0,2.38
+Asda,Iced Coffee Mocha,2,2,1.7,4.0
+Asda,Pomelo & Pink Pepper Tonic Water,2,2,1.43,3.78
+Asda,Rejuvenate Natural Energy Drink,2,2,1.5,4.99
+Asda,Relentless Passion Punch Energy Drinks,2,2,1.0,3.49
+Asda,Sparkling Black Grape Juice Soft Drink,2,2,0.78,1.94
+Asda,Sparkling Pineapple Juice Soft Drink,2,2,0.78,1.94
+Auchan,Nectar guava,2,2,2.29,4.08
+Auchan,drink with aloe vera flavor original,2,2,2.35,3.19
+Auchan,mineral water plate natural,3,3,3.5,4.52
+Auchan,mineral water plate natural bottles,3,3,2.15,3.65
+Auchan,natural mineral water plate,8,8,2.35,4.41
+Auchan,natural mineral water plate bottles,2,2,2.49,3.3
+Auchan,pure apple juice natural glass bottle,2,2,2.69,3.09
+Auchan,pure juice lemon origin sicily,2,2,2.05,3.92
+Auchan,pure pomegranate juice,2,2,6.29,8.05
+Auchandrive,"OASIS
+fruit drink tropical taste",2,2,1.59,1.75
+Auchandrive,"courmayeur
+natural mineral water plate",2,2,1.99,2.17
+Bennet,lemon juice limmi,2,2,0.99,1.99
+Billa,roman spring Emotion apple- ribisel,2,2,0.89,1.25
+Billa,roman spring Emotion apricot- elderflower,2,2,1.15,1.25
+Billa,roman spring Mild,2,2,0.79,0.95
+Billa,roman spring tingly,3,3,0.79,0.89
+Bol.com,senseo cafe latte coffee pads - 8 pads - for in you senseo machine,2,2,3.99,8.38
+CareMarket,zagori natural mineral water 1lt,2,2,0.38,0.95
+Carethy,Iso Tonic Orange Mango 600 gr,2,2,7.04,826.0
+Carethy,L- Carnitine Water Mexican 500 ml,2,2,1.53,1.69
+Carrefour,Cappuccino organic ready to drink black card,2,2,2.05,2.99
+Carrefour,Eau organic coconut vaivai,2,2,2.3,5.89
+Carrefour,Juliet pure juice apples,2,2,4.23,15.39
+Carrefour,drink 6 vitamins / multivitamin SUNNY DELIGHT,2,2,2.45,3.79
+Carrefour,drink at iced tea black white peach may tea,2,2,1.47,2.49
+Carrefour,energy drink CRAZY TIGER,3,3,1.19,3.35
+Carrefour,lemon juice SIRACUSE,4,4,1.77,4.39
+Carrefour,lemonade without sugar ogeu,2,2,0.99,2.99
+Carrefour,milk drink orange mango no added sugar danao,2,2,3.25,3.27
+Carrefour,mineral water courmayeur,2,2,0.35,0.4
+Carrefour,mochaccino ready to drink black card,2,2,2.05,2.99
+Carrefour,natural mineral water HEPAR,4,4,2.09,3.96
+Carrefour,natural mineral water MONT white,5,5,0.55,3.54
+Carrefour,natural mineral water bees,3,3,2.1,3.9
+Carrefour,natural mineral water courmayeur,3,3,2.64,3.88
+Carrefour,natural mineral water mont roucous,4,4,0.52,4.12
+Carrefour,natural mineral water saint amand,9,9,0.43,3.61
+Carrefour,natural mineral water tuna,3,3,0.54,3.12
+Carrefour,natural mineral water wattwiller,3,3,0.52,3.96
+Carrefour,orange juice organic full fruit,2,2,2.69,4.65
+Carrefour,pomegranate syrup mill of valdonne,4,4,2.05,3.39
+Carrefour,pure organic lemon juice - limmi,3,3,4.49,42.7
+Carrefour,rocchetta natural gualdo tadino 6 x 1.5 l,2,2,2.52,2.65
+Carrefour,sparkling natural mineral water ogeu,2,2,2.7,3.42
+Carrefour,sparkling natural mineral water quezac,2,2,2.82,3.22
+Carrefour,sparkling water ST-YORRE,2,2,0.56,3.12
+Carrefour,sparkling water VICHY celestins,2,2,0.62,3.78
+Carrefour,sparkling water bees,2,2,0.82,9.72
+Carrefour,sparkling water lemon flavored salvetat,3,3,0.95,3.35
+Carrefour,sparkling water natural mineral ST-YORRE,3,3,0.52,3.84
+Carrefour,sparkling water natural mineral VICHY celestins,2,2,3.19,3.96
+Carrefour,sparkling water natural mineral orezza,2,2,3.0,11.82
+Carrefour,sparkling water natural mineral rozana,3,3,0.51,3.18
+Carrefour,sparkling water natural mineral saint amand,3,3,0.53,2.7
+Carrefour,sparkling water natural mineral salvetat,3,3,0.5,3.18
+Carrefour,spring water SAINT GEORGES,2,2,0.35,3.0
+Carrefour,syrup peach & apricot mill of valdonne,2,2,2.39,2.84
+Carrefour,syrup white peach mill of valdonne,2,2,3.1,3.95
+Cdiscount,drink Isotonic World Riderz 500ml eric favre,2,2,2.0,5.9
+Cdiscount,organic nature apple juice organic 1 l,2,2,2.99,3.59
+Consum,natural mineral water bottle,2,2,0.59,0.79
+Coop,AA Drink Hydration Zero Sugar 500 ml,2,2,1.19,1.35
+Coop,Coop fresh juice orange,2,2,2.19,3.29
+Coop,Crystal Clear Apple,2,2,1.54,1.55
+Coop,Crystal Clear Cranberry lime,2,2,1.05,1.59
+Coop,Crystal Clear Sparkling peach,2,2,1.05,1.49
+Coop,Cuba Cola,2,2,13.95,16.5
+Coop,Cuba Cola Zero,2,2,13.95,16.5
+Coop,First Choice Cola no sugar,3,3,0.79,1.49
+Coop,First Choice Cola zero sugar,2,2,0.42,1.56
+Coop,First Choice cola light,2,2,0.42,1.56
+Coop,First Choice cola regular,2,2,0.9,1.56
+Coop,Juice apple,4,4,23.0,47.95
+Coop,Juice apple organic,2,2,28.5,32.95
+Coop,Juice orange,5,5,23.0,49.95
+Coop,Juice orange organic,2,2,32.95,36.95
+Coop,PLUS fresh juice orange,2,2,2.49,3.99
+Coop,Shot ginger,3,3,33.5,46.95
+Coop,Slammers Energy drink look,2,2,0.65,0.84
+Coop,bar-le- Duc mineral water carbonated,2,2,0.85,3.39
+Coop,carbonated water Citrus,4,4,6.5,12.5
+Coop,carbonated water Mango & grapefruit,2,2,11.95,12.5
+Coop,carbonated water blackcurrants,2,2,11.95,12.5
+Coop,carbonated water green apple,2,2,11.95,12.5
+Coop,carbonated water natural,5,5,6.5,41.95
+Coop,carbonated water pear,2,2,6.5,11.95
+Coop,carbonated water pineapple,2,2,11.5,11.95
+Coop,carbonated water pomegranate,4,4,6.5,12.5
+Coop,carbonated water raspberry & apple,2,2,11.95,12.5
+Coop,cool best Mango dream,2,2,1.94,2.99
+Coop,cool best Premium orange,3,3,1.6,4.09
+Coop,coolbest fruit breakfast orange mango,2,2,2.51,2.59
+Coop,dalphin Water with carbon dioxide,2,2,0.29,1.48
+Coop,dalphin Water without carbonic,2,2,0.29,1.88
+Coop,double frisss Boost apple & peach,2,2,2.09,2.68
+Coop,double frisss Boost forest fruits & apple,2,2,2.09,2.68
+Coop,double frisss apple & peach,2,2,1.02,3.03
+Coop,double frisss orange & tangerine,2,2,1.35,3.03
+Coop,double frisss pineapple & mango,2,2,1.39,2.82
+Coop,douwe egberts Ice macchiato ice coffee,2,2,1.15,1.59
+Coop,easter must,2,2,7.5,10.95
+Coop,energy drink Wolverine,2,2,9.5,14.5
+Coop,fernandes Cherry bouquet,2,2,1.07,1.72
+Coop,frameless rhubarb & strawberry,2,2,9.0,10.0
+Coop,freshly pressed orange,2,2,46.0,69.0
+Coop,frisian flag gold band coffee creamer,2,2,1.22,2.61
+Coop,frisian flag halvamel coffee creamer,2,2,0.69,2.19
+Coop,frisian flag latte frothed milk,2,2,0.87,2.3
+Coop,fruit drink Mango,5,5,18.95,45.95
+Coop,fruit drink blackcurrant,2,2,22.0,34.95
+Coop,fruit drink blueberry,2,2,34.95,36.5
+Coop,fruit drink orange & mango,2,2,28.5,36.5
+Coop,fruit drink rose hip,2,2,22.0,34.95
+Coop,fruity king Smoothie mango passion fruit banana apple,2,2,1.09,2.09
+Coop,groceries,9,9,0.99,2.47
+Coop,juice orange,2,2,22.5,39.95
+Coop,juice raspberry,2,2,36.95,44.95
+Coop,julmust,5,5,5.95,14.95
+Coop,julmust 12-pack,2,2,55.95,59.95
+Coop,julmust Light,2,2,5.95,55.95
+Coop,julmust sugar free,6,6,5.95,14.95
+Coop,lingonberry drink,2,2,23.5,30.95
+Coop,multivitamin drink tropical,2,2,6.0,18.95
+Coop,raw juice beetroot apple orange lemon & ginger,2,2,43.0,48.5
+Coop,raw juice orange & ginger,3,3,43.0,51.95
+Coop,raw juice spinach apple pineapple & lemon,2,2,43.0,47.95
+Coop,rivella Cranberry,4,4,1.15,1.95
+Coop,rolnik lemon juice concentrated,2,2,0.53,0.81
+Coop,sourcing vitamin water mango guava,2,2,1.29,2.72
+Coop,sourcing vitamin water raspberry pomegranate,2,2,1.29,2.72
+Coop,tax exotic fruits,2,2,1.88,1.98
+Coop,tax tropical fruits,2,2,1.98,3.14
+Coop,trocadero,4,4,7.5,18.95
+Coop,trocadero Zero,5,5,7.0,18.95
+Coop,trocadero Zero geléhallon,3,3,8.95,17.5
+Coop,trochumust Zero,2,2,7.5,13.95
+Coop,wicky orange,2,2,1.09,1.88
+Coop,zingo lemon,3,3,9.5,20.95
+Coop,zingo orange,2,2,9.5,20.95
+Coop,zingo orange sugar free,2,2,14.5,20.95
+Coop,zingo strawberry sugar free,2,2,14.5,20.95
+Coop.dk MAD,Citrus with soda,2,2,42.0,95.0
+Coop.dk MAD,apollinaris with citrus,2,2,2.5,15.0
+Coop.dk MAD,apple juice,4,4,11.5,32.5
+Coop.dk MAD,blueberry,2,2,10.0,18.0
+Coop.dk MAD,fax condi 0 calories,3,3,19.5,105.0
+Coop.dk MAD,frameless Original,2,2,19.95,20.25
+Coop.dk MAD,natural mineral water,2,2,10.5,13.75
+Coop.dk MAD,orange juice,5,5,10.0,28.5
+Coop.dk MAD,organic ginger shots,2,2,11.5,35.95
+Delhaize,Fusion | lemon | Pet,2,2,5.19,7.69
+Delhaize,caffè latte | Cappuccino,3,3,2.09,2.99
+Delhaize,energy drink | Fruity energizer | look,2,2,6.89,9.49
+Delhaize,lemonade | forest fruits | Bio,2,2,6.69,9.75
+Delhaize,mineral water | not sparkling | PET,2,2,4.09,6.19
+Delhaize,mineral water | slightly sparkling | PET,2,2,3.45,4.65
+Dirk,First Choice Cola cola light,2,2,1.45,4.85
+Dirk,Sisi Nb 0% orange,2,2,1.18,45.0
+Dirk,Sisi No bubbles orange,2,2,1.55,45.0
+Dirk,Sisi No bubbles orange 0%,2,2,0.52,2.45
+Dirk,Sisi Orange,2,2,1.59,3.29
+Dirk,Sisi Orange no bubbles,2,2,0.58,74.0
+Dirk,bar le duc mineral water carbonated,6,6,0.29,98.0
+Dirk,double frisss apple-peach,2,2,1.89,2.75
+Dirk,douwe egberts Ice caramel latte,2,2,1.54,5.05
+Dirk,fernandes Cherry bouquet,4,4,0.63,2.79
+Dirk,fernandes Cream ginger,2,2,0.95,75.0
+Dirk,fernandes Green punch,4,4,0.72,2.85
+Dirk,frisian flag latte,2,2,1.99,68.0
+Dirk,rivella Original,4,4,0.64,57.0
+Dirk,roosvicee multivit forest fruits,3,3,1.83,2.79
+Dirk,sourcing vitamin water citroen-cactus,2,2,0.79,2.39
+Dirk,sourcing vitamin water framboos-granaatappel,2,2,1.59,2.35
+Dirk,sourcing vitamin water mango-guave,2,2,1.59,2.29
+Dirk,tax tropical fruits,3,3,0.49,45.0
+E Leclerc,Soda lemon - 1.5 liters,2,2,0.85,0.95
+E Leclerc,lemonade - 1.5 liters,2,2,0.37,0.63
+El Corte Inglés,SIERRA cazorla natural mineral water bottle 1 l,2,2,0.68,0.85
+Food Market Herkku,Rainbow orange juice 1l,3,3,0.79,3.34
+Food Market Herkku,champion orchard orange juice 1 l fruit flesh,2,2,2.49,2.59
+Food Market Herkku,coop orange juice 1l,2,2,2.49,2.69
+Fotex,Cola,3,3,2.65,21.0
+Fotex,Cola sugar free,2,2,2.45,21.0
+Fotex,Tonic,2,2,2.65,21.0
+Fotex,apple nectar from concentrate,2,2,3.0,10.0
+Fotex,energy drink,2,2,11.0,19.95
+Fotex,energy drink m. pineapple flavor,2,2,15.0,15.95
+Fotex,energy drink sugar free,2,2,13.95,20.95
+Fotex,fax condi,4,4,6.5,39.0
+Fotex,ginger shot m. apple and citron organic,2,2,9.95,43.0
+Fotex,ginger shot organic,3,3,11.95,50.95
+Fotex,water,3,3,10.0,14.75
+Fotex,water m. brus,3,3,13.8,18.0
+Fotex,water m. brus citrus,4,4,2.0,45.0
+Fotex,water m. brus tulip and lime,2,2,13.0,15.0
+Fred Meyer Stores,DRY Sparkling Cucumber Soda,2,2,4.99,6.99
+Fred Meyer Stores,NOS High Performance Energy Drink,2,2,1.99,9.99
+Fred Meyer Stores,Zing Zang Bloody Mary Mix,2,2,7.59,11.99
+Giant Eagle,"Clearly Canadian Sparkling Water Beverage, Mountain Blackberry",2,2,2.69,6.99
+Giant Eagle,Coconut Water,2,2,1.79,3.99
+Giant Eagle,Cream Soda,3,3,1.64,6.49
+Giant Eagle,Original Lemonade Juice,2,2,1.99,2.99
+Giant Eagle,Ozarka 100% Natural Spring Water,2,2,29.99,39.99
+Giant Eagle,Stanton Orchards Tart Cherry Concentrate,2,2,26.99,34.99
+Giant Eagle,"Stanton Orchards Tart Cherry Concentrate, 12 PK",2,2,168.0,320.0
+Giant Eagle,"Stanton Orchards Tart Cherry Concentrate, 6 PK",2,2,114.0,156.0
+Giant Eagle,"Starry Lemon Lime Soda, Caffeine Free, Mini Cans",2,2,5.49,6.99
+H-E-B,Big Red Soda,3,3,1.83,2.83
+H-E-B,CFORCE Natural Artesian Water,2,2,1.44,3.1
+H-E-B,Cream Soda Cream Soda,2,2,1.66,5.39
+H-E-B,Kern's Guava Nectar,2,2,0.4,0.99
+H-E-B,Kern's Mango Nectar,2,2,0.4,0.99
+H-E-B,Life Wtr Purified Water,2,2,1.85,2.58
+H-E-B,Luzianne Unsweet Tea,2,2,1.76,2.67
+H-E-B,Manzanita Sol Apple Soda,3,3,1.27,2.75
+H-E-B,Mist TWST Lemon Lime Soda,2,2,1.86,1.87
+H-E-B,Mug Root Beer Soda,2,2,2.04,2.87
+H-E-B,NOS High Performance Energy Drink,2,2,1.46,2.88
+H-E-B,Ozarka 100% Natural Spring Water,5,5,1.81,4.56
+H-E-B,Ozarka 100% Natural Spring Water 16.9 oz Bottles,2,2,2.68,4.98
+H-E-B,RC Cola,2,2,1.77,2.83
+H-E-B,RC Cola 12 oz Cans,2,2,5.89,7.46
+H-E-B,Starry Lemon Lime Soda,2,2,2.37,2.75
+H-E-B,Zing Zang Bloody Mary Mix,3,3,5.7,9.34
+Harris Teeter,100% Lemon Juice - Single Bottle,2,2,2.99,3.69
+Harris Teeter,Cream Soda,3,3,1.49,6.99
+Harris Teeter,"Energy Drink, Cherry Limeade",2,2,2.39,2.79
+Harris Teeter,Ginger Beer,2,2,5.99,7.99
+Harris Teeter,Lemonade - Original,2,2,1.99,3.49
+Harris Teeter,Lemonade Tea,3,3,1.99,3.49
+Harris Teeter,Lime Juice,2,2,1.49,4.99
+Harris Teeter,Mixers - Margarita,2,2,3.49,8.99
+Harris Teeter,Organic Raw Coconut Water,2,2,2.99,4.99
+Harris Teeter,Raspberry Lemonade,2,2,1.99,2.49
+Hemköp,Citrus carbonated water Pet,4,4,7.95,39.95
+Hemköp,Cola soda Pet,3,3,5.82,14.95
+Hemköp,Cuba Cola Zero soda Pet,2,2,14.95,18.95
+Hemköp,Cuba Cola soda Pet,2,2,14.95,17.95
+Hemköp,Energy Drink Zero can,3,3,6.67,11.95
+Hemköp,Energy Drink energy drink can,3,3,6.67,12.5
+Hemköp,Mango carbonated water Pet,5,5,10.0,39.5
+Hemköp,Mango drink,2,2,17.95,24.95
+Hemköp,Mango with no added sugar fruit drink,2,2,26.95,35.95
+Hemköp,Melon carbonated water Pet,2,2,9.0,42.95
+Hemköp,Orange Juice With Bits,2,2,35.95,51.95
+Hemköp,Orange Nectar nectar,2,2,26.95,47.95
+Hemköp,Original carbonated water Pet,4,4,7.95,39.95
+Hemköp,Smoothie apple avocado raspberry strawberry cold pressed,2,2,21.95,32.95
+Hemköp,Smoothie cold pressed avocado spinach,2,2,22.95,32.95
+Hemköp,Tonic Water drinkmix Pet,2,2,12.95,16.95
+Hemköp,apple Juice,2,2,27.95,45.95
+Hemköp,apple juice,4,4,8.5,47.95
+Hemköp,apple juice with pulp,2,2,22.95,32.95
+Hemköp,banana Mango passion fruit Smoothie,2,2,14.95,37.95
+Hemköp,cranberry drink,2,2,29.95,34.95
+Hemköp,easter must Pet,2,2,7.95,10.0
+Hemköp,easter must soda Pet,3,3,15.95,54.95
+Hemköp,easter must sugar free soda Pet,2,2,17.95,59.95
+Hemköp,elder Lime carbonated water Pet,2,2,10.0,12.95
+Hemköp,imsdal spring water still water Pet,2,2,15.95,17.95
+Hemköp,julmust Pet,3,3,7.95,12.95
+Hemköp,julmust can,2,2,7.95,8.95
+Hemköp,julmust soda Pet,5,5,11.95,66.95
+Hemköp,julmust soda can,2,2,5.0,8.95
+Hemköp,julmust sugar free soda Pet,4,4,15.95,66.95
+Hemköp,julmust sugar free soda can,2,2,5.0,8.95
+Hemköp,"lemon Zero soda, Pet",2,2,13.0,20.95
+Hemköp,lemon carbonated water Pet,4,4,10.0,54.95
+Hemköp,lingonberry drink,2,2,22.5,23.95
+Hemköp,natural carbonated water Pet,4,4,10.0,54.95
+Hemköp,natural still water Pet,3,3,10.0,54.95
+Hemköp,"orange Zero soda, can",2,2,10.95,45.95
+Hemköp,orange carrot ginger Chili Juice,2,2,38.95,49.95
+Hemköp,orange freshly squeezed juice,3,3,22.95,47.95
+Hemköp,orange juice,4,4,15.5,46.95
+Hemköp,orange juice freshly pressed,2,2,29.95,69.95
+Hemköp,orange juice organic,2,2,34.95,38.95
+Hemköp,orange juice with pulp,4,4,15.0,39.95
+Hemköp,orange juice without pulp,2,2,39.95,52.95
+Hemköp,"orange julmust sugar free soda, Pet",2,2,14.95,16.95
+Hemköp,orange soda Pet,2,2,14.95,20.95
+Hemköp,orange stilldrink,2,2,5.95,9.95
+Hemköp,peach orange carbonated water Pet,2,2,11.95,12.95
+Hemköp,pear carbonated water Pet,6,6,3.66,51.95
+Hemköp,pear stilldrink,2,2,5.95,9.95
+Hemköp,pineapple carbonated water Pet,2,2,11.95,12.95
+Hemköp,pomegranate carbonated water Pet,4,4,7.95,51.95
+Hemköp,strawberries carbonated water Pet,4,4,10.0,39.5
+Hemköp,strawberry / rabar carbonated water Pet,2,2,10.0,35.95
+Hemköp,strawberry banana Smoothie,2,2,14.95,37.95
+Hemköp,strawberry mixed juice juice Pet,2,2,26.95,39.95
+Hemköp,table water lemon carbonated Pet,2,2,3.66,4.95
+Hemköp,trocadero Zero Sugar soda Pet,2,2,14.95,18.95
+Hemköp,trocadero Zero soda can,3,3,10.95,49.95
+Hemköp,"trocadero jelly hallon Zero soda, Pet",2,2,14.95,17.95
+Hemköp,trocadero soda Pet,3,3,14.95,58.95
+Hemköp,trocadero soda can,3,3,7.95,44.95
+Hemköp,trochumust Zero soda Pet,2,2,14.95,17.95
+Hemköp,trochumust soda Pet,2,2,14.95,17.95
+Hemköp,tropical Juice,2,2,27.95,47.95
+Hemköp,tropical Juice without pulp,3,3,23.95,33.95
+Hemköp,tropical Multivitamin fruit drink,2,2,6.67,18.95
+Hemköp,watermelon carbonated water Pet,2,2,10.0,12.95
+Hy-Vee,Alkaline 88 Water,2,2,4.19,6.29
+Hy-Vee,Body Armor Super Drink Fruit Punch,2,2,1.69,1.99
+Hy-Vee,Body Armor Super Drink Pineapple Coconut,2,2,1.69,1.99
+Hy-Vee,Body Armor Super Drink Strawberry Banana,2,2,1.69,1.99
+Hy-Vee,Body Armor Super Drink Tropical Punch,2,2,2.99,5.0
+Hy-Vee,Cherry Bay Orchards 100% Tart Montmorency Cherry Concentrate,2,2,14.99,19.99
+Hy-Vee,Concord Foods Reconstituted Lemon Juice,2,2,0.99,1.99
+Hy-Vee,Life Wtr Purified Water,2,2,1.89,1.99
+Hy-Vee,Mug Root Beer,2,2,0.99,4.0
+Hy-Vee,Musselman's Premium 100% Apple Juice,2,2,3.49,5.49
+Hy-Vee,Pibb Xtra,2,2,1.99,2.69
+Hy-Vee,Sprecher Cherry Cola,2,2,1.99,2.09
+Hy-Vee,"Starry Lemon Lime Soda, Caffeine Free",2,2,1.99,2.69
+Hy-Vee,Zing Zang Bloody Mary Mix,2,2,7.39,9.99
+ICA,Smoothie Kraft 850ml brämhults,2,2,43.9,44.9
+ICA,Smoothie Vitamin 850ml brämhults,2,2,43.9,44.9
+ICA,fruit drink raspberry & pomegranate 1l proviva,2,2,20.0,27.9
+Intermarche,apple juice and of raisin sparkling,2,2,2.43,5.2
+Intermarche,grenadine syrup,3,3,1.79,2.81
+Intermarche,mineral water naturally carbonated,2,2,2.74,3.52
+Intermarche,natural mineral water,12,12,0.37,4.53
+Intermarche,natural mineral water arcachon,2,2,1.78,2.56
+Intermarche,natural mineral water of the center- loire valley,2,2,0.34,2.68
+Intermarche,natural mineral water sparkling,2,2,1.13,4.05
+Intermarche,natural mineral water sparkling arcachon,2,2,0.8,4.74
+Intermarche,pure juice organic lime,2,2,2.3,4.18
+Intermarche,sparkling natural mineral water,11,11,0.41,4.03
+Intermarche,spring water of mountain d' auvergne,2,2,0.39,2.35
+Intermarche,strawberry syrup,2,2,1.9,3.03
+Intermarche,syrup green mint,2,2,2.7,2.82
+Intermarche,syrup white peach,2,2,2.63,3.18
+Intermarche,syrup wild strawberry,2,2,3.03,3.31
+Intermarche,tea iced infused black tea perfume white peach,2,2,1.89,1.99
+Intermarche,tea iced infused green tea mint scent,2,2,1.89,1.99
+Jan Linders,First Choice cola regular,2,2,0.79,1.48
+Jan Linders,I'm orange,2,2,2.19,3.49
+Jan Linders,Sisi Orange,2,2,0.53,1.77
+K Ruoka,pirkka mixed juice concentrates 0.5l,2,2,2.99,3.89
+Kroger,Alkaline88 Water Alkaline 8.8 Ph,2,2,42.99,55.99
+Kroger,BAWLS Guarana Original Energy Drink 16oz Cans,2,2,37.99,59.99
+Kroger,BAWLS Guarana Zero Energy Drink 10oz Bottles,2,2,37.99,57.99
+Kroger,BAWLS Guarana Zero Energy Drink 16oz Cans,2,2,37.99,59.99
+Kroger,Brew Dr. Kombucha Organic Clear Mind Kombucha,2,2,3.39,9.99
+Kroger,Lemon Perfect Blueberry Acai Cold- Pressed Lemon Water,2,2,1.69,23.88
+Kroger,NOS High Performance Energy Drink,2,2,2.99,13.99
+Kroger,Odwalla Original Superfood 100% Juice Smoothie,2,2,2.0,5.99
+Kroger,Ozarka 100% Natural Spring Water,2,2,2.5,5.99
+Kroger,Sierra Mist Diet Caffeine Free Lemon Lime Soda,2,2,1.67,5.49
+Kroger,Sprecher Cream Soda,2,2,1.79,48.99
+Kroger,Thick- It Clear Advantage Thickened Water Unflavored 8 oz Bottle 24 Ct,2,2,50.09,55.97
+Kroger,Turkey Hill Sweet Tea,3,3,1.0,2.5
+La Grande Epicerie,Nectar organic apricot,2,2,2.85,5.1
+La Grande Epicerie,nectar organic peach,2,2,2.7,5.0
+Longos,A & W Diet Root Beer,2,2,3.29,7.99
+Longos,A & W Root Beer,2,2,3.29,7.99
+Longos,Costa Rica Rain Forest Artesian Water,2,2,3.49,4.99
+Longos,Loop Cold Pressed Smoothie Green Vibes,2,2,4.99,8.99
+Longos,Montellier Carbonated Natural Spring Water,2,2,1.59,6.99
+Longos,Montellier Carbonated Natural Spring Water Lemon,2,2,1.59,6.99
+Longos,Montellier Carbonated Natural Spring Water Lime,2,2,1.59,6.99
+Longos,Mug Root Beer,2,2,3.29,7.99
+Longos,Viveau Fresh Pressed Wild Blueberries plus Sparkling Mineral Water,2,2,3.24,3.49
+Mat Smart,beverage concentrate strawberry,2,2,1.99,2.99
+Mat Smart,beverage concentrate wild berry,2,2,1.49,1.99
+Mat Smart,coconut water,2,2,1.49,12.0
+Mat Smart,frameless Citrus,2,2,7.0,10.0
+Mat Smart,frameless pomegranate,2,2,7.0,10.0
+Mat Smart,julmust 33cl,2,2,6.0,10.0
+Mat Smart,lemon juice,2,2,0.79,2.49
+Mat Smart,lime juice,2,2,0.79,1.69
+Mat Smart,orange juice,2,2,1.19,7.0
+Mat Smart,raspberry mixed juice concentrates,2,2,2.29,3.99
+Mat Smart,strawberry mixed juice concentrates,2,2,2.29,3.99
+Mat Smart,trocadero,2,2,6.0,7.0
+Mat Smart,trocadero Zero,2,2,6.0,7.0
+MatHem,apotekarnes julmust,2,2,13.0,14.0
+MatHem,frameless Passion,2,2,12.0,13.0
+MatHem,frameless peach orange,2,2,12.0,13.0
+MatHem,trocadero Zero 6x33cl,2,2,36.0,45.5
+Medpex,cranberry juice pure organic vital house,2,2,5.99,11.91
+Meny,Fresh & Juicy,2,2,14.25,14.75
+Meny,Urge u / sugar,2,2,10.6,14.65
+Mercadona,soda of orange farmer fresh gas,2,2,0.48,2.88
+Mercadona,soda the landlady big,2,2,1.25,2.45
+Metro,Carbonated Natural Spring Water,2,2,1.5,6.5
+Metro,Coconut Water,2,2,2.99,4.49
+Metro,Coconut Water Beverage with Pulp,2,2,1.49,1.79
+Metro,Cold- Pressed Juice,3,3,5.99,12.99
+Metro,Diet Root Beer Soft Drink,2,2,3.5,6.99
+Metro,Distilled Water,2,2,1.25,4.49
+Metro,Fruit Punch Cocktail,2,2,1.99,3.99
+Metro,Grapefruit Flavoured Carbonated Natural Spring Water,2,2,1.5,6.5
+Metro,Grapefruit Flavoured Sparkling Water,2,2,1.0,6.49
+Metro,Lemon Flavoured Carbonated Natural Spring Water,2,2,1.5,6.5
+Metro,Lemon Flavoured Sparkling Water,2,2,1.0,5.0
+Metro,Lime Flavoured Carbonated Natural Spring Water,2,2,1.5,6.5
+Metro,Lime Flavoured Sparkling Water,2,2,1.0,1.99
+Metro,Natural Spring Water,7,7,1.25,8.79
+Metro,Organic Apple Juice,2,2,4.49,5.49
+Metro,Organic Peach kombucha,2,2,4.49,9.99
+Metro,Peach Cocktail,2,2,1.99,3.99
+Metro,Peach Flavoured Iced Tea,2,2,1.5,8.99
+Metro,Raspberry Flavoured Iced Tea,2,2,1.5,8.99
+Metro,Root Beer Soft Drink,3,3,3.5,7.99
+Migros,Ginger Ale,2,2,1.15,1.3
+Migros,M- Budget Mineral with co2,2,2,0.25,0.35
+Migros,Tonic Water,2,2,1.15,1.35
+Migros,apro Classic,2,2,0.75,1.0
+Migros,apro Cristal,2,2,0.75,1.0
+Migros,from the region Mineral little co2,3,3,0.75,3.9
+Migros,from the region Mineral with CO2,2,2,0.75,4.8
+Migros,from the region knutwiler without co2,2,2,1.1,6.0
+Migros,from the region ramseier huus- Tee,2,2,1.4,1.9
+Migros,knutwiler Mandarinli,2,2,1.2,1.45
+Monoprix,apple juice at concentrated juice base,2,2,1.35,2.45
+Monoprix,natural mineral water,3,3,0.52,3.39
+Monoprix,spring water corsica,2,2,2.38,2.82
+Morrisons,Brecon Carreg Still Natural Mineral Water,2,2,2.75,3.5
+Mytime.de,4 brothers Ice Tea Bubble Gum,2,2,1.49,1.59
+Mytime.de,4 brothers Ice Tea Mango- passion fruit- taste,2,2,1.19,1.49
+Mytime.de,Fritz- Limo orange lemonade ( reusable),2,2,1.59,2.09
+Mytime.de,hella Still & fruity soft drink cherry ( disposable),2,2,0.99,1.59
+Mytime.de,hella Still & fruity soft drink raspberry ( disposable),2,2,4.49,6.49
+Mytime.de,hella Still & fruity soft drink strawberry ( disposable),2,2,1.59,6.49
+Mytime.de,true fruits Smoothie green,2,2,3.39,5.29
+Mytime.de,vilsa Naturfrisch mineral water classic ( reusable),2,2,7.29,7.49
+Mytime.de,vilsa Naturfrisch mineral water classic glass ( reusable),2,2,5.79,9.99
+Mytime.de,vilsa Naturfrisch mineral water medium PET ( disposable),2,2,0.75,1.19
+Mytime.de,vilsa Plus Bio blackcurrant ( disposable),2,2,1.19,5.94
+NaturaSi,apple juice and ginger,2,2,2.8,4.2
+NaturaSi,pure juice of wild blueberries,2,2,5.35,11.64
+Naturalia,mineral water sparkling strong 0.5l,2,2,0.75,0.89
+Notino,Multi Hypotonic Drink,2,2,16.4,19.8
+OOShop,mineral water courmayeur,2,2,0.35,0.39
+OOShop,mineral water mont roucous,2,2,0.48,2.88
+OOShop,natural mineral water Mont white,4,4,0.44,3.36
+OOShop,natural mineral water courmayeur,2,2,2.1,2.34
+OOShop,natural mineral water hepar,4,4,0.48,2.88
+OOShop,natural mineral water ogeu,2,2,0.5,3.0
+OOShop,natural mineral water wattwiller,2,2,0.5,3.0
+OOShop,sparkling natural mineral water rozana,2,2,2.99,3.3
+OOShop,sparkling natural mineral water salvetat,2,2,0.46,2.92
+OOShop,sparkling water Vichy celestins,3,3,0.65,3.9
+OOShop,sparkling water quézac,2,2,0.45,2.7
+Osuma,Citrus m / brus,2,2,39.95,96.0
+Osuma,apple juice,2,2,20.95,24.45
+Osuma,fax condi,3,3,17.95,40.95
+Osuma,fax condi 0 calories,3,3,17.95,96.0
+Osuma,mineral water m / brus,2,2,16.95,19.45
+Osuma,mixed berry / fruit,2,2,21.95,28.45
+Osuma,orange juice,3,3,16.95,34.45
+Osuma,raspberry & strawberry,2,2,6.75,12.5
+Planeta Huerto,Isotonic Drink 226ers berries,2,2,18.0,26.0
+Planeta Huerto,Isotonic Drink lemon 226ers,2,2,18.0,25.95
+Planeta Huerto,apple juice Bio 100% squeezed ékolo,2,2,1.25,2.95
+Planeta Huerto,grape juice black bio 100% squeezed ékolo,2,2,1.4,3.0
+Planeta Huerto,juice of kiwi and organic apple ékolo,2,2,1.4,3.05
+Planeta Huerto,kombucha tea Ginger kombutxa,2,2,3.75,9.0
+Rewe,Fritz-mate 0.33l,2,2,0.99,22.99
+Rewe,alnavit bio Aronia mother juice 0.33l,2,2,2.99,5.99
+Rewe,amecke gentle juices apple 1l,2,2,1.79,2.79
+Rewe,fruit Tiger apple- strawberry 6x0.5l,2,2,0.79,5.94
+Rewe,hella cherry 6x1.5l,3,3,0.99,8.34
+Rewe,hella raspberry 6x1.5l,2,2,1.09,8.34
+Rewe,lichtenauer mineral water medium 6x1l,3,3,0.55,5.4
+Rewe,rhön sparkling water Apple Plus 12x0.75l,2,2,5.99,9.99
+Rewe,rhön sparkling water mineral water natural 6x1l,2,2,3.54,3.79
+Rewe,robby Bubble Apple- Cherry 0.75l,2,2,1.0,2.89
+Rewe,rosbacher mineral water classic 6x0.75l,2,2,4.74,5.29
+Rewe,sinalco cola mix 12x1l,2,2,0.69,6.99
+Rewe,spreequell mineral water medium 1l,2,2,0.55,0.59
+Rewe,spreequell mineral water natural 1l,2,2,0.55,0.59
+Rewe,strange light 6x1l,2,2,0.65,5.29
+Rewe,vilsa Classic 12x1l,2,2,4.99,5.29
+Rewe,vilsa Medium 6x0.75l,2,2,3.3,5.29
+Rewe,vio mineral water still 1l,2,2,0.85,0.99
+Rewe,wolfra apple juice 1l,2,2,1.79,1.99
+S-kaupat,Rainbow orange juice 1l,3,3,1.79,3.34
+S-kaupat,beverage concentrate 0.5l,2,2,1.64,1.84
+S-kaupat,beverage concentrate 1.0l,2,2,3.55,4.05
+S-kaupat,champion orchard orange juice 1 l fruit flesh,2,2,2.8,3.95
+S-kaupat,coop orange juice 1l,2,2,2.59,2.69
+S-kaupat,juice pot Trip sugar free Mansikka-vadelmamehujuoma 2 dl,2,2,0.4,0.45
+S-kaupat,sports drink 0.4 l,2,2,2.89,2.92
+Shop Apotheke,Dr. goerg premium Bio- coconut water,2,2,2.49,28.29
+Shop Apotheke,ROY Lemon kombucha,2,2,1.99,53.79
+Shop Apotheke,granvero organic oats- turmeric Shot,4,4,6.9,109.2
+Shop Apotheke,kulau Bio- coconut water Pure,2,2,2.39,5.19
+Shop Apotheke,vital house cranberry juice pure organic,2,2,7.49,10.69
+Shop Apotheke,vital house pomegranate pure juice Bio,2,2,6.09,12.69
+Sklavenitis,ZAGORI natural mineral water 1lt,2,2,0.44,1.38
+Sokos,add to wish list,3,3,2.0,2.3
+Spar,Battery Juiced,2,2,20.0,22.9
+Spar,Fresh & Juicy,2,2,29.9,30.9
+Spar,Fun Light,3,3,35.5,42.9
+Spar,Smoothie,3,3,19.9,22.9
+Spar,Solo Super,3,3,16.9,52.9
+Spar,Urge u / sugar,2,2,22.9,30.9
+Spar,all i need Organic Green Tea,2,2,1.69,1.89
+Spar,apple juice,3,3,38.9,45.9
+Spar,mezzo mix Cola- orange lemonade,2,2,1.35,1.59
+Spar,roman spring Emotion apricot elderflower,2,2,0.89,1.29
+Spar,roman spring Emotion pear balm,2,2,1.09,1.29
+Spar,roman spring mineral water mild,2,2,0.89,0.95
+Spar,speci Cola- Mix Orange,2,2,1.99,2.59
+SuperValu,Ballygowan Still Mineral Water (750 ml),2,2,1.75,2.6
+Target,Thick- It Clear Advantage Thickened Beverage Apple 64 oz. Bottle,2,2,16.47,17.72
+Thrive Market,"Sparkling Water, Ginger Meyer Lemon",2,2,1.99,8.99
+Thrive Market,"Sparkling Water, Lavender Cucumber",2,2,1.99,8.99
+Vomar,First Choice Regular Cola 330 ml,2,2,0.39,0.49
+Vomar,cool best Fruit breakfast forest fruits 750 ml,2,2,1.89,2.45
+Walmart,"Blenheim """" Not As Hot"""" Ginger Ale 12- Ounce Glass Bottle ( Pack of 12)",2,2,41.6,67.98
+Walmart,"Blenheim Ginger Ale Hot, 12 Ounce (12 Glass Bottles)",2,2,45.03,45.12
+Walmart,"Borsec Mineral Water, 50.7 Fl Oz ( Pack of 6)",2,2,37.99,38.6
+Walmart,"Harmless Harvest Organic Coconut Water, Original, 12 Fl Oz ( Pack of 4)",2,2,18.49,23.49
+Walmart,"Harmless Harvest Raw Organic Coconut Water, 16 oz",2,2,6.99,9.99
+Walmart,Organic Matcha Lemonade Tea Mix With Premium Japanese Matcha Powder (50 Servings) 17.6 OZ,2,2,23.95,24.95
+Walmart,"Proud Source Alkaline Spring Water, Natural Minerals + Electrolytes, Infinitely Recyclable Aluminum, BPA- Free (24 pack 12 oz Cans)",4,4,41.99,62.69
+Walmart,"Proud Source Naturally Alkaline 8.5pH + Spring Water with Electrolytes, BPA Free and Eco- Friendly Packaging, 750ml (12 Pack)",3,3,62.1,73.98
+Walmart,"STUMPTOWN COFFEE ROASTERS Cold Brew Concentrate 2x, 25.4 FZ",3,3,16.31,21.29
+Walmart,"Starbucks Frappuccino, Vanilla Iced Coffee Drink, 9.5 Oz Bottles (4 Pack) Packaging May Vary",2,2,7.47,11.99
+Walmart,Stirrings Simple Lemon Drop Cocktail Mix 750ml Bottles - Real Juice No Preservatives - 90 Calories - Drink Mixer,3,3,45.99,109.98
+Walmart,Zero Calorie Flavored Water Peach (12 bottles),3,3,40.8,43.49
+Wholefoods,"HYDRATING LEMON WATER, 15.2 fl oz",2,2,1.79,2.39
+Willys,Citrus carbonated water Pet,4,4,4.9,34.5
+Willys,Cola soda Pet,2,2,8.9,12.9
+Willys,Cuba Cola Zero soda Pet,2,2,6.5,16.9
+Willys,Energy Drink Zero can,3,3,4.38,9.9
+Willys,Energy Drink energy drink can,2,2,8.9,9.9
+Willys,Mango carbonated water Pet,4,4,8.9,39.9
+Willys,Mango drink,2,2,14.9,17.9
+Willys,Orange Juice With Bits,2,2,32.9,34.9
+Willys,Original carbonated water Pet,4,4,4.9,34.5
+Willys,Tonic Water drinkmix Pet,2,2,9.9,12.5
+Willys,apple Juice,2,2,25.9,41.9
+Willys,apple juice,5,5,5.9,43.9
+Willys,banana Mango passion fruit Smoothie,3,3,11.5,34.9
+Willys,carrot freshly pressed,2,2,19.9,35.5
+Willys,cranberry drink,3,3,20.9,29.9
+Willys,easter must soda Pet,5,5,5.9,49.9
+Willys,easter must sugar free soda Pet,3,3,5.9,59.9
+Willys,elder Lime carbonated water Pet,2,2,8.3,11.9
+Willys,frameless Passion carbonated water Pet,2,2,8.5,8.9
+Willys,imsdal spring water still water Pet,2,2,12.5,15.9
+Willys,julmust soda Pet,7,7,5.9,52.9
+Willys,julmust soda can,2,2,5.9,7.9
+Willys,julmust soda glass,2,2,10.9,11.9
+Willys,julmust sugar free soda Pet,5,5,5.9,52.9
+Willys,julmust sugar free soda can,2,2,5.9,7.9
+Willys,"lemon Zero soda, Pet",2,2,12.9,18.9
+Willys,lemon carbonated water Pet,5,5,4.9,49.9
+Willys,lingonberry drink,2,2,17.5,19.9
+Willys,natural carbonated water Pet,5,5,7.9,49.9
+Willys,natural still water Pet,3,3,9.9,49.9
+Willys,"orange Zero soda, can",2,2,7.9,42.9
+Willys,orange freshly squeezed juice,2,2,19.5,32.5
+Willys,orange juice,4,4,16.5,44.9
+Willys,orange juice with pulp,4,4,15.5,34.9
+Willys,orange soda Pet,2,2,12.9,18.9
+Willys,peach orange carbonated water Pet,2,2,8.5,8.9
+Willys,pear carbonated water Pet,3,3,9.9,41.9
+Willys,pear fruit drink,2,2,14.9,16.9
+Willys,pear stilldrink,2,2,4.9,8.5
+Willys,pomegranate carbonated water Pet,4,4,4.9,41.9
+Willys,raw juice red love,2,2,38.5,39.9
+Willys,strawberries carbonated water Pet,4,4,8.9,39.9
+Willys,strawberry / rabar carbonated water Pet,3,3,7.9,33.9
+Willys,strawberry banana Smoothie,2,2,15.5,34.9
+Willys,trocadero Zero Sugar soda Pet,2,2,11.9,15.9
+Willys,trocadero Zero soda can,2,2,7.5,37.9
+Willys,"trocadero jelly hallon Zero soda, Pet",2,2,11.9,14.9
+Willys,trocadero soda Pet,4,4,6.5,57.9
+Willys,trocadero soda can,4,4,5.9,44.9
+Willys,trochumust Zero soda Pet,2,2,11.9,14.9
+Willys,trochumust soda Pet,2,2,11.9,14.9
+Willys,tropical Juice,2,2,24.9,43.9
+Willys,tropical Juice without pulp,3,3,21.9,35.9
+Willys,tropical Multivitamin fruit drink,2,2,7.9,16.9
+Willys,watermelon carbonated water Pet,2,2,8.5,8.9
+amazon,B- Tea Kombucha - Kombucha Raw & Organic Prebiotics & Probiotics Original - 16 fl. oz.,2,2,3.92,4.45
+amazon,"Bare Nature Peach Vitamin Iced Tea (20 oz., 12 ct.)",2,2,15.99,25.05
+amazon,De mi Pais Coconut Water 16.4 oz - Agua de Coco,2,2,10.73,22.22
+amazon,Drink Mix ( Pack of 16),3,3,49.41,71.61
+amazon,"Dublin Soda Soda, 12 fl oz ( Pack of 24)",2,2,56.51,61.99
+amazon,"Fee Brothers Lemon Cocktail Bitters - Aromatic Cocktail Mixer & Concentrated Flavoring, Gluten Free, Vegan- Friendly, 5 fl oz",2,2,11.57,17.49
+amazon,"Hal's New York Seltzer Carbonated Black Cherry Flavored Sparkling Water, Zero Sugar, Zero Calorie, Zero Carbs, 20 Fl Oz ( Pack of 24)",2,2,29.99,35.99
+amazon,Indian Summer Apple Juice - 4 pk. - 128 oz.,2,2,33.63,118.9
+amazon,"Ingrilli Organic Lemon Squeeze, 4 Fl Oz Bottle ( Pack of 6)",2,2,7.7,20.99
+amazon,"JUST Water Infused - Cherry Flavored Spring Water - Eco- Friendly and Sustainable, Boxed Bottled Water - Low Calorie Beverage with No Artificial Flavors, 8.0 Alkaline pH - 16.9 fl oz ( Pack of 12)",2,2,22.99,39.72
+amazon,"Lavazza Organic Double Shot Oat Milk Cold Brew Coffee, ( Pack of 4 Cans / 8 Fluid Ounce Each) Balanced, Creamy, Dark Roast, 100% Arabica, USDA Certified Organic, Rainforest Alliance Certified",2,2,19.99,25.0
+amazon,NAYA WATER - 600ML 20,2,2,71.51,72.4
+amazon,Organic Hydrating Energy Drink ( Pack of 14),2,2,50.44,50.91
+amazon,Stirrings Pack Lemon Drop Cocktail Mix 750ml Bottle - Real Juice No Preservatives - 90 Calories - Drink Mixer,2,2,14.98,19.98
+amazon,"Thai Iced Tea Mix, Traditional Restaurant Style, 16 oz. ( Pack of 4)",2,2,26.95,31.9
+amazon,"Vivaloe Coconut Aloe Drink (16.9 fl. oz., 12 pk.)",2,2,29.98,45.0
+galaxus,Electrolyte Drink (1000ml),2,2,21.3,23.9
+galaxus,Fast Hydration,3,3,3.13,3.82
+galaxus,coconut water pure,2,2,4.6,9.2
+galaxus,lemons syrup with fructose,2,2,5.2,8.35
+galaxus,oranges syrup m Fruchtzucke,2,2,5.2,8.35
+mat.se,Citrus carbonated water incl. Pant,4,4,12.95,59.95
+mat.se,Cola Zero Sugar incl. Pant,2,2,8.5,15.5
+mat.se,Cola incl. Pant,5,5,6.67,15.5
+mat.se,Energy Drink incl. Pant,3,3,10.5,14.95
+mat.se,Energy Drink sugar free incl. Pant,2,2,10.5,12.5
+mat.se,Juice tropical,2,2,18.95,26.5
+mat.se,Melon carbonated water incl. Pant,2,2,13.95,65.95
+mat.se,Orange incl. Pant,2,2,9.95,14.95
+mat.se,Original carbonated water incl. Pant,4,4,12.95,59.95
+mat.se,Original incl. Pant,4,4,7.95,19.5
+mat.se,Passion carbonated water incl. Pant,2,2,12.95,13.95
+mat.se,Shot ginger,2,2,32.5,41.95
+mat.se,Smoothie apple avocado raspberry strawberry cold pressed,2,2,20.5,32.95
+mat.se,"Smoothie apple, coconut water, avocado & spinach incl. Pant",2,2,24.95,33.95
+mat.se,Smoothie banana / mango passion fruit incl. Pant,2,2,16.95,37.95
+mat.se,Smoothie strawberry & banana incl. Pant,2,2,17.95,37.95
+mat.se,Tonic Water incl.pant,2,2,14.5,19.95
+mat.se,Zero can incl. Pant,2,2,9.5,44.5
+mat.se,Zero incl. Pant,4,4,9.5,17.95
+mat.se,Zero incl.pant,3,3,9.5,63.95
+mat.se,apple juice,4,4,18.95,32.95
+mat.se,carbonated water lemon incl. Pant,2,2,7.5,13.5
+mat.se,carbonated water pear incl. Pant,2,2,13.95,42.5
+mat.se,carbonated water strawberry & rhubarb incl. Pant,2,2,13.95,42.5
+mat.se,easter must incl. Pant,2,2,13.5,15.0
+mat.se,easter must sugar free incl. Pant,2,2,16.95,89.95
+mat.se,elder Lime carbonated water incl. Pant,2,2,12.95,13.95
+mat.se,freshly pressed orange incl. Pant,2,2,25.95,39.95
+mat.se,fruit drink rose hip,2,2,23.95,28.5
+mat.se,incl. Pant,2,2,9.5,44.5
+mat.se,julmust Light incl. Pant,2,2,10.0,72.95
+mat.se,julmust Original incl. Pant,2,2,14.95,67.95
+mat.se,julmust glass bottle,2,2,8.95,11.5
+mat.se,julmust incl. Pant,8,8,7.95,85.95
+mat.se,julmust sugar free incl. Pant,4,4,7.95,85.95
+mat.se,orange Mango with no added sugar fruit drink,2,2,28.5,29.95
+mat.se,orange freshly squeezed juice,2,2,24.95,51.95
+mat.se,orange juice,4,4,16.95,33.95
+mat.se,orange sugar free incl. Pant,2,2,16.5,19.5
+mat.se,orginal incl. Pant,3,3,14.95,17.95
+mat.se,passion fruit incl. Pant,2,2,8.5,15.95
+mat.se,pear incl. Pant,4,4,12.95,59.95
+mat.se,pear soda incl. Pant,2,2,8.5,15.95
+mat.se,pineapple carbonated water incl. Pant,2,2,12.95,13.95
+mat.se,pomegranate carbonated water incl. Pant,3,3,12.95,59.95
+mat.se,raspberry soda incl. Pant,3,3,8.5,15.5
+mat.se,strawberries berry drink,2,2,6.95,17.95
+mat.se,strawberries carbonated water incl. Pant,2,2,15.5,42.5
+mat.se,strawberry sugar free incl. Pant,3,3,9.95,19.5
+mat.se,table water natural carbonated incl. Pant,2,2,13.95,58.95
+mat.se,water natural without carbonation incl. Pant,2,2,6.95,42.5
+mat.se,watermelon carbonated water incl. Pant,2,2,12.95,13.95
+mcdrogerie,morga lemons syrup with fructose,2,2,6.3,7.0
+mcdrogerie,morga passion fruit syrup with fructose,2,2,6.3,8.9
+mcdrogerie,sun gate turmeric- lemons syrup BIO,2,2,12.1,73.6
+peapod,Affinity's Real Water Alkalized Water Antioxidant,2,2,1.49,2.49
+peapod,Harmless Harvest Coconut Water 100% Raw Organic,2,2,3.19,5.49
+peapod,Peapod Acadia Spring Water Natural,2,2,1.19,3.29
+peapod,Peapod Acadia Spring Water Natural - 12 pk,2,2,2.59,2.99
+peapod,Peapod Ginger Ale Diet,2,2,0.89,1.19
+peapod,Peapod Original Seltzer Water,2,2,0.79,1.19
+peapod,Turkey Hill Green Tea with Ginseng & Honey Refrigerated,2,2,1.89,2.89
+peapod,Turkey Hill Lemon Flavored Iced Tea Diet Refrigerated,2,2,1.89,2.89
+peapod,Turkey Hill Lemonade Refrigerated,2,2,1.89,2.89
+peapod,Turkey Hill Lemonade Tea ( Iced Tea & Lemonade Blend) Refrigerated,2,2,1.89,2.89
+peapod,Turkey Hill Sweet Tea Southern Brewed Refrigerated,2,2,1.89,2.89
+safeway,Soleil Sparkling Water Mango - 8-12 Fl. Oz.,2,2,0.79,3.0
+shop-apotheke,Dr. goerg premium Bio- coconut water,2,2,2.69,5.99
+shop-apotheke,kulau Bio- coconut water Pure,2,2,2.6,4.89
+shop-apotheke,vital house cranberry juice pure organic,2,2,6.99,8.79
+shop-apotheke,vital house cranberry- pure juice BIO,2,2,5.98,9.31

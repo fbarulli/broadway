@@ -1,0 +1,14 @@
+column,stored_dtype,non_null,numeric_like
+product_id,object,71623,1.0
+retailer,object,71623,0.0
+country,object,71623,0.0
+title,object,71604,0.0
+description,object,59560,0.0
+category_path,object,71611,0.0
+url,object,71514,0.0
+image_url,object,71623,0.0
+price,object,70203,1.0
+barcode,object,30078,1.0
+brand,object,71623,0.0
+category,object,71623,0.0
+attributes,object,71623,0.0

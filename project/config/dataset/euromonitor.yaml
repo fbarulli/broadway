@@ -1,0 +1,81 @@
+# euromonitor dataset contract
+# Path: project/data/euromonitor/dataset.csv (52MB, ~198K rows)
+# Source: ds-item-task-782206759520.europe-west1.run.app (Shiny app export)
+#
+# column_mapping is the PROJECT-WIDE rename applied by _common.load_dataset():
+# raw-export name -> canonical name. Steps import load_dataset and always see
+# the canonical names below (the raw CSV file itself is never modified).
+# NOTE: null_count values below are aspirational/stale placeholders; the real
+# counts are measured in 01/01c (e.g. barcode is ~42% populated).
+
+dataset:
+  name: euromonitor
+  path: project/data/euromonitor/dataset.csv
+  column_mapping:
+    sku_id: product_id
+    retailer: retailer
+    country: country
+    sku_name_eng: title
+    description_short_eng: description
+    breadcrumbs_eng: category_path
+    sku_url: url
+    image_url: image_url
+    sku_last_price: price
+    gtin: barcode
+    brand: brand
+    category: category
+    attribute: attributes
+  columns:
+    product_id:
+      dtype: string
+      null_count: 0
+      role: id
+    retailer:
+      dtype: string
+      null_count: 0
+      role: categorical
+    country:
+      dtype: string
+      null_count: 0
+      role: categorical
+    title:
+      dtype: string
+      null_count: 0
+      role: text
+    description:
+      dtype: string
+      null_count: 0
+      role: text
+    category_path:
+      dtype: string
+      null_count: 0
+      role: text
+    url:
+      dtype: string
+      null_count: 0
+      role: id
+    image_url:
+      dtype: string
+      null_count: 0
+      role: id
+    price:
+      dtype: float64
+      null_count: 0
+      role: feature
+    barcode:
+      dtype: string
+      null_count: 0
+      role: id
+    brand:
+      dtype: string
+      null_count: 0
+      role: categorical
+    category:
+      dtype: string
+      null_count: 0
+      role: categorical
+    attributes:
+      dtype: string
+      null_count: 0
+      role: text
+  lookup_tables: {}

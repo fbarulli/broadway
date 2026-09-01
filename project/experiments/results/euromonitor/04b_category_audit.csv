@@ -1,0 +1,15 @@
+metric,value
+T1_strict_match_rate_true_pairs,0.9374
+T1_macro_match_rate_true_pairs,0.9789
+T1_strict_match_rate_neg_pairs,0.0712
+T1_macro_match_rate_neg_pairs,0.2003
+T2_MI_brand_vs_match,0.6364
+T2_MI_strict_vs_match,0.4317
+T2_MI_macro_vs_match,0.3734
+T3_cramers_v_category_vs_retailer,0.1835
+T3_cramers_v_macro_vs_retailer,0.2422
+n_true_pairs,15346.0
+n_neg_pairs,10000.0
+T1_decision,MIXED: no clear winner — inspect per-group diffs
+T2_decision,MIXED: category adds little beyond brand — weigh against leakage
+T3_decision,KEEP strict: categories are universal across retailers

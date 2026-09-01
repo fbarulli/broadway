@@ -1,0 +1,7 @@
+check,pass
+S1 statuses only Missing/Flagged_Anomaly/Valid,True
+S2 flagged => volume-type category (taxonomy),True
+S3 flagged => weight_hint or liter>10,True
+S4 volume-type + weight_hint never Valid,True
+S5 counts sum to full row count,True
+S6 weight_hint rows == 01c weight_unit_rows (re-pinned),True
