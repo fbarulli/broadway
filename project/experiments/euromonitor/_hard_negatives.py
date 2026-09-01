@@ -9,6 +9,7 @@ sample and the exclusion is visible, never hidden.
 
 from __future__ import annotations
 
+from collections import defaultdict
 from itertools import combinations
 
 import numpy as np
@@ -36,6 +37,94 @@ def conflicting_barcode_pairs(df: pd.DataFrame) -> set[tuple[int, int]]:
             if barcodes.loc[a] != barcodes.loc[b]:
                 pairs.add((int(a), int(b)))
     return pairs
+
+
+def exact_title_groups(df: pd.DataFrame) -> pd.DataFrame:
+    """Group-level census of exact-title (title, brand) groups.
+
+    Single source for the mislabeled-barcode census used by 06b (raw) and 06c
+    (deduped): per (title, brand) group, the number of retailers, the number of
+    distinct non-empty barcodes, and the barcode/retailer sets for review. A
+    group with >1 retailer and >1 real barcode is a conflicting-barcode label
+    error (same product, two GTINs); <=1 barcode is a clean calibration positive.
+    """
+    cb = (
+        df.groupby(["title", "brand"], dropna=False)
+        .agg(
+            n_retailers=("retailer", "nunique"),
+            barcodes=("barcode", lambda s: sorted({str(x) for x in s.dropna() if str(x)})),
+            retailers=("retailer", lambda s: sorted(set(s.dropna()))),
+        )
+        .reset_index()
+    )
+    cb["n_barcodes"] = cb["barcodes"].apply(len)
+    return cb
+
+
+def split_barcodes(df: pd.DataFrame, seed: int = 42) -> dict[str, set[str]]:
+    """Barcode-level 70/15/15 train/val/test split over multi-retailer barcodes.
+
+    Splits on the barcode (entity) so no product's rows straddle a split — the
+    guard against same-product leakage. Returns sets of barcode strings.
+    """
+    barcodes = df["barcode"].fillna("").astype(str)
+    known = df[barcodes.str.len() > 0]
+    multi = known[known.groupby("barcode")["retailer"].transform("nunique") > 1]
+    bcs = np.array(sorted(multi["barcode"].unique()))
+    perm = np.random.default_rng(seed).permutation(len(bcs))
+    tr = int(0.70 * len(bcs))
+    va = int(0.85 * len(bcs))
+    return {
+        "train": set(bcs[perm[:tr]]),
+        "val": set(bcs[perm[tr:va]]),
+        "test": set(bcs[perm[va:]]),
+    }
+
+
+def pairs_in_set(pairs: np.ndarray, row_barcodes: np.ndarray, bc_set: set[str]) -> np.ndarray:
+    """Boolean mask over pairs whose BOTH endpoints' barcode is in bc_set.
+
+    Held-out pair filtering: a pair is only in the split if both rows belong to
+    it, so no train/test entity leaks across the boundary.
+    """
+    members = list(bc_set)
+    return (
+        np.isin(row_barcodes[pairs[:, 0]], members)
+        & np.isin(row_barcodes[pairs[:, 1]], members)
+    )
+
+
+def build_triplets(
+    train_pos: np.ndarray,
+    hard_train: np.ndarray,
+    payload: list[str],
+    *,
+    seed: int = 42,
+    max_triples: int = 5_000,
+) -> list:
+    """Build (anchor, positive, hard-negative) triples for TripletLoss.
+
+    Each hard-negative partner is drawn from the anchor's mined hard negatives
+    (falling back to the positive partner's). Capped at max_triples so the
+    fine-tune stays tractable.
+    """
+    from sentence_transformers import InputExample
+
+    hn_map: dict[int, list[int]] = defaultdict(list)
+    for a, b in hard_train:
+        hn_map[int(a)].append(int(b))
+
+    rng = np.random.default_rng(seed)
+    triples: list[InputExample] = []
+    for a, b in train_pos:
+        partners = hn_map.get(int(a)) or hn_map.get(int(b))
+        if not partners:
+            continue
+        c = int(partners[rng.integers(len(partners))])
+        triples.append(InputExample(texts=[payload[a], payload[b], payload[c]]))
+        if len(triples) >= max_triples:
+            break
+    return triples
 
 
 def mine_hard_negatives(

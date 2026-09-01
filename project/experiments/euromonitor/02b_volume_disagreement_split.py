@@ -1,7 +1,7 @@
 """02b: Split within-BARCODE volume disagreements into near-miss vs likely-variant/error.
 
-Takes the 61 flagged groups from 02 (within_barcode_volume_agreement) and buckets
-them by max/min volume ratio:
+Takes the flagged groups from 02 (within_barcode_volume_agreement, 57 groups)
+and buckets them by max/min volume ratio:
   - near-miss (ratio < NEAR_MISS_THRESHOLD): likely rounding/bucket noise,
     extractor artifact, or a genuine near-duplicate — safe to treat as
     "agrees" for matching purposes after inspection.
@@ -15,16 +15,15 @@ Writes:
   02b_disagreement_summary.csv        counts + threshold used
 
 NOTE on canonical volume source: canonical_volume_ml comes from title
-ONLY (the validated v2 extractor, committed dc600db). The description field
-is NOT used as a fallback — its nutrition/serving/dilution prose ("per 12 fl
-oz", "0.2 l glass", "dilute in 9 volumes") injects systematic false volumes
-(proven: fallback agreement 96.5% + 198 flagged vs name-only 99.0% + 61
-flagged). Description stays an explicit low-confidence feature, never folded in.
+ONLY (the validated v2 extractor). The description field is NOT used as a
+fallback — its nutrition/serving/dilution prose ("per 12 fl oz", "0.2 l glass",
+"dilute in 9 volumes") injects systematic false volumes (proven: fallback
+agreement 96.5% + 198 flagged vs name-only 99.0% + 57 flagged). Description
+stays an explicit low-confidence feature, never folded in.
 """
 
 import pandas as pd
-from _common import RESULTS, load_euromonitor
-from _text import extract_volume_ml
+from _common import RESULTS, barcode_agreement_table, canonical_volume, load_euromonitor
 
 NEAR_MISS_THRESHOLD = 1.05  # <5% relative diff treated as noise, not a real gap
 
@@ -33,22 +32,8 @@ CSV_SUMMARY = RESULTS / "02b_disagreement_summary.csv"
 
 
 def build_barcode_agreement(df: pd.DataFrame) -> pd.DataFrame:
-    """Recompute the per-BARCODE agreement table (same logic as 02, single source)."""
-    known = df[df["barcode"].fillna("").str.len() > 0]
-    multi = known[known.groupby("barcode")["retailer"].transform("nunique") > 1]
-
-    def _agg(x: pd.DataFrame) -> pd.Series:
-        vols = sorted(x["canonical_volume_ml"].dropna().unique().tolist())
-        return pd.Series({
-            "retailers": x["retailer"].nunique(),
-            "skus": len(x),
-            "canonical_volumes": vols,
-            "canonical_agree": (len(vols) <= 1) if vols else None,
-            "sample_names": x["title"].dropna().unique().tolist()[:5],
-            "sample_retailers": x["retailer"].unique().tolist()[:5],
-        })
-
-    agree = multi.groupby("barcode").apply(_agg).reset_index()
+    """Per-BARCODE agreement table via the shared helper (same logic as 02)."""
+    agree = barcode_agreement_table(df, [("canonical_volume_ml", "canonical")], sample=True)
     return agree.dropna(subset=["canonical_agree"])  # honest denominator, exclude empty groups
 
 
@@ -72,16 +57,16 @@ def main() -> None:
     df = load_euromonitor()
 
     # canonical volume from title ONLY (validated v2; see module docstring)
-    df["canonical_volume_ml"], df["canonical_volume_ambiguous"] = zip(
-        *df["title"].map(extract_volume_ml)
-    )
+    vol = canonical_volume(df["title"])
+    df["canonical_volume_ml"] = vol["canonical_volume_ml"]
+    df["canonical_volume_ambiguous"] = vol["canonical_volume_ambiguous"]
 
     # Description-derived volume kept as a SEPARATE low-confidence signal only
     # (e.g. for future tie-breaking or coverage backfill review) — never
     # merged into canonical_volume_ml, and not used in this split.
-    df["description_volume_ml"], df["description_volume_ambiguous"] = zip(
-        *df["description"].map(extract_volume_ml)
-    )
+    desc = canonical_volume(df["description"])
+    df["description_volume_ml"] = desc["canonical_volume_ml"]
+    df["description_volume_ambiguous"] = desc["canonical_volume_ambiguous"]
 
     agree = build_barcode_agreement(df)
     flagged = classify_disagreements(agree)

@@ -39,9 +39,16 @@ _UNIT_ALTERNATION = r"""
 # whitespace ("0, 33l" = 0.33 L, "1, 5l" = 1.5 L — EU notation with a space);
 # multi-digit integers may NOT ("case of 24, 500ml" is a count-list, not
 # 24.5 ml). A DOT decimal never takes a space ("pH 9.0 bottle 600 ml" must
-# stay 600, not "9. 600"). The (?<![0-9])(?![0-9]) pair pins the single-digit
+# stay 600, not "9. 600"). The (?<![0-9.])(?![0-9]) pair pins the single-digit
 # branch to a REAL single digit, so "24, 500ml" is never read as "4, 500".
-_NUMBER_PART = r"((?<![0-9])\d(?![0-9])(?:,\s*\d+|\.\d+)?|\d{2,}(?:[.,]\d+)?)"
+# A leading-dot decimal (".14 oz" = 0.14 oz, ".5 l" = 0.5 L) is a THIRD branch
+# so the multi-digit branch never eats the digits after the dot and inflates
+# the value 10x/100x (".14" must not read as 14).
+_NUMBER_PART = (
+    r"((?<![0-9.])\d(?![0-9])(?:,\s*\d+|\.\d+)?"
+    r"|(?<![0-9.])\d{2,}(?:[.,]\d+)?"
+    r"|(?<![0-9])\.\d+)"
+)
 
 VOLUME_RE = re.compile(
     _NUMBER_PART + r"\s*(?<![a-zA-Z])" + _UNIT_ALTERNATION + r"(?![a-zA-Z])",
@@ -127,10 +134,15 @@ def norm_unit(token: str) -> str:
 
 
 def bucket_ml(ml: float) -> int:
-    """Round ml to the nearest BUCKET, never 0 for a real detection."""
-    bucketed = round(ml / BUCKET) * BUCKET
+    """Round ml to the nearest BUCKET (half-up), never 0 for a real detection.
+
+    Uses floor(ml / BUCKET + 0.5) instead of round(), whose banker's rounding
+    (round-half-to-even) maps an exact x.5 bucket boundary inconsistently and
+    can split two representations of the same volume into different buckets.
+    """
+    bucketed = math.floor(ml / BUCKET + 0.5) * BUCKET
     if bucketed == 0 and ml > 0:
-        return round(ml)
+        return math.floor(ml + 0.5)
     return bucketed
 
 
@@ -161,7 +173,9 @@ def extract_volume_measurement(text: str) -> tuple[float | None, str | None, boo
     # decimal-interpretation would be implausibly small (< 20 ml).
     if "." in raw_value:
         before, after = raw_value.split(".", 1)
-        if (len(after) == 3 and after.isdigit()
+        # "before" must be non-empty: a leading-dot decimal (".500") is a
+        # 0.500-style value, not a thousands-separated integer.
+        if (before and len(after) == 3 and after.isdigit()
                 and float(raw_value.replace(",", ".")) * _TO_ML[unit] < 20):
             raw_value = before + after  # "1.000" -> "1000"
     # EU-decimal-with-space vs count-list: "0, 33l" = 0.33 L (plausible), but

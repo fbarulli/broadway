@@ -21,15 +21,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from _blocking import build_pairs
-from _common import PATHS, SEED, load_dataset_deduped
+from _common import PATHS, RESULTS, SEED, load_dataset_deduped
 from _text import MACRO_MAP, extract_volume_ml
 from sklearn.metrics import average_precision_score, precision_recall_curve
 
-from broadway.training.nlp import encode_corpus
+from broadway.training.nlp import _cosine, encode_corpus
 
 MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 CACHE = str(PATHS.experiments.parent / "data" / "euromonitor" / "embeddings_cache")
-RESULTS = PATHS.experiments / "results" / "euromonitor"
 
 
 def main() -> None:
@@ -38,8 +37,8 @@ def main() -> None:
     pos, neg = build_pairs(df, SEED, 4, 10_000)
     emb, _ = encode_corpus(MODEL, payload, batch_size=256, max_seq_length=128, cache_dir=CACHE)
 
-    pos_s = (emb[pos[:, 0]] * emb[pos[:, 1]]).sum(axis=1)
-    neg_s = (emb[neg[:, 0]] * emb[neg[:, 1]]).sum(axis=1)
+    pos_s = _cosine(emb, pos)
+    neg_s = _cosine(emb, neg)
     y = np.r_[np.ones(len(pos_s)), np.zeros(len(neg_s))]
     scores = np.r_[pos_s, neg_s]
     thr = float(np.quantile(neg_s, 0.95))
@@ -69,9 +68,11 @@ def main() -> None:
     tp = np.array([(pos_s >= t).sum() for t in ths], dtype=float)
     fp = np.array([(neg_s >= t).sum() for t in ths], dtype=float)
     fn = len(pos_s) - tp
-    p = tp / (tp + fp)
-    r = tp / (tp + fn)
-    f1 = 2 * p * r / (p + r)
+    # guard: at the top of the sweep tp==fp==0, so precision/F1 are 0/0 -> NaN.
+    with np.errstate(invalid="ignore", divide="ignore"):
+        p = np.divide(tp, tp + fp, out=np.zeros_like(tp), where=(tp + fp) > 0)
+        r = tp / (tp + fn)
+        f1 = np.divide(2 * p * r, p + r, out=np.zeros_like(p), where=(p + r) > 0)
     fig, ax = plt.subplots(figsize=(7, 4.5), constrained_layout=True)
     ax.plot(ths, p, color="#4C72B0", label="precision")
     ax.plot(ths, r, color="#55A868", label="recall")

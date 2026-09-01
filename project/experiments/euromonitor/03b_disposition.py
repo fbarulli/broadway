@@ -23,25 +23,15 @@ ratio, volume list) so every classification is traceable.
 
 from __future__ import annotations
 
-import ast
 import re
 
 import pandas as pd
-from _common import RESULTS, load_euromonitor
+from _common import RESULTS, load_euromonitor, parse_list_cell
 
 CSV_IN = RESULTS / "03_pack_reconcile.csv"
 CSV_OUT = RESULTS / "03b_disposition.csv"
 
 from _text import DRY_MIX_HINTS, SUSPECT_ROUND, extract_pack_counts
-
-
-def _list(value) -> list:
-    if isinstance(value, str):
-        try:
-            return ast.literal_eval(value)
-        except (ValueError, SyntaxError):
-            return [value]
-    return list(value or [])
 
 
 def classify_row(row: pd.Series, full_names: list[str]) -> tuple[str, str]:
@@ -53,7 +43,7 @@ def classify_row(row: pd.Series, full_names: list[str]) -> tuple[str, str]:
         return "pack_variant", f"ratio matches printed {row['matched_pack_count']}-pack"
 
     ratio = row["vol_ratio"]
-    vols = _list(row["canonical_volumes"])
+    vols = parse_list_cell(row["canonical_volumes"])
     if pd.isna(ratio):  # NaN or missing
         if any(v == 0 for v in vols):
             return "extraction_bug", f"vols={vols} include literal 0 (extractor artifact)"

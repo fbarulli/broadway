@@ -4,7 +4,7 @@ Same exact product title at 2+ retailers should carry ONE barcode. Groups
 where it carries several are either barcode errors or the same product under
 two GTINs. They are FLAGGED for human review, never merged — barcode is the
 ground-truth key and we don't silently override it. This is also the direct
-explanation of the 04 finding (negative-pair max TF-IDF similarity 0.704):
+explanation of the 04 finding (negative-pair max TF-IDF similarity 0.796):
 near-identical titles that the barcode layer says are different products.
 
 Writes:
@@ -14,52 +14,48 @@ Writes:
 
 import pandas as pd
 from _common import RESULTS, load_dataset
+from _hard_negatives import exact_title_groups
 
 CSV_CONFLICTS = RESULTS / "06b_conflicting_barcode_groups.csv"
 CSV_SUMMARY = RESULTS / "06b_conflicting_summary.csv"
+
+N_CONFLICTING = 339  # snapshot expectation shared with 05b's corrected probe
 
 
 def main() -> None:
     RESULTS.mkdir(parents=True, exist_ok=True)
     df = load_dataset()
 
-    cb = (
-        df.groupby(["title", "brand"], dropna=False)
-          .agg(
-              n_retailers=("retailer", "nunique"),
-              barcodes=("barcode", lambda s: sorted({
-                  str(x) for x in s.dropna() if str(x)})),
-              retailers=("retailer", lambda s: sorted(set(s.dropna()))),
-          )
-          .reset_index()
-    )
-    cb["n_barcodes"] = cb["barcodes"].apply(len)
+    cb = exact_title_groups(df)
     conflicts = cb[(cb["n_retailers"] > 1) & (cb["n_barcodes"] > 1)]
 
     # sanity: same definition as 05b's corrected probe (cross-retailer, >1
-    # unique real barcode) — both must agree on 339.
-    if len(conflicts) != 339:
-        print(f"NOTE: expected 339 conflicting groups (05b agrees); "
-              f"this run finds {len(conflicts)} — definitions diverged")
+    # unique real barcode) — both must agree on 339. Fail loudly, don't just
+    # note, so a definitional drift is never silent.
+    if len(conflicts) != N_CONFLICTING:
+        raise AssertionError(
+            f"expected {N_CONFLICTING} conflicting groups (05b agrees); "
+            f"this run finds {len(conflicts)} — definitions diverged")
     conflicts.to_csv(CSV_CONFLICTS, index=False)
     print(f"wrote {CSV_CONFLICTS} (reviewer artifact, {len(conflicts)} rows)")
 
+    n_cross = int((cb["n_retailers"] > 1).sum())
     summary = pd.DataFrame({
         "metric": ["exact_title_cross_retailer_groups",
                    "conflicting_barcode_groups",
                    "clean_calibration_positives",
                    "conflict_rate"],
-        "value": [int(((cb["n_retailers"] > 1)).sum()),
+        "value": [n_cross,
                   len(conflicts),
                   int(((cb["n_retailers"] > 1) & (cb["n_barcodes"] <= 1)).sum()),
-                  round(len(conflicts) / max(int((cb["n_retailers"] > 1).sum()), 1), 4)],
+                  round(len(conflicts) / max(n_cross, 1), 4)],
     })
     summary.to_csv(CSV_SUMMARY, index=False)
     print(f"wrote {CSV_SUMMARY} (display table, {len(summary)} rows)")
 
-    print(f"\nexact-title cross-retailer groups: {int((cb['n_retailers'] > 1).sum()):,}")
+    print(f"\nexact-title cross-retailer groups: {n_cross:,}")
     print(f"  with CONFLICTING barcodes (flagged): {len(conflicts):,}  "
-          f"({len(conflicts) / (cb['n_retailers'] > 1).sum():.1%})")
+          f"({len(conflicts) / max(n_cross, 1):.1%})")
     print(f"  CLEAN calibration positives: "
           f"{int(((cb['n_retailers'] > 1) & (cb['n_barcodes'] <= 1)).sum()):,}")
     if len(conflicts):

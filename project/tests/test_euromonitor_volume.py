@@ -2,20 +2,19 @@
 
 Pins the extractor as a fixed point for step 03: broader unit coverage
 (dl/gal/qt/pt/lt), EU decimal-comma, punctuation tolerance, symmetric
-word boundaries, and the bare-oz ambiguity flag. These 26 cases are the
-validation record behind the 98.9% within-barcode agreement metric.
+word boundaries, and the bare-oz ambiguity flag. These cases are the
+validation record behind the 98.98% within-barcode agreement metric.
 """
 
 from __future__ import annotations
 
-import importlib.util
 from pathlib import Path
 
 import pytest
 
 REPO = Path(__file__).resolve().parents[2]
 # Load the extractor from _text.py directly (not 02_volume_normalize.py): the
-# latter exec's `from _common import ...`, whose bare module name collides with
+# latter imports `from _common import ...`, whose bare module name collides with
 # other experiments' _common.py when the FULL suite runs (sys.modules caching).
 # _text.py has no _common/broadway/project imports, so it is collision-free.
 EXTRACTOR = REPO / "project" / "experiments" / "euromonitor" / "_text.py"
@@ -27,10 +26,9 @@ def _load_extractor():
     series_dir = EXTRACTOR.parent
     if str(series_dir) not in sys.path:
         sys.path.insert(0, str(series_dir))
-    src = EXTRACTOR.read_text(encoding="utf-8")
-    ns: dict = {}
-    exec(src.split("def main()")[0], ns)  # module-level defs only, no side effects
-    return ns
+    import _text
+
+    return _text.__dict__
 
 
 @pytest.fixture(scope="module")
@@ -82,6 +80,13 @@ CASES: list[tuple[str, float | None, bool]] = [
     ("levissima natural water levissima Issima 33 x 4, 132 cl", 1320, False),
     # a DOT decimal never takes a space: "pH 9.0 bottle 600 ml" stays 600
     ("ACTIPH alkaline water ionized pH 9.0 bottle 600 ml", 600, False),
+    # leading-dot decimal (missing leading zero) reads the dot, not the digits:
+    # ".14" is 0.14, not 14 (regression — used to inflate 10x/100x)
+    (".14 Oz", 5, True),
+    (".5 L", 500, False),
+    (".33 l", 330, False),
+    (".75 fl oz", 20, False),
+    ("Alpine Drink Mix, Spiced Apple Cider, .14 Oz, 10 Packets, 1 Count", 5, True),
 ]
 
 
@@ -130,6 +135,8 @@ def text_module():
     ("2 lt (2.1 qt) Cola", 2.0, "lt", False),
     ("Powder Mix 2 kg", None, None, False),  # weight units never extract
     ("8 oz chips", 8.0, "oz", True),
+    (".14 Oz", 0.14, "oz", True),  # leading-dot decimal (regression)
+    (".5 L", 0.5, "l", False),
     (None, None, None, False),
 ], ids=lambda c: str(c)[:40])
 def test_extract_volume_measurement(text_module, text, exp_value, exp_unit,
@@ -137,6 +144,15 @@ def test_extract_volume_measurement(text_module, text, exp_value, exp_unit,
     value, unit, ambig = text_module.extract_volume_measurement(text)
     assert (value, unit, ambig) == (exp_value, exp_unit, exp_ambig), \
         f"{text!r}: got ({value}, {unit}, {ambig})"
+
+
+def test_bucket_ml_rounds_half_up(text_module) -> None:
+    """Nearest-5 bucketing uses half-up, not banker's rounding."""
+    assert text_module.bucket_ml(352.5) == 355
+    assert text_module.bucket_ml(357.5) == 360
+    assert text_module.bucket_ml(2.5) == 5
+    assert text_module.bucket_ml(352.0) == 350
+    assert text_module.bucket_ml(353.0) == 355
 
 
 @pytest.mark.parametrize("value,unit,category,weight_hint,expected", [

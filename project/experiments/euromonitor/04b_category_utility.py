@@ -106,7 +106,12 @@ def main() -> None:
     v_macro = cramers_v(df["macro_category"], df["retailer"])
 
     # ---- decisions (the mentor's thresholds) -------------------------------------
+    # T1 governs the BLOCKING granularity (recall-first): blocking rolls up to
+    # macro whenever macro keeps more true pairs in-block than strict. T3 is a
+    # SEPARATE leakage signal (taxonomy universality), not a blocking verdict.
     def verdict_t1() -> str:
+        if macro_match_rate > 0.95 and macro_match_rate > strict_match_rate:
+            return "BLOCK on macro: recovers more true pairs (recall-first)"
         if strict_match_rate > 0.95:
             return "KEEP strict: retailers categorize consistently (>95%)"
         if strict_match_rate < 0.85 and macro_match_rate > 0.95:

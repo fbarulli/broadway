@@ -18,13 +18,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import numpy as np
 import pandas as pd
 from _blocking import build_pairs
-from _common import PATHS, SEED, load_dataset_deduped
+from _common import PATHS, RESULTS, SEED, load_dataset_deduped
 
-from broadway.training.nlp import encode_corpus, entity_resolution_metrics
+from broadway.training.nlp import _cosine, encode_corpus, entity_resolution_metrics
 
 MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 CACHE = str(PATHS.experiments.parent / "data" / "euromonitor" / "embeddings_cache")
-RESULTS = PATHS.experiments / "results" / "euromonitor"
 SEP = " | "
 
 
@@ -60,8 +59,8 @@ def main() -> None:
     for name, series in variants.items():
         payload = series.iloc[rows].tolist()
         emb, encode_s = encode_corpus(MODEL, payload, batch_size=256, max_seq_length=128, cache_dir=CACHE)
-        pos_s = (emb[pos_idx[:, 0]] * emb[pos_idx[:, 1]]).sum(axis=1)
-        neg_s = (emb[neg_idx[:, 0]] * emb[neg_idx[:, 1]]).sum(axis=1)
+        pos_s = _cosine(emb, pos_idx)
+        neg_s = _cosine(emb, neg_idx)
         m = entity_resolution_metrics(pos_s, neg_s)
         records.append({"variant": name, "encode_s": round(encode_s, 1), **m})
         print(f"{name:<22} AUC={m['auc']:.4f}  AP={m['average_precision']:.4f}  "

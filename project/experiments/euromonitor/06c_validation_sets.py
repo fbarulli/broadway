@@ -19,6 +19,7 @@ import numpy as np
 import pandas as pd
 from _blocking import build_true_pairs
 from _common import RESULTS, SEED, load_dataset_deduped
+from _hard_negatives import exact_title_groups
 from _matching import build_vectorizer, score_pairs
 
 CSV_SUMMARY = RESULTS / "06c_validation_summary.csv"
@@ -26,6 +27,7 @@ CSV_HARD = RESULTS / "06c_hard_validation_pairs.csv"
 
 LOW, HIGH = 0.3, 0.8  # the hard band: moderate similarity
 N_NEG = 20_000
+HARD_NEG_CAP = 3_000  # requested hard-negative sample size
 
 
 def main() -> None:
@@ -37,13 +39,9 @@ def main() -> None:
     # ---- calibration set: clean exact-title cross-retailer groups -------------
     # clean = cross-retailer AND <=1 UNIQUE real barcode (several rows sharing
     # one barcode are still clean; only genuinely conflicting barcodes aren't).
-    cb = (
-        df.groupby(["title", "brand"], dropna=False)
-          .agg(n_retailers=("retailer", "nunique"),
-               n_barcodes=("barcode", lambda s: len({
-                   str(x) for x in s.dropna() if str(x)})))
-          .reset_index()
-    )
+    # Shared definition with 06b (exact_title_groups) so the calibration census
+    # can never drift from the conflicting-barcode report.
+    cb = exact_title_groups(df)
     clean = cb[(cb["n_retailers"] > 1) & (cb["n_barcodes"] <= 1)]
     n_calib = len(clean)
     print(f"calibration positives (exact-title, single barcode): {n_calib:,}")
@@ -63,18 +61,32 @@ def main() -> None:
     print(f"true pairs: {len(pairs):,}  in hard band: {int(band.sum()):,}")
 
     # hard negatives: sampled cross-barcode pairs in the same band, scored in
-    # ONE vectorized bulk pass (no per-attempt Python loop).
+    # ONE vectorized bulk pass (no per-attempt Python loop). Both rows must
+    # carry a non-empty (different) barcode, matching _blocking.py and
+    # _hard_negatives.py: a GTIN-missing row has unknown ground truth.
     bc = df["barcode"].fillna("").astype(str).to_numpy()
     tt = np.array(titles)
     n = len(df)
     a = rng.integers(0, n, size=N_NEG * 8)
     b = rng.integers(0, n, size=N_NEG * 8)
-    mask = (a != b) & (bc[a] != "") & (bc[a] != bc[b]) & (tt[a] != tt[b])
+    mask = (a != b) & (bc[a] != "") & (bc[b] != "") & (bc[a] != bc[b]) & (tt[a] != tt[b])
     cand_a, cand_b = a[mask], b[mask]
     cos = np.array(score_pairs(X, cand_a, cand_b))
     band_mask = (cos >= LOW) & (cos < HIGH)
     hard_neg = [(int(cand_a[k]), int(cand_b[k]), float(cos[k]))
-                for k in np.flatnonzero(band_mask)[:3000]]
+                for k in np.flatnonzero(band_mask)[:HARD_NEG_CAP]]
+
+    # The TF-IDF hard band is sparse on the negative side: fail loudly when it
+    # is empty, and warn when it falls short of the requested sample so the
+    # shortfall is never a silent pass.
+    if not hard_neg:
+        raise RuntimeError(
+            f"no hard negatives found in cosine band [{LOW}, {HIGH}); "
+            "validation set is empty")
+    if len(hard_neg) < HARD_NEG_CAP:
+        print(f"WARNING: hard band produced {len(hard_neg):,} negatives, below the "
+              f"{HARD_NEG_CAP:,} target — the TF-IDF negative band is nearly empty "
+              f"({len(hard_pos):,} hard positives vs {len(hard_neg):,} hard negatives)")
     print(f"hard negatives sampled in band: {len(hard_neg):,}")
 
     rows = ([{"title_a": titles[a], "title_b": titles[b], "cosine": round(c, 4),

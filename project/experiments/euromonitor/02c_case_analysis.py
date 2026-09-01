@@ -23,8 +23,13 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
-from _common import RESULTS, load_dataset
-from _text import extract_volume_ml
+from _common import (
+    RESULTS,
+    barcode_agreement_table,
+    canonical_volume,
+    load_dataset,
+    multi_retailer_mask,
+)
 
 CSV_LETTERS = RESULTS / "02c_uppercase_letters.csv"
 CSV_SUMMARY = RESULTS / "02c_case_match_summary.csv"
@@ -45,12 +50,12 @@ def uppercase_letter_counts(names: pd.Series) -> pd.DataFrame:
     return df
 
 
-def volume_agree_rate(multi: pd.DataFrame, col: str) -> float:
-    """02-style honest within-BARCODE agreement: a group counts only if it has
-    >=1 non-null volume (empty groups are excluded, not trivially agreeing)."""
-    agree = multi.groupby("barcode")[col].apply(
-        lambda s: (s.dropna().nunique() <= 1) if s.notna().any() else None)
-    return float(agree.dropna().mean())
+def volume_agree_rate(df: pd.DataFrame, col: str) -> float:
+    """02-style honest within-BARCODE agreement (shared helper, single source):
+    a group counts only if it has >=1 non-null volume (empty groups are excluded,
+    not trivially agreeing)."""
+    agree = barcode_agreement_table(df, [(col, col)])[f"{col}_agree"].dropna()
+    return float(agree.mean())
 
 
 def main() -> None:
@@ -58,8 +63,7 @@ def main() -> None:
     df = load_dataset()
 
     # ---- ground-truth subset, identical to 02 ----------------------------------
-    known = df[df["barcode"].fillna("").str.len() > 0]
-    multi = known[known.groupby("barcode")["retailer"].transform("nunique") > 1].copy()
+    multi = df[multi_retailer_mask(df)].copy()
     multi["name_raw"] = multi["title"].str.strip()
     multi["name_lower"] = multi["name_raw"].str.lower()
 
@@ -87,10 +91,8 @@ def main() -> None:
     real_diff = int(((uniq_raw[valid] > 1) & (uniq_lower[valid] > 1)).sum())
 
     # ---- 3) volume agreement reference: as-is vs lowercased (must be equal) ----
-    multi["vol_raw"] = multi["title"].map(
-        lambda s: extract_volume_ml(s)[0] if pd.notna(s) else None)
-    multi["vol_lower"] = multi["name_lower"].map(
-        lambda s: extract_volume_ml(s)[0] if pd.notna(s) else None)
+    multi["vol_raw"] = canonical_volume(multi["title"])["canonical_volume_ml"]
+    multi["vol_lower"] = canonical_volume(multi["name_lower"])["canonical_volume_ml"]
     vol_raw = volume_agree_rate(multi, "vol_raw")
     vol_lower = volume_agree_rate(multi, "vol_lower")
 

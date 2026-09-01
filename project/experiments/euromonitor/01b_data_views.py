@@ -28,7 +28,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from _common import RESULTS, SEED, load_dataset
+from _common import RESULTS, SEED, column_profile, load_dataset
 from _matching import build_vectorizer
 from sklearn.decomposition import TruncatedSVD
 
@@ -39,7 +39,7 @@ CSV_SPACE = RESULTS / "01b_product_space.csv"
 CSV_PLOT_DATA = RESULTS / "01b_product_space_plot_data.csv"
 
 
-def plot_column_scatter(dtype_info: pd.DataFrame, out_path: Path) -> None:
+def plot_column_scatter(dtype_info: pd.DataFrame, out_path: Path, total_rows: int) -> None:
     """Columns as bubbles: completeness (x) vs value diversity (y, log).
 
     A different cut than the plain completeness x numeric-content plot: the
@@ -49,7 +49,7 @@ def plot_column_scatter(dtype_info: pd.DataFrame, out_path: Path) -> None:
     columns: barcode sits alone at 42% complete / 15k values / fully numeric.
     """
     frame = dtype_info.sort_values("non_null").reset_index(drop=True)
-    x = frame["non_null"] / frame["non_null"].max() * 100  # completeness %
+    x = frame["non_null"] / total_rows * 100  # completeness = % of total rows
     y = np.log10(frame["cardinality"].clip(lower=1))
     sizes = 40 + 80 * (y / y.max())
     fig, ax = plt.subplots(figsize=(10, 6.5), constrained_layout=True)
@@ -169,20 +169,9 @@ def main() -> None:
     RESULTS.mkdir(parents=True, exist_ok=True)
     df = load_dataset()
 
-    # column scatter reuses the same dtype computation as 01 (honest, single source)
-    dtype_info = []
-    for col in df.columns:
-        non_null = int(df[col].notna().sum())
-        cardinality = int(df[col].dropna().nunique())
-        numeric_like = 0.0
-        if non_null:
-            sample = df[col].dropna().head(5000)
-            numeric_like = round(
-                float(pd.to_numeric(sample, errors="coerce").notna().mean()), 4)
-        dtype_info.append({
-            "column": col, "non_null": non_null, "cardinality": cardinality,
-            "numeric_like": numeric_like})
-    plot_column_scatter(pd.DataFrame(dtype_info), PNG_COLUMN)
+    # column scatter reuses the shared dtype computation (single source in _common)
+    profile = column_profile(df)
+    plot_column_scatter(profile, PNG_COLUMN, total_rows=len(df))
     print(f"wrote {PNG_COLUMN}")
 
     embed = compute_product_space(df)

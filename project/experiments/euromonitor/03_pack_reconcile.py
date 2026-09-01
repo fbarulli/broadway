@@ -11,10 +11,8 @@ Independent of VOLUME_RE — works on raw listing text (full names per BARCODE).
 
 from __future__ import annotations
 
-import ast
-
 import pandas as pd
-from _common import RESULTS
+from _common import RESULTS, parse_list_cell
 from _text import is_pack_multiple
 
 CSV_IN = RESULTS / "02b_volume_disagreement_split.csv"
@@ -36,10 +34,7 @@ def main() -> None:
     reclassified = 0
     out_rows = []
     for _, r in df.iterrows():
-        names = (
-            ast.literal_eval(r["sample_names"])
-            if isinstance(r["sample_names"], str) else r["sample_names"]
-        )
+        names = parse_list_cell(r["sample_names"])
         new_bucket, matched_n = reclassify_bucket(
             r["bucket"], r["vol_ratio"], names)
         if new_bucket != r["bucket"]:

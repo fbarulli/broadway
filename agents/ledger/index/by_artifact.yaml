@@ -804,7 +804,7 @@ project/data/euromonitor/dataset.csv:
 - GATE-SURF-103
 project/data/euromonitor/eda.parquet (evidence):
 - GATE-SURF-103
-project/experiments/euromonitor/07_nlp_hpo.py pair construction (same 12,038 pos / 10,000 neg population as step 04):
+project/experiments/euromonitor/07_nlp_hpo.py pair construction (same 10,891 pos / 10,000 neg population as step 04):
 - GATE-HPO-154
 project/experiments/mlflow/_common.py RESULTS convention:
 - GATE-SURF-68

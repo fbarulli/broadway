@@ -92,8 +92,12 @@ def precision_at_recall(pos_scores: np.ndarray, neg_scores: np.ndarray, target_r
     retains target_recall of true pairs), then precision = TP / (TP + FP) at
     that threshold. This is the business-relevant number for the scoring stage:
     at target recall, how many of the flagged pairs are actually the same product.
+
+    Returns NaN when either score population is empty: an empty negative set
+    would otherwise make precision spuriously 1.0 (a division with no false
+    positives), and an empty positive set has no threshold to define.
     """
-    if len(pos_scores) == 0:
+    if len(pos_scores) == 0 or len(neg_scores) == 0:
         return float("nan")
     threshold = float(np.quantile(pos_scores, 1 - target_recall))
     pos_at = float((pos_scores >= threshold).sum())

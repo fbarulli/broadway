@@ -11,7 +11,7 @@ Three outputs:
        recall (true pairs retained), candidates (classifier cost), blocks,
        and agree_when_both (P(equal | both present) — scoring-side utility).
      Reading: high recall + low candidates => blocking material; low recall
-     but high agree_when_both => scoring material (e.g. volume: 0.36 vs 0.99).
+     but high agree_when_both => scoring material (e.g. volume: 0.60 vs 0.98).
   B. Composite frontier — curated combinations + the cliff where volume
      enters the key (recall collapses to ~0.63).
   C. Greedy forward selection — repeatedly add the feature that keeps recall

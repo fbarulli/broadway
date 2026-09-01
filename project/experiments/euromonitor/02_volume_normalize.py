@@ -28,7 +28,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from _common import RESULTS, load_euromonitor
+from _common import (
+    RESULTS,
+    barcode_agreement_table,
+    canonical_volume,
+    has_barcode,
+    load_euromonitor,
+)
 
 CSV_PER_SKU = RESULTS / "02_volume_normalize.csv"
 CSV_BEFORE_AFTER = RESULTS / "02_volume_agreement_before_after.csv"
@@ -63,18 +69,18 @@ def plot_disagreement(agree_df: pd.DataFrame, out_path: Path, ratio_threshold: f
 
     Plots the group-level max/min volume ratio for the flagged groups, with the
     near-miss / likely-variant threshold marked. Uses the consolidated `agree`
-    table so the chart matches the 54/199 number cited in the write-up.
+    table so the chart matches the 57 flagged groups reported in the summary.
     """
     flagged = agree_df[agree_df["canonical_agree"] == False].copy()
     flagged["vol_ratio"] = flagged["canonical_volumes"].apply(
-        lambda v: max(v) / min(v) if len(v) > 1 and min(v) > 0 else 1)
+        lambda v: max(v) / min(v) if len(v) > 1 and min(v) > 0 else float("nan"))
     fig, ax = plt.subplots(figsize=(8, 4.5), constrained_layout=True)
     if len(flagged):
-        sns.histplot(flagged["vol_ratio"], bins=30, ax=ax, color="#C44E52")
+        sns.histplot(flagged["vol_ratio"].dropna(), bins=30, ax=ax, color="#C44E52")
     ax.axvline(ratio_threshold, color="black", linestyle="--",
                label=f"near-miss threshold ({ratio_threshold})")
     n_near = int((flagged["vol_ratio"] < ratio_threshold).sum())
-    n_real = int((flagged["vol_ratio"] >= ratio_threshold).sum())
+    n_real = int(len(flagged) - n_near)  # zero-min groups are NOT near-miss
     if len(flagged):
         ax.set_xlim(0, min(flagged["vol_ratio"].max() * 1.05, 100))
     ax.set_xlabel("max(volume) / min(volume) within BARCODE group")
@@ -93,7 +99,7 @@ def plot_flavor(df: pd.DataFrame, out_path: Path) -> None:
     (the step-03 feature-weighting decision) via the both/name-only/attr-only/
     neither split and the agreement rate when both fire.
     """
-    known = df[df["barcode"].fillna("").str.len() > 0].copy()
+    known = df[has_barcode(df)].copy()
     known["has_name"] = known["flavor_from_name"].notna()
     known["has_attr"] = known["flavor_from_attributes"].notna()
     both = known[known["has_name"] & known["has_attr"]]
@@ -170,13 +176,13 @@ def main() -> None:
     # source). Description is NOT used as a fallback: its nutrition/serving/
     # dilution prose ("per 12 fl oz", "0.2 l glass", "dilute in 9 volumes")
     # injects systematic false volumes (proven: fallback agreement 96.5% and
-    # 198 flagged vs 99.0% and 54 flagged name-only). Description volume is
+    # 198 flagged vs 99.0% and 57 flagged name-only). Description volume is
     # kept as an explicit low-confidence feature, never silently folded in.
-    # extract_volume_ml returns (ml, ambiguous) — split into the canonical
-    # column + an ambiguity flag (bare oz/ounce could be weight).
-    _vol = df["title"].map(extract_volume_ml)
-    df["canonical_volume_ml"] = _vol.map(lambda x: x[0])
-    df["canonical_volume_ambiguous"] = _vol.map(lambda x: x[1])
+    # canonical_volume returns (canonical_volume_ml, canonical_volume_ambiguous)
+    # — the ambiguity flag marks bare oz/ounce (weight vs fluid).
+    _vol = canonical_volume(df["title"])
+    df["canonical_volume_ml"] = _vol["canonical_volume_ml"]
+    df["canonical_volume_ambiguous"] = _vol["canonical_volume_ambiguous"]
     df["desc_volume_ml"] = df["description"].map(
         lambda s: extract_volume_ml(s)[0])
     df["attributes_volume_ml"] = df["attributes"].map(parse_attributes_volume)
@@ -207,7 +213,7 @@ def main() -> None:
         ],
         "value": [
             len(df),
-            int(df["barcode"].fillna("").str.len().gt(0).sum()),
+            int(has_barcode(df).sum()),
             int(df["canonical_volume_ml"].notna().sum()),
             int(df["attributes_volume_ml"].notna().sum()),
             round(df["volume_agreement"].mean(), 4),
@@ -216,35 +222,16 @@ def main() -> None:
             round(df["flavor_from_attributes"].notna().mean(), 4),
         ],
     })
-    summary.to_csv(CSV_PER_SKU, index=False)
-    print(f"wrote {CSV_PER_SKU} (display table, {len(summary)} rows)")
-
     out = df  # working frame; per-SKU columns live here, not persisted to CSV
 
     # ---- BARCODE-group validation on multi-retailer subset --------------------
-    # Computed ONCE; summary stat + printed sample both derive from `agree`.
-    # Honest denominators: a group counts toward canonical_agree only if it has
-    # >=1 detected canonical volume (empty groups are excluded, not counted as
-    # trivially-agreeing). attr_agree mirrors the same rule for the attributes
-    # field, giving the ML-vs-regex contrast point.
-    known = out[out["barcode"].fillna("").str.len() > 0]
-    multi = known[known.groupby("barcode")["retailer"].transform("nunique") > 1]
-    agree = multi.groupby("barcode").apply(
-        lambda x: pd.Series({
-            "retailers": x["retailer"].nunique(),
-            "skus": len(x),
-            "canonical_volumes": sorted(x["canonical_volume_ml"].dropna().unique().tolist()),
-            "attr_volumes": sorted(x["attributes_volume_ml"].dropna().unique().tolist()),
-            "canonical_agree": (
-                x["canonical_volume_ml"].dropna().nunique() <= 1
-                if x["canonical_volume_ml"].notna().any() else None
-            ),
-            "attr_agree": (
-                x["attributes_volume_ml"].dropna().nunique() <= 1
-                if x["attributes_volume_ml"].notna().any() else None
-            ),
-        }),
-    ).reset_index()
+    # Computed ONCE via the shared helper; summary stat + printed sample both
+    # derive from `agree`. Honest denominators: a group counts toward an agree
+    # column only if it has >=1 detected value for that column (empty groups are
+    # excluded, not counted as trivially-agreeing). attr_agree mirrors the same
+    # rule for the attributes field, giving the ML-vs-regex contrast point.
+    agree = barcode_agreement_table(
+        out, [("canonical_volume_ml", "canonical"), ("attributes_volume_ml", "attr")])
     with_canon = agree.dropna(subset=["canonical_agree"])
     canonical_rate = with_canon["canonical_agree"].mean()
     with_attr = agree.dropna(subset=["attr_agree"])

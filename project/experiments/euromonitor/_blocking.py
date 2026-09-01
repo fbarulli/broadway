@@ -72,7 +72,10 @@ def build_pairs(
     tt = titles.to_numpy()
     a = rng.integers(0, n, size=n_neg * 60)
     b = rng.integers(0, n, size=n_neg * 60)
-    mask = (a != b) & (bc[a] != bc[b]) & (tt[a] != tt[b])
+    # A negative is only a KNOWN non-match when both rows carry a non-empty
+    # (and different) barcode; a GTIN-missing row has unknown ground truth and
+    # must not enter the negative population (matches _hard_negatives.py).
+    mask = (a != b) & (bc[a] != "") & (bc[b] != "") & (bc[a] != bc[b]) & (tt[a] != tt[b])
     if int(mask.sum()) < n_neg:
         raise RuntimeError(f"only {int(mask.sum())} valid negative pairs sampled (need {n_neg})")
 

@@ -195,8 +195,9 @@ def main() -> None:
     # ---- printed report -----------------------------------------------------------
     print(f"\nprice: n={len(p):,}  cv={p.std()/p.mean():.2f}  "
           f"outliers(1.5xIQR)={out_pct:.1%}")
+    non_digit = int(known.str.contains(r"\D").sum())
     print(f"barcode: {known.nunique():,} values, {len(known)/len(df):.1%} coverage, "
-          f"{int(known.str.contains(r"\D").sum()):,} rows with non-digit chars")
+          f"{non_digit:,} rows with non-digit chars")
     print(f"brand conflicts within multi-retailer BARCODE groups: "
           f"{float((multi_brands > 1).mean()):.1%} of {len(multi_brands):,} groups")
     print(f"price conflicts: all-BARCODE {float((barcode_prices > 1).mean()):.1%}  "
