@@ -111,7 +111,7 @@ sync_to_main() {
 PARITY_ERA=dev                 # dev: sklearn active, main frozen | main: lockstep day
 PARITY_TRACK_BRANCH=sklearn    # active development line during dev era
 PARITY_ALLOWLIST=()            # SHARED paths exempt from custody; extend only by cited ruling
-PARITY_MAIN_ANCHOR=70f4e5d45b0e9cb4e094f2bd44b8eb2b86bc7826  # re-anchored 2026-08-31 after the public README follow-ups and the verified snapshot-guard ShellCheck fix on frozen main
+PARITY_MAIN_ANCHOR=6f102f29079d9911f79c0069f6ee2eea9ef62065  # re-anchored 2026-09-01 by owner ruling ("yes anchor, continue"): the Aug-31 reroot series IS the ratified frozen state; old anchor 70f4e5d superseded
 
 # Preserved validations (D16 rider). The old ENV_FILE readability test,
 # `source`, ${VAR:?} trio, and declare -p existence check are DEAD here —
