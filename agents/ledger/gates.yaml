@@ -1,6 +1,6 @@
 # Gate registry SSOT — hand-maintained; the {01..09} gate fragments it consolidated predate git custody.
 meta:
-  head: '033c338'
+  head: '929a527'
   counts:
     total: 145
     gates_with_findings: 84
@@ -3033,12 +3033,13 @@ gates:
   - tests/test_hpo.py::test_run_hpo_end_to_end
   - tests/test_hpo.py::test_run_hpo_no_bandit_when_budget_exhausted
   - tests/test_hpo.py::test_mlflow_tracking_logs_trials
+  - tests/test_hpo.py::test_run_hpo_bandit_isolates_failed_model
   if_changed:
   - trial-state semantics under exceptions/pruning
   - round-abort behavior
   - budget math feeding GATE-HPO-85
   findings:
-  - 'one raising trial aborts the WHOLE optimize call (no catch=, :159) and the exception propagates out of future.result() during result collection (:229, :256-257) — sibling studies'' completed work is discarded mid-round and run_hpo dies with no leaderboard/summary; no test pins the partial-failure semantics. root: src/broadway/training/hpo.py:159'
+  - 'RESIDUAL after 2026-09 per-model isolation (hpo.py _initial_round/_bandit_round catch each future and surface failures under result[''failed''], pinned by tests/test_hpo.py::test_run_hpo_bandit_isolates_failed_model): within ONE study a single raising trial still aborts that study''s optimize call (no catch= tuple at :159), so its remaining trials are lost and the whole study is recorded FAIL rather than partial. root: src/broadway/training/hpo.py:159'
   - 'bool params are UNTUNABLE END-TO-END (cross-ref E2E-D6, e2e-lane defect confirmed at clean HEAD 5016e93 and reproduced identically in this working tree) — three layers conspire: (a) the registry vocabulary is NAME-only (allowed_params frozenset, src/broadway/training/models/registry.py:28 advertises fit_intercept/positive/copy_X with no dtype dimension); (b) the suggest dispatch knows only int-vs-float from bound types (:107-111) — there is no suggest_categorical/bool branch; (c) ModelHPOSpec.search_space dict[str, list[float | int]] (src/broadway/config/schema.py:122) SILENTLY COERCES native bool bounds — verified live: [true, false] validates to [1.0, 0.0]. Int-encoded [0, 1] passes schema AND registry validation, then sklearn strict validation raises InvalidParameterError (''fit_intercept … must be an instance of bool … Got 0 instead.'') on EVERY trial sampling those params; a only-bool space aborts optimize() on trial 0 via the no-catch= mechanics above; a mixed space decimates the leaderboard probabilistically. root: src/broadway/training/hpo.py:107-111 (+ src/broadway/config/schema.py:122 silent bool→float coercion, src/broadway/training/models/registry.py:28 dtype-blind vocabulary)'
 - id: GATE-HPO-83
   phase: hpo-optuna

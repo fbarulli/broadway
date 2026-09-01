@@ -1,6 +1,6 @@
 # DIGEST.md — rendered from agents/ledger/gates.yaml · NEVER HAND-EDIT ·
 
-> 145 gates · rendered 2026-09-01 @ HEAD 033c338 · load THIS into context;
+> 145 gates · rendered 2026-09-01 @ HEAD 929a527 · load THIS into context;
 > gates.yaml is the sole SSOT; the retired GATES.md/gates/*.md markdown world survives in agents/ledger/arbitration/2026-08-24/surface-and-analysis-preservation.md.
 
 | band | phase | gates | findings |
@@ -243,7 +243,7 @@
 - **GATE-HPO-81** `src/broadway/training/hpo.py:30 make_objective()` ⚠FINDING
   [PipelineConfig experiment block, ModelHPOSpec.name registry key, CFG-HPO-SPEC.target_metric, X/y train+val frames] → [Objective(params[, trial]) -> float closure; per-trial 'broadway_metrics' user attr] · pins: 5
 - **GATE-HPO-82** `src/broadway/training/hpo.py:159+:177 study.optimize call sites (run_model_study leg + _optimize_study bandit continuation)` ⚠FINDING
-  [_trial_objective wrapper (hpo.py:99), n_trials budget (initial_trials_per_model or bandit allocation), callbacks list from GATE-HPO-83] → [COMPLETE/PRUNED/FAIL trials appended to ARTIFACT-OPTUNA-STUDY] · pins: 4
+  [_trial_objective wrapper (hpo.py:99), n_trials budget (initial_trials_per_model or bandit allocation), callbacks list from GATE-HPO-83] → [COMPLETE/PRUNED/FAIL trials appended to ARTIFACT-OPTUNA-STUDY] · pins: 5
 - **GATE-HPO-83** `src/broadway/training/hpo.py:66 _mlflow_callback()` ⚠FINDING
   [FrozenTrial states/values/user attrs from the optimize callbacks hook, ambient MLFLOW_TRACKING_URI, caller mlflow_tags] → [one nested ARTIFACT-MLFLOW-RUN per COMPLETE trial (params + numeric metrics + tags)] · pins: 2
 - **GATE-HPO-84** `src/broadway/training/hpo.py:350 best_model min()/max() selection in run_hpo_bandit()` ⚠FINDING
