@@ -129,12 +129,15 @@ raw["_has_bc"] = raw["barcode"].fillna("").str.len().gt(0).astype(int)
 raw["_nonnull"] = raw.notna().sum(axis=1)
 raw["_rank"] = raw["_has_bc"] * 1e12 + raw["_nonnull"] * 1e6 - raw["_price"].fillna(1e9)
 
-rep_pos = raw.groupby(["retailer", "title"], sort=False)["_rank"].idxmax()
-reps = raw.loc[rep_pos].reset_index(drop=True)
+# NaN-safe dedup key (empty title/retailer become "", so dict lookups cannot miss)
+raw["_title"] = raw["title"].fillna("")
+raw["_retailer"] = raw["retailer"].fillna("")
+rep_pos = raw.groupby(["_retailer", "_title"], sort=False)["_rank"].idxmax()
+reps = raw.loc[rep_pos.values].reset_index(drop=True)
 
 # exact SKU -> representative mapping (same source frame, so it cannot miss)
-key_to_rep = {(r, t): i for i, (r, t) in enumerate(zip(reps["retailer"], reps["title"]))}
-raw["rep_id"] = [key_to_rep[(r, t)] for r, t in zip(raw["retailer"], raw["title"])]
+key_to_rep = {(r, t): i for i, (r, t) in enumerate(zip(reps["_retailer"], reps["_title"]))}
+raw["rep_id"] = [key_to_rep[(r, t)] for r, t in zip(raw["_retailer"], raw["_title"])]
 print(f"representatives: {len(reps):,}  (from {len(raw):,} SKUs; dropped {len(raw) - len(reps):,} duplicates)")"""),
 
     md("""## 6. Embed the representatives
