@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main, taxi, sklearn]
+    branches: ['**']
   pull_request:
-    branches: [main, taxi, sklearn]
+    branches: ['**']
 
 # Rapid pushes to the same branch/PR cancel the in-flight run — no wasted
 # compute on superseded commits.

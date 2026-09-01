@@ -865,7 +865,7 @@ published annotated tag with a ledger row naming its procedure:
 - GATE-INFRA-141
 published worker image:
 - GATE-INFRA-126
-push/PR to main|taxi|sklearn (:3-7):
+'push/PR to all branches (branches: [''**''], :3-7)':
 - GATE-INFRA-99
 pyproject [project.scripts] entrypoint table:
 - GATE-INFRA-147

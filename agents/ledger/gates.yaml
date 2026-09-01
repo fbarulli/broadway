@@ -1,6 +1,6 @@
 # Gate registry SSOT — hand-maintained; the {01..09} gate fragments it consolidated predate git custody.
 meta:
-  head: '929a527'
+  head: '7d40b37'
   counts:
     total: 145
     gates_with_findings: 84
@@ -3579,7 +3579,7 @@ gates:
   order: 118
   owner: '.github/workflows/ci.yml:47 platform job step "Platform gates (SSOT)" (delegation law :42-46; docker-only checks :51-66; build-and-boot :151; CD job :310; concurrency :11-13)'
   inputs:
-  - push/PR to main|taxi|sklearn (:3-7)
+  - "push/PR to all branches (branches: ['**'], :3-7)"
   - fetch-depth 0 for parity tips (:28)
   - uv sync --all-extras --frozen (:40)
   - bash scripts/run_local_ci.sh (no args ⇒ full tier)
