@@ -13,6 +13,7 @@ build/
 data/raw/
 data/processed/
 data/samples/
+project/data/
 artifacts/
 /results/
 project/experiments/results/**
