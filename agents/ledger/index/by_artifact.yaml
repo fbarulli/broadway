@@ -391,6 +391,8 @@ audit JSONs (GATE-ETL-13/14/15):
 - GATE-ETL-10
 'autoscaling bounds minReplicas: 2 / maxReplicas: 10 / averageUtilization: 70 (:48-56)':
 - GATE-INFRA-131
+'bandit result {models, best_model, best_params, best_value, metrics} (direction: maximize, reused run_hpo_bandit)':
+- GATE-HPO-154
 banner FAST-GREEN | LOCAL-CI GREEN | LOCAL-CI RED:
 - GATE-INFRA-90
 bash scripts/run_local_ci.sh (no args ⇒ full tier):
@@ -527,6 +529,8 @@ dict[str, np.ndarray] group arrays:
 - GATE-STATS-44
 direction:
 - GATE-HPO-86
+direction str (:184, default minimize):
+- GATE-HPO-85
 dispatch into timeline.walkthrough.run (cli.py:166-173):
 - GATE-TLINE-59
 ? 'docker-only verdicts: sh -n + shellcheck k8s/optuna/*.sh AND scripts/*.sh (:57-66), kubeconform -strict k8s/optuna/ plus project/k8s/optuna/configmap.yaml minus kind-config.yaml (:79), orchestrator dry-run render+kubeconform (:104)'
@@ -631,9 +635,9 @@ kind:
 - GATE-TLINE-52
 kind restricted to Literal["omnibus","posthoc"]:
 - GATE-TLINE-51
-leaderboard from _leaderboard (:260-268):
+leaderboard from _leaderboard (:285-293):
 - GATE-HPO-84
-'leaderboard {model: best objective} (lower=better)':
+'leaderboard {model: best objective} (lower=better for minimize, higher=better for maximize)':
 - GATE-HPO-85
 left df:
 - GATE-ETL-13
@@ -786,6 +790,8 @@ pending CURRENT intent followed by one synced mirror item:
 - GATE-INFRA-148
 ? per-group {skew, kurtosis, shapiro_p} (:31-35); levene {statistic, p_value} (:15-16); ValueError "normality checks require non-constant groups" (:23-24); ValueError "Levene's test requires non-zero variance in every group" (:13-14)
 : - GATE-STATS-46
+? per-model entity-resolution metrics (auc, recall_at_5pct_fpr, pos_median, neg_p90, encode_s) via trial broadway_metrics user attr
+: - GATE-HPO-154
 ? per-order executor dispatch through _STEP_RUNNERS (walkthrough.py:281-288); step JSONs saved (walkthrough.py:384); DECISION REQUIRED console panels (walkthrough.py:138-189); reports regenerated via _write_timeline (walkthrough.py:71-91 -> reports/timeline.md, reports/index.md, reports/results/*); stale-decision warnings (walkthrough.py:192-201)
 : - GATE-TLINE-54
 per-sublane classification records owed per resolution:
@@ -825,10 +831,18 @@ project/config/ (project-owned layout, experiment, and taxi config-overlay SSOT)
 - GATE-INFRA-92
 ? 'project/config/dataset/*.yaml (column pins: dtype/null_count/role per column, e.g. project/config/dataset/taxi.yaml:1-29; lookup_tables with value_policies/sentinel_values taxi.yaml:31-59)'
 : - GATE-CFG-74
+'project/config/experiments/nlp.yaml model_zoo + hpo: block (bi-encoder zoo SSOT, direction: maximize)':
+- GATE-HPO-154
 project/config/project/taxi.yaml knobs:
 - GATE-ETL-117
 project/config/{dataset,analysis,project}/ taxi overlay plus generic base configs:
 - GATE-CFG-104
+project/data/euromonitor/dataset.csv:
+- GATE-SURF-103
+project/data/euromonitor/eda.parquet (evidence):
+- GATE-SURF-103
+project/experiments/euromonitor/07_nlp_hpo.py pair construction (same 12,038 pos / 10,000 neg population as step 04):
+- GATE-HPO-154
 project/experiments/mlflow/_common.py RESULTS convention:
 - GATE-SURF-68
 project/experiments/more_modeling/:
@@ -899,7 +913,7 @@ registry=BUILDERS∪extra_builders (builders.py:115-117):
 - GATE-FEAT-21
 release/tag minting intent:
 - GATE-INFRA-141
-remaining trial budget (:302):
+remaining trial budget (:330):
 - GATE-HPO-85
 renamed post-filter df:
 - GATE-ETL-17
@@ -977,6 +991,8 @@ sample.column_mapping logical→source resolution (:132):
 - GATE-STATS-49
 sample_name/sample_role:
 - GATE-TLINE-58
+sentence-transformers bi-encoders resolved via model_zoo (zero-shot; optional contrastive fine-tune examples):
+- GATE-HPO-154
 seven module-level config singletons resolved at import (_contract/_project/_etl/_features and siblings):
 - GATE-CFG-104
 sha-tagged images built/boot-tested; CD publishes bit-for-bit verified tarball to GHCR on main/taxi pushes only (:290-376):
@@ -1120,5 +1136,5 @@ yaml.safe_load stream:
 - GATE-CFG-70
 '{"tier": FULL|CHECKLIST, "reasons": [...]} JSON':
 - GATE-INFRA-98
-'{model: n_trials} allocation dict fed to _bandit_round (:304-305)':
+'{model: n_trials} allocation dict fed to _bandit_round (:333)':
 - GATE-HPO-85

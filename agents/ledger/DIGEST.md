@@ -1,6 +1,6 @@
 # DIGEST.md — rendered from agents/ledger/gates.yaml · NEVER HAND-EDIT ·
 
-> 143 gates · rendered 2026-09-01 @ HEAD d36f1d8 · load THIS into context;
+> 145 gates · rendered 2026-09-01 @ HEAD 46e2135 · load THIS into context;
 > gates.yaml is the sole SSOT; the retired GATES.md/gates/*.md markdown world survives in agents/ledger/arbitration/2026-08-24/surface-and-analysis-preservation.md.
 
 | band | phase | gates | findings |
@@ -11,12 +11,12 @@
 | 04-training | training-eval | 13 | 12 |
 | 05-stats | stats | 11 | 7 |
 | 06-timeline | timeline-lineage | 11 | 7 |
-| 07-surfaces | surfaces | 13 | 1 |
+| 07-surfaces | surfaces | 14 | 1 |
 | 08-config | config-schema | 17 | 11 |
-| 80-hpo-optuna | hpo-optuna | 10 | 9 |
+| 80-hpo-optuna | hpo-optuna | 11 | 9 |
 | 09-infra | infra-meta | 31 | 17 |
 | 81-object-custody | object-custody | 6 | 0 |
-| **total** | | **143** | **84** |
+| **total** | | **145** | **84** |
 
 ### 01-ingest — ingest
 
@@ -196,6 +196,8 @@
   [raw CSV path (ds-pipeline columns subparser argv)] → [stdout per-column dtype report (read-only probe, zero artifact writes)] · pins: none direct
 - **GATE-SURF-102** `src/broadway/reports/experiments_dashboard.py:56 FastAPI app custody (generic dashboard series endpoints)`
   [project-provided experiment results CSVs via BROADWAY_EXPERIMENTS_ROOT] → [dashboard series endpoints served by the FastAPI app object] · pins: 3
+- **GATE-SURF-103** `project/experiments/euromonitor/01_eda.py:38 plot_barcode_coverage()`
+  [project/data/euromonitor/dataset.csv] → [project/data/euromonitor/eda.parquet (evidence)] · pins: 1
 
 ### 08-config — config-schema
 
@@ -244,10 +246,10 @@
   [_trial_objective wrapper (hpo.py:99), n_trials budget (initial_trials_per_model or bandit allocation), callbacks list from GATE-HPO-83] → [COMPLETE/PRUNED/FAIL trials appended to ARTIFACT-OPTUNA-STUDY] · pins: 4
 - **GATE-HPO-83** `src/broadway/training/hpo.py:66 _mlflow_callback()` ⚠FINDING
   [FrozenTrial states/values/user attrs from the optimize callbacks hook, ambient MLFLOW_TRACKING_URI, caller mlflow_tags] → [one nested ARTIFACT-MLFLOW-RUN per COMPLETE trial (params + numeric metrics + tags)] · pins: 2
-- **GATE-HPO-84** `src/broadway/training/hpo.py:317 best_model min() selection` ⚠FINDING
-  [leaderboard from _leaderboard (:260-268), studies dict, cfg.experiment.model.type (trainer side)] → [result dict {'models': {name: {best_params, best_value, n_trials}}, 'best_model', 'best_params', 'best_value'}] · pins: 2
+- **GATE-HPO-84** `src/broadway/training/hpo.py:350 best_model min()/max() selection in run_hpo_bandit()` ⚠FINDING
+  [leaderboard from _leaderboard (:285-293), studies dict, cfg.experiment.model.type (trainer side)] → [result dict {'models': {name: {best_params, best_value, n_trials}}, 'best_model', 'best_params', 'best_value'}] · pins: 2
 - **GATE-HPO-85** `src/broadway/training/hpo.py:180 bandit_allocate()`
-  [leaderboard {model: best objective} (lower=better), remaining trial budget (:302), top_k (CFG-HPO-SPEC)] → [{model: n_trials} allocation dict fed to _bandit_round (:304-305)] · pins: 8
+  [leaderboard {model: best objective} (lower=better for minimize, higher=better for maximize), remaining trial budget (:330), top_k (CFG-HPO-SPEC), direction str (:184, default minimize)] → [{model: n_trials} allocation dict fed to _bandit_round (:333)] · pins: 10
 - **GATE-HPO-86** `src/broadway/training/optuna.py:48 run_study_rdb()` ⚠FINDING
   [storage_url string (sqlite:/// locally; postgresql://…:5432/optuna in k8s via compose_db_url), study_name, direction, optional random_state] → [durable Optuna schema in the RDB (ARTIFACT-OPTUNA-STUDY at rest); stale RUNNING trials flipped FAIL on resume, ARTIFACT-OPTUNA-SNAPSHOT dumps under gitignored data/optuna-backup/] · pins: 5
 - **GATE-HPO-87** `k8s/optuna/render_worker_jobs.py:26 render_jobs()` ⚠FINDING
@@ -256,6 +258,8 @@
   [random_state base seed, hpo.models list ORDER, CFG-HPO-SPEC / CFG-HPO-EXPERIMENT seed literals upstream] → [deterministic per-model sampler seeds; reproducible trajectories across runs/processes] · pins: 3
 - **GATE-HPO-89** `src/broadway/config/schema.py:125 HPOConfig` ⚠FINDING
   [configs/experiments/mlflow.yaml hpo: block (:14-44) = CFG-HPO-SPEC, ExperimentConfig.hpo (experiment-embedded twin, e.g. configs/experiment/hyperopt.yaml:23-36) = CFG-HPO-EXPERIMENT, k8s configmap inline config.yaml = CFG-K8S-OPTUNA-INFRA (infra keys only)] → [typed HPOConfig{engine, direction, total_trials, initial_trials_per_model, top_k, target_metric, models[].search_space, storage_url}] · pins: 3
+- **GATE-HPO-154** `src/broadway/training/nlp.py:98 make_objective() + :147 run_nlp_hpo()`
+  [project/config/experiments/nlp.yaml model_zoo + hpo: block (bi-encoder zoo SSOT, direction: maximize), sentence-transformers bi-encoders resolved via model_zoo (zero-shot; optional contrastive fine-tune examples), project/experiments/euromonitor/07_nlp_hpo.py pair construction (same 12,038 pos / 10,000 neg population as step 04)] → [per-model entity-resolution metrics (auc, recall_at_5pct_fpr, pos_median, neg_p90, encode_s) via trial broadway_metrics user attr, bandit result {models, best_model, best_params, best_value, metrics} (direction: maximize, reused run_hpo_bandit)] · pins: 4
 
 ### 09-infra — infra-meta
 

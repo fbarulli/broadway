@@ -210,6 +210,8 @@ broadway.timeline.runners.run_omnibus (:315-319):
 - GATE-STATS-45
 broadway.timeline.runners.run_posthoc (:396):
 - GATE-STATS-47
+broadway.training.hpo.run_hpo_bandit:
+- GATE-HPO-154
 broadway.viz.palette_colors (:112 — indirect viz.yaml disk read, see GATE-STATS-48 FINDING):
 - GATE-STATS-49
 broadway.viz.palette_colors — INDIRECT CONFIG READ (see FINDING):
@@ -344,6 +346,7 @@ optuna:
 - GATE-HPO-83
 - GATE-HPO-86
 - GATE-HPO-88
+- GATE-HPO-154
 orchestration entrypoints dispatching flows:
 - GATE-CFG-78
 os:
@@ -379,6 +382,7 @@ pandas:
 - GATE-STATS-48
 - GATE-STATS-49
 - GATE-SURF-101
+- GATE-SURF-103
 - GATE-HPO-81
 - GATE-HPO-84
 pandas (df ops):
@@ -508,6 +512,8 @@ scripts/run_local_ci.sh:47-51 configs gate:
 - GATE-CFG-70
 scripts/ship.sh:24:
 - GATE-INFRA-90
+sentence-transformers:
+- GATE-HPO-154
 sklearn.metrics:
 - GATE-STATS-48
 sqlalchemy:

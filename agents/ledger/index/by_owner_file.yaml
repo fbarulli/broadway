@@ -42,6 +42,8 @@ project/etl/process_config.py:
 - GATE-ETL-117
 project/experiments.py:
 - GATE-INFRA-122
+project/experiments/euromonitor/01_eda.py:
+- GATE-SURF-103
 project/experiments/mlflow/03_optuna_worker.py:
 - GATE-INFRA-129
 - GATE-CUST-149
@@ -216,6 +218,8 @@ src/broadway/training/module.py:
 - GATE-TRAIN-30
 - GATE-TRAIN-31
 - GATE-TRAIN-33
+src/broadway/training/nlp.py:
+- GATE-HPO-154
 src/broadway/training/optuna.py:
 - GATE-HPO-86
 src/broadway/training/trainer.py:
