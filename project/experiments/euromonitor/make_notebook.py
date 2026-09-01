@@ -39,13 +39,14 @@ The naive approach — compare every SKU to every other SKU — is ~2.6 **billio
 
     md("""## 2. Setup"""),
 
-    code("""import sys, itertools
+    code("""import itertools
+import sys
 from pathlib import Path
-from collections import defaultdict
 
+import matplotlib
 import numpy as np
 import pandas as pd
-import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from scipy.sparse import csr_matrix
@@ -56,8 +57,9 @@ ROOT = Path.cwd()
 SERIES = ROOT / "project" / "experiments" / "euromonitor"
 sys.path.insert(0, str(SERIES))
 
-from _common import load_dataset, PATHS, SEED
+from _common import PATHS, SEED, load_dataset
 from _text import MACRO_MAP, extract_volume_ml
+
 from broadway.training.nlp import encode_corpus, entity_resolution_metrics
 
 MODEL = "sentence-transformers/all-MiniLM-L6-v2"
@@ -203,6 +205,7 @@ out.head()"""),
 Barcode gives us an **independent** ground truth: two listings with the same non-empty barcode *are* the same product. We score the bi-encoder on that truth (same-barcode pairs = positives, cross-barcode pairs = negatives) and report **PR-AUC and precision@recall** — not just AUC, because AUC saturates (~0.999) on easy random negatives."""),
 
     code("""from _blocking import build_pairs
+
 pos, neg = build_pairs(reps, SEED, 4, 10_000)   # same-barcode / cross-barcode
 pos_s = (emb[pos[:, 0]] * emb[pos[:, 1]]).sum(axis=1)
 neg_s = (emb[neg[:, 0]] * emb[neg[:, 1]]).sum(axis=1)

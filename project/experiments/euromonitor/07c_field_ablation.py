@@ -17,9 +17,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import numpy as np
 import pandas as pd
-
 from _blocking import build_pairs
 from _common import PATHS, SEED, load_dataset_deduped
+
 from broadway.training.nlp import encode_corpus, entity_resolution_metrics
 
 MODEL = "sentence-transformers/all-MiniLM-L6-v2"
