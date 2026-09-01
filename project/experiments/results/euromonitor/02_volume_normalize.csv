@@ -1,0 +1,10 @@
+metric,value
+skus_total,71623.0
+skus_with_gtin,30078.0
+canonical_volume_detected,46029.0
+attribute_volume_detected,62475.0
+row_level_volume_agreement,0.59
+within_gtin_volume_agreement,0.9891
+flavor_from_name_detected,0.6263
+flavor_from_attribute_detected,0.5842
+within_gtin_attribute_agreement,0.9765

@@ -1,0 +1,4 @@
+# euromonitor experiment config — seed + series knobs (YAML SSOT)
+seed: 42
+gtin_sample_gtin: "5000128652797"
+top_n_attribute_keys: 15
