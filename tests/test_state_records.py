@@ -460,7 +460,14 @@ def test_active_state_has_no_legacy_tail_before_events() -> None:
         "## Access protocol",
         "## Retention",
     ]
-    assert sum(line.startswith("|") for line in active.splitlines()) == 3
+    # No legacy table tail before ## EVENTS: every pipe line must live inside
+    # the ## CURRENT record table (header + divider + one row per open record),
+    # never in a stray table fragment after ## Retention.
+    current = active.split("## Access protocol", 1)[0]
+    assert sum(line.startswith("|") for line in current.splitlines()) >= 3
+    assert sum(line.startswith("|") for line in active.splitlines()) == sum(
+        line.startswith("|") for line in current.splitlines()
+    )
 
 
 # --------------------------------------------------------------------------- #

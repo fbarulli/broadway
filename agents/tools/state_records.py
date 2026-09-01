@@ -31,6 +31,8 @@ ARCHIVE_DIR = REPO / "agents" / "ledger" / "archive"
 CURRENT_START, CURRENT_END, EVENTS_START = "## CURRENT\n", "## Access protocol\n", "## EVENTS\n"
 COLUMNS = ("id", "kind", "status", "owner", "custody", "updated", "source", "github_item", "mirror_state", "summary")
 KINDS = {"lane", "custody", "hazard", "decision", "checkpoint"}
+# STATE-YYYYMMDD-NNN is the declared record-id namespace; its 8-digit date
+# segment is exempt from the 8-hex governance probe (test_governance_probes.py).
 STATE_ID = re.compile(r"STATE-\d{8}-\d{3}")
 STATUSES = frozenset({"open", "blocked", "approved", "closed", "void"})
 

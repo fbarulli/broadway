@@ -192,6 +192,8 @@ Before dispatching work, the main agent confirms the current HEAD and relevant s
 
 At session close, repository state and recorded operational state must agree, unless an explicit waiver is recorded.
 
+STATE record ids use the `STATE-YYYYMMDD-NNN` shape; the date segment of a record id is a declared record-id namespace, not a commit hash. Ledger prose must not emit a bare 8-hex digit run — write dates as `YYYY-MM-DD`. Enforced by the 8-hex governance probe.
+
 ## 13. Review
 
 Every implementation receives independent adversarial review before landing.

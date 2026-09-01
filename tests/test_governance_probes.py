@@ -15,7 +15,11 @@ matches role vocabulary agent/adversar*/reviewer/synthesis within 80 chars.
 USER-MVP pilot event-ids are a THIRD namespace (F4′, senior 3813c37c): a
 FULL-LINE ``EVENT: issues/<n>#issuecomment-<m> event-id <8hex>`` line's token
 is valid only via a UNIQUE row in STATE.md's normative ``## EVENTS`` table —
-role vocabulary grants NO escape inside that grammar. Probe C scans FIXES,
+role vocabulary grants NO escape inside that grammar. STATE record ids
+(``STATE-YYYYMMDD-NNN``) are a FOURTH namespace: the 8-digit date segment of a
+record id is declared (not a commit SHA) and exempt; a BARE 8-hex date in
+prose (no ``STATE-`` wrapper) is still a finding — write ``YYYY-MM-DD``.
+Probe C scans FIXES,
 DECISIONS and STATE; inside STATE.md only shape-matched registry rows between
 the ``## EVENTS`` heading and the next ``##`` heading are exempt (section-
 scoped); every other hex-bearing line stays in scan.
@@ -44,6 +48,10 @@ ROOT = Path(__file__).resolve().parents[1]
 
 BACKTICKED_PATH = re.compile(r"`([^\s`]+)\.(py|sh|md|ya?ml|toml|txt|json|env|cfg|ini)`")
 HEX8 = re.compile(r"\b[0-9a-f]{8}\b")  # known lookalike, OUT OF SCOPE: reports/audit/* carries decimal join-counts with accidental hex shape (e.g. 17091666) — reports/ is outside probe-C scan scope by design
+# STATE record ids (STATE-YYYYMMDD-NNN) are a DECLARED fourth namespace: the
+# 8-digit date segment is a record id, not a commit SHA, so it is exempt from
+# the 8-hex scan. A BARE 8-hex date in prose (no STATE- wrapper) still fails.
+STATE_RECORD_ID = re.compile(r"\bSTATE-\d{8}-\d{3}\b")
 # Canonical EVENT-line grammar (senior 3813c37c, full-line anchored,
 # no-trailing-newline form): <hex8> expands to the named group (?P<eid>...)
 # so span extraction shares these exact bytes. Kept on ONE source line so
@@ -248,12 +256,17 @@ def probe_hex_tokens(
     event_registry: frozenset[str] | None = None,
     exempt_spans: frozenset[tuple[int, int]] = frozenset(),
 ) -> None:
-    """Every 8-hex token resolves as a revision or is a declared agent ID.
+    """Every 8-hex token resolves as a revision or sits in a declared namespace.
 
     F4′ third namespace: an occurrence introduced by a FULL-LINE
     ``EVENT: issues/<n>#issuecomment-<m> event-id <8hex>`` line never resolves
     via git and role vocabulary grants NO escape — it is valid only when listed
     in ``event_registry`` (the STATE.md ``## EVENTS`` resolution table).
+
+    STATE record ids are a FOURTH namespace: the 8-digit date segment inside a
+    ``STATE-YYYYMMDD-NNN`` id is a declared record id (not a commit SHA) and is
+    skipped outright. A BARE 8-hex date in prose (no ``STATE-`` wrapper) is not
+    declared and still fails — ledger prose writes dates as ``YYYY-MM-DD``.
 
     ``exempt_spans`` (section-scoped STATE.md exemption): occurrences whose
     span lies inside one are skipped outright — used for registry rows between
@@ -261,9 +274,12 @@ def probe_hex_tokens(
     """
     registry = event_registry if event_registry is not None else frozenset()
     event_spans = {m.span("eid") for m in EVENT_LINE.finditer(text)}
+    state_id_spans = {m.span() for m in STATE_RECORD_ID.finditer(text)}
     for match in HEX8.finditer(text):
         token = match.group(0)
         if any(s <= match.start() and match.end() <= e for s, e in exempt_spans):
+            continue
+        if any(s <= match.start() and match.end() <= e for s, e in state_id_spans):
             continue
         if match.span() in event_spans:
             if token not in registry:
@@ -280,7 +296,8 @@ def probe_hex_tokens(
             continue
         raise AssertionError(
             f"{source}: 8-hex token {token} is neither a resolvable revision nor "
-            f"inside the declared agent-ID namespace (role vocabulary within {window} chars)"
+            f"inside a declared namespace (role vocabulary within {window} chars, "
+            f"a STATE-YYYYMMDD-NNN record id, or a registered event-id)"
         )
 
 
@@ -404,8 +421,29 @@ def test_probe_c_red_unattributed_8hex_token(tmp_path: Path) -> None:
     def everything_except_seed(token: str) -> bool:
         return token != "cafe1234"  # deterministic stub resolver, no git dependence
 
-    with pytest.raises(AssertionError, match="declared agent-ID namespace"):
+    with pytest.raises(AssertionError, match="declared namespace"):
         probe_hex_tokens(seeded_text, everything_except_seed, source="seeded-DECISIONS")
+
+
+def test_probe_c_green_state_record_id_date_segment() -> None:
+    # STATE-YYYYMMDD-NNN is a DECLARED record-id namespace: its 8-digit date
+    # segment is exempt even with no role vocabulary within range.
+    probe_hex_tokens(
+        "Deferred decision recorded as STATE-20260901-008 pending owner.",
+        lambda token: False,  # deterministic stub resolver: nothing resolves
+        source="seeded-STATE",
+    )
+
+
+def test_probe_c_red_bare_date_lookalike() -> None:
+    # A BARE 8-hex date (no STATE- wrapper, no role vocab) is still a finding:
+    # ledger prose must use the hyphenated YYYY-MM-DD form instead.
+    with pytest.raises(AssertionError, match="declared namespace"):
+        probe_hex_tokens(
+            "Deferred decision recorded on 20260901 pending owner.",
+            lambda token: False,
+            source="seeded-STATE",
+        )
 
 
 _FORGED_EVENT_LINE = "EVENT: issues/4#issuecomment-12345678 event-id deadbeef"
