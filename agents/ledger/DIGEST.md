@@ -1,6 +1,6 @@
 # DIGEST.md — rendered from agents/ledger/gates.yaml · NEVER HAND-EDIT ·
 
-> 143 gates · rendered 2026-08-30 @ HEAD d09d1fb · load THIS into context;
+> 143 gates · rendered 2026-09-01 @ HEAD afe9cf2 · load THIS into context;
 > gates.yaml is the sole SSOT; the retired GATES.md/gates/*.md markdown world survives in agents/ledger/arbitration/2026-08-24/surface-and-analysis-preservation.md.
 
 | band | phase | gates | findings |
@@ -60,11 +60,11 @@
 - **GATE-ETL-18** `project/etl/process.py:23 _ROW_DELTA` ⚠FINDING
   [reason strings produced by _ingest_audit (:168) in the form "<stage>: -<N> rows"; mirrored consumer broadway.etl.module._explained_rows() at src/broadway/etl/module.py:32 parsing etl-step reasons incl. "CI sampling: -N rows"] → [explained row total subtracted from dropped_total → TransformAudit.rows_dropped_unexplained (process.py:183-187; module.py:115)] · pins: 6
 - **GATE-ETL-19** `project/etl/process.py:194 process_data()` ⚠FINDING
-  [dataset name → configs/dataset/<name>.yaml via _load_contract (:140), raw yellow_tripdata_*.parquet glob (get_raw_files :28 raises FileNotFoundError when empty), taxi knobs from configs/project/taxi.yaml via process_config.py:16-18 (raw_dir/processed_dir/processed_file)] → [training_data.parquet via save_processed_data (:132, to_parquet index=False), lineage record node_id('ingest') with full _ingest_audit (columns_before/after, added/removed, balanced drop accounting) at :211-217] · pins: 5
+  [dataset name → configs/dataset/<name>.yaml via _load_contract (:140), raw yellow_tripdata_*.parquet glob (get_raw_files :28 raises FileNotFoundError when empty), taxi knobs from project/config/project/taxi.yaml via process_config.py (config_path overlay-first)] → [training_data.parquet via save_processed_data (:132, to_parquet index=False), lineage record node_id('ingest') with full _ingest_audit (columns_before/after, added/removed, balanced drop accounting) at :211-217] · pins: 5
 - **GATE-ETL-116** `src/broadway/samples/generate.py:106 generate_sample()`
   [SampleSpec definition + source file (.parquet or .csv)] → [<name>@<version>.parquet + provenance json {artifact_sha256, definition_sha256, row_count}] · pins: 2
 - **GATE-ETL-117** `project/etl/process_config.py:10 _PROJECT_YAML/_ETL_YAML module-load constants (legacy globals raw_dir/processed_dir/processed_file :16-25)`
-  [configs/project/taxi.yaml knobs] → [raw_dir/processed_dir/processed_file for the LEGACY pipeline] · pins: 1
+  [project/config/project/taxi.yaml knobs] → [raw_dir/processed_dir/processed_file for the LEGACY pipeline] · pins: 1
 
 ### 03-features — features
 
@@ -208,7 +208,7 @@
 - **GATE-CFG-73** `src/broadway/config/schema.py:62 EnvironmentConfig`
   [merged environment section (post GATE-CFG-71)] → [typed EnvironmentConfig instance embedded in PipelineConfig (loader.py:135)] · pins: 4
 - **GATE-CFG-74** `src/broadway/config/schema.py:51 DatasetContract` ⚠FINDING
-  [configs/dataset/*.yaml (column pins: dtype/null_count/role per column, e.g. configs/dataset/taxi.yaml:1-29; lookup_tables with value_policies/sentinel_values taxi.yaml:31-59)] → [DatasetContract with dict[str, ColumnSchema], consumed by pandera_dtype/build_raw_schema and every loader] · pins: 5
+  [project/config/dataset/*.yaml (column pins: dtype/null_count/role per column, e.g. project/config/dataset/taxi.yaml:1-29; lookup_tables with value_policies/sentinel_values taxi.yaml:31-59)] → [DatasetContract with dict[str, ColumnSchema], consumed by pandera_dtype/build_raw_schema and every loader] · pins: 5
 - **GATE-CFG-75** `src/broadway/contracts/pandera.py:46 build_raw_schema()` ⚠FINDING
   [DatasetContract.columns (post GATE-CFG-74)] → [pa.DataFrameSchema, one pa.Column per contract entry, coerce=False strict dtypes, nullable=True (pandera.py:55-59)] · pins: 5
 - **GATE-CFG-76** `src/broadway/config/schema.py:187 ExperimentConfig` ⚠FINDING
@@ -218,7 +218,7 @@
 - **GATE-CFG-78** `src/broadway/config/loader.py:155 resolve_full_steps()`
   [PipelineConfig(full+analysis), configs/flow/<name>.yaml (FlowConfig steps list, schema.py:319-320)] → [ordered list[str] of concrete step names for the analysis mode] · pins: 5
 - **GATE-CFG-79** `src/broadway/samples/loader.py:34 _build_schema()` ⚠FINDING
-  [SampleSpec.schema block from configs/sample/*.yaml (e.g. configs/sample/fare_prediction_1m.yaml:29-36 dtype/nullable/checks), provenance JSON sidecar, parquet artifact] → [pa.DataFrameSchema with op-derived pa.Checks (_CHECK_BUILDERS map loader.py:24-31); validated Sample(df, spec, provenance)] · pins: 9
+  [SampleSpec.schema block from project/config/sample/*.yaml (e.g. project/config/sample/fare_prediction_1m.yaml:29-36 dtype/nullable/checks), provenance JSON sidecar, parquet artifact] → [pa.DataFrameSchema with op-derived pa.Checks (_CHECK_BUILDERS map loader.py:24-31); validated Sample(df, spec, provenance)] · pins: 9
 - **GATE-CFG-103** `src/broadway/config/loader.py:50 STEP_MODULES` ⚠FINDING
   [step name argv] → [module binding or loud unknown-step error] · pins: 1
 - **GATE-CFG-104** `project/data.py:32-48 composed project-config resolution block`
@@ -226,7 +226,7 @@
 - **GATE-CFG-105** `src/broadway/onboard/module.py:215 init() (_write_configs :178-198)`
   [stdin prompts + 13 argv flags] → [configs dataset/analysis/experiment YAMLs + profile JSON + 1 lineage record (write call :302)] · pins: none direct
 - **GATE-CFG-107** `src/broadway/data/loader.py:134 lookup pre-read existence admission (declared-lookup bootstrap check)` ⚠FINDING
-  [DatasetContract.lookup_tables paths — configs/dataset/taxi.yaml:31-34 declares out-of-repo symlink data/raw/taxi_zone_lookup.csv → /home/opc/ONE/learning/data/raw/taxi_zone_lookup.csv] → [dangling-symlink-aware loud pre-merge error NAMING the bootstrap step] · pins: none direct
+  [DatasetContract.lookup_tables paths — project/config/dataset/taxi.yaml:31-34 declares out-of-repo symlink data/raw/taxi_zone_lookup.csv → /home/opc/ONE/learning/data/raw/taxi_zone_lookup.csv] → [dangling-symlink-aware loud pre-merge error NAMING the bootstrap step] · pins: none direct
 - **GATE-CFG-108** `src/broadway/onboard/infer.py:10 _IDENTIFIER_THRESHOLD`
   [BROADWAY_IDENTIFIER_THRESHOLD env var] → [typed float threshold or named parse error] · pins: none direct
 - **GATE-CFG-111** `project/experiments/mlflow/_common.py:60 CONFIG_PATH BROADWAY_MLFLOW_CONFIG resolution + project/experiments/mlflow/03_optuna_worker.py:46-49 HPO_CONFIG_PATH env branch` ⚠FINDING

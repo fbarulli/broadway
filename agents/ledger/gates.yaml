@@ -1,6 +1,6 @@
 # Gate registry SSOT — hand-maintained; the {01..09} gate fragments it consolidated predate git custody.
 meta:
-  head: d09d1fb
+  head: 'afe9cf2'
   assembled: '2026-08-24'
   source_fragments:
   - agents/ledger/gates/01-ingest.md
@@ -177,7 +177,7 @@ gates:
   - GATE-INGEST-05..09 inputs
   - project/tests/test_ingest_*.py
   findings:
-  - this gate duplicates drop-semantics that the CONTRACT pipeline re-implements inside canonicalize (dedup + null drops) with a DIFFERENT order (here dropna→dedup; there dedup→…→target-null-only) — NaN-twins accounting differs by construction (see project/tests/test_ingest_surface.py::test_select_and_clean_columns_nan_twins_die_at_dropna_not_dedup). rename_map keys are defined in configs/project/taxi.yaml (contents UNVERIFIED — not opened) and reach the code only via process_config.py:27, outside DatasetContract; drift is caught only reactively by the missing-column ValueError.
+  - this gate duplicates drop-semantics that the CONTRACT pipeline re-implements inside canonicalize (dedup + null drops) with a DIFFERENT order (here dropna→dedup; there dedup→…→target-null-only) — NaN-twins accounting differs by construction (see project/tests/test_ingest_surface.py::test_select_and_clean_columns_nan_twins_die_at_dropna_not_dedup). rename_map keys are defined in project/config/project/taxi.yaml (contents UNVERIFIED — not opened) and reach the code only via process_config.py config_path resolution, outside DatasetContract; drift is caught only reactively by the missing-column ValueError.
 - id: GATE-INGEST-05
   phase: ingest
   order: 5
@@ -636,7 +636,7 @@ gates:
   inputs:
   - dataset name → configs/dataset/<name>.yaml via _load_contract (:140)
   - raw yellow_tripdata_*.parquet glob (get_raw_files :28 raises FileNotFoundError when empty)
-  - taxi knobs from configs/project/taxi.yaml via process_config.py:16-18 (raw_dir/processed_dir/processed_file)
+  - taxi knobs from project/config/project/taxi.yaml via process_config.py (config_path overlay-first)
   outputs:
   - training_data.parquet via save_processed_data (:132, to_parquet index=False)
   - lineage record node_id('ingest') with full _ingest_audit (columns_before/after, added/removed, balanced drop accounting) at :211-217
@@ -668,7 +668,7 @@ gates:
   - project/tests/test_ingest_audit.py::test_ci_sampling_reorder_becomes_visible_in_ledger
   - project/tests/test_ingest_audit.py::test_nan_twins_account_at_dropna_through_full_pipeline
   if_changed:
-  - configs/project/taxi.yaml keys consumed by process_config
+  - project/config/project/taxi.yaml keys consumed by process_config
   - processed_file name
   - node_id('ingest') parents ([node_id('dataset')])
   findings:
@@ -700,11 +700,11 @@ gates:
   order: 21
   owner: 'project/etl/process_config.py:10 _PROJECT_YAML/_ETL_YAML module-load constants (legacy globals raw_dir/processed_dir/processed_file :16-25)'
   inputs:
-  - 'configs/project/taxi.yaml knobs'
+  - 'project/config/project/taxi.yaml knobs'
   outputs:
   - 'raw_dir/processed_dir/processed_file for the LEGACY pipeline'
   transforms:
-  - 'twin verified: module-level loads of configs/project/taxi.yaml + configs/step/etl.yaml (:10-14) expose legacy module globals (:16-25) — a parallel configs dialect alongside broadway.loader; module-scope constants ARE the symbol here (no functions in file, packet F #26)'
+  - 'twin verified: module-level loads of project/config/project/taxi.yaml + configs/step/etl.yaml (:10-14) expose legacy module globals (:16-25) — a parallel configs dialect alongside broadway.loader; module-scope constants ARE the symbol here (no functions in file, packet F #26)'
   - 'retirement/fork guard cites BOTH dialect facts (packet F #26 rider feeding GATE-CFG-104): the twin imports CONFIGS_DIR from broadway.config.loader (:6) while project/data.py hardcodes relative Paths (:31-47)'
   touched_by:
   - project.etl.process (caller chain)
@@ -1137,8 +1137,8 @@ gates:
   - tests/test_data_loader.py::test_read_sample_requires_sample_or_full
   - tests/test_data_loader.py::test_read_sample_full_returns_all
   if_changed:
-  - every experiments/univariate/fare_amount_trip_distance script importing it (01:16, 06:6)
-  - experiments_ui.py external-source audit regex (_EXTERNAL_RE :47 flags the literal 'read_training_sample' in observation JSON)
+  - every project/experiments/univariate/fare_amount_trip_distance script importing it (01:17, 06:6)
+  - src/broadway/reports/experiments_dashboard.py external-source audit regex (_EXTERNAL_RE :46 flags the literal 'read_training_sample' in observation JSON)
   - reproducibility of all seeded experiment artifacts
   findings:
   - the seed PIN itself is untested below the glue — all five validated_by ids hit broadway.data.loader.read_sample directly with explicit seeds; nothing asserts read_training_sample()'s default binds to RANDOM_STATE, so decoupling the default (project/data.py:168) would pass the suite while silently changing every experiment's sample. Callers passing seed=None also silently disable reproducibility with no warning.
@@ -1324,7 +1324,7 @@ gates:
   - tests/test_stats_robust.py::test_estimation_table_already_hc3_input_is_idempotent
   - tests/test_stats_robust.py::test_estimation_table_plain_ols_still_yields_hc3_columns
   if_changed:
-  - experiments/univariate/fare_amount_trip_distance/_ols_bp.py delegation wrapper (:117-120) and every HC3 CSV/result JSON downstream (31/32/33/29 result files)
+  - project/experiments/univariate/fare_amount_trip_distance/_ols_bp.py delegation wrapper (:117) and every HC3 CSV/result JSON downstream (31/32/33/29 result files)
   - stats/API.md contract (fit_robust cov_type='HC3')
   findings:
   - neighbors standardized_coefs (:67-82) and scenario_dollars (:85-97) index model.params[term] with NO fitted/TypeError gate — a KeyError on an unknown term or an unfitted-model attribute error is the only failure mode, unpinned by any test in tests/test_stats_robust.py beyond hand-computed happy paths (:152-192).
@@ -2589,7 +2589,7 @@ gates:
   order: 84
   owner: src/broadway/config/schema.py:51 DatasetContract
   inputs:
-  - 'configs/dataset/*.yaml (column pins: dtype/null_count/role per column, e.g. configs/dataset/taxi.yaml:1-29; lookup_tables with value_policies/sentinel_values taxi.yaml:31-59)'
+  - 'project/config/dataset/*.yaml (column pins: dtype/null_count/role per column, e.g. project/config/dataset/taxi.yaml:1-29; lookup_tables with value_policies/sentinel_values taxi.yaml:31-59)'
   outputs:
   - DatasetContract with dict[str, ColumnSchema]
   - consumed by pandera_dtype/build_raw_schema and every loader
@@ -2613,7 +2613,7 @@ gates:
   if_changed:
   - src/broadway/config/schema.py
   - src/broadway/contracts/pandera.py
-  - configs/dataset/taxi.yaml
+  - project/config/dataset/taxi.yaml
   - configs/dataset/test.yaml
   findings:
   - schema-without-strictness asymmetry — DatasetContract (schema.py:51) and EnvironmentConfig (schema.py:62) do NOT set ConfigDict(extra="forbid"), while AnalysisContract (analysis/contracts.py:20), DataSourceRef (schema.py:146), ModelHPOSpec (schema.py:120), PreprocessingStepConfig (schema.py:175) and SampleSpec (lineage/models.py:38) DO. A typo'd key in a dataset/environment yaml (e.g. `datbase_host`) is SILENTLY IGNORED by pydantic-v2 default — config drift invisible at the exact layer whose job is to pin truth.
@@ -2764,7 +2764,7 @@ gates:
   order: 89
   owner: src/broadway/samples/loader.py:34 _build_schema()
   inputs:
-  - SampleSpec.schema block from configs/sample/*.yaml (e.g. configs/sample/fare_prediction_1m.yaml:29-36 dtype/nullable/checks)
+  - SampleSpec.schema block from project/config/sample/*.yaml (e.g. project/config/sample/fare_prediction_1m.yaml:29-36 dtype/nullable/checks)
   - provenance JSON sidecar
   - parquet artifact
   outputs:
@@ -2792,9 +2792,9 @@ gates:
   - src/broadway/samples/loader.py
   - src/broadway/lineage/models.py
   - src/broadway/lineage/sample.py
-  - configs/sample/fare_prediction_1m.yaml
+  - project/config/sample/fare_prediction_1m.yaml
   findings:
-  - C1 _SAMPLE_SCHEMA DERIVATION STILL QUEUED (agents/ledger/FIXES.md:40 "queued"; audit note agents/audits/B-TRUTH-ENFORCEMENT.md:32). Production derivation EXISTS (samples/loader.py:34 builds the schema FROM the sample config's schema block), but the boundary tripwire hand-maintains its own `_SAMPLE_SCHEMA` literal at tests/test_boundary_contracts.py:302-307 instead of deriving from configs/sample/fare_prediction_1m.yaml:29-36 — a second declaration surface that can drift from the shipped config with nothing red.
+  - C1 _SAMPLE_SCHEMA DERIVATION STILL QUEUED (agents/ledger/FIXES.md:40 "queued"; audit note agents/audits/B-TRUTH-ENFORCEMENT.md:32). Production derivation EXISTS (samples/loader.py:34 builds the schema FROM the sample config's schema block), but the boundary tripwire hand-maintains its own `_SAMPLE_SCHEMA` literal at tests/test_boundary_contracts.py:302-307 instead of deriving from project/config/sample/fare_prediction_1m.yaml:29-36 — a second declaration surface that can drift from the shipped config with nothing red.
 - id: GATE-CFG-103
   phase: config-schema
   order: 90
@@ -2857,12 +2857,12 @@ gates:
   order: 93
   owner: 'src/broadway/data/loader.py:134 lookup pre-read existence admission (declared-lookup bootstrap check)'
   inputs:
-  - 'DatasetContract.lookup_tables paths — configs/dataset/taxi.yaml:31-34 declares out-of-repo symlink data/raw/taxi_zone_lookup.csv → /home/opc/ONE/learning/data/raw/taxi_zone_lookup.csv'
+  - 'DatasetContract.lookup_tables paths — project/config/dataset/taxi.yaml:31-34 declares out-of-repo symlink data/raw/taxi_zone_lookup.csv → /home/opc/ONE/learning/data/raw/taxi_zone_lookup.csv'
   outputs:
   - dangling-symlink-aware loud pre-merge error NAMING the bootstrap step
   transforms:
   - 'AMENDED per packet H X2: the gate lives as a PRE-READ existence assertion at load_with_audit — Path.exists() follows links so a DANGLING symlink passes naive checks; the error must name the bootstrap step'
-  - 'co-tenancy with GATE-ETL-11/GATE-INGEST-02 on load_with_audit DECLARED, line-anchored aspect: pre-read admission check (O5 precedent); artifact declaration side remains configs/dataset/taxi.yaml:31-34'
+  - 'co-tenancy with GATE-ETL-11/GATE-INGEST-02 on load_with_audit DECLARED, line-anchored aspect: pre-read admission check (O5 precedent); artifact declaration side remains project/config/dataset/taxi.yaml:31-34'
   touched_by: []
   validated_by: []
   if_changed:
@@ -2937,7 +2937,7 @@ gates:
   outputs:
   - ARTIFACT-OPTUNA-STUDY (optuna.Study — in-memory object or RDB-backed shared study)
   transforms:
-  - study_name convention f'hpo-{model.name}' (:139); k8s twin f'hpo-{key}' (experiments/mlflow/03_optuna_worker.py:186)
+  - study_name convention f'hpo-{model.name}' (:139); k8s twin f'hpo-{key}' (project/experiments/mlflow/03_optuna_worker.py:186)
   - TPESampler seeded AT CONSTRUCTION — Optuna 4.x reads the seed only there (:132-140), so the same (model, random_state) reproduces the trajectory
   - storage_url None → optuna.create_study(direction, sampler) IN-MEMORY; study_name unused on this branch (:141-142)
   - else RDBStorage(url, heartbeat_interval=60, grace_period=300) (:144-148) + create_study(load_if_exists=True) reopen (:149-155) — heartbeat pattern from GATE-HPO-86
@@ -2956,7 +2956,7 @@ gates:
   - mlflow run-name/tag schema of GATE-HPO-83
   - GATE-HPO-82/-86
   findings:
-  - 'distributed phase-1 points N pods at ONE shared study with IDENTICALLY seeded samplers — every pod constructs TPESampler(seed) from the same config seed (experiments/mlflow/03_optuna_worker.py:190-194) and no TPESampler(constant_liar=True) exists anywhere in the repo, so concurrent pods reading the same trial history can propose identical params and burn duplicated budget; nothing detects or dedupes collisions. root: src/broadway/training/hpo.py:140 (+ experiments/mlflow/03_optuna_worker.py:194)'
+  - 'distributed phase-1 points N pods at ONE shared study with IDENTICALLY seeded samplers — every pod constructs TPESampler(seed) from the same config seed (project/experiments/mlflow/03_optuna_worker.py:190-194) and no TPESampler(constant_liar=True) exists anywhere in the repo, so concurrent pods reading the same trial history can propose identical params and burn duplicated budget; nothing detects or dedupes collisions. root: src/broadway/training/hpo.py:140 (+ project/experiments/mlflow/03_optuna_worker.py:194)'
 - id: GATE-HPO-81
   phase: hpo-optuna
   order: 98
@@ -3035,7 +3035,7 @@ gates:
   - 'COMPLETE-only guard: non-COMPLETE state or value=None returns BEFORE any logging (:78-79) — pruned/failed trials emit NOTHING'
   - nested run per COMPLETE trial named f'{study_name} trial {n}' with tags {**caller_tags, trial, study} (:80-84)
   - logs trial.params (:85); numeric-filtered broadway_metrics user attr (:86-93); target_metric re-logged explicitly (:94)
-  - tracking URI stays AMBIENT (MLFLOW_TRACKING_URI set by caller — docstring :74; k8s caller setup_mlflow at experiments/mlflow/03_optuna_worker.py:189)
+  - tracking URI stays AMBIENT (MLFLOW_TRACKING_URI set by caller — docstring :74; k8s caller setup_mlflow at project/experiments/mlflow/03_optuna_worker.py:189)
   - NO trial.report and NO intermediate_values readers anywhere in the repo (grep census) — pruning is raise-only, no intermediate pruning decisions are ever read back
   touched_by:
   - mlflow@3.15.1
@@ -3046,7 +3046,7 @@ gates:
   if_changed:
   - per-trial MLflow run volume/schema
   - nested-run grouping under the study's best run
-  - columns of experiments/results/mlflow/01_model_battle_optuna.csv
+  - columns of project/experiments/results/mlflow/01_model_battle_optuna.csv
   findings:
   - 'pruned and failed trials are invisible in BOTH telemetry planes — the callback skips them (:78) and _leaderboard silently DROPS their studies via bare except ValueError (:260-268) — so an all-pruned study leaves no MLflow trace and vanishes from result[''models''] with no warning; the consumer-side silent-empty .get failure mode is ALREADY RULED (cross-ref arbitration board row B-HPO-METRICS-MAPPING, verdicts #23 — not re-ruled here). root: src/broadway/training/hpo.py:78'
 - id: GATE-HPO-84
@@ -3064,8 +3064,8 @@ gates:
   - '''best_model'' = min(leaderboard, key=value) — minimize HARDCODED regardless of configured direction (:317)'
   - return shape fixed at :318-323
   - 'trainer consumption: training/module.py:76-85 models.get(cfg.experiment.model.type) → None → ValueError ''hpo produced no valid trial for model …'' — OWNED BY GATE-TRAIN-33, cross-ref only, not re-ruled'
-  - 'battle consumption: experiments/mlflow/01_model_battle_mlflow.py:226-229 run_hpo(battle_pipeline_config(), hpo_cfg, encoded frames, SEED, mlflow_tracking=True); best_params/best_value/best_model logged into the ''hpo_bandit'' run (:230-236); per-model CSV experiments/results/mlflow/01_model_battle_optuna.csv (:245-250)'
-  - 'worker consumption: experiments/mlflow/03_optuna_worker.py:195-200 study.best_trial → log_to_mlflow (mae := best.value)'
+  - 'battle consumption: project/experiments/mlflow/01_model_battle_mlflow.py:226-229 run_hpo(battle_pipeline_config(), hpo_cfg, encoded frames, SEED, mlflow_tracking=True); best_params/best_value/best_model logged into the ''hpo_bandit'' run (:230-236); per-model CSV project/experiments/results/mlflow/01_model_battle_optuna.csv (:245-250)'
+  - 'worker consumption: project/experiments/mlflow/03_optuna_worker.py:195-200 study.best_trial → log_to_mlflow (mae := best.value)'
   touched_by:
   - pandas@2.3.3
   - mlflow@3.15.1
@@ -3125,7 +3125,7 @@ gates:
   - 'create-race retry: 8 attempts × 5 s sleep on sqlalchemy IntegrityError/OperationalError (:20-21, :32-45) — mitigates concurrent create_study races'
   - load_if_exists=True ALWAYS (:37, :152) — reopen ACCUMULATES trials, never resets
   - 'snapshot plane (k8s/optuna/lifecycle.sh): dump_state pg_dump -Fc optuna | gzip → $BACKUP_DIR/optuna.sql.gz (:149-165); restore via pg_restore --clean --if-exists (:119-120); view_local restores into a throwaway docker postgres (:195-198); cluster is otherwise EPHEMERAL — down deletes everything (:167-170) — ARTIFACT-OPTUNA-SNAPSHOT is the ONLY durable store'
-  - 'naming: ''hpo-{model}'' carries NO dataset/experiment scope (hpo.py:139, experiments/mlflow/03_optuna_worker.py:186) — see FINDING'
+  - 'naming: ''hpo-{model}'' carries NO dataset/experiment scope (hpo.py:139, project/experiments/mlflow/03_optuna_worker.py:186) — see FINDING'
   - 'legacy in-memory twin run_study (:76-109): generic search_space dict → suggest dispatch, TrialPruned non-finite (:100-102), empty → ValueError ''HPO study produced no valid trial (N trials)'' (:106-109); ZERO production callers (grep census — imported by tests only)'
   - compose_db_url interpolates driver/user/password/host/port/name into a plain URL string (src/broadway/training/optuna_worker.py:19-21; run_worker :24-36 wraps run_study_rdb and raises 'worker study … produced no valid trial')
   touched_by:
@@ -3145,7 +3145,7 @@ gates:
   - compose_db_url URL shape (also asserted by experiments.py:447)
   findings:
   - 'study_name COLLIDES across datasets/experiments — ''hpo-lgbm''-style names are globally unique keys in one storage, and load_if_exists makes re-use SILENT; pointing any second experiment at a persistent storage_url appends foreign trials to the existing studies, mixing datasets inside one leaderboard. root: src/broadway/training/hpo.py:139'
-  - 'DB credentials reach pod LOGS — compose_db_url bakes the raw password into the URL (optuna_worker.py:21) and the worker prints the composed db_url to stdout as a deliberate ''visibility requirement'' (experiments/mlflow/03_optuna_worker.py:87); the 2026-08-24 secret-audit factsheet covered manifests/templates only, not this runtime print. root: experiments/mlflow/03_optuna_worker.py:87'
+  - 'DB credentials reach pod LOGS — compose_db_url bakes the raw password into the URL (optuna_worker.py:21) and the worker prints the composed db_url to stdout as a deliberate ''visibility requirement'' (project/experiments/mlflow/03_optuna_worker.py:87); the 2026-08-24 secret-audit factsheet covered manifests/templates only, not this runtime print. root: project/experiments/mlflow/03_optuna_worker.py:87'
 - id: GATE-HPO-87
   phase: hpo-optuna
   order: 104
@@ -3158,7 +3158,7 @@ gates:
   - Job manifests optuna-{display_name} applied by lifecycle.sh run_hpo (k8s/optuna/lifecycle.sh:136-138); optuna-init Job pre-creating studies
   transforms:
   - the HPO spec is the SINGLE SOURCE for which Jobs exist (docstring :3-5; static worker-jobs.yaml removed); renderer is the ONLY generator
-  - env BROADWAY_MLFLOW_CONFIG=/app/configs/experiments/mlflow.yaml injected (:47-50); the worker branches on env presence with a parents[2] repo fallback (experiments/mlflow/03_optuna_worker.py:46-49)
+  - env BROADWAY_MLFLOW_CONFIG=/app/project/config/experiments/mlflow.yaml injected (k8s/optuna/render_worker_jobs.py:48-50); the worker branches on env presence with a parents[2] repo fallback (project/experiments/mlflow/03_optuna_worker.py:46-49)
   - 'mounts: configMap optuna-config → /etc/broadway/config.yaml subPath readOnly (:52-53); Secret optuna-db → /etc/broadway/secret readOnly (:54-55) — FILE-based credentials, NEVER env vars (module docstring :3-5); load_secret reads DB_USER/DB_PASSWORD/DB_NAME files (03_optuna_worker.py:52-56)'
   - 'Job semantics: restartPolicy Never, backoffLimit 2, ttlSecondsAfterFinished 120 (:36-40); init-Job twin ttl 600 with args [--init-only] materializing empty studies via _dummy_objective returning 0.0 (k8s/optuna/optuna-init.yaml:10-20; 03_optuna_worker.py:74-76, :165-171)'
   - image tag injectable --image for CD pinning (:71; consumed via OPTUNA_WORKER_IMAGE at lifecycle.sh:135-137)
@@ -3192,7 +3192,7 @@ gates:
   transforms:
   - per-model sampler seed = random_state + model_index over specs INSERTION ORDER (:212-228, offset at :223) — identical search spaces diverge deterministically (docstring :5-7)
   - parallel==sequential pinned by swapping ThreadPoolExecutor for an eager executor (tests/test_hpo.py::test_run_hpo_parallel_equals_sequential); intra-study execution sequential EVERYWHERE (no optimize n_jobs>1 call site)
-  - 'seed literals feeding the HPO data path: configs/experiments/mlflow.yaml seed:42 (:11) → experiments/mlflow/03_optuna_worker.py:156 + train_test_split(random_state=seed) (:176-177); configs/experiment/hyperopt.yaml random_state:42 (:21) → training/module.py:73 passes experiment.random_state into run_hpo; battle sample/split SEED=42 (experiments/mlflow/_common.py:69, :113, :120)'
+  - 'seed literals feeding the HPO data path: project/config/experiments/mlflow.yaml seed:42 (:11) → project/experiments/mlflow/03_optuna_worker.py:156 + train_test_split(random_state=seed) (:176-177); configs/experiment/hyperopt.yaml random_state:42 (:21) → training/module.py:73 passes experiment.random_state into run_hpo; battle sample/split SEED=42 (project/experiments/mlflow/_common.py:69, :113, :120)'
   - sampler reproducibility contract stated as Optuna-4.x-constructor-only (src/broadway/training/optuna.py:56-62); reopened-trajectory pins carry OBSERVED magic numbers ('x == 3.943281 observed over 10 runs', tests/test_optuna_extended.py:32-35 and :74-75) with deliberately tight bands
   - 'hazards NOT guarded: lgbm/xgb boosting randomness relies solely on registry random_state injection (GATE-TRAIN-34 pin); TPE without constant_liar under threaded RDB sharing (GATE-HPO-80 finding); host BLAS thread counts untouched'
   touched_by:

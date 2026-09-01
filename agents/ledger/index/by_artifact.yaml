@@ -180,7 +180,7 @@ DatasetContract.columns (declared dtypes/null_count):
 - GATE-FEAT-26
 DatasetContract.columns (post GATE-CFG-74):
 - GATE-CFG-75
-? DatasetContract.lookup_tables paths — configs/dataset/taxi.yaml:31-34 declares out-of-repo symlink data/raw/taxi_zone_lookup.csv → /home/opc/ONE/learning/data/raw/taxi_zone_lookup.csv
+? DatasetContract.lookup_tables paths — project/config/dataset/taxi.yaml:31-34 declares out-of-repo symlink data/raw/taxi_zone_lookup.csv → /home/opc/ONE/learning/data/raw/taxi_zone_lookup.csv
 : - GATE-CFG-107
 DatasetContract.path (csv/parquet/xlsx via READERS dict keyed on suffix):
 - GATE-ETL-11
@@ -285,7 +285,7 @@ SampleSpec REQUIRED (no canonical leg, unlike GATE-STATS-41):
 - GATE-STATS-49
 SampleSpec definition + source file (.parquet or .csv):
 - GATE-ETL-116
-? SampleSpec.schema block from configs/sample/*.yaml (e.g. configs/sample/fare_prediction_1m.yaml:29-36 dtype/nullable/checks)
+? SampleSpec.schema block from project/config/sample/*.yaml (e.g. project/config/sample/fare_prediction_1m.yaml:29-36 dtype/nullable/checks)
 : - GATE-CFG-79
 SchemaError naming every duplicated label + provenance (raises before merge):
 - GATE-ETL-12
@@ -461,8 +461,6 @@ configs dataset/analysis/experiment YAMLs + profile JSON + 1 lineage record (wri
 - GATE-CFG-105
 configs/ tree:
 - GATE-SURF-64
-? 'configs/dataset/*.yaml (column pins: dtype/null_count/role per column, e.g. configs/dataset/taxi.yaml:1-29; lookup_tables with value_policies/sentinel_values taxi.yaml:31-59)'
-: - GATE-CFG-74
 configs/experiment/*.yaml (data_source/features/model/split/hpo/preprocessing):
 - GATE-CFG-76
 configs/experiment/*.yaml via load_config(dataset='test') (configs):
@@ -471,8 +469,6 @@ configs/flow/<name>.yaml (FlowConfig steps list, schema.py:319-320):
 - GATE-CFG-78
 configs/flow/hypothesis_walkthrough.yaml (step ids/orders/questions/kind/action):
 - GATE-TLINE-57
-configs/project/taxi.yaml knobs:
-- GATE-ETL-117
 ? configs/step/viz.yaml knobs (qq_figure :14, qq_log_figure :15, dist_figure :15, diagnostics.figure :31, dpi, chunk sizes, zones/markers toggles)
 : - GATE-SURF-66
 ? configs/step/walkthrough.yaml (skew/kurtosis/shapiro/imbalance/significance thresholds, max_qq_groups, decisions.{omnibus,posthoc}.{methods,parents})
@@ -825,6 +821,10 @@ project-provided experiment results CSVs via BROADWAY_EXPERIMENTS_ROOT:
 - GATE-SURF-102
 project/config/ (project-owned layout, experiment, and taxi config-overlay SSOT):
 - GATE-INFRA-92
+? 'project/config/dataset/*.yaml (column pins: dtype/null_count/role per column, e.g. project/config/dataset/taxi.yaml:1-29; lookup_tables with value_policies/sentinel_values taxi.yaml:31-59)'
+: - GATE-CFG-74
+project/config/project/taxi.yaml knobs:
+- GATE-ETL-117
 project/config/{dataset,analysis,project}/ taxi overlay plus generic base configs:
 - GATE-CFG-104
 project/experiments/mlflow/_common.py RESULTS convention:
@@ -1045,7 +1045,7 @@ target (dataset target name):
 - GATE-FEAT-21
 target column name:
 - GATE-STATS-42
-taxi knobs from configs/project/taxi.yaml via process_config.py:16-18 (raw_dir/processed_dir/processed_file):
+taxi knobs from project/config/project/taxi.yaml via process_config.py (config_path overlay-first):
 - GATE-ETL-19
 teardown invocation after cluster/image-producing lanes:
 - GATE-INFRA-145
