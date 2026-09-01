@@ -164,11 +164,15 @@ for g, idxs in reps.groupby(bc).indices.items():
         continue
     for a, b in itertools.combinations(idxs, 2):
         edges.add((min(a, b), max(a, b)))
+n_barcode = len(edges)
 
-# 7b. soft links: cosine >= threshold among blocked candidates (same macro block)
-macro = reps["macro_category"] = reps["category"].fillna("").map(lambda c: MACRO_MAP.get(c, "OTHER"))
-for m in macro.unique():
-    idx = np.flatnonzero((macro == m).to_numpy())
+# 7b. soft links: cosine >= threshold among blocked candidates (brand x macro block)
+# Blocking by macro ALONE explodes (~494M candidates -> OOM); brand x macro is
+# the recall-first key (0.957 recall, ~1.78M candidates) and keeps edges tractable.
+reps["macro_category"] = reps["category"].fillna("").map(lambda c: MACRO_MAP.get(c, "OTHER"))
+reps["_brand"] = reps["brand"].fillna("")
+for (br, m), grp in reps.groupby(["_brand", "macro_category"], sort=False):
+    idx = grp.index.to_numpy()
     if len(idx) < 2:
         continue
     nn = NearestNeighbors(radius=1.0 - THRESHOLD, metric="cosine")
@@ -181,7 +185,7 @@ for m in macro.unique():
             if a < b:
                 edges.add((a, b))
 
-print(f"hard (barcode) edges: {sum(1 for _ in edges):,}  total edges incl. fuzzy: {len(edges):,}")"""),
+print(f"barcode edges: {n_barcode:,}  |  total edges (barcode + fuzzy): {len(edges):,}")"""),
 
     code("""# transitive closure -> ITEM_ID per representative (symmetric adjacency for undirected components)
 rows = np.array(sorted(edges))
@@ -192,7 +196,7 @@ print(f"ITEMs (clusters): {n_items:,}  from {n:,} representatives")
 print(f"sizes: median {np.median(np.bincount(rep_item)):.0f}, max {np.bincount(rep_item).max():,}")"""),
 
     code("""# map every SKU to its ITEM_ID, and write the deliverable
-raw["ITEM_ID"] = raw["rep_id"].map(rep_item)
+raw["ITEM_ID"] = [rep_item[int(i)] for i in raw["rep_id"]]
 out = raw[["product_id", "ITEM_ID"]].rename(columns={"product_id": "SKU_ID"})
 out_path = PATHS.experiments / "results" / "euromonitor" / "sku_to_item.csv"
 out_path.parent.mkdir(parents=True, exist_ok=True)
