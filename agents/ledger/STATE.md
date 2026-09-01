@@ -5,9 +5,9 @@ the authority for landed history; GitHub Project #4 is a mirror, never evidence.
 
 ## CURRENT
 
-| id | kind | status | owner | updated | source | github_item | mirror_state | summary |
-|---|---|---|---|---|---|---|---|---|
-| STATE-20260830-001 | checkpoint | open | main agent | 2026-08-30 | state-foundation seed | pending | pending | Seed record for the private STATE-to-Project mirror; no worktree claim is implied. |
+| id | kind | status | owner | custody | updated | source | github_item | mirror_state | summary |
+|---|---|---|---|---|---|---|---|---|---|
+| STATE-20260830-001 | checkpoint | open | main agent | main agent | 2026-08-30 | state-foundation seed | pending | pending | Seed record for the private STATE-to-Project mirror; no worktree claim is implied. |
 
 ## Access protocol
 
