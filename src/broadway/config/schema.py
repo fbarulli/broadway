@@ -156,6 +156,7 @@ class NLPConfig(BaseModel):
     cache_dir: str | None = None
     model_zoo: dict[str, str]
     prompts: dict[str, str] = {}
+    loss: str = "mnrl"
     hpo: HPOConfig
 
 

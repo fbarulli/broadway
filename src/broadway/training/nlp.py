@@ -22,6 +22,7 @@ from __future__ import annotations
 import hashlib
 import time
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 
@@ -65,6 +66,26 @@ def entity_resolution_metrics(
         "pos_median": round(float(np.median(pos_scores)), 4),
         "neg_p90": round(float(np.quantile(neg_scores, 0.9)), 4),
     }
+
+
+def precision_at_recall(y_true: np.ndarray, scores: np.ndarray, target_recall: float = 0.99) -> float:
+    """Precision at the operating threshold that achieves >= target_recall.
+
+    The business-relevant number on a hand-labeled hard set: at the scoring
+    stage a false match corrupts downstream (pricing) decisions, so we report
+    precision-at-recall instead of an unstable small-set AUC. ``y_true`` is
+    0/1 (1 = true match); returns NaN when no positives are present.
+    """
+    n_pos = int(y_true.sum())
+    if n_pos == 0:
+        return float("nan")
+    order = np.argsort(-scores)
+    y_sorted = y_true[order].astype(float)
+    recall = np.cumsum(y_sorted) / n_pos
+    idx = int(np.searchsorted(recall, target_recall, side="left"))
+    if idx >= len(y_sorted):
+        return 0.0
+    return float(np.cumsum(y_sorted)[idx] / (idx + 1))
 
 
 def _has_finetune_params(params: dict[str, float | int]) -> bool:
@@ -146,16 +167,18 @@ def encode_corpus(
     return _encode_payload(model, payload, batch_size, cache_path, prompt)
 
 
-def _finetune(model, params: dict[str, float | int], examples, max_seq_length: int) -> None:
-    """Contrastive fine-tune a fresh base model in place (no disk save).
+def _finetune(model, params: dict[str, float | int], examples, max_seq_length: int, loss: str = "mnrl") -> None:
+    """Fine-tune a fresh base model in place (no disk save).
 
     The caller owns the model object; fit() mutates it, so encoding afterwards
-    uses the fine-tuned weights. ``examples`` must be POSITIVE-ONLY
-    ``InputExample`` pairs (same product): MultipleNegativesRankingLoss builds
-    the negatives in-batch, so a label-bearing example would be silently
-    misused as a positive. ``learning_rate`` is passed through optimizer_params
-    (sentence-transformers has no top-level lr knob); when absent the library
-    default is used, so the argument is omitted rather than passed as None.
+    uses the fine-tuned weights. ``loss`` selects the bi-encoder objective:
+    ``mnrl`` (MultipleNegativesRankingLoss — positive-only examples, negatives
+    mined in-batch), ``contrastive`` (ContrastiveLoss — labeled pos/neg
+    examples), or ``triplet`` (TripletLoss — anchor/positive/negative triples).
+    The caller must build ``examples`` to match the chosen loss. ``learning_rate``
+    is passed through optimizer_params (sentence-transformers has no top-level lr
+    knob); when absent the library default is used, so the argument is omitted
+    rather than passed as None.
     """
     from sentence_transformers.sentence_transformer import losses
     from torch.utils.data import DataLoader
@@ -165,7 +188,13 @@ def _finetune(model, params: dict[str, float | int], examples, max_seq_length: i
     batch_size = int(params.get("batch_size", 32))
     warmup_steps = int(params.get("warmup_steps", 0))
     loader = DataLoader(examples, shuffle=True, batch_size=batch_size)
-    train_loss = losses.MultipleNegativesRankingLoss(model)
+    train_loss: Any
+    if loss == "contrastive":
+        train_loss = losses.ContrastiveLoss(model)
+    elif loss == "triplet":
+        train_loss = losses.TripletLoss(model)
+    else:
+        train_loss = losses.MultipleNegativesRankingLoss(model)
     fit_kwargs: dict = {
         "epochs": epochs,
         "warmup_steps": warmup_steps,
@@ -189,6 +218,7 @@ def make_objective(
     max_seq_length: int = 128,
     cache_dir: str | None = None,
     prompt: str | None = None,
+    loss: str = "mnrl",
 ) -> Objective:
     """Build the NLP objective for one bi-encoder: encode -> score -> AUC.
 
@@ -214,7 +244,7 @@ def make_objective(
     def objective(params: dict[str, float | int], trial=None) -> float:
         model = SentenceTransformer(model_id, device=device)
         if finetune_examples is not None and _has_finetune_params(params):
-            _finetune(model, params, finetune_examples, max_seq_length)
+            _finetune(model, params, finetune_examples, max_seq_length, loss)
             emb, encode_s = _encode_payload(model, payload, batch_size, None, prompt)
         else:
             model.max_seq_length = max_seq_length
@@ -250,6 +280,7 @@ def run_nlp_hpo(
     max_seq_length: int = 128,
     cache_dir: str | None = None,
     prompts: dict[str, str] | None = None,
+    loss: str = "mnrl",
     mlflow_tracking: bool = False,
     mlflow_tags: dict[str, str] | None = None,
 ) -> dict:
@@ -279,6 +310,7 @@ def run_nlp_hpo(
             max_seq_length=max_seq_length,
             cache_dir=cache_dir,
             prompt=prompts.get(spec.name),
+            loss=loss,
         )
         for spec in hpo_cfg.models
     }
@@ -319,6 +351,7 @@ def run_nlp(
         max_seq_length=cfg.max_seq_length,
         cache_dir=cfg.cache_dir,
         prompts=cfg.prompts,
+        loss=getattr(cfg, "loss", "mnrl"),
         mlflow_tracking=mlflow_tracking,
         mlflow_tags=mlflow_tags,
     )
