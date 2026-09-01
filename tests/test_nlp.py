@@ -169,7 +169,12 @@ def test_make_objective_passes_prompt(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def _install_fake_finetune_modules(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Stub the sentence_transformer.losses and torch.utils.data submodules."""
+    """Stub sentence_transformer.losses AND the whole torch package chain.
+
+    Stubbing torch.utils.data alone still imports the real ``torch`` package
+    (the parent), so we also stub ``torch`` and ``torch.utils`` for a fully
+    hermetic unit (no torch/ST import, only stdlib + numpy).
+    """
     losses_mod = types.ModuleType("losses")
 
     class _Loss:
@@ -187,6 +192,12 @@ def _install_fake_finetune_modules(monkeypatch: pytest.MonkeyPatch) -> None:
 
     torch_data = types.ModuleType("torch.utils.data")
     torch_data.DataLoader = _Loader
+    torch_utils = types.ModuleType("torch.utils")
+    torch_utils.data = torch_data
+    torch_mod = types.ModuleType("torch")
+    torch_mod.utils = torch_utils
+    monkeypatch.setitem(sys.modules, "torch", torch_mod)
+    monkeypatch.setitem(sys.modules, "torch.utils", torch_utils)
     monkeypatch.setitem(sys.modules, "torch.utils.data", torch_data)
 
 

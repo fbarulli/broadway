@@ -61,7 +61,8 @@ def main() -> None:
             df["title"].fillna("") + PAYLOAD_SEP + df["brand"].fillna("") + PAYLOAD_SEP + df["category"].fillna("")
         ).tolist()
     with report.record("pair_build"):
-        pos_pairs, neg_pairs = build_pairs(df, cfg.seed, MAX_POS_PAIRS_PER_GROUP, N_NEG_PAIRS)
+        pair_seed = cfg.pair_seed if cfg.pair_seed is not None else cfg.seed
+        pos_pairs, neg_pairs = build_pairs(df, pair_seed, MAX_POS_PAIRS_PER_GROUP, N_NEG_PAIRS)
     print(f"payload: {len(payload):,} rows | "
           f"positive pairs: {len(pos_pairs):,} | negative pairs: {len(neg_pairs):,}")
 
@@ -94,7 +95,9 @@ def main() -> None:
         m = result["metrics"].get(name, {})
         rows.append({
             "model": name,
-            "auc": summary["best_value"],
+            # single AUC source: the rounded per-trial metric (best_value is
+            # the same objective value pre-rounding, used only for selection).
+            "auc": m.get("auc", summary["best_value"]),
             "recall_at_5pct_fpr": m.get("recall_at_5pct_fpr"),
             "encode_s": m.get("encode_s"),
             "pos_median": m.get("pos_median"),

@@ -138,13 +138,17 @@ class NLPConfig(BaseModel):
     ``model_zoo`` maps short HPO names to HF repo ids; ``hpo`` is the shared
     bandit spec (direction: maximize for ROC AUC). ``prompts`` optionally maps a
     short name to a prompt prefix applied to every text before encoding (e.g.
-    ``query: `` for e5-family bi-encoders). The payload/pairs that score the
-    objective are supplied by the caller (see broadway.training.nlp.run_nlp),
-    so this config carries no dataset-specific fields.
+    ``query: `` for e5-family bi-encoders). ``pair_seed`` seeds the ground-truth
+    pair sampling independently of ``seed`` (the TPE sampler), defaulting to
+    ``seed`` when unset so changing the HPO seed never silently changes the
+    evaluation pairs. The payload/pairs themselves are supplied by the caller
+    (see broadway.training.nlp.run_nlp), so this config carries no
+    dataset-specific fields.
     """
 
     model_config = ConfigDict(extra="forbid")
     seed: int
+    pair_seed: int | None = None
     target_metric: str = "auc"
     device: str = "cpu"
     batch_size: int = 256

@@ -299,7 +299,7 @@ def run_hpo_bandit(
     random_state: int,
     mlflow_tracking: bool = False,
     mlflow_tags: dict[str, str] | None = None,
-    return_studies: bool = False,
+    metric_extractor: Callable[[optuna.Study], dict] | None = None,
 ) -> dict:
     """Run the two-round bandit over pre-built objectives and return results.
 
@@ -316,10 +316,9 @@ def run_hpo_bandit(
     and bandit allocation honor hpo.direction (minimize by default, maximize
     for higher-is-better objectives such as NLP AUC). With mlflow_tracking,
     every COMPLETE trial across both rounds is logged as a nested mlflow run
-    tagged with the model plus the caller's mlflow_tags. When return_studies is
-    true, the live optuna Study objects are also returned under "studies"
-    (for callers that must read per-trial user attrs) — off by default so the
-    plain result stays JSON-safe.
+    tagged with the model plus the caller's mlflow_tags. When metric_extractor
+    is provided, its per-study output is returned under "metrics" (plain data —
+    live optuna Study objects never cross the API boundary).
     """
     if not hpo.models:
         raise ValueError("hpo requires at least one model in `models`")
@@ -356,8 +355,8 @@ def run_hpo_bandit(
     }
     if failures:
         result["failed"] = failures
-    if return_studies:
-        result["studies"] = studies
+    if metric_extractor is not None:
+        result["metrics"] = {name: metric_extractor(studies[name]) for name in models}
     return result
 
 

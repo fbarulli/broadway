@@ -15,6 +15,9 @@
 #   cross-encoder/ms-marco-MiniLM-L-6-v2
 #   BAAI/bge-reranker-v2-m3
 seed: 42
+# Ground-truth pair-sampling seed, independent of `seed` (the TPE sampler) so
+# HPO tuning never silently re-samples the evaluation pairs.
+pair_seed: 42
 target_metric: auc
 device: cpu
 batch_size: 256

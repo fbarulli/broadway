@@ -198,6 +198,14 @@ def make_objective(
     return objective
 
 
+def _extract_broadway_metrics(study) -> dict[str, float]:
+    """Read the objective's broadway_metrics user attr from a study's best trial."""
+    return {
+        key: float(value)
+        for key, value in study.best_trial.user_attrs.get("broadway_metrics", {}).items()
+    }
+
+
 def run_nlp_hpo(
     model_zoo: dict[str, str],
     hpo_cfg: HPOConfig,
@@ -244,19 +252,10 @@ def run_nlp_hpo(
         )
         for spec in hpo_cfg.models
     }
-    result = run_hpo_bandit(
-        objectives, hpo_cfg, seed, mlflow_tracking, mlflow_tags, return_studies=True
+    return run_hpo_bandit(
+        objectives, hpo_cfg, seed, mlflow_tracking, mlflow_tags,
+        metric_extractor=_extract_broadway_metrics,
     )
-    studies = result.pop("studies")
-    result["metrics"] = {
-        name: {
-            key: float(value)
-            for key, value in study.best_trial.user_attrs.get("broadway_metrics", {}).items()
-        }
-        for name, study in studies.items()
-        if name in result["models"]
-    }
-    return result
 
 
 def run_nlp(
