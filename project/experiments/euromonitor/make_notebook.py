@@ -166,24 +166,32 @@ for g, idxs in reps.groupby(bc).indices.items():
         edges.add((min(a, b), max(a, b)))
 n_barcode = len(edges)
 
-# 7b. soft links: cosine >= threshold among blocked candidates (brand x macro block)
-# Blocking by macro ALONE explodes (~494M candidates -> OOM); brand x macro is
-# the recall-first key (0.957 recall, ~1.78M candidates) and keeps edges tractable.
+# 7b. soft links: SAME product = same brand + same size + near-identical title.
+# Cosine >= 0.55 alone over-merges (chains every variant of a brand into one
+# cluster). Adding the volume constraint + a higher threshold keeps only true
+# same-product pairs (same brand + same size + same flavor).
+SOFT_THRESHOLD = 0.85
 reps["macro_category"] = reps["category"].fillna("").map(lambda c: MACRO_MAP.get(c, "OTHER"))
 reps["_brand"] = reps["brand"].fillna("")
+reps["_vol"] = reps["title"].fillna("").map(extract_volume_ml).map(lambda t: t[0])
+vol_arr = reps["_vol"].to_numpy()
 for (br, m), grp in reps.groupby(["_brand", "macro_category"], sort=False):
     idx = grp.index.to_numpy()
     if len(idx) < 2:
         continue
-    nn = NearestNeighbors(radius=1.0 - THRESHOLD, metric="cosine")
+    nn = NearestNeighbors(radius=1.0 - SOFT_THRESHOLD, metric="cosine")
     nn.fit(emb[idx])
     dist, neigh = nn.radius_neighbors(emb[idx])
     for i, row in enumerate(neigh):
         a = int(idx[i])
         for j in row:
             b = int(idx[j])
-            if a < b:
-                edges.add((a, b))
+            if a >= b:
+                continue
+            va, vb = vol_arr[a], vol_arr[b]
+            if pd.notna(va) and pd.notna(vb) and va != vb:
+                continue  # different size -> different product
+            edges.add((a, b))
 
 print(f"barcode edges: {n_barcode:,}  |  total edges (barcode + fuzzy): {len(edges):,}")"""),
 
