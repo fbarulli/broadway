@@ -45,12 +45,14 @@ def entity_resolution_metrics(
     pos_scores: np.ndarray,
     neg_scores: np.ndarray,
     fpr: float = 0.05,
+    target_recall: float = 0.90,
 ) -> dict[str, float]:
     """Ranking metrics for a bi-encoder's pos-vs-neg score populations.
 
     pos_scores are true-pair similarities, neg_scores are non-pair
     similarities. Returns AUC (probability a random positive outscores
-    a random negative) plus the recall at a fixed false-positive budget and the
+    a random negative), recall at a fixed false-positive budget, precision at a
+    target recall (the business-relevant number for the scoring stage), and the
     score-distribution summaries used for the threshold trade-off.
     """
     from sklearn.metrics import roc_auc_score
@@ -58,11 +60,14 @@ def entity_resolution_metrics(
     if len(pos_scores) == 0 or len(neg_scores) == 0:
         raise ValueError("entity_resolution_metrics requires non-empty pos and neg scores")
     y = np.r_[np.ones(len(pos_scores)), np.zeros(len(neg_scores))]
-    auc = float(roc_auc_score(y, np.r_[pos_scores, neg_scores]))
+    scores = np.r_[pos_scores, neg_scores]
+    auc = float(roc_auc_score(y, scores))
     thr = float(np.quantile(neg_scores, 1 - fpr))
     return {
         "auc": round(auc, 4),
         f"recall_at_{int(fpr * 100)}pct_fpr": round(float((pos_scores >= thr).mean()), 4),
+        f"precision_at_{int(target_recall * 100)}pct_recall": round(
+            float(precision_at_recall(y, scores, target_recall=target_recall)), 4),
         "pos_median": round(float(np.median(pos_scores)), 4),
         "neg_p90": round(float(np.quantile(neg_scores, 0.9)), 4),
     }

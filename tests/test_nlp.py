@@ -54,6 +54,7 @@ def test_entity_resolution_metrics_perfect_separation() -> None:
     m = entity_resolution_metrics(pos, neg)
     assert m["auc"] == 1.0
     assert m["recall_at_5pct_fpr"] == 1.0
+    assert m["precision_at_90pct_recall"] == 1.0
     assert 0.5 < m["pos_median"] < 1.0
     assert m["neg_p90"] < 0.3
 
@@ -83,7 +84,8 @@ def test_make_objective_returns_auc_and_attaches_metrics(monkeypatch: pytest.Mon
     value = objective({}, trial)
     assert isinstance(value, float) and 0.0 <= value <= 1.0
     assert set(trial.attrs["broadway_metrics"]) == {
-        "auc", "recall_at_5pct_fpr", "pos_median", "neg_p90", "encode_s",
+        "auc", "recall_at_5pct_fpr", "precision_at_90pct_recall",
+        "pos_median", "neg_p90", "encode_s",
     }
 
 
