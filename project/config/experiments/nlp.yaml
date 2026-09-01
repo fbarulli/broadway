@@ -22,6 +22,9 @@ max_seq_length: 128
 # Encode-once/score-many embedding cache (one .npz per model+payload); relative
 # to the repo root. Set to null to disable. Populated only for zero-shot models.
 cache_dir: data/euromonitor/embeddings_cache
+# Prompt prefix applied before encoding (e5-family models expect `query:`).
+prompts:
+  e5_small: "query: "
 
 model_zoo:
   minilm_l6: sentence-transformers/all-MiniLM-L6-v2

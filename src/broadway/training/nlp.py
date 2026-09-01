@@ -77,21 +77,26 @@ def _embedding_cache_path(
     payload: list[str],
     max_seq_length: int,
     batch_size: int,
+    prompt: str | None = None,
 ) -> Path | None:
     """Deterministic .npz cache path for a model+payload (None disables cache)."""
     if cache_dir is None:
         return None
     digest = hashlib.sha1("\x1f".join(payload).encode("utf-8")).hexdigest()[:12]
-    key = f"{model_id.replace('/', '_')}_{max_seq_length}_{batch_size}_{digest}"
+    key = f"{model_id.replace('/', '_')}_{max_seq_length}_{batch_size}_{prompt or ''}_{digest}"
     return Path(cache_dir) / f"emb_{key}.npz"
 
 
-def _encode_payload(model, payload: list[str], batch_size: int, cache_path: Path | None):
+def _encode_payload(
+    model, payload: list[str], batch_size: int, cache_path: Path | None, prompt: str | None = None
+):
     """Encode the corpus once; reuse a cached .npz (emb + encode_s) on re-run.
 
     Encode-once, score-many: the cache holds the raw embedding matrix and the
     original encode wall-time so a warm re-run reports the SAME latency instead
     of a misleading 0. Fine-tuned models never cache (params vary per trial).
+    ``prompt`` (e.g. ``query: `` for e5-family models) is prepended to every
+    text by sentence-transformers.
     """
     if cache_path is not None and cache_path.exists():
         with np.load(cache_path) as cached:
@@ -102,6 +107,7 @@ def _encode_payload(model, payload: list[str], batch_size: int, cache_path: Path
         batch_size=batch_size,
         normalize_embeddings=True,
         show_progress_bar=False,
+        prompt=prompt,
     )
     encode_s = time.perf_counter() - t0
     if cache_path is not None:
@@ -152,6 +158,7 @@ def make_objective(
     batch_size: int = 256,
     max_seq_length: int = 128,
     cache_dir: str | None = None,
+    prompt: str | None = None,
 ) -> Objective:
     """Build the NLP objective for one bi-encoder: encode -> score -> AUC.
 
@@ -166,19 +173,22 @@ def make_objective(
     is a zero-shot benchmark (load -> encode -> score). ``cache_dir`` enables
     encode-once/score-many: zero-shot embeddings are cached to .npz so a warm
     re-run skips the encode but still reports the original encode latency.
+    ``prompt`` is prepended to every text before encoding (e5-family models).
     """
     from sentence_transformers import SentenceTransformer
 
-    cache_path = _embedding_cache_path(cache_dir, model_id, payload, max_seq_length, batch_size)
+    cache_path = _embedding_cache_path(
+        cache_dir, model_id, payload, max_seq_length, batch_size, prompt
+    )
 
     def objective(params: dict[str, float | int], trial=None) -> float:
         model = SentenceTransformer(model_id, device=device)
         if finetune_examples is not None and _has_finetune_params(params):
             _finetune(model, params, finetune_examples, max_seq_length)
-            emb, encode_s = _encode_payload(model, payload, batch_size, None)
+            emb, encode_s = _encode_payload(model, payload, batch_size, None, prompt)
         else:
             model.max_seq_length = max_seq_length
-            emb, encode_s = _encode_payload(model, payload, batch_size, cache_path)
+            emb, encode_s = _encode_payload(model, payload, batch_size, cache_path, prompt)
         metrics = entity_resolution_metrics(_cosine(emb, pos_pairs), _cosine(emb, neg_pairs))
         metrics["encode_s"] = round(encode_s, 3)
         if trial is not None:
@@ -201,18 +211,21 @@ def run_nlp_hpo(
     batch_size: int = 256,
     max_seq_length: int = 128,
     cache_dir: str | None = None,
+    prompts: dict[str, str] | None = None,
     mlflow_tracking: bool = False,
     mlflow_tags: dict[str, str] | None = None,
 ) -> dict:
     """Run the bandit HPO over the embedding model zoo (direction: maximize).
 
     model_zoo maps the HPO spec's short names to HF repo ids; every
-    hpo_cfg.models entry must resolve through it (loud failure otherwise). The
-    bandit, seeded TPE, mlflow callback, and RDB contract are reused from
-    run_hpo_bandit unchanged. The returned dict adds a "metrics" map (name ->
-    the best trial's broadway_metrics: auc, recall@5%FPR, encode latency, and
-    score summaries) so callers can build the benchmark table from plain data.
+    hpo_cfg.models entry must resolve through it (loud failure otherwise).
+    ``prompts`` optionally maps a short name to a text prefix (e.g. ``query: ``
+    for e5-family models) applied before encoding. The bandit, seeded TPE,
+    mlflow callback, and RDB contract are reused from run_hpo_bandit unchanged.
+    The returned dict adds a "metrics" map (name -> the best trial's
+    broadway_metrics) so callers can build the benchmark table from plain data.
     """
+    prompts = prompts or {}
     unknown = [spec.name for spec in hpo_cfg.models if spec.name not in model_zoo]
     if unknown:
         raise ValueError(f"hpo.models names missing from model_zoo: {sorted(unknown)}")
@@ -227,6 +240,7 @@ def run_nlp_hpo(
             batch_size=batch_size,
             max_seq_length=max_seq_length,
             cache_dir=cache_dir,
+            prompt=prompts.get(spec.name),
         )
         for spec in hpo_cfg.models
     }
@@ -275,6 +289,7 @@ def run_nlp(
         batch_size=cfg.batch_size,
         max_seq_length=cfg.max_seq_length,
         cache_dir=cfg.cache_dir,
+        prompts=cfg.prompts,
         mlflow_tracking=mlflow_tracking,
         mlflow_tags=mlflow_tags,
     )

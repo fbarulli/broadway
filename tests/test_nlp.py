@@ -143,6 +143,31 @@ def test_run_nlp_typed_config_entry(monkeypatch: pytest.MonkeyPatch) -> None:
     assert set(result["models"]) == {"good", "bad"}
 
 
+def test_make_objective_passes_prompt(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A per-model prompt (e.g. e5 'query: ') reaches sentence-transformers."""
+    captured: dict = {}
+    st = types.ModuleType("sentence_transformers")
+
+    class _PromptModel:
+        def __init__(self, model_id: str, device: str = "cpu") -> None:
+            self.model_id = model_id
+
+        def encode(self, payload, **kwargs):
+            captured["prompt"] = kwargs.get("prompt")
+            emb = np.random.default_rng(0).normal(size=(len(payload), 2))
+            return emb / np.linalg.norm(emb, axis=1, keepdims=True)
+
+    st.SentenceTransformer = _PromptModel
+    monkeypatch.setitem(sys.modules, "sentence_transformers", st)
+
+    payload = [f"s{i}" for i in range(8)]
+    pos = np.array([[0, 1], [2, 3]])
+    neg = np.array([[4, 5], [6, 7]])
+    objective = nlp.make_objective("m", payload, pos, neg, prompt="query: ")
+    objective({})
+    assert captured["prompt"] == "query: "
+
+
 def _install_fake_finetune_modules(monkeypatch: pytest.MonkeyPatch) -> None:
     """Stub the sentence_transformer.losses and torch.utils.data submodules."""
     losses_mod = types.ModuleType("losses")

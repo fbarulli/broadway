@@ -136,8 +136,10 @@ class NLPConfig(BaseModel):
     """Data-agnostic NLP HPO config — the embedding-model-zoo analogue of HPOConfig.
 
     ``model_zoo`` maps short HPO names to HF repo ids; ``hpo`` is the shared
-    bandit spec (direction: maximize for ROC AUC). The payload/pairs that score
-    the objective are supplied by the caller (see broadway.training.nlp.run_nlp),
+    bandit spec (direction: maximize for ROC AUC). ``prompts`` optionally maps a
+    short name to a prompt prefix applied to every text before encoding (e.g.
+    ``query: `` for e5-family bi-encoders). The payload/pairs that score the
+    objective are supplied by the caller (see broadway.training.nlp.run_nlp),
     so this config carries no dataset-specific fields.
     """
 
@@ -149,6 +151,7 @@ class NLPConfig(BaseModel):
     max_seq_length: int = 128
     cache_dir: str | None = None
     model_zoo: dict[str, str]
+    prompts: dict[str, str] = {}
     hpo: HPOConfig
 
 
