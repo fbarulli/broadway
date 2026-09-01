@@ -56,8 +56,8 @@ def _assert_unique_merged_labels(
     G2): ``merged_lookup_column_names`` only checks whether a lookup column
     name collides with an existing column — it never checks whether the
     *renamed result* (``<name>_lookup``) itself already exists. A raw frame
-    carrying both ``Borough`` and ``Borough_lookup`` while the lookup
-    contributes ``Borough`` therefore merges to TWO ``Borough_lookup`` labels,
+    carrying both ``region`` and ``region_lookup`` while the lookup
+    contributes ``region`` therefore merges to TWO ``region_lookup`` labels,
     which today survives the (non-strict) schemas and only trips an accidental
     deep error inside ``audit_lookup_values``. This guard raises ``SchemaError``
     before the merge, naming every duplicated label and its provenance.
@@ -65,9 +65,9 @@ def _assert_unique_merged_labels(
     The check is list-level (``pd.Index(...).is_unique``) on the ACTUAL
     produced label list — existing labels plus every value of ``merged_names``,
     preserving multiplicity — because a pure set-size equation collapses a
-    genuine lookup-vs-lookup rename collision (e.g. existing ``{Borough}`` with
-    lookup columns ``{Borough, Borough_lookup}`` maps BOTH to
-    ``Borough_lookup``).
+    genuine lookup-vs-lookup rename collision (e.g. existing ``{region}`` with
+    lookup columns ``{region, region_lookup}`` maps BOTH to
+    ``region_lookup``).
     """
     # pandas keeps the right join key in the output; when the join is on the
     # same name (left_key == right_key) the single key column the merge emits

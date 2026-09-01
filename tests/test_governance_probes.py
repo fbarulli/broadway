@@ -821,8 +821,8 @@ def probe_new_surfaces_registered(
     hoc allowlist row. ``NEW_SURFACE_ALLOWLIST`` is the dated escape hatch;
     entries strictly past their review date fail loud (decay by design).
     The strict-grammar sweep is represented by accepted registry declarations:
-    GATE-INFRA-129 names the experiment subtrees and GATE-INFRA-92 names
-    project/tests/**. Temporary allowlist entries are therefore empty.
+    GATE-INFRA-92 names the experiment subtrees and project/tests/**.
+    Temporary allowlist entries are therefore empty.
     """
     exemptions = NEW_SURFACE_EXEMPTS if exemptions is None else dict(exemptions)
     failures = [

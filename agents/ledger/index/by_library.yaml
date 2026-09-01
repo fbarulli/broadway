@@ -63,8 +63,6 @@ broadway.cleaning.models.ParseFailure:
 - GATE-ETL-15
 broadway.cleaning.structural:
 - GATE-ETL-10
-broadway.config.loader.CONFIGS_DIR:
-- GATE-ETL-19
 broadway.config.schema:
 - GATE-ETL-10
 - GATE-ETL-11
@@ -78,7 +76,6 @@ broadway.config.schema(EncodingConfig, FeatureConfig):
 - GATE-FEAT-24
 broadway.config.schema.DatasetContract:
 - GATE-ETL-17
-- GATE-ETL-19
 broadway.config.schema.DerivedFeature:
 - GATE-FEAT-20
 - GATE-FEAT-21
@@ -99,7 +96,6 @@ broadway.config.schema.normalize_dtype:
 broadway.contracts.pandera:
 - GATE-ETL-10
 - GATE-ETL-11
-- GATE-ETL-19
 broadway.contracts.pandera (build_raw_schema):
 - GATE-ETL-12
 broadway.contracts.pandera(pandera_dtype):
@@ -149,25 +145,18 @@ broadway.lineage.ids:
 broadway.lineage.ids(node_id):
 - GATE-FEAT-25
 broadway.lineage.ids.node_id:
-- GATE-ETL-19
 - GATE-STATS-41
 broadway.lineage.models:
 - GATE-ETL-10
 broadway.lineage.models(TransformAudit):
 - GATE-FEAT-25
-broadway.lineage.models.TransformAudit:
-- GATE-ETL-18
-- GATE-ETL-19
 broadway.lineage.records:
 - GATE-ETL-10
 broadway.lineage.records write_record:
 - GATE-TRAIN-118
 broadway.lineage.records(enforce_drop_fraction, write_record):
 - GATE-FEAT-25
-broadway.lineage.records.enforce_drop_fraction (downstream consumer):
-- GATE-ETL-18
 broadway.lineage.records.write_record:
-- GATE-ETL-19
 - GATE-STATS-41
 - GATE-STATS-49
 broadway.lineage.sample load path (lineage/sample.py):
@@ -300,7 +289,6 @@ load_config→_build_config dispatch (loader.py:132-138):
 logging:
 - GATE-ETL-10
 - GATE-ETL-17
-- GATE-ETL-19
 - GATE-FEAT-25
 - GATE-STATS-40
 lookup value audit (data/lookup_value_audit.py:48):
@@ -324,7 +312,6 @@ mlflow.tracking.MlflowClient:
 no dedicated CI job wiring found in scripts/ or pyproject:
 - GATE-SURF-67
 numpy:
-- GATE-TRAIN-32
 - GATE-TRAIN-36
 - GATE-STATS-42
 - GATE-STATS-44
@@ -351,9 +338,7 @@ orchestration entrypoints dispatching flows:
 - GATE-CFG-78
 os:
 - GATE-ETL-10
-- GATE-ETL-19
 pandas:
-- GATE-INGEST-01
 - GATE-INGEST-02
 - GATE-INGEST-04
 - GATE-INGEST-05
@@ -364,14 +349,12 @@ pandas:
 - GATE-ETL-13
 - GATE-ETL-14
 - GATE-ETL-15
-- GATE-ETL-19
 - GATE-ETL-116
 - GATE-FEAT-23
 - GATE-FEAT-26
 - GATE-FEAT-27
 - GATE-TRAIN-30
 - GATE-TRAIN-31
-- GATE-TRAIN-32
 - GATE-TRAIN-33
 - GATE-TRAIN-34
 - GATE-TRAIN-35
@@ -402,11 +385,9 @@ pandas(select_dtypes):
 pandas.read_parquet:
 - GATE-STATS-41
 pandera:
-- GATE-INGEST-01
 - GATE-INGEST-02
 - GATE-INGEST-04
 - GATE-INGEST-09
-- GATE-ETL-19
 - GATE-FEAT-27
 pandera(pa.DataFrameSchema via sink):
 - GATE-FEAT-26
@@ -421,7 +402,6 @@ pathlib (stdlib only — NO direct pandas/polars/pydantic import in this file):
 pathlib.Path:
 - GATE-ETL-11
 - GATE-ETL-16
-- GATE-ETL-19
 - GATE-FEAT-25
 - GATE-STATS-41
 pickle:
@@ -429,24 +409,15 @@ pickle:
 pingouin:
 - GATE-STATS-47
 polars:
-- GATE-INGEST-01
 - GATE-INGEST-02
 - GATE-INGEST-04
 - GATE-ETL-11
-- GATE-ETL-19
-- GATE-TRAIN-32
-project.etl.process (caller chain):
-- GATE-ETL-117
-project.etl.process_config:
-- GATE-ETL-19
 project.etl.process_config (indirectly via caller chain):
 - GATE-ETL-17
 project/data.py:
 - GATE-STATS-43
 psycopg2-binary:
 - GATE-HPO-86
-pyarrow:
-- GATE-TRAIN-32
 pydantic:
 - GATE-INGEST-05
 - GATE-INGEST-06
@@ -461,17 +432,12 @@ pydantic (extra=forbid models :25-45):
 python -m broadway.cli equivalent:
 - GATE-TLINE-59
 pyyaml:
-- GATE-INGEST-01
 - GATE-INGEST-04
 - GATE-INGEST-09
-- GATE-TRAIN-32
 - GATE-HPO-87
 - GATE-HPO-89
 re:
 - GATE-ETL-10
-- GATE-ETL-19
-re (both sides):
-- GATE-ETL-18
 read_named_sample consumers (stats/timeline runners):
 - GATE-CFG-79
 reports.describe.GroupSummary consumer:
@@ -618,5 +584,3 @@ uv run ds-pipeline (installed entry point):
 - GATE-TLINE-59
 walkthrough.py:384 (step save):
 - GATE-TLINE-53
-yaml:
-- GATE-ETL-19

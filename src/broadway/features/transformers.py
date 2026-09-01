@@ -79,7 +79,7 @@ class FrequencyEncoding(BaseEstimator, TransformerMixin):
 
     Fit computes ``value_counts`` per key — normalized by default (identical to
     the legacy ``fit_frequency_encoding``); pass ``normalize=False`` for raw
-    counts (the taxi binding's ``route_frequency``). Unseen/NaN keys at
+    counts (e.g. a route-frequency binding). Unseen/NaN keys at
     transform map to the ``fill`` value (default 0, matching the legacy
     signature). The output column is named ``feature_name`` when provided
     (verbatim), else ``<joined_cols>_freq_enc``.

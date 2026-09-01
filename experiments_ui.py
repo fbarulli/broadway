@@ -6,7 +6,7 @@ restricted to the euromonitor experiment series under
 (`BROADWAY_EXPERIMENTS_ROOT` / `BROADWAY_DEFAULT_EXPERIMENT_SERIES` /
 `BROADWAY_OBSERVATIONS_DIR`); this launcher pins those to the euromonitor
 surface BEFORE the first import so the UI lists and renders only
-euromonitor series, never the taxi-era experiment tree.
+euromonitor series, never the legacy experiment tree.
 
 The pre-composition root `experiments_ui.py` was a full multi-series
 duplicate of the dashboard module, deleted when experiments moved under

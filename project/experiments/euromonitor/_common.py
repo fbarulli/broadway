@@ -1,6 +1,6 @@
 """Shared paths and plot helpers for the euromonitor series.
 
-Follows the repo experiment convention (see fare_prediction/_common.py):
+Follows the repo experiment convention for a series' shared paths and plot helpers:
 RESULTS = PATHS.results / HERE.name, and every step writes
 `NN_name_describe.csv` + `NN_name.png` under it. The dataset lives at
 project/data/euromonitor/dataset.csv (raw export from the Shiny app);

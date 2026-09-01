@@ -220,19 +220,25 @@ def test_lookup_spec_na_values_default_empty() -> None:
 
 
 def test_hpo_configs_parse() -> None:
-    """Both HPO configs must parse as the unified HPOConfig schema."""
+    """The HPO config parses as HPOConfig; the euromonitor experiment config
+    keeps its shared seed key (consumed by project/experiments/euromonitor/_common.py)."""
     import yaml
 
     from broadway.config.schema import HPOConfig
 
-    for path in (
-        Path(__file__).resolve().parents[1] / "configs" / "experiment" / "hyperopt.yaml",
-        Path(__file__).resolve().parents[1] / "project" / "config" / "experiments" / "mlflow.yaml",
-    ):
-        raw = yaml.safe_load(path.read_text())
-        assert "hpo" in raw, f"{path.name} missing hpo block"
-        cfg = HPOConfig(**raw["hpo"])
-        assert cfg.models, f"{path.name}: no models in hpo spec"
+    root = Path(__file__).resolve().parents[1]
+
+    hpo_raw = yaml.safe_load(
+        (root / "configs" / "experiment" / "hyperopt.yaml").read_text()
+    )
+    assert "hpo" in hpo_raw, "hyperopt.yaml missing hpo block"
+    cfg = HPOConfig(**hpo_raw["hpo"])
+    assert cfg.models, "hyperopt.yaml: no models in hpo spec"
+
+    euromonitor_raw = yaml.safe_load(
+        (root / "project" / "config" / "experiments" / "euromonitor.yaml").read_text()
+    )
+    assert "seed" in euromonitor_raw, "euromonitor.yaml missing seed key"
 
 
 def _experiment_kwargs() -> dict[str, object]:

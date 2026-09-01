@@ -1,27 +1,27 @@
 # Gate registry SSOT — hand-maintained; the {01..09} gate fragments it consolidated predate git custody.
 meta:
-  head: '7d40b37'
+  head: '61252d3'
   counts:
-    total: 145
-    gates_with_findings: 84
-    finding_strings: 109
+    total: 134
+    gates_with_findings: 78
+    finding_strings: 103
     by_band:
       01-ingest:
-        gates: 9
-        flagged: 9
-        finding_strings: 9
-      02-etl-lookup:
-        gates: 12
-        flagged: 7
+        gates: 8
+        flagged: 8
         finding_strings: 8
+      02-etl-lookup:
+        gates: 9
+        flagged: 5
+        finding_strings: 6
       03-features:
         gates: 10
         flagged: 4
         finding_strings: 6
       04-training:
-        gates: 13
-        flagged: 12
-        finding_strings: 14
+        gates: 12
+        flagged: 11
+        finding_strings: 13
       05-stats:
         gates: 11
         flagged: 7
@@ -35,19 +35,19 @@ meta:
         flagged: 1
         finding_strings: 1
       08-config:
-        gates: 17
-        flagged: 11
-        finding_strings: 14
+        gates: 15
+        flagged: 10
+        finding_strings: 13
       80-hpo-optuna:
         gates: 11
         flagged: 9
         finding_strings: 13
       09-infra:
-        gates: 31
-        flagged: 17
-        finding_strings: 25
+        gates: 29
+        flagged: 16
+        finding_strings: 24
       81-object-custody:
-        gates: 6
+        gates: 4
         flagged: 0
         finding_strings: 0
   assembled: '2026-08-24'
@@ -62,36 +62,19 @@ meta:
   - agents/ledger/gates/08-config.md
   - agents/ledger/gates/09-infra.md
   - agents/ledger/gates/80-hpo-optuna.md
-gates:
-- id: GATE-INGEST-01
-  phase: ingest
-  order: 1
-  owner: project/etl/process.py:28 get_raw_files()
-  inputs:
-  - CFG-TAXI-PROJECT
-  outputs:
+vocabulary:
   - ARTIFACT-RAW-PARQUET
-  transforms:
-  - glob `<raw_dir>/yellow_tripdata_*.parquet`, sorted() for deterministic order (:30)
-  - empty result → FileNotFoundError naming raw_dir (:31-32)
-  touched_by:
-  - pandas@2.3.3
-  - polars@1.43.2
-  - pandera@0.32.1
-  - pyyaml@6.0.2
-  validated_by:
-  - project/tests/test_process.py::test_process_data_writes_ingest_lineage
-  if_changed:
-  - ARTIFACT-RAW-PARQUET set/order
-  - GATE-INGEST-02
-  - GATE-INGEST-03
-  - project/tests/test_process.py
-  - project/tests/test_ingest_audit.py fixtures
-  findings:
-  - the FileNotFoundError branch has NO test anywhere — repo-wide grep finds get_raw_files only at its definition and its process_data call site; the sole covering test exercises the happy path with a seeded parquet. The `yellow_tripdata_*.parquet` prefix is hardcoded, so no contract-declared dataset can ever route through this discovery gate.
+  - ARTIFACT-SELECTED-FRAME
+  - ARTIFACT-STRUCTURAL-CLEAN
+  - ARTIFACT-LOOKUP-VALUE-AUDIT
+  - CFG-ENV-PROCESSED-SUBDIR
+  - CFG-ETL-SPLIT-FILES
+  - ARTIFACT-STATS-PLAN
+  - ARTIFACT-DESCRIBE-SUMMARY
+gates:
 - id: GATE-INGEST-02
   phase: ingest
-  order: 2
+  order: 1
   owner: src/broadway/data/loader.py:124 load_with_audit()
   inputs:
   - CFG-DATASET-CONTRACT
@@ -122,12 +105,11 @@ gates:
   - 'the unsupported-extension ValueError branch (loader.py:127-128) has zero test coverage — grep for ''unsupported format'' in tests/ returns nothing. Legacy twin read_raw_data (project/etl/process.py:36) bypasses this whole gate: polars scan_parquet with no extension check, no lookup merges, no label-collision guard.'
 - id: GATE-INGEST-03
   phase: ingest
-  order: 3
+  order: 2
   owner: src/broadway/etl/module.py:74 run() CI-sample guard
   inputs:
   - ARTIFACT-RAW-FRAME
   - CFG-ETL-STEP
-  - CFG-TAXI-PROJECT
   outputs:
   - ARTIFACT-RAW-FRAME
   transforms:
@@ -138,7 +120,6 @@ gates:
   touched_by: []
   validated_by:
   - tests/test_structural_cleaning.py::test_etl_ci_sampling_gated
-  - project/tests/test_ingest_audit.py::test_ci_sampling_reorder_becomes_visible_in_ledger
   if_changed:
   - row counts of every downstream artifact
   - TransformAudit.reasons grammar consumed by enforce_drop_fraction (src/broadway/lineage/records.py:43)
@@ -147,11 +128,10 @@ gates:
   - 'teeth-status rider (packet F O5/W9 CONFIRM-LAND condition): one pin lives in WIP-M tests/test_structural_cleaning.py and one in untracked project/tests/test_ingest_audit.py — both must land TRACKED with the StageLedger batch or these teeth are self-attestation.'
 - id: GATE-INGEST-04
   phase: ingest
-  order: 4
+  order: 3
   owner: 'project/etl/process.py: select_and_clean_columns() projection/missing/extra/dropna aspects (numeric anchors stripped pending DP-A07/R2 StageLedger merge)'
   inputs:
   - CFG-DATASET-CONTRACT
-  - CFG-TAXI-PROJECT
   - ARTIFACT-RAW-FRAME
   outputs:
   - ARTIFACT-SELECTED-FRAME
@@ -167,8 +147,6 @@ gates:
   - pandera@0.32.1
   - pyyaml@6.0.2
   validated_by:
-  - project/tests/test_process.py::test_rename_columns
-  - project/tests/test_process.py::test_select_and_clean_columns
   - project/tests/test_ingest_contract.py::test_missing_contract_column_raises
   - project/tests/test_ingest_contract.py::test_extra_column_not_in_contract_is_dropped_not_error
   - project/tests/test_ingest_surface.py::test_select_and_clean_columns_nan_twins_die_at_dropna_not_dedup
@@ -177,10 +155,10 @@ gates:
   - GATE-INGEST-05..09 inputs
   - project/tests/test_ingest_*.py
   findings:
-  - this gate duplicates drop-semantics that the CONTRACT pipeline re-implements inside canonicalize (dedup + null drops) with a DIFFERENT order (here dropna→dedup; there dedup→…→target-null-only) — NaN-twins accounting differs by construction (see project/tests/test_ingest_surface.py::test_select_and_clean_columns_nan_twins_die_at_dropna_not_dedup). rename_map keys are defined in project/config/project/taxi.yaml (contents UNVERIFIED — not opened) and reach the code only via process_config.py config_path resolution, outside DatasetContract; drift is caught only reactively by the missing-column ValueError.
+  - this gate duplicates drop-semantics that the CONTRACT pipeline re-implements inside canonicalize (dedup + null drops) with a DIFFERENT order (here dropna→dedup; there dedup→…→target-null-only) — NaN-twins accounting differs by construction (see project/tests/test_ingest_surface.py::test_select_and_clean_columns_nan_twins_die_at_dropna_not_dedup). rename_map keys are defined in project/config/project/euromonitor.yaml (contents UNVERIFIED — not opened) and reach the code only via process_config.py config_path resolution, outside DatasetContract; drift is caught only reactively by the missing-column ValueError.
 - id: GATE-INGEST-05
   phase: ingest
-  order: 5
+  order: 4
   owner: src/broadway/cleaning/structural.py:49 parse_datetime()
   inputs:
   - CFG-DATASET-CONTRACT
@@ -207,7 +185,7 @@ gates:
   - unparseable values become NaT and are only RECORDED, never raised (see GATE-INGEST-07); because build_raw_schema declares every column nullable=True (src/broadway/contracts/pandera.py:57), NaT-filled non-target datetime rows PASS the dtype gate silently and survive into canonical parquet — only a null TARGET dies later at cleaner.py:71-75. LEGACY pipeline never calls parse_datetime at all (tpep_* parsed by parquet reader alone, filtered at process.py:51-60).
 - id: GATE-INGEST-06
   phase: ingest
-  order: 6
+  order: 5
   owner: src/broadway/cleaning/structural.py:83 parse_numeric()
   inputs:
   - CFG-DATASET-CONTRACT
@@ -241,7 +219,7 @@ gates:
   - 'FX-A05 fractional-refusal branch is WIP-ONLY at HEAD 5016e93 — the HEAD astype-back has NO refusal (any int-target column with zero NaN gets plain astype :78-81). When the batch merges, its known caveat applies: reachable ONLY when the column has no NaN, so a column mixing unparseable strings AND fractional floats records just the unparseable ParseFailure and skips the refusal via the NaN condition — FX-A05 protection degrades to "float64 survives to the dtype gate". LEGACY pipeline imports neither parse_numeric nor any structural primitive (repo grep: zero callers in project/) — its dtype correctness rests entirely on parquet-read dtypes plus GATE-INGEST-09''s legacy twin.'
 - id: GATE-INGEST-07
   phase: ingest
-  order: 7
+  order: 6
   owner: src/broadway/etl/module.py:129 run() evidence surfacing
   inputs:
   - ARTIFACT-CLEAN-EVIDENCE
@@ -268,7 +246,7 @@ gates:
   - 'GUARANTEE NOBODY CHECKS — the ParseFailure channel is recorded-not-enforced: nothing in the repo raises on a non-empty parse_failures list; loud failure is delegated entirely to GATE-INGEST-09''s dtype mismatch, which for nullable=True columns masks datetime NaT (and any float-typed int column only via strict dtype comparison). A run with thousands of unparseable timestamps still exits green with evidence written to JSON that no gate reads back.'
 - id: GATE-INGEST-08
   phase: ingest
-  order: 8
+  order: 7
   owner: src/broadway/data/cleaner.py:34 canonicalize()
   inputs:
   - CFG-DATASET-CONTRACT
@@ -299,7 +277,7 @@ gates:
   - CHECK WITH NO UPSTREAM GUARANTEE — the locked order binds only the CONTRACT pipeline; the LEGACY pipeline (project/etl/process.py) shares none of this code and enforces its own order (filters→duration→passenger_count→rename→select/dropna/dedup, process.py:145-165). The ONLY shared invariant between the two ingests is the textual '-<N> rows' reason grammar (process.py:21-23 comment), which nothing validates at runtime.
 - id: GATE-INGEST-09
   phase: ingest
-  order: 9
+  order: 8
   owner: src/broadway/contracts/pandera.py:46 build_raw_schema()
   inputs:
   - CFG-DATASET-CONTRACT
@@ -326,7 +304,7 @@ gates:
   - nullable=True is deliberate ("null_count observed, not an invariant", pandera.py:51-53), so this gate checks NAMES and DTYPES only — null-ratio drift, value ranges and uniqueness are out of contract here. An EMPTY contract.columns dict would build a vacuous schema that validates any frame (pydantic does not require columns to be non-empty; no test covers that case). The legacy blank-dtype/pa.Object ValueErrors are tested, but the legacy validate call itself runs before save_processed_data with no re-validation after write.
 - id: GATE-ETL-10
   phase: etl-lookup
-  order: 10
+  order: 9
   owner: src/broadway/etl/module.py:61 run()
   inputs:
   - PipelineConfig (cfg.dataset + cfg.etl + cfg.experiment)
@@ -377,7 +355,7 @@ gates:
   findings: []
 - id: GATE-ETL-11
   phase: etl-lookup
-  order: 11
+  order: 10
   owner: src/broadway/data/loader.py:124 load_with_audit()
   inputs:
   - DatasetContract.path (csv/parquet/xlsx via READERS dict keyed on suffix)
@@ -415,7 +393,7 @@ gates:
   - NA semantics are ASYMMETRIC across the same merge — main frame read through READERS uses pandas' default NA set while the lookup side restricts conversion to authored tokens (keep_default_na=False, :134); a literal like "NA" becomes NaN on the left but stays a string on the right, so audit_join matching and sentinel counting operate on divergent representations with no warning.
 - id: GATE-ETL-12
   phase: etl-lookup
-  order: 12
+  order: 11
   owner: src/broadway/data/loader.py:46 _assert_unique_merged_labels()
   inputs:
   - DatasetContract
@@ -443,7 +421,7 @@ gates:
   findings: []
 - id: GATE-ETL-13
   phase: etl-lookup
-  order: 13
+  order: 12
   owner: src/broadway/data/join_audit.py:27 audit_join()
   inputs:
   - left df
@@ -473,7 +451,7 @@ gates:
   findings: []
 - id: GATE-ETL-14
   phase: etl-lookup
-  order: 14
+  order: 13
   owner: src/broadway/data/lookup_value_audit.py:33 audit_lookup_values()
   inputs:
   - post-merge df
@@ -507,7 +485,7 @@ gates:
   - this channel is EVIDENCE-ONLY — no threshold or gate ever consumes affected_rate/sentinel_counts; a lookup whose every matched value is null or sentinel still passes etl.run silently (module.py writes the report and continues).
 - id: GATE-ETL-15
   phase: etl-lookup
-  order: 15
+  order: 14
   owner: src/broadway/cleaning/structural.py:83 parse_numeric()
   inputs:
   - pd.Series
@@ -540,7 +518,7 @@ gates:
   - coercion evidence is PARTIAL by construction — only int-target astype-backs are recorded; float-target arriving-dtype drift and parse_datetime's errors="coerce" (:50) emit NO CoercionRecord, and rows_affected is len(coerced) i.e. the whole column even when zero values actually changed. Additionally the module.py:145-156 persistence branch has no test asserting the coercion_audit.json artifact (see UNVERIFIED).
 - id: GATE-ETL-16
   phase: etl-lookup
-  order: 16
+  order: 15
   owner: src/broadway/data/loader.py:112 canonical_path()
   inputs:
   - EnvironmentConfig.data_dir + EnvironmentConfig.processed_subdir (CFG-ENV-PROCESSED-SUBDIR)
@@ -568,7 +546,7 @@ gates:
   - POST-WRITE RELOAD VALIDATION DOES NOT EXIST in this band — etl never re-reads the parquet bytes it just wrote; schema validation happens exclusively pre-write on the in-memory frame (module.py:95), so any parquet round-trip dtype drift (e.g. datetime→int64, categorical loss) would surface only when features/training readers open the file (src/broadway/features/module.py:25, src/broadway/training/module.py:42 — different band). The only reload today is inside tests (tests/test_structural_cleaning.py:236).
 - id: GATE-ETL-17
   phase: etl-lookup
-  order: 17
+  order: 16
   owner: 'project/etl/process.py: select_and_clean_columns() ledger-accounting grammar aspect (narrowed ledger-append-sites owner BLOCKED pending DP-A07/R2 StageLedger merge — packet F #1b)'
   inputs:
   - renamed post-filter df
@@ -588,7 +566,6 @@ gates:
   - broadway.config.schema.DatasetContract
   - project.etl.process_config (indirectly via caller chain)
   validated_by:
-  - project/tests/test_process.py::test_select_and_clean_columns
   - project/tests/test_ingest_surface.py::test_select_and_clean_columns_dedups
   - project/tests/test_ingest_surface.py::test_select_and_clean_columns_nan_twins_die_at_dropna_not_dedup
   - project/tests/test_ingest_surface.py::test_select_and_clean_columns_zero_duplicates_keeps_counts_equal
@@ -601,81 +578,9 @@ gates:
   findings:
   - StageLedger stores ROWS-AFTER, not deltas, and appends even for zero-drop stages; the "-N rows" deltas only materialize later in _ingest_audit (:178-181). Any consumer treating ledger entries as drop counts overcounts; per-column attribution of dropna losses does not exist anywhere on this path.
   - 'WIP-PENDENCY (packet F #1): the StageLedger param/appends and the dedup ordering exist ONLY in the M project/etl/process.py worktree — at HEAD 5016e93 the body ends df[cols].dropna() (:99) with no ledger param, no ledger.append, no drop_duplicates. This row''s accounting grammar lands tracked WITH that batch (DP-A07/R2); until then the GATE-INGEST-04 co-tenancy flag stays deliberately unresolved.'
-- id: GATE-ETL-18
-  phase: etl-lookup
-  order: 18
-  owner: project/etl/process.py:23 _ROW_DELTA
-  inputs:
-  - 'reason strings produced by _ingest_audit (:168) in the form "<stage>: -<N> rows"; mirrored consumer broadway.etl.module._explained_rows() at src/broadway/etl/module.py:32 parsing etl-step reasons incl. "CI sampling: -N rows"'
-  outputs:
-  - explained row total subtracted from dropped_total → TransformAudit.rows_dropped_unexplained (process.py:183-187; module.py:115)
-  transforms:
-  - regex r'-(\d+) rows$' anchored at END-of-string; stages with zero delta emit NO reason line (:180-181) so they parse as zero
-  - any reason NOT ending in '-<N> rows' is silently unparseable → counts toward rows_dropped_unexplained → trips enforce_drop_fraction (loud) rather than vanishing
-  touched_by:
-  - re (both sides)
-  - broadway.lineage.models.TransformAudit
-  - broadway.lineage.records.enforce_drop_fraction (downstream consumer)
-  validated_by:
-  - project/tests/test_ingest_audit.py::test_ingest_record_carries_balanced_audit
-  - project/tests/test_ingest_audit.py::test_audit_zeros_on_zero_drop_run
-  - project/tests/test_ingest_audit.py::test_ci_sampling_reorder_becomes_visible_in_ledger
-  - project/tests/test_ingest_audit.py::test_nan_twins_account_at_dropna_through_full_pipeline
-  - tests/test_loud_failures.py::test_enforce_drop_fraction_raises
-  - tests/test_loud_failures.py::test_enforce_drop_fraction_zero_rows_ok
-  if_changed:
-  - _ROW_DELTA pattern OR module.py:35 inline r"-(\\d+) rows$"
-  - 'reason-string format "<stage>: -N rows"'
-  - TransformAudit.rows_dropped_unexplained semantics
-  findings:
-  - the "shared grammar" is shared BY COMMENT ONLY — process.py:21-23 and module.py:32-38 carry two independent copies of the identical regex with no common symbol (project imports broadway, but neither side imports the other's parser); editing either pattern alone silently desyncs explained/unexplained accounting between the ingest and etl steps.
-- id: GATE-ETL-19
-  phase: etl-lookup
-  order: 19
-  owner: project/etl/process.py:194 process_data()
-  inputs:
-  - dataset name → configs/dataset/<name>.yaml via _load_contract (:140)
-  - raw yellow_tripdata_*.parquet glob (get_raw_files :28 raises FileNotFoundError when empty)
-  - taxi knobs from project/config/project/taxi.yaml via process_config.py (config_path overlay-first)
-  outputs:
-  - training_data.parquet via save_processed_data (:132, to_parquet index=False)
-  - lineage record node_id('ingest') with full _ingest_audit (columns_before/after, added/removed, balanced drop accounting) at :211-217
-  transforms:
-  - polars lazy scan → collect → to_pandas (:37), CI-gated sample_for_ci
-  - _stage_ledger chains sample/filter/duration/rename/select recording (stage, rows_out) per stage
-  - validate_contract_schema (:123) rejects empty dtype strings, unsupported pandera dtypes, and fails build_raw_schema().validate BEFORE the write
-  - audit built AFTER write from captured rows_in/stages/column snapshots
-  touched_by:
-  - logging
-  - os
-  - re
-  - pathlib.Path
-  - pandera
-  - pandas
-  - polars
-  - yaml
-  - broadway.config.loader.CONFIGS_DIR
-  - broadway.config.schema.DatasetContract
-  - broadway.contracts.pandera
-  - project.etl.process_config
-  - broadway.lineage.ids.node_id
-  - broadway.lineage.models.TransformAudit
-  - broadway.lineage.records.write_record
-  validated_by:
-  - project/tests/test_process.py::test_process_data_writes_ingest_lineage
-  - project/tests/test_ingest_audit.py::test_ingest_record_carries_balanced_audit
-  - project/tests/test_ingest_audit.py::test_audit_zeros_on_zero_drop_run
-  - project/tests/test_ingest_audit.py::test_ci_sampling_reorder_becomes_visible_in_ledger
-  - project/tests/test_ingest_audit.py::test_nan_twins_account_at_dropna_through_full_pipeline
-  if_changed:
-  - project/config/project/taxi.yaml keys consumed by process_config
-  - processed_file name
-  - node_id('ingest') parents ([node_id('dataset')])
-  findings:
-  - the ingest path NEVER calls enforce_drop_fraction — repo-wide the only callers are etl (module.py:127) and features (features/module.py:68); process_data persists rows_dropped_unexplained on the ingest record with no max_drop_fraction enforcement, so unexplained loss at the project ingest boundary is recorded but never loud.
 - id: GATE-ETL-116
   phase: etl-lookup
-  order: 20
+  order: 17
   owner: 'src/broadway/samples/generate.py:106 generate_sample()'
   inputs:
   - 'SampleSpec definition + source file (.parquet or .csv)'
@@ -695,27 +600,9 @@ gates:
   - provenance json schema consumed at sample load time
   - supported named-sample source suffixes
   findings: []
-- id: GATE-ETL-117
-  phase: etl-lookup
-  order: 21
-  owner: 'project/etl/process_config.py:10 _PROJECT_YAML/_ETL_YAML module-load constants (legacy globals raw_dir/processed_dir/processed_file :16-25)'
-  inputs:
-  - 'project/config/project/taxi.yaml knobs'
-  outputs:
-  - 'raw_dir/processed_dir/processed_file for the LEGACY pipeline'
-  transforms:
-  - 'twin verified: module-level loads of project/config/project/taxi.yaml + configs/step/etl.yaml (:10-14) expose legacy module globals (:16-25) — a parallel configs dialect alongside broadway.loader; module-scope constants ARE the symbol here (no functions in file, packet F #26)'
-  - 'retirement/fork guard cites BOTH dialect facts (packet F #26 rider feeding GATE-CFG-104): the twin imports CONFIGS_DIR from broadway.config.loader (:6) while project/data.py hardcodes relative Paths (:31-47)'
-  touched_by:
-  - project.etl.process (caller chain)
-  validated_by:
-  - project/tests/test_process_config.py::test_project_config_matches_process_constants
-  if_changed:
-  - legacy global names consumed by process_data (GATE-ETL-19)
-  findings: []
 - id: GATE-FEAT-20
   phase: features
-  order: 22
+  order: 18
   owner: src/broadway/features/builders.py:46 BUILDERS (log1p at builders.py:53)
   inputs:
   - ARTIFACT-SPLIT (etl train/val parquet frame)
@@ -748,7 +635,7 @@ gates:
   - log1p output is numerically pinned ONLY by the double-log chaining test (test_builders.py:78 asserts np.log1p∘np.log1p); no direct single-hop golden test for BUILDERS['log_distance'] exists — the transform itself rides unpinned on guard-test vehicles (test_builders.py:43,64).
 - id: GATE-FEAT-21
   phase: features
-  order: 23
+  order: 19
   owner: 'src/broadway/features/builders.py:122 build_derived()  # F6-GUARD label-collision guard'
   inputs:
   - df (input frame)
@@ -779,7 +666,7 @@ gates:
   findings: []
 - id: GATE-FEAT-22
   phase: features
-  order: 24
+  order: 20
   owner: src/broadway/features/builders.py:76 load_custom_builders()
   inputs:
   - CFG-FEATURES (features.builder_module str|None)
@@ -805,7 +692,7 @@ gates:
   findings: []
 - id: GATE-FEAT-23
   phase: features
-  order: 25
+  order: 21
   owner: src/broadway/features/pipeline.py:21 FeaturePipeline.fit()
   inputs:
   - ARTIFACT-SPLIT train frame (loaded at src/broadway/features/module.py:25)
@@ -837,7 +724,7 @@ gates:
   - TargetEncoding.fit y-is-None raise (src/broadway/features/transformers.py:52-55) is an UNPINNED raise site — no test node id exercises it (grep tests/ for 'requires y' → 0 hits).
 - id: GATE-FEAT-24
   phase: features
-  order: 26
+  order: 22
   owner: src/broadway/features/pipeline.py:34 FeaturePipeline.transform()
   inputs:
   - train/val frame
@@ -871,7 +758,7 @@ gates:
   findings: []
 - id: GATE-FEAT-25
   phase: features
-  order: 27
+  order: 23
   owner: 'src/broadway/features/module.py:45 run()  # ARTIFACT-TRAIN-PARQUET write'
   inputs:
   - ARTIFACT-SPLIT train parquet (module.py:25)
@@ -913,7 +800,7 @@ gates:
   - write-side validation (:41,:49) uses build_engineered_schema which is UNORDERED (schema.py:29-37 sets no ordered=True) while the read contract engineered_schema_for is ordered=True (generic.py:55) — column-order drift passes silently through the features-step write gate and only explodes later at training/evaluate read time.
 - id: GATE-FEAT-26
   phase: features
-  order: 28
+  order: 24
   owner: src/broadway/features/generic.py:14 build_generic_feature_specs()
   inputs:
   - DatasetContract.columns (declared dtypes/null_count)
@@ -944,7 +831,7 @@ gates:
   findings: []
 - id: GATE-FEAT-27
   phase: features
-  order: 29
+  order: 25
   owner: 'src/broadway/features/generic.py:122 validate_engineered_frame()  # the contract''s ''validate_engineered_schema'''
   inputs:
   - ARTIFACT-TRAIN-PARQUET / ARTIFACT-VAL-PARQUET frames read back (training/module.py:42-44, evaluate/module.py:49,58)
@@ -978,7 +865,7 @@ gates:
   - contract symbol name mismatch recorded in header — 'validate_engineered_schema' does not exist in this tree.
 - id: GATE-FEAT-28
   phase: features
-  order: 30
+  order: 26
   owner: src/broadway/utils.py:16 eligible_feature_columns()
   inputs:
   - engineered frame (post GATE-FEAT-27 validation)
@@ -1019,7 +906,7 @@ gates:
   findings: []
 - id: GATE-FEAT-29
   phase: features
-  order: 31
+  order: 27
   owner: 'src/broadway/schemas/__init__.py:17 _engineered_schema_columns()  # dispatch at schemas/__init__.py:41 schema_columns()'
   inputs:
   - cfg.experiment.data_source.schema_contract string
@@ -1050,7 +937,7 @@ gates:
   findings: []
 - id: GATE-TRAIN-30
   phase: training-eval
-  order: 32
+  order: 28
   owner: src/broadway/training/module.py:89 run()
   inputs:
   - CFG-DATASET-CONTRACT
@@ -1081,7 +968,7 @@ gates:
   - both entry raises are pinned ONLY through the CLI wrapper (exit-1 stderr substrings in test_cli.py) — no test calls training.module.run with a deficient PipelineConfig directly, so a refactor of run()'s guard clauses (not the CLI dispatch) would pass the whole suite silently.
 - id: GATE-TRAIN-31
   phase: training-eval
-  order: 33
+  order: 29
   owner: src/broadway/training/module.py:39 _load_features()
   inputs:
   - 'ARTIFACT-CANONICAL-FRAME derivatives: etl train_features_file parquet'
@@ -1110,41 +997,9 @@ gates:
   - leakage posture (val file presence decides split path)
   findings:
   - splitter.split's two raise sites are UNPINNED — repo-wide grep of tests/ finds no test exercising time-split-without-datetime_column or stratified-on-regression; only happy-path split() calls exist (tests/test_integration.py:38,:63). A silent re-order or deletion of either guard would land green.
-- id: GATE-TRAIN-32
-  phase: training-eval
-  order: 34
-  owner: project/data.py:166 read_training_sample()
-  inputs:
-  - CFG-DATASET-CONTRACT (taxi.yaml via _contract :31-32)
-  - CFG-STEP-TRAIN.random_state
-  - optional sample n / columns / full flag
-  outputs:
-  - raw sampled pd.DataFrame (pre-feature-engineering)
-  transforms:
-  - 'thin glue: _loader.read_sample(_contract, sample, seed=seed, columns, full) with seed DEFAULTING to RANDOM_STATE pinned from configs/step/train.yaml (:106, :168, delegate :173-175)'
-  - 'loader guard: sample=None without full=True → ValueError ''pass sample=<n>, or full=True'' (src/broadway/data/loader.py:168-169)'
-  - polars lazy scan → optional column pruning → df.sample(n, seed=seed passthrough) → to_pandas (loader.py:170-176); NOT DATA_MODE-aware by design
-  touched_by:
-  - numpy@2.5.2
-  - pandas@2.3.3
-  - polars@1.43.2
-  - pyarrow@19.0.1
-  - pyyaml@6.0.2
-  validated_by:
-  - tests/test_data_loader.py::test_read_sample_respects_sample_size
-  - tests/test_data_loader.py::test_read_sample_seed_reproducible
-  - tests/test_data_loader.py::test_read_sample_column_pruning
-  - tests/test_data_loader.py::test_read_sample_requires_sample_or_full
-  - tests/test_data_loader.py::test_read_sample_full_returns_all
-  if_changed:
-  - every project/experiments/univariate/fare_amount_trip_distance script importing it (01:17, 06:6)
-  - src/broadway/reports/experiments_dashboard.py external-source audit regex (_EXTERNAL_RE :46 flags the literal 'read_training_sample' in observation JSON)
-  - reproducibility of all seeded experiment artifacts
-  findings:
-  - the seed PIN itself is untested below the glue — all five validated_by ids hit broadway.data.loader.read_sample directly with explicit seeds; nothing asserts read_training_sample()'s default binds to RANDOM_STATE, so decoupling the default (project/data.py:168) would pass the suite while silently changing every experiment's sample. Callers passing seed=None also silently disable reproducibility with no warning.
 - id: GATE-TRAIN-33
   phase: training-eval
-  order: 35
+  order: 30
   owner: src/broadway/training/module.py:59 _resolve_params()
   inputs:
   - CFG-STEP-TRAIN.model.params
@@ -1177,7 +1032,7 @@ gates:
   - 'the model-type mismatch raise (:83-85) — the only guard tying the study to the trained estimator — has ZERO test coverage (grep ''produced no valid trial for model'' in tests/: nothing). An hpo.models list that omits model.type currently passes test_run_hpo_end_to_end-style fixtures because their specs always include the trained type.'
 - id: GATE-TRAIN-34
   phase: training-eval
-  order: 36
+  order: 31
   owner: src/broadway/training/trainer.py:17 build_model_pipeline()
   inputs:
   - PipelineConfig with experiment block
@@ -1209,7 +1064,7 @@ gates:
   - both experiment-required raises (:31-32, :59-60) are unpinned — grep 'requires an experiment config' / 'model pipeline requires' in tests/ returns nothing (only the unrelated baseline 'requires an experiment binding' in test_structural_cleaning.py:434).
 - id: GATE-TRAIN-35
   phase: training-eval
-  order: 37
+  order: 32
   owner: src/broadway/evaluate/module.py:82 run()
   inputs:
   - CFG-STEP-EVALUATE
@@ -1243,7 +1098,7 @@ gates:
   - asymmetric loader hardening — _load_train_features (:55-61) lacks the missing-file guard its val twin has (:45-48); a deleted train parquet surfaces as a raw pyarrow FileNotFoundError from pd.read_parquet (:58) instead of the named loud failure pattern the module promises in its docstring (:3-5). No test covers the train-file-missing branch.
 - id: GATE-TRAIN-36
   phase: training-eval
-  order: 38
+  order: 33
   owner: src/broadway/evaluate/metrics.py:23 compute_metrics()
   inputs:
   - y_true/y_pred arrays from holdout predict
@@ -1277,7 +1132,7 @@ gates:
   - 'residual_summary mislabels signed semantics — ''mean_residual'' actually computes np.mean(np.abs(residuals)) (validation.py:63) and the test PINS the absolute-value behavior under the signed name (test_evaluate_contracts.py:160-167 asserts +1.0 for residuals [+1,-1,+1,-1], where signed mean is 0.0): consumers reading ''mean_residual'' as bias get |bias| instead, locked in by the pin.'
 - id: GATE-TRAIN-37
   phase: training-eval
-  order: 39
+  order: 34
   owner: src/broadway/evaluate/promotion.py:6 should_promote()
   inputs:
   - candidate_metrics[target_metric]
@@ -1306,7 +1161,7 @@ gates:
   - 'lower-is-better is HARDCODED while the caller feeds an arbitrary target_metric — parameter names say rmse (should_promote(candidate_rmse, champion_rmse, threshold)) but run() passes cfg.evaluate.target_metric (:126-129), so flipping evaluate.yaml to r2 (higher-better) INVERTS every decision: candidate improvement reads as degradation and worse candidates clear the threshold. Only the no-champion and degradation branches are unit-pinned; the threshold-exceedance branch has no direct test at all.'
 - id: GATE-TRAIN-38
   phase: training-eval
-  order: 40
+  order: 35
   owner: src/broadway/stats/robust.py:34 estimation_table()
   inputs:
   - any FITTED statsmodels regression results object
@@ -1330,7 +1185,7 @@ gates:
   - neighbors standardized_coefs (:67-82) and scenario_dollars (:85-97) index model.params[term] with NO fitted/TypeError gate — a KeyError on an unknown term or an unfitted-model attribute error is the only failure mode, unpinned by any test in tests/test_stats_robust.py beyond hand-computed happy paths (:152-192).
 - id: GATE-TRAIN-39
   phase: training-eval
-  order: 41
+  order: 36
   owner: src/broadway/training/mlflow_utils.py:195 list_champions()
   inputs:
   - tracking_uri (file store auto-flagged via MLFLOW_ALLOW_FILE_STORE :202-204)
@@ -1370,7 +1225,7 @@ gates:
   - log_dataset's StopIteration raise (:120-124) is the ONE untested raise site of this file — grep shows no test removing LocalArtifactDatasetSource from the registry; the warn-and-continue (:100-102) and duplicate-name-first (:125-129) branches ARE pinned/hermetically noted respectively.
 - id: GATE-TRAIN-118
   phase: training-eval
-  order: 42
+  order: 37
   owner: 'src/broadway/baseline/module.py:75 run() (+ _git_commit() :20-27 subprocess-provenance leg)'
   inputs:
   - PipelineConfig baseline section + dataset frame
@@ -1390,7 +1245,7 @@ gates:
   - 'LAND with validated_by [] + FINDING/root (lawful combination, packet G D4). Fix shape ≤2 files when landed: fallback branch must logger.warning naming the exception class + record monkeypatched CalledProcessError→assert value AND warning test pins (FileNotFoundError twin). Raise-on-missing REJECTED: containers legitimately lack .git; baseline must not die for metadata. Deletion-first applied honestly: deleting _git_commit strips a contract field consumed via ArtifactTrace — rejected (B#14 keep-with-rationale class).'
 - id: GATE-TRAIN-119
   phase: training-eval
-  order: 43
+  order: 38
   owner: 'src/broadway/causal/module.py:18 run()'
   inputs:
   - cfg.causal design params + canonical frame
@@ -1405,7 +1260,7 @@ gates:
   findings: []
 - id: GATE-TRAIN-120
   phase: training-eval
-  order: 44
+  order: 39
   owner: 'src/broadway/training/mlflow_utils.py:47-51 _CONNECTION_REFUSED_MARKERS/_is_unreachable_http_store connectivity-marker net'
   inputs:
   - tracking URI
@@ -1424,7 +1279,7 @@ gates:
   - 'code-side widening is recorded here as the gate''s binding requirement; the marker tuple still carries the three HEAD literals until the widening batch lands.'
 - id: GATE-STATS-40
   phase: stats
-  order: 45
+  order: 40
   owner: src/broadway/stats/module.py:24 run()
   inputs:
   - PipelineConfig (optional sections cfg.dataset, cfg.stats; required cfg.analysis)
@@ -1451,7 +1306,7 @@ gates:
   findings: []
 - id: GATE-STATS-41
   phase: stats
-  order: 46
+  order: 41
   owner: src/broadway/stats/module.py:31 run() data leg
   inputs:
   - canonical parquet at canonical_path(cfg.dataset, cfg.environment) when sample is None; else SampleSpec.path (+ sample.column_mapping logical→source remap of group_column :41-42)
@@ -1487,7 +1342,7 @@ gates:
   - 'load_plan (src/broadway/stats/plan.py:35) has ZERO production callers — repo-wide src/ grep finds save_plan called only at module.py:61; the plan JSON is write-only in this band, so a reader-side schema drift would surface nowhere except tests (tests/test_loud_failures.py:31). Strict-purity note: this gate is a deliberate IO boundary (step entry), not a library violation.'
 - id: GATE-STATS-42
   phase: stats
-  order: 47
+  order: 42
   owner: src/broadway/stats/groups.py:9 build_declared_groups()
   inputs:
   - df
@@ -1522,7 +1377,7 @@ gates:
   - 'the "constructor ValueError on partial absence" is an INVARIANT ENFORCED ONLY BY CONVENTION — groups.py structurally cannot raise, so every future caller re-decides whether to fail loud; the walkthrough''s keep-arrays exception is sanctioned by docstring (:25-26) but nothing mechanical distinguishes it from a silent-skip regression like the one T-BUG-4 fixed. Second wobble: describe''s plot pass re-runs the builder and ignores absent AGAIN (src/broadway/stats/describe.py:107) — the known redundant-second-construction rider (agents/ledger/FIXES.md:111-112).'
 - id: GATE-STATS-43
   phase: stats
-  order: 48
+  order: 43
   owner: src/broadway/stats/module.py:50 run() floor binding
   inputs:
   - groups from GATE-STATS-42
@@ -1549,7 +1404,7 @@ gates:
   - 'FLOOR BINDS ON ONE SURFACE ONLY — walkthrough omnibus (src/broadway/timeline/runners.py:315-319) passes ONLY alpha (configs/step/walkthrough.yaml:5 significance_alpha=0.05 via _thresholds(), runners.py:53-54) and never small_group_threshold, so its underpowered warnings judge groups against library-default 30 (anova.py:80,122,165) while the stats step judges against 10000: same warning string, two effective floors (the recorded floor-kwarg semantic-tension rider, agents/ledger/FIXES.md:115-116).'
 - id: GATE-STATS-44
   phase: stats
-  order: 49
+  order: 44
   owner: src/broadway/stats/guards.py:8 validate_groups()
   inputs:
   - dict[str, np.ndarray] group arrays
@@ -1581,7 +1436,7 @@ gates:
   findings: []
 - id: GATE-STATS-45
   phase: stats
-  order: 50
+  order: 45
   owner: src/broadway/stats/anova.py:79 run_anova() family (run_welch :121, run_kruskal :164)
   inputs:
   - groups
@@ -1623,7 +1478,7 @@ gates:
   - 'GOLDEN-FLOAT STATUS — glob tests/*golden* matches NOTHING on this tree; every repo-wide "golden" hit belongs to other phases (tests/test_cross_validate.py:27 sklearn-KFold golden dict, tests/test_transformers.py:31/:87 encoding goldens, tests/test_decision5_columns.py:104, project/tests/test_ml_pipeline.py:153). Stats float assertions are pytest.approx RELATIVE hand-computed pins (tests/test_effect_size.py:17/:21/:34, tests/test_anova.py:29) — approx everywhere, exact nowhere, EXCEPT ONE bitwise pin: tests/test_stats_robust.py:118-121 np.testing.assert_array_equal on HC3 SE/CIs (T-BUG-1 idempotency rider). NO golden pin exists for any statistic/p_value/shapiro output, so scipy-version drift in this band''s headline numbers is undetected by design.'
 - id: GATE-STATS-46
   phase: stats
-  order: 51
+  order: 46
   owner: src/broadway/stats/assumptions.py:19 check_normality() (companion run_levene :11)
   inputs:
   - groups; shapiro_max_n default 5000 (:20); run_levene(groups) plain
@@ -1651,7 +1506,7 @@ gates:
   - 'threshold-with-no-caller-pinning — shapiro_max_n=5000 AND seed 0 are unconfigurable literals: neither the stats step nor the walkthrough passes them and no config key (StatsStep or WalkthroughConfig) exposes them, so tuning normality behavior for wide groups requires a code edit invisible to config-diff review. Seeding itself is PRESENT and deterministic (contract question answered: yes, default_rng(0)).'
 - id: GATE-STATS-47
   phase: stats
-  order: 52
+  order: 47
   owner: src/broadway/stats/post_hoc.py:11 games_howell()
   inputs:
   - long df
@@ -1678,7 +1533,7 @@ gates:
   findings: []
 - id: GATE-STATS-48
   phase: stats
-  order: 53
+  order: 48
   owner: src/broadway/stats/robust.py:47 estimation_table() (regression/diagnostics/time_series/baseline cluster)
   inputs:
   - fitted statsmodels results object exposing get_robustcov_results
@@ -1726,7 +1581,7 @@ gates:
   - 'PURITY + UNPINNED THRESHOLDS — (a) indirect config+IO read inside stats: diagnostics.py:37 calls viz.palette_colors(1) whose default-palette branch (src/broadway/viz.py:32-35) calls load_viz_config() which OPENS configs/step/viz.yaml from disk (src/broadway/config/viz.py:79-83); describe.py:112 has the same reach — the "pure library" thus depends on a config file through a plotting helper. (b) CORRECTED caller map (supersedes the earlier no-production-caller claim): production callers EXIST for bp_jb (project/scripts/08_ols_residuals_diagnostics.py:45, project/scripts/09_log_target_ols.py:35, project/scripts/11_interaction_ols.py:72), fit_ols (project/scripts/08_ols_residuals_diagnostics.py:82, project/scripts/09_log_target_ols.py:62+70, project/scripts/10_durbin_watson_time.py:41, project/scripts/11_interaction_ols.py:38+45), fit_robust (project/scripts/09_log_target_ols.py:74), durbin_watson_test (project/scripts/10_durbin_watson_time.py:43), plot_acf (project/scripts/10_durbin_watson_time.py:54), train_lgbm (project/scripts/12_lgbm_baseline.py:59), evaluate (project/scripts/12_lgbm_baseline.py:72); genuinely caller-less outside tests: outlier_mask, winsorize, estimation_table, standardized_coefs, scenario_dollars; whether project/scripts counts as a production surface awaits an explicit ruling (agents/ledger/arbitration/2026-08-24/00-resolutions.md §6), so threshold pins remain provisional. Dead-in-src status now applies only to the five caller-less functions above — flagged per contract, severity low (tests exercise every knob).'
 - id: GATE-STATS-49
   phase: stats
-  order: 54
+  order: 49
   owner: src/broadway/stats/describe.py:121 run()
   inputs:
   - PipelineConfig (cfg.dataset/cfg.stats/cfg.analysis)
@@ -1773,7 +1628,7 @@ gates:
   findings: []
 - id: GATE-STATS-113
   phase: stats
-  order: 55
+  order: 50
   owner: 'src/broadway/stats/guards.py:8 validate_groups() + sample-size floor config'
   inputs:
   - sample parquet + declared group_values incl Staten Island
@@ -1793,7 +1648,7 @@ gates:
   - 'source FINDING-D3 (courtesy-verified packet F #22: guards.py:8 exact, test at test_walkthrough.py:751 exists).'
 - id: GATE-TLINE-50
   phase: timeline-lineage
-  order: 56
+  order: 51
   owner: src/broadway/timeline/models.py:31 AnalysisStep()
   inputs:
   - step_id/order/question/kind from configs/flow/hypothesis_walkthrough.yaml
@@ -1829,7 +1684,7 @@ gates:
   findings: []
 - id: GATE-TLINE-51
   phase: timeline-lineage
-  order: 57
+  order: 52
   owner: src/broadway/timeline/models.py:50 AnalysisDecision()
   inputs:
   - kind restricted to Literal["omnibus","posthoc"]
@@ -1862,7 +1717,7 @@ gates:
   findings: []
 - id: GATE-TLINE-52
   phase: timeline-lineage
-  order: 58
+  order: 53
   owner: src/broadway/timeline/decide.py:21 record()
   inputs:
   - analysis.name from AnalysisContract (hypothesis mode enforced upstream at cli.py:182 require_mode)
@@ -1892,7 +1747,7 @@ gates:
   - the executor fork accepts ANY `decide_*` flow-step id as a kind without validating it against WalkthroughConfig.decisions (walkthrough.py:328 removeprefix), prints a `ds-pipeline decide --kind {kind}` prescription for it (walkthrough.py:353-355) that decide.record will then reject ("unknown decision kind", decide.py:28-29); meanwhile _print_decision_required/_print_posthoc_decision_required hard-index thresholds.decisions["omnibus"]/["posthoc"] (walkthrough.py:166, walkthrough.py:182) -> KeyError if the YAML drops a kind, whereas this gate tolerates a missing kind via .get (decide.py:27). The two ends of the same fork disagree on how a bad kind fails.
 - id: GATE-TLINE-53
   phase: timeline-lineage
-  order: 59
+  order: 54
   owner: src/broadway/timeline/module.py:19 save_step()
   inputs:
   - validated AnalysisStep / AnalysisDecision objects
@@ -1921,7 +1776,7 @@ gates:
   - writers-of-record duplicated across modules — timeline/module.save_step/save_decision (module.py:19-22, module.py:43-46) and lineage/records.write_record (records.py:19-40) are two structurally identical mkdir+write_text(model_dump_json) writers-of-record over parallel env-overridable roots (BROADWAY_TIMELINE_DIR module.py:8 / BROADWAY_LINEAGE_DIR records.py:8), with different filename rules (raw step_id vs ":"->"_" sanitized node_id) and no shared persistence layer; a durability or atomic-write fix must be applied twice.
 - id: GATE-TLINE-54
   phase: timeline-lineage
-  order: 60
+  order: 55
   owner: src/broadway/timeline/walkthrough.py:291 run()
   inputs:
   - PipelineConfig (stats step, hypothesis-mode enforced walkthrough.py:292-296)
@@ -1956,7 +1811,7 @@ gates:
   findings: []
 - id: GATE-TLINE-55
   phase: timeline-lineage
-  order: 61
+  order: 56
   owner: src/broadway/timeline/runners.py:302 run_omnibus()
   inputs:
   - groups dict[str,np.ndarray] built by build_declared_groups (runners.py:107)
@@ -1991,7 +1846,7 @@ gates:
   - 'these execute-time forks are the unvalidated twin of GATE-TLINE-52''s allowlist — nothing static ties walkthrough.yaml methods to the dispatch sets here; the only guards are two content-pinning tests, and run_conclusion re-derives effect sizes from an `else` branch (runners.py:472-473) that will crash with KeyError(''epsilon_squared'') on any future non-anova/welch/kruskal method that forks #1 ever admits.'
 - id: GATE-TLINE-56
   phase: timeline-lineage
-  order: 62
+  order: 57
   owner: src/broadway/timeline/runners.py:114 run_describe()
   inputs:
   - runner-local evidence models from timeline/evidence.py (NormalityEvidence evidence.py:14, VarianceEvidence evidence.py:22, PosthocEvidence evidence.py:40, ConclusionEvidence evidence.py:48)
@@ -2025,7 +1880,7 @@ gates:
   - 'duplicate writer-of-record for describe evidence — broadway/stats/describe.py:139-140 writes its own <stats.output_dir>/describe.json (the ONLY describe.json read back at runtime, reports/describe.py:11, and the artifact lineage node describe:<analysis> points at via stats/describe.py:143-147), while run_describe re-invokes describe() and re-writes a same-named describe.json in the timeline tree (runners.py:130-140): two modules own one artifact name with divergent freshness and only one is consumed.'
 - id: GATE-TLINE-57
   phase: timeline-lineage
-  order: 63
+  order: 58
   owner: src/broadway/timeline/sequence.py:47 load_walkthrough_sequence()
   inputs:
   - configs/flow/hypothesis_walkthrough.yaml (step ids/orders/questions/kind/action)
@@ -2055,7 +1910,7 @@ gates:
   findings: []
 - id: GATE-TLINE-58
   phase: timeline-lineage
-  order: 64
+  order: 59
   owner: src/broadway/lineage/records.py:19 write_record()
   inputs:
   - node_id strings from lineage/ids.py:1 node_id() (f"{kind}:{name}", no character validation)
@@ -2078,8 +1933,6 @@ gates:
   - tests/test_lineage_models.py::test_transform_audit_and_lineage_record_round_trip
   - tests/test_lineage_graph.py::test_build_graph_links_nodes_and_records
   - tests/test_lineage_graph.py::test_dangling_parent_gets_placeholder_node
-  - tests/test_process.py::test_process_data_writes_ingest_lineage
-  - project/tests/test_ingest_audit.py::test_ingest_record_carries_balanced_audit
   - tests/test_lineage_state.py::test_non_lineage_kinds_never_listed
   if_changed:
   - rerun tests/test_lineage_*.py
@@ -2091,7 +1944,7 @@ gates:
   - KIND_LABELS (graph.py:19-36) is referenced by nothing and already drifted — it omits the 'coercion' kind that etl actually writes (etl/module.py:153); state.LINEAGE_STEPS (state.py:5-9) also lacks coercion, so coercion nodes never advance stage/not_yet_run accounting. Dead label vocabulary coexisting with a live unwritten kind.
 - id: GATE-TLINE-59
   phase: timeline-lineage
-  order: 65
+  order: 60
   owner: src/broadway/cli.py:105 main()
   inputs:
   - 'argv parsed by _build_parser (cli.py:26-102): walkthrough --analysis/--dataset/--sample/--force (cli.py:87-92)'
@@ -2125,7 +1978,7 @@ gates:
   - '`ds-pipeline decide` — the only command that mints decision records — has no CLI-level test: tests exercise decide.record directly (tests/test_decide.py) and walkthrough arg validation (tests/test_cli.py:157-160 asserts exit 2 for missing --dataset), but no test drives main() through the decide branch (cli.py:174-189), so the argparse choices + record + save wiring is unpinned end-to-end.'
 - id: GATE-TLINE-114
   phase: timeline-lineage
-  order: 66
+  order: 61
   owner: 'src/broadway/lineage/state.py:5 LINEAGE_STEPS + src/broadway/baseline/module.py:87-91 parents'
   inputs:
   - flow step sequence
@@ -2144,7 +1997,7 @@ gates:
   - 'source FINDING-D2 root; validated_by [] with FINDING conforms to house law (packet F #23 amendment).'
 - id: GATE-SURF-60
   phase: surfaces
-  order: 67
+  order: 62
   owner: 'src/broadway/timeline/walkthrough.py:87 _write_timeline()  # renders via src/broadway/reports/index.py:61 render_dashboard()'
   inputs:
   - persisted AnalysisStep list (timeline/module.load_steps)
@@ -2170,7 +2023,7 @@ gates:
   findings: []
 - id: GATE-SURF-61
   phase: surfaces
-  order: 68
+  order: 63
   owner: 'src/broadway/timeline/walkthrough.py:85 _write_timeline()  # renders via src/broadway/reports/timeline.py:16 render_timeline()'
   inputs:
   - persisted AnalysisStep list
@@ -2195,7 +2048,7 @@ gates:
   findings: []
 - id: GATE-SURF-62
   phase: surfaces
-  order: 69
+  order: 64
   owner: 'src/broadway/reports/results.py:244 write_results()   # sole writer of reports/results/*.md; index via _render_index results.py:146; save loop results.py:258-259'
   inputs:
   - persisted AnalysisStep list
@@ -2228,7 +2081,7 @@ gates:
   findings: []
 - id: GATE-SURF-63
   phase: surfaces
-  order: 70
+  order: 65
   owner: 'src/broadway/reports/audit.py:684 run()               # writes all five audit pages at audit.py:694-706'
   inputs:
   - artifacts <dataset>_clean.json (StructuralCleanResult)
@@ -2259,7 +2112,7 @@ gates:
   findings: []
 - id: GATE-SURF-64
   phase: surfaces
-  order: 71
+  order: 66
   owner: 'src/broadway/lineage/module.py:15 run()               # graph.json at :27; graph.md at :38-40'
   inputs:
   - configs/ tree
@@ -2285,7 +2138,7 @@ gates:
   findings: []
 - id: GATE-SURF-65
   phase: surfaces
-  order: 72
+  order: 67
   owner: 'src/broadway/stats/describe.py:117 plot_describe_figures() [savefig describe.png] + src/broadway/discover/qq.py:478 _plot_qq_joint() [savefig normality_qq.png]  # invoked solely by timeline/runners.py:143-146 and :210 inside run_describe()/run_normality()'
   inputs:
   - raw canonical/sample frame groups loaded by runners.load_frame_and_groups (runners.py:86)
@@ -2312,7 +2165,7 @@ gates:
   findings: []
 - id: GATE-SURF-66
   phase: surfaces
-  order: 73
+  order: 68
   owner: 'src/broadway/discover/module.py:74 _write_qq_overview() -> src/broadway/discover/qq.py:566 plot_numeric_qq()  # savefig sites qq.py:297/:356/:514/:562; called from module.py:78 (run() :105 and profile() :127)'
   inputs:
   - raw CSV/parquet frame
@@ -2342,7 +2195,7 @@ gates:
   findings: []
 - id: GATE-SURF-67
   phase: surfaces
-  order: 74
+  order: 69
   owner: tests/test_surface_integrity.py:41 test_report_markdown_links_resolve()
   inputs:
   - git ls-files reports/ '*.md' (tracked surface inventory, :26-38)
@@ -2365,7 +2218,7 @@ gates:
   findings: []
 - id: GATE-SURF-68
   phase: surfaces
-  order: 75
+  order: 70
   owner: '.gitignore:17-19  # project/experiments/results tracking convention (negation triad), pinned-sample negations :21-22'
   inputs:
   - experiment script outputs written ad hoc under project/experiments/
@@ -2387,7 +2240,7 @@ gates:
   findings: []
 - id: GATE-SURF-69
   phase: surfaces
-  order: 76
+  order: 71
   owner: 'src/broadway/reports/__init__.py  # renderer-purity contract over the package (markdown.py, results.py, timeline.py, index.py, audit.py, registry.py)'
   inputs:
   - persisted typed evidence JSON artifacts
@@ -2410,11 +2263,11 @@ gates:
   findings: []
 - id: GATE-SURF-100
   phase: surfaces
-  order: 77
+  order: 72
   owner: 'src/broadway/inference/api.py:1 FastAPI app stub (module docstring only — NO app symbol at HEAD; gate demands its creation) + k8s/api-deployment.yaml:18 uvicorn command'
   inputs:
   - uvicorn ASGI target import (inference.api:app)
-  - models:/taxi@champion via MLflow registry
+  - models:/euromonitor@champion via MLflow registry
   outputs:
   - HTTP GET /health POST /predict GET /metrics bound 0.0.0.0:8000 — or loud CrashLoopBackOff with named cause on every replica
   transforms:
@@ -2429,7 +2282,7 @@ gates:
   - 'CrashLoopBackOff today: the serving manifest demands a symbol that does not exist — deploy BLOCKED. Disposition = packet G D1 option (a): documented aspiration whose deploy stays blocked until implemented; refusal condition — if DEPLOY-F1-API-LANE is not executed by the next arbitration cycle the manifests die instead (drop Deployment+Service+HPA set demanding the unbuilt app); that decision belongs to the MERGE-WITH-DEPLOY-F1-API-LANE row (INFRA-130 lane, id burned), no duplicate custody minted.'
 - id: GATE-SURF-101
   phase: surfaces
-  order: 78
+  order: 73
   owner: src/broadway/discover/columns.py:10 run()
   inputs:
   - raw CSV path (ds-pipeline columns subparser argv)
@@ -2446,7 +2299,7 @@ gates:
   findings: []
 - id: GATE-SURF-102
   phase: surfaces
-  order: 79
+  order: 74
   owner: 'src/broadway/reports/experiments_dashboard.py:56 FastAPI app custody (generic dashboard series endpoints)'
   inputs:
   - project-provided experiment results CSVs via BROADWAY_EXPERIMENTS_ROOT
@@ -2465,7 +2318,7 @@ gates:
   findings: []
 - id: GATE-SURF-103
   phase: surfaces
-  order: 80
+  order: 75
   owner: 'project/experiments/euromonitor/01_eda.py:38 plot_barcode_coverage()'
   inputs:
   - project/data/euromonitor/dataset.csv
@@ -2484,7 +2337,7 @@ gates:
   findings: []
 - id: GATE-CFG-70
   phase: config-schema
-  order: 81
+  order: 76
   owner: src/broadway/config/loader.py:92 config_path() + :102 _load_yaml()
   inputs:
   - config-relative path via CONFIGS_DIR plus optional BROADWAY_CONFIG_OVERLAY_DIR
@@ -2520,7 +2373,7 @@ gates:
   - CONFIGS_DIR silently honors BROADWAY_CONFIGS_DIR (loader.py:34) — an inherited/stale value repoints EVERY load at a foreign tree with no warning; only tests/scripts set it deliberately.
 - id: GATE-CFG-71
   phase: config-schema
-  order: 82
+  order: 77
   owner: src/broadway/config/resolver.py:9 _resolve_string()
   inputs:
   - every string scalar in the merged config dict
@@ -2548,7 +2401,7 @@ gates:
   - resolver module has ZERO test coverage — grep census of tests/ for expandvars|expanduser|resolve_values|${ returns no hits; interpolation, passthrough behavior, and ordering vs merge are all unpinned.
 - id: GATE-CFG-72
   phase: config-schema
-  order: 83
+  order: 78
   owner: src/broadway/config/loader.py:104 _merge_section()
   inputs:
   - environment (required name, loader.py:193)
@@ -2574,7 +2427,7 @@ gates:
   - deep-merge precedence (override wins, loader.py:83-87) and list-replacement semantics are UNTESTED — grep census of tests/ shows no _deep_merge/_merge_section exercise; a future merge-semantics change lands silent. Merge happens BEFORE env-var resolution (merge at :110, resolve at :126), so a partial `${VAR}` inside an overridden subtree still resolves once, merged — correct today, unpinned tomorrow.
 - id: GATE-CFG-73
   phase: config-schema
-  order: 84
+  order: 79
   owner: src/broadway/config/schema.py:62 EnvironmentConfig
   inputs:
   - merged environment section (post GATE-CFG-71)
@@ -2605,10 +2458,10 @@ gates:
   findings: []
 - id: GATE-CFG-74
   phase: config-schema
-  order: 85
+  order: 80
   owner: src/broadway/config/schema.py:51 DatasetContract
   inputs:
-  - 'project/config/dataset/*.yaml (column pins: dtype/null_count/role per column, e.g. project/config/dataset/taxi.yaml:1-29; lookup_tables with value_policies/sentinel_values taxi.yaml:31-59)'
+  - 'project/config/dataset/*.yaml (column pins: dtype/null_count/role per column, e.g. project/config/dataset/euromonitor.yaml:1-29; lookup_tables with value_policies/sentinel_values euromonitor.yaml:31-59)'
   outputs:
   - DatasetContract with dict[str, ColumnSchema]
   - consumed by pandera_dtype/build_raw_schema and every loader
@@ -2632,14 +2485,14 @@ gates:
   if_changed:
   - src/broadway/config/schema.py
   - src/broadway/contracts/pandera.py
-  - project/config/dataset/taxi.yaml
+  - project/config/dataset/euromonitor.yaml
   - configs/dataset/test.yaml
   findings:
   - schema-without-strictness asymmetry — DatasetContract (schema.py:51) and EnvironmentConfig (schema.py:62) do NOT set ConfigDict(extra="forbid"), while AnalysisContract (analysis/contracts.py:20), DataSourceRef (schema.py:146), ModelHPOSpec (schema.py:120), PreprocessingStepConfig (schema.py:175) and SampleSpec (lineage/models.py:38) DO. A typo'd key in a dataset/environment yaml (e.g. `datbase_host`) is SILENTLY IGNORED by pydantic-v2 default — config drift invisible at the exact layer whose job is to pin truth.
   - dead EnvironmentConfig fields with zero consumers — grep census of src/ finds NO reader of sample_size_ci / sample_size_stats / api_replicas_min / api_replicas_max / api_hpa_cpu_threshold (schema.py:74-78; only the declaration matches). production.yaml:12-13 hardcodes both sample sizes to 0 and nothing rejects 0 (no ge constraint, contrast EtlStep.ci_sample_size Field(ge=0) schema.py:227). D11 (DECISIONS.md:60-62) already rules dead EnvironmentConfig fields = straight delete.
 - id: GATE-CFG-75
   phase: config-schema
-  order: 86
+  order: 81
   owner: src/broadway/contracts/pandera.py:46 build_raw_schema()
   inputs:
   - DatasetContract.columns (post GATE-CFG-74)
@@ -2672,7 +2525,7 @@ gates:
   - 'silent-degrade tail of the dtype map — pandera_dtype returns pa.Object for ANY unrecognized dtype string (pandera.py:43) and ColumnSchema.dtype is free-form str (only the datetime64 prefix is normalized, schema.py:24-25): a misspelled pin (`flaot64`, `int`) builds a schema whose column validates almost anything — the raw boundary gate quietly loses its teeth for that column instead of failing at derivation.'
 - id: GATE-CFG-76
   phase: config-schema
-  order: 87
+  order: 82
   owner: src/broadway/config/schema.py:187 ExperimentConfig
   inputs:
   - configs/experiment/*.yaml (data_source/features/model/split/hpo/preprocessing)
@@ -2709,7 +2562,7 @@ gates:
   - B1 include-validation NOT LANDED (slate v4 row QUEUED — agents/ledger/FIXES.md:38; DECISIONS.md:12-13, absorbed into Tier2 by D13 DECISIONS.md:67-68). Today build_generic_feature_specs SILENTLY SKIPS any FeatureConfig.include name absent from contract.columns (features/generic.py:16-19, `if col in contract.columns:` with no else) — a typo'd include shrinks the feature surface invisibly, violating the very "YAML declares everything" doctrine; no tripwire test pins the silence either (tests/test_generic_features.py::test_build_generic_feature_specs exercises only resolvable includes).
 - id: GATE-CFG-77
   phase: config-schema
-  order: 88
+  order: 83
   owner: src/broadway/features/recipe.py:102 validate_preprocessing_columns()
   inputs:
   - PipelineConfig with experiment.preprocessing + data_source.schema_contract + dataset
@@ -2749,7 +2602,7 @@ gates:
   findings: []
 - id: GATE-CFG-78
   phase: config-schema
-  order: 89
+  order: 84
   owner: src/broadway/config/loader.py:155 resolve_full_steps()
   inputs:
   - PipelineConfig(full+analysis)
@@ -2780,10 +2633,10 @@ gates:
   findings: []
 - id: GATE-CFG-79
   phase: config-schema
-  order: 90
+  order: 85
   owner: src/broadway/samples/loader.py:34 _build_schema()
   inputs:
-  - SampleSpec.schema block from project/config/sample/*.yaml (e.g. project/config/sample/fare_prediction_1m.yaml:29-36 dtype/nullable/checks)
+  - SampleSpec.schema block from project/config/sample/*.yaml (e.g. project/config/sample/demo.yaml:29-36 dtype/nullable/checks)
   - provenance JSON sidecar
   - parquet artifact
   outputs:
@@ -2811,12 +2664,12 @@ gates:
   - src/broadway/samples/loader.py
   - src/broadway/lineage/models.py
   - src/broadway/lineage/sample.py
-  - project/config/sample/fare_prediction_1m.yaml
+  - project/config/sample/demo.yaml
   findings:
-  - C1 _SAMPLE_SCHEMA DERIVATION STILL QUEUED (agents/ledger/FIXES.md:40 "queued"; audit note agents/audits/B-TRUTH-ENFORCEMENT.md:32). Production derivation EXISTS (samples/loader.py:34 builds the schema FROM the sample config's schema block), but the boundary tripwire hand-maintains its own `_SAMPLE_SCHEMA` literal at tests/test_boundary_contracts.py:302-307 instead of deriving from project/config/sample/fare_prediction_1m.yaml:29-36 — a second declaration surface that can drift from the shipped config with nothing red.
+  - C1 _SAMPLE_SCHEMA DERIVATION STILL QUEUED (agents/ledger/FIXES.md:40 "queued"; audit note agents/audits/B-TRUTH-ENFORCEMENT.md:32). Production derivation EXISTS (samples/loader.py:34 builds the schema FROM the sample config's schema block), but the boundary tripwire hand-maintains its own `_SAMPLE_SCHEMA` literal at tests/test_boundary_contracts.py:302-307 instead of deriving from project/config/sample/demo.yaml:29-36 — a second declaration surface that can drift from the shipped config with nothing red.
 - id: GATE-CFG-103
   phase: config-schema
-  order: 91
+  order: 86
   owner: 'src/broadway/config/loader.py:50 STEP_MODULES'
   inputs:
   - step name argv
@@ -2834,31 +2687,9 @@ gates:
   - unknown-step error grammar consumed by GATE-CFG-78
   findings:
   - 'lands WITH the same-commit flip of the former UNOWNED-surface tripwire (was test_has_step_modules_stays_a_drift_proof_miss @ tests/test_gate_registry.py:689-695 pinning arbitration PROPOSE-GH1-01) — rewritten into an ownership assertion so CI stays green (packet F #12 mandatory correction b: teeth live TRACKED in this batch, no self-attestation).'
-- id: GATE-CFG-104
-  phase: config-schema
-  order: 92
-  owner: 'project/data.py:32-48 composed project-config resolution block'
-  inputs:
-  - 'project/config/{dataset,analysis,project}/ taxi overlay plus generic base configs'
-  outputs:
-  - seven module-level config singletons resolved at import (_contract/_project/_etl/_features and siblings)
-  transforms:
-  - 'seven configs resolve through config_path(): project overlay wins by name; generic step configs fall back to CONFIGS_DIR (:32-48)'
-  - 'project/__init__.py and project.cli activate BROADWAY_CONFIG_OVERLAY_DIR from ProjectPaths.config, so reusable source stays project-agnostic'
-  - 'file-shared/symbol-disjoint CO-TENANCY declared with GATE-TRAIN-32 (owner read_training_sample() project/data.py:166) — closes the PROPOSE-GH3-02 OVERLAP-PATH flag'
-  touched_by: []
-  validated_by:
-  - tests/test_loader.py::test_config_overlay_precedes_base_and_falls_back
-  - project/tests/test_process_config.py::test_project_config_matches_process_constants
-  - project/tests/test_process.py::test_process_data_writes_ingest_lineage
-  - tests/test_experiments_dispatcher.py::test_project_cli_activates_the_project_config_overlay
-  if_changed:
-  - project/config/
-  - config_path consumers in project/etl/process.py and project/etl/process_config.py
-  findings: []
 - id: GATE-CFG-105
   phase: config-schema
-  order: 93
+  order: 87
   owner: 'src/broadway/onboard/module.py:215 init() (_write_configs :178-198)'
   inputs:
   - stdin prompts + 13 argv flags
@@ -2873,15 +2704,15 @@ gates:
   findings: []
 - id: GATE-CFG-107
   phase: config-schema
-  order: 94
+  order: 88
   owner: 'src/broadway/data/loader.py:134 lookup pre-read existence admission (declared-lookup bootstrap check)'
   inputs:
-  - 'DatasetContract.lookup_tables paths — project/config/dataset/taxi.yaml:31-34 declares out-of-repo symlink data/raw/taxi_zone_lookup.csv → /home/opc/ONE/learning/data/raw/taxi_zone_lookup.csv'
+  - 'DatasetContract.lookup_tables paths — project/config/dataset/euromonitor.yaml:31-34 declares out-of-repo symlink data/raw/(out-of-repo lookup symlink)'
   outputs:
   - dangling-symlink-aware loud pre-merge error NAMING the bootstrap step
   transforms:
   - 'AMENDED per packet H X2: the gate lives as a PRE-READ existence assertion at load_with_audit — Path.exists() follows links so a DANGLING symlink passes naive checks; the error must name the bootstrap step'
-  - 'co-tenancy with GATE-ETL-11/GATE-INGEST-02 on load_with_audit DECLARED, line-anchored aspect: pre-read admission check (O5 precedent); artifact declaration side remains project/config/dataset/taxi.yaml:31-34'
+  - 'co-tenancy with GATE-ETL-11/GATE-INGEST-02 on load_with_audit DECLARED, line-anchored aspect: pre-read admission check (O5 precedent); artifact declaration side remains project/config/dataset/euromonitor.yaml:31-34'
   touched_by: []
   validated_by: []
   if_changed:
@@ -2890,7 +2721,7 @@ gates:
   - 'FINDING root (packet H X2): dependency on a path OUTSIDE the repo, checked by nobody today; complements D#7''s README bootstrap edit (docs side).'
 - id: GATE-CFG-108
   phase: config-schema
-  order: 95
+  order: 89
   owner: 'src/broadway/onboard/infer.py:10 _IDENTIFIER_THRESHOLD'
   inputs:
   - BROADWAY_IDENTIFIER_THRESHOLD env var
@@ -2903,30 +2734,12 @@ gates:
   if_changed:
   - identifier-threshold semantics consumed at infer.py:44
   findings: []
-- id: GATE-CFG-111
-  phase: config-schema
-  order: 96
-  owner: 'project/experiments/mlflow/_common.py:60 CONFIG_PATH BROADWAY_MLFLOW_CONFIG resolution + project/experiments/mlflow/03_optuna_worker.py:46-49 HPO_CONFIG_PATH env branch'
-  inputs:
-  - BROADWAY_MLFLOW_CONFIG env var
-  outputs:
-  - single resolution dialect for the MLflow/HPO config path
-  transforms:
-  - '_common.py falls back through ProjectPaths.experiment_configs when env unset (:60); worker branches on env presence with a project-relative fallback (:46-49)'
-  - k8s render_worker_jobs.py:48 injects the env into worker pods (injection site rides the same dialect)
-  touched_by: []
-  validated_by: []
-  if_changed:
-  - worker-image config mounting contract
-  - project/config/layout.yaml experiment_configs path
-  findings:
-  - 'slate attributed the owner to training/mlflow_utils.py — corrected during landing to the REAL resolution sites after existence verification (packet F #20 routed note); BROADWAY_MLFLOW_CONFIG never appears in mlflow_utils.'
 - id: GATE-CFG-112
   phase: config-schema
-  order: 97
-  owner: 'src/broadway/lineage/models.py:37 SampleSpec.column_mapping + project/config/sample/taxi_diagnostic.yaml:5 (+ consumers stats/module.py:42, stats/describe.py:132, timeline/runners.py:100)'
+  order: 90
+  owner: 'src/broadway/lineage/models.py:37 SampleSpec.column_mapping (+ consumers stats/module.py:42, stats/describe.py:132, timeline/runners.py:100)'
   inputs:
-  - 'column_mapping block + analysis group_column (project/config/analysis/taxi_hypothesis.yaml:13 group_column: Borough)'
+  - 'column_mapping block + analysis group_column (project/config/analysis/euromonitor.yaml group_column)'
   outputs:
   - 'validated mapping direction (logical→source); load-time existence validation of mapped values against the sample artifact'
   transforms:
@@ -2942,12 +2755,12 @@ gates:
   - tests/test_describe.py::test_describe_run_column_mapping
   if_changed:
   - SampleSpec.column_mapping field semantics
-  - taxi_diagnostic.yaml mapping block
+  - sample mapping block
   findings:
   - 'FINDING-D1 correction carried per packets F/G: the three cited TRACKED tests pin the consumers'' correct direction (describe test builds source_{group} physical columns); the "fixture fix / inverted yaml" framing is struck — what legitimately remains is direction-law documentation plus the unpinned load-time existence check.'
 - id: GATE-HPO-80
   phase: hpo-optuna
-  order: 98
+  order: 91
   owner: src/broadway/training/hpo.py:120 run_model_study()
   inputs:
   - ModelHPOSpec search space via _trial_objective (hpo.py:99)
@@ -2978,7 +2791,7 @@ gates:
   - 'distributed phase-1 points N pods at ONE shared study with IDENTICALLY seeded samplers — every pod constructs TPESampler(seed) from the same config seed (project/experiments/mlflow/03_optuna_worker.py:190-194) and no TPESampler(constant_liar=True) exists anywhere in the repo, so concurrent pods reading the same trial history can propose identical params and burn duplicated budget; nothing detects or dedupes collisions. root: src/broadway/training/hpo.py:140 (+ project/experiments/mlflow/03_optuna_worker.py:194)'
 - id: GATE-HPO-81
   phase: hpo-optuna
-  order: 99
+  order: 92
   owner: src/broadway/training/hpo.py:30 make_objective()
   inputs:
   - PipelineConfig experiment block
@@ -3013,7 +2826,7 @@ gates:
   - 'metrics[target_metric] KeyError is UNPINNED — no test drives make_objective with a target_metric outside the 7-key vocabulary, so a YAML typo (e.g. ''MAE'') surfaces mid-study as a bare KeyError AFTER trials have burned, never as a config-validation error. root: src/broadway/training/hpo.py:61'
 - id: GATE-HPO-82
   phase: hpo-optuna
-  order: 100
+  order: 93
   owner: 'src/broadway/training/hpo.py:159+:177 study.optimize call sites (run_model_study leg + _optimize_study bandit continuation)'
   inputs:
   - _trial_objective wrapper (hpo.py:99)
@@ -3043,7 +2856,7 @@ gates:
   - 'bool params are UNTUNABLE END-TO-END (cross-ref E2E-D6, e2e-lane defect confirmed at clean HEAD 5016e93 and reproduced identically in this working tree) — three layers conspire: (a) the registry vocabulary is NAME-only (allowed_params frozenset, src/broadway/training/models/registry.py:28 advertises fit_intercept/positive/copy_X with no dtype dimension); (b) the suggest dispatch knows only int-vs-float from bound types (:107-111) — there is no suggest_categorical/bool branch; (c) ModelHPOSpec.search_space dict[str, list[float | int]] (src/broadway/config/schema.py:122) SILENTLY COERCES native bool bounds — verified live: [true, false] validates to [1.0, 0.0]. Int-encoded [0, 1] passes schema AND registry validation, then sklearn strict validation raises InvalidParameterError (''fit_intercept … must be an instance of bool … Got 0 instead.'') on EVERY trial sampling those params; a only-bool space aborts optimize() on trial 0 via the no-catch= mechanics above; a mixed space decimates the leaderboard probabilistically. root: src/broadway/training/hpo.py:107-111 (+ src/broadway/config/schema.py:122 silent bool→float coercion, src/broadway/training/models/registry.py:28 dtype-blind vocabulary)'
 - id: GATE-HPO-83
   phase: hpo-optuna
-  order: 101
+  order: 94
   owner: src/broadway/training/hpo.py:66 _mlflow_callback()
   inputs:
   - FrozenTrial states/values/user attrs from the optimize callbacks hook
@@ -3071,7 +2884,7 @@ gates:
   - 'pruned and failed trials are invisible in BOTH telemetry planes — the callback skips them (:78) and _leaderboard silently DROPS their studies via bare except ValueError (:260-268) — so an all-pruned study leaves no MLflow trace and vanishes from result[''models''] with no warning; the consumer-side silent-empty .get failure mode is ALREADY RULED (cross-ref arbitration board row B-HPO-METRICS-MAPPING, verdicts #23 — not re-ruled here). root: src/broadway/training/hpo.py:78'
 - id: GATE-HPO-84
   phase: hpo-optuna
-  order: 102
+  order: 95
   owner: src/broadway/training/hpo.py:350 best_model min()/max() selection in run_hpo_bandit()
   inputs:
   - leaderboard from _leaderboard (:285-293)
@@ -3100,7 +2913,7 @@ gates:
   - 'HPOConfig.direction remains an UNCONSTRAINED str (schema.py:127, no Literal): bandit_allocate and best_model now honor ''minimize'' vs ''maximize'' (2026-09 direction-inversion fix, GATE-HPO-85/-84), so the only residual is deferred validation — a typo is caught at optuna.create_study time (ValueError) rather than at config load, never a silent misranking. root: src/broadway/config/schema.py:127'
 - id: GATE-HPO-85
   phase: hpo-optuna
-  order: 103
+  order: 96
   owner: src/broadway/training/hpo.py:180 bandit_allocate()
   inputs:
   - 'leaderboard {model: best objective} (lower=better for minimize, higher=better for maximize)'
@@ -3133,7 +2946,7 @@ gates:
   findings: []
 - id: GATE-HPO-86
   phase: hpo-optuna
-  order: 104
+  order: 97
   owner: src/broadway/training/optuna.py:48 run_study_rdb()
   inputs:
   - storage_url string (sqlite:/// locally; postgresql://…:5432/optuna in k8s via compose_db_url)
@@ -3171,7 +2984,7 @@ gates:
   - 'DB credentials reach pod LOGS — compose_db_url bakes the raw password into the URL (optuna_worker.py:21) and the worker prints the composed db_url to stdout as a deliberate ''visibility requirement'' (project/experiments/mlflow/03_optuna_worker.py:87); the 2026-08-24 secret-audit factsheet covered manifests/templates only, not this runtime print. root: project/experiments/mlflow/03_optuna_worker.py:87'
 - id: GATE-HPO-87
   phase: hpo-optuna
-  order: 105
+  order: 98
   owner: k8s/optuna/render_worker_jobs.py:26 render_jobs()
   inputs:
   - CFG-HPO-SPEC hpo.models (ONE Job per model)
@@ -3204,7 +3017,7 @@ gates:
   - 'worker pods hold FULL MLflow write power — configmap tracking_uri http://mlflow:5000 plus allowed_hosts ''*'' (project/k8s/optuna/configmap.yaml:28, :30) hands every optuna worker ambient write access to the whole tracking store INCLUDING the champion alias, so any compromised/buggy pod can move production custody; single-writer custody for the champion alias is ALREADY PROPOSED upstream (cross-ref GH-5 / PROPOSE-GH5-01, agents/ledger/arbitration/2026-08-24/gap-cd-mlflow.md:108 — cited, not re-found). root: project/k8s/optuna/configmap.yaml:28'
 - id: GATE-HPO-88
   phase: hpo-optuna
-  order: 106
+  order: 99
   owner: src/broadway/training/hpo.py:204 _initial_round()
   inputs:
   - random_state base seed
@@ -3233,7 +3046,7 @@ gates:
   - 'the seed OFFSET couples determinism to MODEL LIST ORDER — inserting, removing, or reordering hpo.models shifts EVERY subsequent model''s sampler seed (:212-228), silently changing all trajectories while every determinism test stays green (they freeze the whole config, not the offset scheme); no test pins the offset convention itself. root: src/broadway/training/hpo.py:223'
 - id: GATE-HPO-89
   phase: hpo-optuna
-  order: 107
+  order: 100
   owner: src/broadway/config/schema.py:125 HPOConfig
   inputs:
   - 'configs/experiments/mlflow.yaml hpo: block (:14-44) = CFG-HPO-SPEC'
@@ -3262,7 +3075,7 @@ gates:
   - 'engine is DEAD CONFIG — declared REQUIRED (:126), set in both YAMLs (configs/experiments/mlflow.yaml:15, configs/experiment/hyperopt.yaml:24), echoed in fixtures (tests/test_config.py:138, :172), and READ BY NOTHING (repo-wide grep census finds no consumer of HPOConfig.engine); it implies a pluggable-engine surface that does not exist and would mask a future engine-vs-implementation mismatch. root: src/broadway/config/schema.py:126'
 - id: GATE-HPO-154
   phase: hpo-optuna
-  order: 108
+  order: 101
   owner: src/broadway/training/nlp.py:144 make_objective() + :191 run_nlp_hpo() + :248 run_nlp()
   inputs:
   - 'src/broadway/config/schema.py:135 NLPConfig (typed data-agnostic config: model_zoo + hpo + knobs)'
@@ -3294,7 +3107,7 @@ gates:
   findings: []
 - id: GATE-INFRA-90
   phase: infra-meta
-  order: 109
+  order: 102
   owner: scripts/run_local_ci.sh:16 case-dispatch STATIC/TIER/CLEAN_LINT (+ run() aggregator :26-31, banner law :23/:100)
   inputs:
   - argv[1] ∈ {unset, --static, --tier=fast, --tier=full, --clean-lint} (else usage exit 2)
@@ -3323,7 +3136,7 @@ gates:
   - --static alone skips pytest+cov on a nominally full tier; scope discipline ("static is for iteration, not landing") is contract prose, not enforced by code.
 - id: GATE-INFRA-91
   phase: infra-meta
-  order: 110
+  order: 103
   owner: scripts/run_local_ci.sh:30 gate_parity() (F1b pin-guard, wired at :43)
   inputs:
   - refs/remotes/origin/sklearn:scripts/check_branch_parity.sh via `git show` (:33)
@@ -3348,11 +3161,11 @@ gates:
   - validation extracts-and-executes the real function body against a PATH-shimmed git — the true `git show refs/remotes/origin/sklearn:...` network path is never exercised in CI.
 - id: GATE-INFRA-92
   phase: infra-meta
-  order: 111
+  order: 104
   owner: scripts/run_local_ci.sh:102 gate battery (ruff, mypy, Vulture, configs, shell-scripts, pytest+cov floor=95, project-tests)
   inputs:
   - src/** tests/test_project_paths.py project/experiments/** project/experiments.py project/dashboard.py project/paths.py project/working.py project/data.py scripts/check_project_paths.py scripts/ (ruff)
-  - project/config/ (project-owned layout, experiment, and taxi config-overlay SSOT)
+  - project/config/ (project-owned layout, experiment, and config-overlay SSOT)
   - src/broadway/** (mypy)
   - configs/experiment/*.yaml via load_config(dataset='test') (configs)
   - k8s/optuna/*.sh + scripts/*.sh via sh -n + shellcheck (shell-scripts)
@@ -3369,7 +3182,7 @@ gates:
   - 'project-tests step (:97, full-tier-only): uv run pytest project/tests -q --dist worksteal with NO coverage flags — the >=95 floor deliberately stays on tests/ (header :7-8); closes the data-gate hole (human ruling): 26 tests / 6 files collected+passing at HEAD eb9ea18'
   - coverage floor value 95 owned here; docs must quote it identically
   - configs gate asserts non-empty glob then loads every experiment config
-  - project-paths fails if a runtime surface or file restores retired root experiment/taxi config paths, or the project layout is incomplete
+  - project-paths fails if a runtime surface or file restores retired root experiment config paths, or the project layout is incomplete
   touched_by:
   - agents/ledger/DECISIONS.md D26 (senior adoption makes gate-list edits executable)
   - tests/test_governance_probes.py:287 probe_coverage_floor (floor-quote SSOT check)
@@ -3399,7 +3212,7 @@ gates:
   - probes validate the floor NUMBER as text, not enforcement behavior — no test proves a sub-95 cov run actually fails.
 - id: GATE-INFRA-93
   phase: infra-meta
-  order: 112
+  order: 105
   owner: scripts/check_branch_parity.sh:71 check() (SHARED lockstep, list at :43-69) + sync_to_main() :89
   inputs:
   - '24-entry SHARED surface: src/ tests/ demo/ configs/dataset/test.yaml configs/experiment/{baseline,engineered,hyperopt}.yaml configs/analysis/{test,test_hypothesis,test_causal}.yaml configs/step/{causal,etl}.yaml configs/environment/ configs/flow/ k8s/ docker/ .github/workflows/ pyproject.toml Dockerfile docker-compose.yml .gitignore .dockerignore README.md scripts/'
@@ -3428,7 +3241,7 @@ gates:
   - sync_to_main() is still not executed against a disposable main worktree; its project-removal and generic-sample projection are statically pinned by tests/test_project_paths.py.
 - id: GATE-INFRA-94
   phase: infra-meta
-  order: 113
+  order: 106
   owner: scripts/check_branch_parity.sh:111 inline era declaration PARITY_ERA/PARITY_TRACK_BRANCH/PARITY_ALLOWLIST/PARITY_MAIN_ANCHOR (:111-114) + anchor guards :121-132 + dev-era dispatch :192-226
   inputs:
   - inline constants (no env dialect, D21)
@@ -3455,7 +3268,7 @@ gates:
   - anchor shape/resolution guards (:121-128) and both dev-era pass-along guards (:212,:218) are asserted nowhere — no test feeds a non-ancestor taxi or a drifted taxi tip through the dispatch.
 - id: GATE-INFRA-95
   phase: infra-meta
-  order: 114
+  order: 107
   owner: scripts/check_branch_parity.sh:134 custody() — layer 1 anchor-drift diff :146, freeze-intact shortcut :162, layer 2 blob-provenance comm -23 :166
   inputs:
   - PARITY_MAIN_ANCHOR=18607091ddbb2602ad4475341ad377bafee5ec4b (:114)
@@ -3483,7 +3296,7 @@ gates:
   - stale-pin failure direction is documented safe (false-red AFTER an unanchored ratified change), yet no test pins that behavior either.
 - id: GATE-INFRA-96
   phase: infra-meta
-  order: 115
+  order: 108
   owner: 'scripts/ship.sh:24 ship gate (`if ! bash scripts/run_local_ci.sh` → refuse :24-27; single push later) + WAVE-A teeth insertions (:15-19 tier_gate sourcing, :31-40 L1 hook guard, :42-53 TIER-GATE batch) mirrored by .git/hooks/pre-push:5'
   inputs:
   - argv remote/refspec (default origin sklearn:sklearn :14)
@@ -3514,7 +3327,7 @@ gates:
   - '.git/hooks/pre-push remains UNTRACKED machine-local (under .git/, invisible to git status; core.hooksPath unset) — every fresh clone ships with NO local gate; WAVE-A adds the tracked SSOT template (agents/contracts/hooks-pre-push.template) plus a ship-path REFUSAL when the live hook is missing/stale (:31-40), so the gap is now detected-and-named instead of procedural-only.'
 - id: GATE-INFRA-97
   phase: infra-meta
-  order: 116
+  order: 109
   owner: scripts/check_e2e_determinism.sh:106 compare_trees() (json_diff whitelist :35-46, compare_file :89, --run chain run_e2e :163)
   inputs:
   - two artifact trees (positional) or --run
@@ -3546,7 +3359,7 @@ gates:
   - the comparator core is well-tested but the --run runner (ephemeral MLflow boot, port pick, sed rewrite) has NO automated coverage; also this script is wired into NO tier of run_local_ci.sh nor ci.yml — determinism is checked only when someone remembers to run it.
 - id: GATE-INFRA-98
   phase: infra-meta
-  order: 117
+  order: 110
   owner: scripts/tier_classifier.py:104 classify() (triggers :51-64, parse_diff_payload :138, CLI main :162)
   inputs:
   - git-diff payload on stdin (files + added lines)
@@ -3576,7 +3389,7 @@ gates:
   - 'nothing enforces that committed commits actually CARRY a computed Tier: trailer — the classifier classifies when invoked, but no gate invokes it automatically on staging.'
 - id: GATE-INFRA-99
   phase: infra-meta
-  order: 118
+  order: 111
   owner: '.github/workflows/ci.yml:47 platform job step "Platform gates (SSOT)" (delegation law :42-46; docker-only checks :51-66; build-and-boot :151; CD job :310; concurrency :11-13)'
   inputs:
   - "push/PR to all branches (branches: ['**'], :3-7)"
@@ -3624,29 +3437,9 @@ gates:
 # git-tag mints, cache-root forks) must route through a NAMED chokepoint, and
 # a created object earns exactly one append-only ledger row; re-mint at >=154
 # when tracked_run exists with real owners + a named ledger consumer.
-- id: GATE-INFRA-122
-  phase: infra-meta
-  order: 119
-  owner: 'project/experiments.py:496 main argparse dispatcher (ols|diagnostics|qq_legend|verify)'
-  inputs:
-  - argv subcommand
-  outputs:
-  - project-owned plots/results CSVs/verification JSON (self-auditing verify subcommand)
-  transforms:
-  - 'project dispatcher custody: add_parser ols/:498 diagnostics/:500 qq_legend/:502 verify/:504; taxi inputs come from project config and outputs use PATHS.results'
-  touched_by: []
-  validated_by:
-  - tests/test_experiments_dispatcher.py::test_help_lists_exact_dispatcher_commands
-  - tests/test_experiments_dispatcher.py::test_dispatcher_uses_project_configured_data_and_results_paths
-  - tests/test_project_paths.py::test_ci_smoke_uses_the_moved_project_dispatcher
-  - tests/test_project_paths.py::test_reusable_source_never_imports_the_project_layer
-  if_changed:
-  - subcommand result-file layout under project/experiments/results/
-  - CI smoke command path
-  findings: []
 - id: GATE-INFRA-123
   phase: infra-meta
-  order: 120
+  order: 112
   owner: 'project/dashboard.py:15 main() project composition entry'
   inputs:
   - host/port argv
@@ -3662,7 +3455,7 @@ gates:
   findings: []
 - id: GATE-INFRA-124
   phase: infra-meta
-  order: 121
+  order: 113
   owner: 'k8s/optuna/lifecycle.sh:221 train|up|view|dump|down case dispatch'
   inputs:
   - subcommand
@@ -3680,7 +3473,7 @@ gates:
   - 'FINDING(:215): doubled-echo bug prints the stop hint literally instead of executing it. The orphaned broadway-view-pg container (gone by ruling time) was this function''s own product — the pairing gap is PROVEN, not hypothetical.'
 - id: GATE-INFRA-125
   phase: infra-meta
-  order: 122
+  order: 114
   owner: 'k8s/optuna/optuna-init.yaml:19 init-job container command'
   inputs:
   - init-job manifest apply
@@ -3695,7 +3488,7 @@ gates:
   findings: []
 - id: GATE-INFRA-126
   phase: infra-meta
-  order: 123
+  order: 115
   owner: 'k8s/optuna/Dockerfile.worker:16 CMD'
   inputs:
   - published worker image
@@ -3710,7 +3503,7 @@ gates:
   findings: []
 - id: GATE-INFRA-127
   phase: infra-meta
-  order: 124
+  order: 116
   owner: './Dockerfile:19 CMD bare deployable-image default entrypoint'
   inputs:
   - deployable image build
@@ -3725,7 +3518,7 @@ gates:
   findings: []
 - id: GATE-INFRA-128
   phase: infra-meta
-  order: 125
+  order: 117
   owner: 'docker-compose.yml:3 mlflow/postgres service command custody'
   inputs:
   - compose stack definition
@@ -3740,30 +3533,9 @@ gates:
   - compose command surface
   findings:
   - 'D#17 broken-context fact rides as FINDING root (postgres context lacks Dockerfile).'
-- id: GATE-INFRA-129
-  phase: infra-meta
-  order: 126
-  owner: 'project/experiments/mlflow/03_optuna_worker.py:106 optuna-worker __main__ sublane exemplar (three named sublanes enumerated in transforms)'
-  inputs:
-  - any project/experiments/** script invoked as __main__
-  - project/experiments/multivariate/
-  - project/experiments/polynomial_regression_et_all/
-  - project/experiments/univariate/fare_amount_trip_distance/
-  - project/experiments/more_modeling/
-  outputs:
-  - per-sublane classification records owed per resolution #6
-  transforms:
-  - 'SPLIT-OWNER ratified WITH mandatory named sublanes: teaching-surface = project/experiments/{univariate,multivariate,polynomial_regression_et_all,fare_prediction,more_modeling}/ __main__ scripts · model-battle = project/experiments/mlflow/01_model_battle_mlflow.py + 02_explainability.py · optuna-worker = project/experiments/mlflow/03_optuna_worker.py'
-  - 'resolution #6 forces the intentional-record-free classification to be WRITTEN DOWN per sublane at attach time — this row IS the attach record; per-sublane intentional notes remain owed'
-  touched_by: []
-  validated_by: []
-  if_changed:
-  - sublane membership (new experiment dirs must pick a lane or found one)
-  findings:
-  - 'flagged honestly: the per-sublane intentional-classification texts are required by resolution #6 but their prose lives outside this registry row; attach-time enumeration done here from the live tree.'
 - id: GATE-INFRA-131
   phase: infra-meta
-  order: 127
+  order: 118
   owner: 'k8s/api-deployment.yaml:40 HorizontalPodAutoscaler bounds'
   inputs:
   - api workload metrics
@@ -3778,7 +3550,7 @@ gates:
   findings: []
 - id: GATE-INFRA-133
   phase: infra-meta
-  order: 128
+  order: 119
   owner: 'k8s/postgres-deployment.yaml:2 StatefulSet durable-state workload'
   inputs:
   - postgres manifest apply
@@ -3793,7 +3565,7 @@ gates:
   findings: []
 - id: GATE-INFRA-137
   phase: infra-meta
-  order: 129
+  order: 120
   owner: 'docker-compose.yml:26 compose-stack build/volume FILE law'
   inputs:
   - compose stack definition
@@ -3809,7 +3581,7 @@ gates:
   findings: []
 - id: GATE-INFRA-138
   phase: infra-meta
-  order: 130
+  order: 121
   owner: 'tests/conftest.py:8 _SNAPSHOT_DIRS snapshot hygiene'
   inputs:
   - pytest session lifecycle
@@ -3824,7 +3596,7 @@ gates:
   findings: []
 - id: GATE-INFRA-139
   phase: infra-meta
-  order: 131
+  order: 122
   owner: 'tests/test_uv_probe_guard.py:27 package-discovery probe guard suite'
   inputs:
   - uv editable-install discovery behavior
@@ -3841,7 +3613,7 @@ gates:
   findings: []
 - id: GATE-INFRA-141
   phase: infra-meta
-  order: 132
+  order: 123
   owner: 'scripts/ship.sh push-path creator site for annotated tags (law: manual git tag -a mints ONLY via a named ledger-row procedure; NO scripted minter exists at HEAD)'
   inputs:
   - release/tag minting intent
@@ -3857,7 +3629,7 @@ gates:
   - 'Evidence CORRECTED (packet H DRIFT #4): the tag is ON ORIGIN, not local-only (ls-remote: tag object 015c5049, peeled 0d383125) — makes minting custody MORE urgent (published, unminted-law object). Credential rationale INADMISSIBLE: HC-1 VOIDED (00-resolutions.md §1); grounds survive on custody-hygiene law only.'
 - id: GATE-INFRA-142
   phase: infra-meta
-  order: 133
+  order: 124
   owner: 'scripts/check_branch_parity.sh:89 sync_to_main() ref-management site (stale-ref retirement law; objects: LOCAL refs refs/heads/pr-1 + pr-2, closed-unmerged snapshots)'
   inputs:
   - named local refs (pr-1/pr-2 and future strays)
@@ -3875,7 +3647,7 @@ gates:
   - 'owner-anchor judgment recorded: the gated objects are untracked .git-side refs with no in-repo declaring file; the law binds the scripted ref-management site plus the fetch/pull creator pattern rather than the ephemeral objects.'
 - id: GATE-INFRA-143
   phase: infra-meta
-  order: 134
+  order: 125
   owner: '.github/workflows/ci.yml:145 actions/cache@v4 cache retention/dedupe law'
   inputs:
   - CI cache key family (broadway-base hashFiles key)
@@ -3892,7 +3664,7 @@ gates:
   findings: []
 - id: GATE-INFRA-144
   phase: infra-meta
-  order: 135
+  order: 126
   owner: '.github/workflows/ci.yml:355 Push verified images to GHCR (CD single writer)'
   inputs:
   - verified image builds from the CD job
@@ -3909,7 +3681,7 @@ gates:
   - 'inventory honestly UNVERIFIABLE: package listing 403/404 (token lacks read:packages) — recorded, not invented. OPEN QUESTION carried: who executes the registry-side version cap?'
 - id: GATE-INFRA-145
   phase: infra-meta
-  order: 136
+  order: 127
   owner: 'k8s/optuna/teardown.sh teardown zero-footprint creation-time law (HEAD has ZERO rmi/residual lines; codified shape = WIP worktree :63-73)'
   inputs:
   - teardown invocation after cluster/image-producing lanes
@@ -3927,7 +3699,7 @@ gates:
   - 'kindest/node:<none> remnant is machine-local tooling (accepted-local) — do NOT widen the grep pattern to chase it (explicit rider, packet H #145).'
 - id: GATE-INFRA-146
   phase: infra-meta
-  order: 137
+  order: 128
   owner: 'scripts/uv.sh:1 host-local cache selector — the sole UV_CACHE_DIR runtime owner'
   inputs:
   - HOME/XDG_CACHE_HOME/TMPDIR/UV_CACHE_DIR environment
@@ -3948,7 +3720,7 @@ gates:
   findings: []
 - id: GATE-INFRA-147
   phase: infra-meta
-  order: 138
+  order: 129
   owner: 'scripts/deadcode_census.py:1 module — teeth ⑥ DEADCODE-CENSUS advisory engine'
   inputs:
   - tracked *.py corpus via git ls-files (src/project/tests/scripts)
@@ -3966,7 +3738,7 @@ gates:
   findings: []
 - id: GATE-INFRA-148
   phase: infra-meta
-  order: 139
+  order: 130
   owner: agents/tools/state_records.py sync()
   inputs:
   - STATE CURRENT record and immutable EVENTS section
@@ -3987,7 +3759,7 @@ gates:
 # --- BAND 81-OBJECT-CUSTODY (minted per slate §0; header law above) ------
 - id: GATE-CUST-147
   phase: object-custody
-  order: 140
+  order: 131
   owner: 'src/broadway/training/mlflow_utils.py:162 promote_candidate()'
   inputs:
   - 'model_uri + alias="champion"'
@@ -4006,7 +3778,7 @@ gates:
   findings: []
 - id: GATE-CUST-148
   phase: object-custody
-  order: 141
+  order: 132
   owner: 'src/broadway/training/mlflow_utils.py:163 register_model call sites'
   inputs:
   - candidate model_uri + dataset name
@@ -4020,26 +3792,9 @@ gates:
   if_changed:
   - dataset-name plumbing into promotion
   findings: []
-- id: GATE-CUST-149
-  phase: object-custody
-  order: 142
-  owner: 'project/experiments/mlflow/03_optuna_worker.py:111 set_tag trio (model/study/seed) + hpo callback tags + battle writers'
-  inputs:
-  - every mlflow.set_tag call across the independent writer sites
-  outputs:
-  - 'documented CLOSED VOCABULARY {model, study, seed}'
-  transforms:
-  - 'writer scatter verified (packet H #149): worker trio set_tag model/study/seed (:111-113); battle set_tag model (01_model_battle_mlflow.py:99/:233); hpo tags payload sites (hpo.py :217/:246 feeding _mlflow_callback :66)'
-  - 'AMENDED enforcement vehicle: documented closed vocabulary + the SAME import-lint/test net as GATE-CUST-147 over the writer sites — NOT runtime rejection, because mlflow.set_tag accepts arbitrary keys server-side and wrapping every call buys machinery, not safety; say what the vocabulary is, lint who writes it'
-  - 'W6 namespace join declared (packet G R4): TRAIN-36 metric dicts land in training/evaluate RUNS while HPO-83 nests trial runs — disjoint namespaces joined by THIS vocabulary'
-  touched_by: []
-  validated_by: []
-  if_changed:
-  - tag vocabulary additions (must land with lint-net updates)
-  findings: []
 - id: GATE-CUST-150
   phase: object-custody
-  order: 143
+  order: 133
   owner: 'src/broadway/training/mlflow_utils.py:59 set_experiment auto-create chokepoint (inside setup_mlflow :54-63)'
   inputs:
   - experiment_name argument at setup time
@@ -4054,7 +3809,7 @@ gates:
   findings: []
 - id: GATE-CUST-151
   phase: object-custody
-  order: 144
+  order: 134
   owner: 'k8s/optuna/lifecycle.sh:149 dump_state() snapshot generations (keep-N cap) + training-plane registry-prune policy (non-champion versions)'
   inputs:
   - registry versions + $BACKUP_DIR snapshot generations
@@ -4069,49 +3824,3 @@ gates:
   if_changed:
   - keep-N budget vs restore needs (view_local reads generations)
   findings: []
-- id: GATE-CUST-152
-  phase: object-custody
-  order: 145
-  owner: 'project/experiments/mlflow/03_optuna_worker.py:106 optuna_{model} run-name convention (+ {study} trial {n}, battle names)'
-  inputs:
-  - every run-name emission across optuna/battle/callback writers
-  outputs:
-  - convention TEXT owned here so determinism-diff and champion manifest can rely on run identity
-  transforms:
-  - 'conventions verified de-facto (packet H #152): optuna_{model_name} (worker :106), {study} trial {n} (hpo callback), battle names (01_model_battle_mlflow.py:86/:230 start_run blocks)'
-  - 'AMENDED: gate owns the CONVENTION TEXT; enforcement rides the GATE-CUST-147/CUST-149 lint net — no third mechanism; consumers of record: check_e2e_determinism.sh + champion manifest'
-  touched_by: []
-  validated_by: []
-  if_changed:
-  - run-name grammar consumed by determinism diffing
-  findings: []
-vocabulary:
-- ARTIFACT-CANONICAL-FRAME
-- ARTIFACT-CANONICAL-PARQUET
-- ARTIFACT-CHAMPION-REGISTRY
-- ARTIFACT-CLEAN-EVIDENCE
-- ARTIFACT-COERCION-AUDIT
-- ARTIFACT-DESCRIBE-SUMMARY
-- ARTIFACT-EVALUATION-RESULT
-- ARTIFACT-JOIN-AUDIT
-- ARTIFACT-LOOKUP-VALUE-AUDIT
-- ARTIFACT-MLFLOW-RUN
-- ARTIFACT-RAW-FRAME
-- ARTIFACT-RAW-PARQUET
-- ARTIFACT-SAMPLE-CACHE
-- ARTIFACT-SELECTED-FRAME
-- ARTIFACT-STATS-PLAN
-- ARTIFACT-STRUCTURAL-CLEAN
-- ARTIFACT-TRAIN-PARQUET
-- ARTIFACT-TRAINING-RESULT
-- CFG-DATA-MODE
-- CFG-DATASET-CONTRACT
-- CFG-ENV-PROCESSED-SUBDIR
-- CFG-ETL-SPLIT-FILES
-- CFG-ETL-STEP
-- CFG-STATS-FLOOR
-- CFG-STEP-EVALUATE
-- CFG-STEP-TRAIN
-- CFG-TAXI-PROJECT
-- CFG-WALKTHROUGH-THRESHOLDS
-- VOCAB-DECLARED-GROUPS-ABSENT

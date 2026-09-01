@@ -1,4 +1,0 @@
-name: pre_2024
-dataset: taxi
-description: trips with pickup before 2024
-filter_expression: pickup_datetime < 2024-01-01

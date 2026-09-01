@@ -68,22 +68,6 @@ def test_worker_image_copies_the_project_path_import_closure() -> None:
     assert "FROM broadway-base:latest" in worker
 
 
-def test_moved_experiment_helpers_resolve_layout_through_project_paths() -> None:
-    helpers = (
-        "project/experiments/fare_prediction/_common.py",
-        "project/experiments/more_modeling/_common.py",
-        "project/experiments/polynomial_regression_et_all/_common.py",
-        "project/experiments/multivariate/_setup.py",
-        "project/experiments/mlflow/_common.py",
-        "project/experiments/univariate/fare_amount_trip_distance/_common.py",
-    )
-    for relative in helpers:
-        text = (REPO / relative).read_text(encoding="utf-8")
-        assert "load_project_paths" in text, relative
-        assert ' / "experiments" / "results"' not in text, relative
-        assert ' / "config" / "experiments"' not in text, relative
-
-
 def test_main_day_sync_removes_project_surfaces_and_keeps_generic_sample() -> None:
     sync = (REPO / "scripts" / "main_day_sync.sh").read_text(encoding="utf-8")
     assert "git rm -r --ignore-unmatch project experiments configs/project configs/experiments" in sync

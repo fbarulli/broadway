@@ -438,13 +438,12 @@ def test_query_file_lists_owners_and_referencers(capsys):
     ids = [line.split(" · ")[0] for line in out.splitlines()
            if line.startswith("GATE-")]
     # every owner gate under project/etl/process.py (by_owner_file.yaml keys)
-    assert {"GATE-INGEST-01", "GATE-INGEST-04",
-            "GATE-ETL-17", "GATE-ETL-18", "GATE-ETL-19"} <= set(ids)
+    assert {"GATE-INGEST-04", "GATE-ETL-17"} <= set(ids)
     # GATE-INGEST-02 does not own the path but its if_changed range
     # GATE-INGEST-03..09 covers owner GATE-INGEST-04 -> must be listed too
     assert "GATE-INGEST-02" in ids
     owner_line = next(l for l in out.splitlines()
-                      if l.startswith("GATE-INGEST-01 "))
+                      if l.startswith("GATE-INGEST-04 "))
     assert "· owns" in owner_line
     ref_line = next(l for l in out.splitlines()
                     if l.startswith("GATE-INGEST-02 "))
@@ -460,7 +459,7 @@ def test_query_file_suffix_match_equals_full_path(capsys):
                                if l.startswith("GATE-")]
     assert gate_lines(suffix_out) == gate_lines(full_out), \
         "suffix match must hit the same owner set"
-    assert "== 7 gate(s) touch" in suffix_out
+    assert "== 3 gate(s) touch" in suffix_out
 
 
 @pytest.mark.parametrize("argv", [
@@ -475,10 +474,10 @@ def test_query_zero_hits_exit_3_with_empty_stdout(capsys, argv):
 
 
 def test_query_artifact_marks_producers_and_consumers(capsys):
-    code, out, err = _run_renderer(capsys, ["--artifact", "ARTIFACT-RAW-PARQUET"])
+    code, out, err = _run_renderer(capsys, ["--artifact", "ARTIFACT-RAW-FRAME"])
     assert code == 0 and err == ""
-    producer = next(l for l in out.splitlines() if l.startswith("GATE-INGEST-01 "))
-    consumer = next(l for l in out.splitlines() if l.startswith("GATE-INGEST-02 "))
+    producer = next(l for l in out.splitlines() if l.startswith("GATE-INGEST-02 "))
+    consumer = next(l for l in out.splitlines() if l.startswith("GATE-INGEST-04 "))
     assert producer.endswith("· produces")
     assert consumer.endswith("· consumes")
 
@@ -508,8 +507,8 @@ def test_query_findings_sheet_matches_meta_counts(capsys):
     assert code == 0 and err == ""
     body = [l for l in out.splitlines() if l.startswith("GATE-")]
     footer = out.strip().splitlines()[-1]
-    assert len(body) == REG["meta"]["counts"]["gates_with_findings"] == 84
-    assert footer == (f"== 84 flagged gate(s) · "
+    assert len(body) == REG["meta"]["counts"]["gates_with_findings"] == 78
+    assert footer == (f"== 78 flagged gate(s) · "
                       f"{REG['meta']['counts']['finding_strings']} finding(s) ==")
     parts = body[0].split(" · ")
     assert len(parts) == 4
@@ -529,7 +528,8 @@ def test_query_blast_radius_deterministic_ordered_and_pinned(capsys):
     orders = [int(l.split()[1].rsplit("-", 1)[1]) for l in gate_lines]
     assert orders == sorted(orders), "affected gates ordered by phase/order"
     depths = {l.split()[1]: l.split()[0] for l in gate_lines}
-    assert depths["GATE-INGEST-01"] == "d0"   # direct owner
+    assert depths["GATE-INGEST-04"] == "d0"   # direct owner
+    assert depths["GATE-ETL-17"] == "d0"      # direct owner
     assert depths["GATE-INGEST-02"] == "d0"   # referencer (range covers -04)
     assert lines[-1].startswith("pins (") and "none" not in lines[-1]
 
@@ -539,9 +539,9 @@ def test_query_blast_radius_one_hop_downstream_marked(capsys):
     depths = {l.split()[1]: l.split()[0]
               for l in out.splitlines() if l.startswith("d")}
     # depth 1 comes from seeds' outputs→inputs/if_changed closure:
-    # GATE-INGEST-03 is named explicitly in seed GATE-INGEST-01's if_changed;
-    # GATE-INGEST-05..09 arrive via seed GATE-INGEST-02's GATE-INGEST-03..09
-    # range and via ARTIFACT-RAW-FRAME consumption.
+    # GATE-INGEST-03..09 arrive via seed GATE-INGEST-02's GATE-INGEST-03..09
+    # range, GATE-INGEST-04's GATE-INGEST-05..09 range, and ARTIFACT-RAW-FRAME
+    # consumption.
     assert depths["GATE-INGEST-03"] == "d1"
     assert depths["GATE-INGEST-09"] == "d1"
     assert "GATE-ETL-16" not in depths, "unrelated bands stay outside the radius"
@@ -563,9 +563,9 @@ def test_query_csv_round_trip_row_count_header_and_joins(tmp_path, capsys):
     assert by_id["GATE-INGEST-03"]["touched_by"] == ""      # empty list -> empty cell
     ingest06 = next(g for g in GATES if g["id"] == "GATE-INGEST-06")
     assert by_id["GATE-INGEST-06"]["findings"] == " ;; ".join(ingest06["findings"])
-    ingest01 = next(g for g in GATES if g["id"] == "GATE-INGEST-01")
-    assert by_id["GATE-INGEST-01"]["touched_by"] == " | ".join(ingest01["touched_by"])
-    assert by_id["GATE-INGEST-01"]["validated_by"] == ingest01["validated_by"][0]
+    ingest02 = next(g for g in GATES if g["id"] == "GATE-INGEST-02")
+    assert by_id["GATE-INGEST-02"]["touched_by"] == " | ".join(ingest02["touched_by"])
+    assert by_id["GATE-INGEST-02"]["validated_by"] == " | ".join(ingest02["validated_by"])
 
 
 def test_query_csv_writes_only_the_named_file(tmp_path, capsys):
@@ -585,7 +585,7 @@ def test_query_modes_leave_registry_and_rendered_views_byte_identical(capsys):
                  ["--file", "project/etl/process.py"],
                  ["--artifact", "ARTIFACT-CANONICAL-PARQUET"],
                  ["--library", "pyyaml"],
-                 ["--test", "test_process"],
+                 ["--test", "test_load_with_audit"],
                  ["--findings"],
                  ["--blast-radius", "src/broadway/data/loader.py"]):
         code, _, _ = _run_renderer(capsys, argv)
@@ -732,7 +732,7 @@ def test_has_probe_cascade_first_hit_wins(capsys):
     assert code == 0 and "matched gate-id 'GATE-ETL-16'" in out
     code2, out2, _ = _run_renderer(capsys, ["--has", "ARTIFACT-RAW-PARQUET"])
     assert code2 == 0
-    assert set(_gate_ids(out2)) == {"GATE-INGEST-01", "GATE-INGEST-02"}
+    assert set(_gate_ids(out2)) == {"GATE-INGEST-02"}
     assert "matched artifact 'ARTIFACT-RAW-PARQUET'" in out2
     node_id = next(g for g in GATES if g["id"] == "GATE-INGEST-06")[
         "validated_by"][0]

@@ -69,7 +69,6 @@ ARTIFACT-RAW-FRAME:
 - GATE-INGEST-06
 - GATE-INGEST-08
 ARTIFACT-RAW-PARQUET:
-- GATE-INGEST-01
 - GATE-INGEST-02
 ARTIFACT-SELECTED-FRAME:
 - GATE-INGEST-04
@@ -105,8 +104,6 @@ BROADWAY_IDENTIFIER_THRESHOLD env var:
 - GATE-CFG-108
 BROADWAY_LINEAGE_DIR env (records.py:8, default artifacts/lineage):
 - GATE-TLINE-58
-BROADWAY_MLFLOW_CONFIG env var:
-- GATE-CFG-111
 BROADWAY_TIMELINE_DIR env override (module.py:8, default artifacts/timeline):
 - GATE-TLINE-53
 BaselineResult JSON saved :85 (save_result, out_path :84) + lineage node_id("baseline") with parents :87-91:
@@ -119,7 +116,6 @@ CFG-DATASET-CONTRACT:
 - GATE-INGEST-08
 - GATE-INGEST-09
 - GATE-TRAIN-30
-- GATE-TRAIN-32
 CFG-ENV-PROCESSED-SUBDIR:
 - GATE-ETL-16
 CFG-ETL-SPLIT-FILES:
@@ -151,12 +147,7 @@ CFG-STEP-EVALUATE:
 - GATE-TRAIN-37
 CFG-STEP-TRAIN:
 - GATE-TRAIN-30
-- GATE-TRAIN-32
 - GATE-TRAIN-33
-CFG-TAXI-PROJECT:
-- GATE-INGEST-01
-- GATE-INGEST-03
-- GATE-INGEST-04
 CI cache key family (broadway-base hashFiles key):
 - GATE-INFRA-143
 CMD ["ds-pipeline"] default entrypoint (:19):
@@ -180,7 +171,7 @@ DatasetContract.columns (declared dtypes/null_count):
 - GATE-FEAT-26
 DatasetContract.columns (post GATE-CFG-74):
 - GATE-CFG-75
-? DatasetContract.lookup_tables paths — project/config/dataset/taxi.yaml:31-34 declares out-of-repo symlink data/raw/taxi_zone_lookup.csv → /home/opc/ONE/learning/data/raw/taxi_zone_lookup.csv
+? DatasetContract.lookup_tables paths — project/config/dataset/euromonitor.yaml:31-34 declares out-of-repo symlink data/raw/(out-of-repo lookup symlink)
 : - GATE-CFG-107
 DatasetContract.path (csv/parquet/xlsx via READERS dict keyed on suffix):
 - GATE-ETL-11
@@ -285,7 +276,7 @@ SampleSpec REQUIRED (no canonical leg, unlike GATE-STATS-41):
 - GATE-STATS-49
 SampleSpec definition + source file (.parquet or .csv):
 - GATE-ETL-116
-? SampleSpec.schema block from project/config/sample/*.yaml (e.g. project/config/sample/fare_prediction_1m.yaml:29-36 dtype/nullable/checks)
+? SampleSpec.schema block from project/config/sample/*.yaml (e.g. project/config/sample/demo.yaml:29-36 dtype/nullable/checks)
 : - GATE-CFG-79
 SchemaError naming every duplicated label + provenance (raises before merge):
 - GATE-ETL-12
@@ -361,16 +352,12 @@ and the decision allowlists/parent sets used by GATE-TLINE-52/-54/-55:
 - GATE-TLINE-57
 any FITTED statsmodels regression results object:
 - GATE-TRAIN-38
-any project/experiments/** script invoked as __main__:
-- GATE-INFRA-129
 api workload metrics:
 - GATE-INFRA-131
 'argv parsed by _build_parser (cli.py:26-102): walkthrough --analysis/--dataset/--sample/--force (cli.py:87-92)':
 - GATE-TLINE-59
 argv remote/refspec (default origin sklearn:sklearn :14):
 - GATE-INFRA-96
-argv subcommand:
-- GATE-INFRA-122
 argv[1] ∈ {unset, --static, --tier=fast, --tier=full, --clean-lint} (else usage exit 2):
 - GATE-INFRA-90
 artifacts <dataset>_clean.json (StructuralCleanResult):
@@ -446,7 +433,7 @@ coef/HC3_SE/CI_low/CI_high DataFrame:
 - GATE-TRAIN-38
 coerce=False strict dtypes:
 - GATE-CFG-75
-'column_mapping block + analysis group_column (project/config/analysis/taxi_hypothesis.yaml:13 group_column: Borough)':
+column_mapping block + analysis group_column (project/config/analysis/euromonitor.yaml group_column):
 - GATE-CFG-112
 compose stack definition:
 - GATE-INFRA-128
@@ -481,8 +468,6 @@ contract exclude_from_profiling list:
 - GATE-SURF-66
 contract-projected:
 - GATE-ETL-17
-convention TEXT owned here so determinism-diff and champion manifest can rely on run identity:
-- GATE-CUST-152
 cov floor breach ⇒ FAIL pytest:
 - GATE-INFRA-92
 dangling-symlink-aware loud pre-merge error NAMING the bootstrap step:
@@ -493,8 +478,6 @@ dashboard server (uvicorn.run(app, host="127.0.0.1", port=8000) :19):
 - GATE-INFRA-123
 data/processed/deadcode_census.md suspicion report (gitignored sink); stdout default:
 - GATE-INFRA-147
-dataset name → configs/dataset/<name>.yaml via _load_contract (:140):
-- GATE-ETL-19
 dataset.lookup_tables CSVs read with keep_default_na=False + authored na_values:
 - GATE-ETL-11
 dataset/experiment/analysis (optional CLI names, loader.py:194-196):
@@ -535,8 +518,6 @@ dispatch into timeline.walkthrough.run (cli.py:166-173):
 - GATE-TLINE-59
 ? 'docker-only verdicts: sh -n + shellcheck k8s/optuna/*.sh AND scripts/*.sh (:57-66), kubeconform -strict k8s/optuna/ plus project/k8s/optuna/configmap.yaml minus kind-config.yaml (:79), orchestrator dry-run render+kubeconform (:104)'
 : - GATE-INFRA-99
-documented CLOSED VOCABULARY {model, study, seed}:
-- GATE-CUST-149
 dropna'd:
 - GATE-ETL-17
 'durable-state workload custody (kind: StatefulSet :2)':
@@ -553,10 +534,6 @@ engineered frame (post GATE-FEAT-27 validation):
 - GATE-FEAT-24
 environment (required name, loader.py:193):
 - GATE-CFG-72
-every mlflow.set_tag call across the independent writer sites:
-- GATE-CUST-149
-every run-name emission across optuna/battle/callback writers:
-- GATE-CUST-152
 every string scalar in the merged config dict:
 - GATE-CFG-71
 exit 0 green / 1 red / 2 usage:
@@ -569,8 +546,6 @@ experiment+etl config sections:
 - GATE-TRAIN-30
 experiment_name argument at setup time:
 - GATE-CUST-150
-? explained row total subtracted from dropped_total → TransformAudit.rows_dropped_unexplained (process.py:183-187; module.py:115)
-: - GATE-ETL-18
 ? 'extra_builders dict merged over BUILDERS inside build_derived (builders.py:115-117); raise sites: unimportable module ⇒ ValueError (builders.py:82)'
 : - GATE-FEAT-22
 features.derived[] in config order:
@@ -659,8 +634,6 @@ lineage node_id("stats", analysis.name) parents [node_id("baseline",…), node_i
 - GATE-STATS-41
 lineage record node_id("features", dataset) with TransformAudit rows/columns_before/after/added/removed (module.py:57-69):
 - GATE-FEAT-25
-? lineage record node_id('ingest') with full _ingest_audit (columns_before/after, added/removed, balanced drop accounting) at :211-217
-: - GATE-ETL-19
 lineage records node_id("etl"):
 - GATE-ETL-10
 lineage.module.run (cli.py:118-121):
@@ -702,7 +675,7 @@ model_type registry key:
 - GATE-TRAIN-34
 model_uri + alias="champion":
 - GATE-CUST-147
-models:/taxi@champion via MLflow registry:
+models:/euromonitor@champion via MLflow registry:
 - GATE-SURF-100
 modified_zscore MAD-guard :12-13:
 - GATE-STATS-48
@@ -740,8 +713,6 @@ optional StageLedger param (list[tuple[str,int]]; WIP-pending, see FINDING):
 : - GATE-ETL-15
 optional random_state:
 - GATE-HPO-86
-optional sample n / columns / full flag:
-- GATE-TRAIN-32
 optional val parquet (:27):
 - GATE-FEAT-25
 optional val_features_file parquet:
@@ -794,8 +765,6 @@ pending CURRENT intent followed by one synced mirror item:
 : - GATE-HPO-154
 ? per-order executor dispatch through _STEP_RUNNERS (walkthrough.py:281-288); step JSONs saved (walkthrough.py:384); DECISION REQUIRED console panels (walkthrough.py:138-189); reports regenerated via _write_timeline (walkthrough.py:71-91 -> reports/timeline.md, reports/index.md, reports/results/*); stale-decision warnings (walkthrough.py:192-201)
 : - GATE-TLINE-54
-per-sublane classification records owed per resolution:
-- GATE-INFRA-129
 persisted AnalysisDecision list:
 - GATE-SURF-60
 persisted AnalysisStep list:
@@ -823,20 +792,14 @@ posthoc.json (runners.py:413):
 - GATE-TLINE-55
 pre-merge df.columns:
 - GATE-ETL-12
-project-owned plots/results CSVs/verification JSON (self-auditing verify subcommand):
-- GATE-INFRA-122
 project-provided experiment results CSVs via BROADWAY_EXPERIMENTS_ROOT:
 - GATE-SURF-102
-project/config/ (project-owned layout, experiment, and taxi config-overlay SSOT):
+project/config/ (project-owned layout, experiment, and config-overlay SSOT):
 - GATE-INFRA-92
-? 'project/config/dataset/*.yaml (column pins: dtype/null_count/role per column, e.g. project/config/dataset/taxi.yaml:1-29; lookup_tables with value_policies/sentinel_values taxi.yaml:31-59)'
+? 'project/config/dataset/*.yaml (column pins: dtype/null_count/role per column, e.g. project/config/dataset/euromonitor.yaml:1-29; lookup_tables with value_policies/sentinel_values euromonitor.yaml:31-59)'
 : - GATE-CFG-74
 'project/config/experiments/nlp.yaml model_zoo + hpo: block (bi-encoder zoo SSOT, direction: maximize)':
 - GATE-HPO-154
-project/config/project/taxi.yaml knobs:
-- GATE-ETL-117
-project/config/{dataset,analysis,project}/ taxi overlay plus generic base configs:
-- GATE-CFG-104
 project/data/euromonitor/dataset.csv:
 - GATE-SURF-103
 project/data/euromonitor/eda.parquet (evidence):
@@ -845,18 +808,10 @@ project/experiments/euromonitor/07_nlp_hpo.py pair construction (same 12,038 pos
 - GATE-HPO-154
 project/experiments/mlflow/_common.py RESULTS convention:
 - GATE-SURF-68
-project/experiments/more_modeling/:
-- GATE-INFRA-129
-project/experiments/multivariate/:
-- GATE-INFRA-129
-project/experiments/polynomial_regression_et_all/:
-- GATE-INFRA-129
 project/experiments/results/**/*.csv (tracked):
 - GATE-SURF-68
 project/experiments/results/univariate/fare_amount_trip_distance/ratecode1_sample.parquet|.json (pinned, tracked):
 - GATE-SURF-68
-project/experiments/univariate/fare_amount_trip_distance/:
-- GATE-INFRA-129
 'project/tests/** (project-tests: full tier only, -q --dist worksteal, NO coverage flags)':
 - GATE-INFRA-92
 provenance JSON sidecar:
@@ -887,18 +842,10 @@ raw dataset at DatasetContract.path via load_with_audit:
 - GATE-ETL-10
 raw dict[Any, Any] section payload:
 - GATE-CFG-70
-raw sampled pd.DataFrame (pre-feature-engineering):
-- GATE-TRAIN-32
-raw yellow_tripdata_*.parquet glob (get_raw_files :28 raises FileNotFoundError when empty):
-- GATE-ETL-19
-raw_dir/processed_dir/processed_file for the LEGACY pipeline:
-- GATE-ETL-117
 reason from `ds-pipeline decide` args:
 - GATE-TLINE-52
 reason list:
 - GATE-TLINE-51
-? 'reason strings produced by _ingest_audit (:168) in the form "<stage>: -<N> rows"; mirrored consumer broadway.etl.module._explained_rows() at src/broadway/etl/module.py:32 parsing etl-step reasons incl. "CI sampling: -N rows"'
-: - GATE-ETL-18
 refs/remotes/origin/sklearn:scripts/check_branch_parity.sh via `git show` (:33):
 - GATE-INFRA-91
 registered model name pinned to cfg.dataset.name (= configmap dataset.name):
@@ -993,8 +940,6 @@ sample_name/sample_role:
 - GATE-TLINE-58
 sentence-transformers bi-encoders resolved via model_zoo (zero-shot; optional contrastive fine-tune examples):
 - GATE-HPO-154
-seven module-level config singletons resolved at import (_contract/_project/_etl/_features and siblings):
-- GATE-CFG-104
 sha-tagged images built/boot-tested; CD publishes bit-for-bit verified tarball to GHCR on main/taxi pushes only (:290-376):
 - GATE-INFRA-99
 silent return 0 via shortcut when main==anchor:
@@ -1003,8 +948,6 @@ single git push invocation → one hook gate (:25):
 - GATE-INFRA-96
 single merged dict keyed by section:
 - GATE-CFG-72
-single resolution dialect for the MLflow/HPO config path:
-- GATE-CFG-111
 'six evidence JSONs under artifacts/timeline/<analysis>/evidence/: describe.json (runners.py:138)':
 - GATE-TLINE-56
 size caps HTML_CAP_BYTES=5MiB :20 / PNG_CAP_BYTES=2MiB :21:
@@ -1065,8 +1008,6 @@ target (dataset target name):
 - GATE-FEAT-21
 target column name:
 - GATE-STATS-42
-taxi knobs from project/config/project/taxi.yaml via process_config.py (config_path overlay-first):
-- GATE-ETL-19
 teardown invocation after cluster/image-producing lanes:
 - GATE-INFRA-145
 tests/** (pytest -n 4 --dist worksteal, --cov-fail-under=95):
@@ -1088,8 +1029,6 @@ train_features_file parquet:
 - GATE-TRAIN-35
 train_lgbm(**params)/evaluate(tail_quantile) (baseline.py:11-23):
 - GATE-STATS-48
-training_data.parquet via save_processed_data (:132, to_parquet index=False):
-- GATE-ETL-19
 two artifact trees (positional) or --run:
 - GATE-INFRA-97
 typed EnvironmentConfig instance embedded in PipelineConfig (loader.py:135):

@@ -4,7 +4,7 @@
 # editing YAML alone reopens two-source drift (D16d rejected C7).
 # CI-only (need docker; live in ci.yml BY NAME): kubeconform,
 # orchestrator dry-run, build-and-boot. experiments.py verify
-# runs on taxi only. The full tier additionally runs 'project-tests'
+# runs on the project branch only. The full tier additionally runs 'project-tests'
 # (project/tests, collected WITHOUT --cov; the >=95 floor stays on tests/).
 # Usage: run_local_ci.sh [--static|--tier=fast|--tier=full] [--clean-lint]
 #        [-h|--help]; flags COMBINE (e.g. --tier=fast --clean-lint);
@@ -101,8 +101,6 @@ gate_parity() {
 }
 run parity gate_parity
 run ruff    dispatch bash scripts/uv.sh run --extra dev ruff check src tests project/experiments \
-            project/experiments.py \
-            project/working.py project/data.py \
             scripts
 run mypy    dispatch bash scripts/uv.sh run --extra dev mypy src/broadway
 run vulture dispatch bash scripts/uv.sh run --extra dev vulture src/broadway project scripts --min-confidence 95

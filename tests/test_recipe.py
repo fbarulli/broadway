@@ -2,7 +2,7 @@
 
 Raw + lookup CSVs are generated under ``tmp_path``; nothing reads real data
 (enforced by tests/test_platform_hygiene.py). The lookup fixture mirrors
-taxi's join shape: two lookups keyed on columns absent from the raw contract,
+the dataset's join shape: two lookups keyed on columns absent from the raw contract,
 so the second merge collides and produces ``*_lookup`` names.
 """
 
@@ -34,7 +34,7 @@ from broadway.schemas.joined import joined_schema_columns
 
 @pytest.fixture
 def lookup_dataset(tmp_path: Path) -> DatasetContract:
-    """Synthetic lookup-bearing dataset mirroring taxi's join shape (two lookups)."""
+    """Synthetic lookup-bearing dataset mirroring the dataset's join shape (two lookups)."""
     raw_path = tmp_path / "raw.csv"
     pd.DataFrame(
         {
