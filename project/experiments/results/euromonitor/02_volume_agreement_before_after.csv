@@ -1,4 +1,0 @@
-metric,before,after,delta_after_minus_before
-row_level_volume_agreement,0.5787,0.5908,0.0121
-within_barcode_volume_agreement,0.9653,0.9898,0.0245
-flagged_disagreeing_groups,198.0,57.0,141.0

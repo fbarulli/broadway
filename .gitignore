@@ -18,7 +18,7 @@ artifacts/
 /results/
 project/experiments/results/**
 !project/experiments/results/**/
-!project/experiments/results/**/*.csv
+# Generated results CSVs are derived data, not source (regenerated per run).
 # Pinned sample + evidence (single source of truth — committed on purpose)
 !project/experiments/results/univariate/sample_evidence/sample_evidence.parquet
 !project/experiments/results/univariate/sample_evidence/sample_evidence.json

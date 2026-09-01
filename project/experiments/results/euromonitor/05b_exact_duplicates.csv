@@ -1,6 +1,0 @@
-key,duplicate_groups,duplicate_rows,share_of_rows,cross_retailer_groups
-full_row (13 cols),0,0,0.0,
-retailer+title,4638,13519,0.1888,
-retailer+title+price,1631,4439,0.062,
-retailer+barcode,1266,3420,0.0478,
-title+brand,9538,24437,0.3412,5782.0

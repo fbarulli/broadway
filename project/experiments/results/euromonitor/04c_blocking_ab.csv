@@ -1,8 +1,0 @@
-rule,blocking_recall,candidate_pairs,n_blocks
-A brand x strict x vol,0.5864,883102,12077
-B brand x macro x vol,0.6154,1146524,8809
-C brand x vol,0.6275,1339172,7091
-decomp: both members have volume,0.3693,,
-decomp: same brand,0.9825,,
-decomp: same macro,0.976,,
-ref: brand x macro (NO volume in key),0.9608,,
