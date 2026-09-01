@@ -18,15 +18,15 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import matplotlib
+
 matplotlib.use("Agg")
 
 import numpy as np
-import pandas as pd
-from sklearn.metrics import roc_auc_score
-
 from _blocking import build_pairs
 from _common import PATHS, SEED, load_dataset_deduped
 from _hard_negatives import mine_hard_negatives
+from sklearn.metrics import roc_auc_score
+
 from broadway.training.nlp import encode_corpus, precision_at_recall
 
 MODEL = "sentence-transformers/all-MiniLM-L6-v2"
@@ -96,8 +96,9 @@ def main() -> None:
     print(f"training triples {len(triples):,} (loss={LOSS})", flush=True)
 
     # ---- fine-tune ----
-    from broadway.training.nlp import _finetune
     from sentence_transformers import SentenceTransformer
+
+    from broadway.training.nlp import _finetune
     model = SentenceTransformer(MODEL, device="cpu")
     model.max_seq_length = 128
     params = {"epochs": EPOCHS, "batch_size": BATCH_SIZE, "learning_rate": LR, "warmup_steps": 0}
@@ -118,11 +119,9 @@ def main() -> None:
     hn_test_mask = np.isin(row_bc[hard_pairs[:, 0]], list(split_bc["test"])) | np.isin(row_bc[hard_pairs[:, 1]], list(split_bc["test"]))
     htp = hard_pairs[hn_test_mask]
     hn_s = cos(htp) if len(htp) else np.array([])
-    y = np.r_[np.ones(len(pos_s)), np.zeros(len(hn_s))]
-    scores = np.r_[pos_s, hn_s]
-    p_at_r = precision_at_recall(y, scores, target_recall=0.99)
+    p_at_r = precision_at_recall(pos_s, hn_s, target_recall=0.90)
     print(f"hard-band pairs scored: {len(hn_s):,}", flush=True)
-    print(f"precision@recall=0.99 on hard band: {p_at_r:.4f}", flush=True)
+    print(f"precision@90pct-recall on hard band: {p_at_r:.4f}", flush=True)
     print(f"TOTAL {time.perf_counter()-t0:.0f}s", flush=True)
 
 

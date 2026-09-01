@@ -49,48 +49,56 @@ def entity_resolution_metrics(
 ) -> dict[str, float]:
     """Ranking metrics for a bi-encoder's pos-vs-neg score populations.
 
-    pos_scores are true-pair similarities, neg_scores are non-pair
-    similarities. Returns AUC (probability a random positive outscores
-    a random negative), recall at a fixed false-positive budget, precision at a
-    target recall (the business-relevant number for the scoring stage), and the
-    score-distribution summaries used for the threshold trade-off.
+    pos_scores are true-pair similarities, neg_scores are non-pair similarities.
+    Returns ROC AUC, PR-AUC (average precision), recall at a fixed FPR budget,
+    precision at a target recall (operating-point precision via the positive
+    score distribution), F1 at the operating threshold, and score-distribution
+    summaries used for the threshold trade-off.
     """
-    from sklearn.metrics import roc_auc_score
+    from sklearn.metrics import average_precision_score, roc_auc_score
 
     if len(pos_scores) == 0 or len(neg_scores) == 0:
         raise ValueError("entity_resolution_metrics requires non-empty pos and neg scores")
     y = np.r_[np.ones(len(pos_scores)), np.zeros(len(neg_scores))]
     scores = np.r_[pos_scores, neg_scores]
     auc = float(roc_auc_score(y, scores))
+    ap = float(average_precision_score(y, scores))
+
+    # operating threshold: recall at fixed FPR budget
     thr = float(np.quantile(neg_scores, 1 - fpr))
+    tp_op = float((pos_scores >= thr).sum())
+    fp_op = float((neg_scores >= thr).sum())
+    recall_op = tp_op / len(pos_scores)
+    precision_op = tp_op / (tp_op + fp_op) if (tp_op + fp_op) > 0 else 0.0
+    f1_op = (2 * precision_op * recall_op / (precision_op + recall_op)
+             if (precision_op + recall_op) > 0 else 0.0)
+
     return {
         "auc": round(auc, 4),
-        f"recall_at_{int(fpr * 100)}pct_fpr": round(float((pos_scores >= thr).mean()), 4),
+        "average_precision": round(ap, 4),
+        f"recall_at_{int(fpr * 100)}pct_fpr": round(recall_op, 4),
         f"precision_at_{int(target_recall * 100)}pct_recall": round(
-            float(precision_at_recall(y, scores, target_recall=target_recall)), 4),
+            float(precision_at_recall(pos_scores, neg_scores, target_recall=target_recall)), 4),
+        "f1_at_5pct_fpr": round(f1_op, 4),
         "pos_median": round(float(np.median(pos_scores)), 4),
         "neg_p90": round(float(np.quantile(neg_scores, 0.9)), 4),
     }
 
 
-def precision_at_recall(y_true: np.ndarray, scores: np.ndarray, target_recall: float = 0.99) -> float:
-    """Precision at the operating threshold that achieves >= target_recall.
+def precision_at_recall(pos_scores: np.ndarray, neg_scores: np.ndarray, target_recall: float = 0.90) -> float:
+    """Precision at the score threshold that keeps exactly target_recall of positives.
 
-    The business-relevant number on a hand-labeled hard set: at the scoring
-    stage a false match corrupts downstream (pricing) decisions, so we report
-    precision-at-recall instead of an unstable small-set AUC. ``y_true`` is
-    0/1 (1 = true match); returns NaN when no positives are present.
+    The threshold is set on the POSITIVE score distribution (the quantile that
+    retains target_recall of true pairs), then precision = TP / (TP + FP) at
+    that threshold. This is the business-relevant number for the scoring stage:
+    at target recall, how many of the flagged pairs are actually the same product.
     """
-    n_pos = int(y_true.sum())
-    if n_pos == 0:
+    if len(pos_scores) == 0:
         return float("nan")
-    order = np.argsort(-scores)
-    y_sorted = y_true[order].astype(float)
-    recall = np.cumsum(y_sorted) / n_pos
-    idx = int(np.searchsorted(recall, target_recall, side="left"))
-    if idx >= len(y_sorted):
-        return 0.0
-    return float(np.cumsum(y_sorted)[idx] / (idx + 1))
+    threshold = float(np.quantile(pos_scores, 1 - target_recall))
+    pos_at = float((pos_scores >= threshold).sum())
+    neg_at = float((neg_scores >= threshold).sum())
+    return pos_at / (pos_at + neg_at) if (pos_at + neg_at) > 0 else 0.0
 
 
 def _has_finetune_params(params: dict[str, float | int]) -> bool:
