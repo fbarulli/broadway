@@ -82,6 +82,7 @@ def main() -> None:
     )
     timing_frame.to_csv(CSV_TIMING, index=False)
     print(f"wrote {CSV_TIMING} (phase timing profile, {len(timing_frame)} rows)")
+    print(f"total wall-clock: {report.total():.1f}s")
 
     failed = result.get("failed", {})
     if failed:

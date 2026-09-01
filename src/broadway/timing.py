@@ -43,6 +43,10 @@ class TimingReport:
         """Total recorded seconds for ``name`` (0.0 if never recorded)."""
         return self._sum.get(name, 0.0)
 
+    def total(self) -> float:
+        """Total wall-clock across all recorded phases (seconds)."""
+        return sum(self._sum.values())
+
     def as_dict(self) -> dict[str, dict[str, float]]:
         """Plain-data snapshot: {name: {seconds, calls, last}} sorted by name."""
         return {

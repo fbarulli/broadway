@@ -15,6 +15,7 @@ def test_timing_report_accumulates() -> None:
     assert r.elapsed("load") == 3.0
     assert r.elapsed("encode") == 0.5
     assert r.elapsed("missing") == 0.0
+    assert r.total() == 3.5
     d = r.as_dict()
     assert d["load"]["seconds"] == 3.0
     assert d["load"]["calls"] == 2
