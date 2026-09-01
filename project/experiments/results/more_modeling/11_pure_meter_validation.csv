@@ -1,4 +1,0 @@
-,Train (80%),Test (20%),Diff
-const,3.3663,3.4176,-0.0513
-trip_distance,3.2591,3.2518,0.0073
-trip_duration_minutes,0.3037,0.3012,0.0025

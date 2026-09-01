@@ -1,4 +1,0 @@
-population,sample_name,source,weighted,n_train,n_test,mae,rmse,r2,tail_mae
-A,manhattan_sample,manhattan,False,31834,7959,1.2006,2.1542,0.9629,4.183145064585146
-B,stratified_sample,stratified,False,4202,1051,2.8386,5.2592,0.9636,8.50883454313499
-C,weighted_sample,manhattan,True,31834,7959,1.2174,2.1435,0.9632,4.192315859752705
