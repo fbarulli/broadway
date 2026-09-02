@@ -1,6 +1,6 @@
 # Gate registry SSOT — hand-maintained; the {01..09} gate fragments it consolidated predate git custody.
 meta:
-  head: '1bed31e'
+  head: '5f3cf5f'
   counts:
     total: 163
     gates_with_findings: 75
