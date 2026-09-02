@@ -1,15 +1,22 @@
-"""Verify every local DATA-file path referenced by Dockerfiles and configs exists.
+"""Verify the build/deploy layer references only paths declared in the SSOT.
 
-Catches the class of "docker keeps breaking" bug where a Dockerfile/COPY or a
-config ``parquet:`` key points at a data asset that was deleted or never
-committed (e.g. k8s/optuna/Dockerfile.worker COPYing
-project/experiments/results/univariate/sample_evidence/sample_evidence.parquet
-after the taxi results were removed).
+project/config/layout.yaml (loaded via project/paths.py) is the SINGLE SOURCE
+OF TRUTH for what the images COPY and what CI builds. This gate closes the
+"docker keeps breaking" class of bug where a Dockerfile COPY/ADD source or a
+ci.yml dockerfile/manifest reference points at a path that was deleted or
+never declared — removing a dataset or moving the project layout must land in
+layout.yaml, and any reference that escapes it fails here.
 
-Rule: a referenced local path must either exist on disk OR be a gitignored
-generated artifact. Anything else is a dangling reference and fails the check.
-This is the data-asset analogue of the gate registry's closure test — the
-knowledge graph is NOT required to answer "does every referenced file exist?".
+Rules:
+  * a Dockerfile COPY/ADD source must sit inside a declared build.copy_dirs
+    directory or equal a declared build.copy_files entry, AND be git-committed
+    (the build context is a fresh checkout);
+  * every ci.yml ``-f <dockerfile>`` reference must be a declared
+    build.dockerfiles entry, and every ci.yml ``k8s/*.yaml`` reference a
+    declared build.manifests entry;
+  * every declared build surface must itself exist on disk;
+  * a config ``parquet:``/``path:``/``file:`` data path must exist or be a
+    gitignored generated artifact.
 
 Usage: python scripts/check_data_refs.py   # exit 0 green / 1 red
 """
@@ -19,6 +26,8 @@ import re
 import subprocess
 import sys
 from pathlib import Path
+
+from project.paths import load_project_paths
 
 REPO = Path(__file__).resolve().parents[1]
 
@@ -40,25 +49,18 @@ def _exists(rel: str) -> bool:
     return (REPO / rel).exists()
 
 
-def _normalize(ref: str) -> str | None:
-    """Resolve a config/Dockerfile path token to a repo-relative path.
+def _committed(rel: str) -> bool:
+    """A Docker COPY source must be git-tracked: the build context is a fresh
+    checkout, so a gitignored/untracked file is absent at COPY time."""
+    return subprocess.run(
+        ["git", "ls-files", "--error-unmatch", "--", rel],
+        cwd=REPO, check=False, capture_output=True,
+    ).returncode == 0
 
-    Handles the three conventions the repo uses:
-      * repo-relative ``project/...``            -> unchanged
-      * in-image absolute ``/app/project/...``   -> strip ``/app/``
-      * project-relative ``experiments/...`` or  -> prefix ``project/``
-        ``config/...`` (configs resolve against ``project/``)
-    Returns None for tokens that are not local file references.
-    """
-    ref = ref.strip().strip("\"'")
-    ref = ref.removeprefix("/app/")
-    if ref.startswith("/"):
-        return None  # image/absolute path with no local source
-    if ref.startswith(("experiments/", "config/", "results/")):
-        ref = f"project/{ref}"
-    if ref.startswith(("$", "~", "--")):
-        return None
-    return ref
+
+def _in_copy_dir(rel: str, dirs: tuple[str, ...]) -> bool:
+    """True when ``rel`` is one of the declared COPY directories or beneath it."""
+    return any(rel == d or rel.startswith(f"{d}/") for d in dirs)
 
 
 def _dockerfile_refs() -> list[tuple[str, str]]:
@@ -73,23 +75,40 @@ def _dockerfile_refs() -> list[tuple[str, str]]:
             if not m:
                 continue
             for tok in m.group(1).split():
-                # multi-stage (--from=), image-absolute (/uv, /app), and env ($) tokens
-                if tok.startswith(("--", "/", "$", "~")):
+                # multi-stage (--from=), image-absolute (/uv, /app), env ($),
+                # and bare-dot destination (. / ./ .. / ../) tokens
+                if tok.startswith(("--", "/", "$", "~")) or tok in {".", "./", "..", "../"}:
                     continue
-                refs.append((tok, parent))
+                refs.append((tok.strip("\"'"), parent))
     return refs
 
 
-def _committed(rel: str) -> bool:
-    """A Docker COPY source must be git-tracked: the build context is a fresh
-    checkout, so a gitignored/untracked file is absent at COPY time."""
-    return subprocess.run(
-        ["git", "ls-files", "--error-unmatch", "--", rel],
-        cwd=REPO, check=False, capture_output=True,
-    ).returncode == 0
+def _ci_lines() -> list[str]:
+    """Non-comment lines of .github/workflows/ci.yml."""
+    ci = REPO / ".github" / "workflows" / "ci.yml"
+    return [
+        line for line in ci.read_text(encoding="utf-8").splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    ]
 
 
-def _yaml_parquet_refs() -> list[str]:
+def _ci_dockerfile_refs() -> list[str]:
+    """Every ``docker build -f <dockerfile>`` reference in ci.yml."""
+    refs: list[str] = []
+    for line in _ci_lines():
+        refs.extend(re.findall(r"-f\s+(\S+)", line))
+    return refs
+
+
+def _ci_manifest_refs() -> list[str]:
+    """Every repo-relative ``k8s/*.yaml`` reference in ci.yml."""
+    refs: list[str] = []
+    for line in _ci_lines():
+        refs.extend(re.findall(r"\b(k8s/[A-Za-z0-9_.-]+\.ya?ml)\b", line))
+    return refs
+
+
+def _yaml_data_refs() -> list[str]:
     """Data-file paths declared under ``parquet:`` / ``path:`` / ``file:`` keys."""
     refs: list[str] = []
     roots = [REPO / "project", REPO / "configs"]
@@ -108,28 +127,59 @@ def _yaml_parquet_refs() -> list[str]:
 
 
 def main() -> int:
-    # Docker COPY sources must be committed (build context = git checkout);
-    # a source may be repo-rooted or relative to its Dockerfile's directory.
+    paths = load_project_paths()
     missing: list[str] = []
-    seen: set[str] = set()
+
+    # Dockerfile COPY/ADD sources must be declared in the SSOT build surfaces
+    # AND committed. A source is repo-rooted or relative to its Dockerfile dir.
     for tok, parent in _dockerfile_refs():
-        norm = _normalize(tok)
-        if norm is None:
-            continue
-        candidates = [norm] if parent == "." else [norm, f"{parent}/{norm}"]
-        if not any(_committed(c) for c in candidates) and norm not in seen:
-            missing.append(norm)
-            seen.add(norm)
-    yaml_refs = {r for r in (_normalize(x) for x in _yaml_parquet_refs()) if r}
-    # YAML data paths may legitimately be gitignored generated artifacts.
-    missing += sorted(r for r in yaml_refs if not _exists(r) and not _git_ignored(r))
+        candidates = [tok] if parent == "." else [tok, f"{parent}/{tok}"]
+        declared = [
+            c for c in candidates
+            if c in paths.build_copy_files or _in_copy_dir(c, paths.build_copy_dirs)
+        ]
+        if not declared:
+            missing.append(f"undeclared COPY/ADD source: {tok} ({parent})")
+        elif not any(_committed(c) for c in declared):
+            missing.append(f"dangling COPY/ADD source: {tok} ({parent})")
+
+    # ci.yml dockerfile/manifest references must be declared in the SSOT.
+    missing += [
+        f"undeclared ci.yml dockerfile: {ref}"
+        for ref in _ci_dockerfile_refs()
+        if ref not in paths.build_dockerfiles
+    ]
+    missing += [
+        f"undeclared ci.yml manifest: {ref}"
+        for ref in _ci_manifest_refs()
+        if ref not in paths.build_manifests
+    ]
+
+    # Every declared build surface must itself resolve (SSOT self-consistency).
+    declared_surfaces = (
+        *paths.build_dockerfiles, *paths.build_manifests,
+        *paths.build_copy_files, *paths.build_copy_dirs, *paths.build_contexts,
+    )
+    missing += [
+        f"declared build surface missing: {ref}"
+        for ref in declared_surfaces
+        if not _exists(ref)
+    ]
+
+    # Config data paths may legitimately be gitignored generated artifacts.
+    missing += [
+        f"dangling data reference: {ref}"
+        for ref in _yaml_data_refs()
+        if not _exists(ref) and not _git_ignored(ref)
+    ]
+
     if missing:
-        for rel in missing:
+        for rel in sorted(set(missing)):
             print(f"dangling data reference: {rel}", file=sys.stderr)
-        print(f"{len(missing)} dangling data reference(s) — referenced but neither "
-              f"committed nor present", file=sys.stderr)
+        print(f"{len(set(missing))} dangling data reference(s) — referenced but "
+              f"not declared in the SSOT or not present", file=sys.stderr)
         return 1
-    print("data-refs OK: COPY/ADD sources committed, config paths resolve")
+    print("data-refs OK: COPY/ADD sources + ci.yml references match the SSOT")
     return 0
 
 

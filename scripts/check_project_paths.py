@@ -8,26 +8,27 @@ from pathlib import Path
 from project.paths import load_project_paths
 
 REPO = Path(__file__).resolve().parents[1]
-LEGACY_PATH = re.compile(
-    r"(?<!project/)configs/(?:experiments/|dataset/taxi\.yaml|analysis/taxi(?:_causal|_hypothesis)?\.yaml|experiment/taxi\.yaml|project/taxi\.yaml|sample/(?:fare_prediction_1m|taxi_diagnostic|taxi_estimation)\.yaml|slice/(?:airport|distance_duration_inconsistent|passenger_out_of_range|pre_2024)\.yaml)|(?<!project/)(?<!config/)(?:experiments/(?:results|mlflow|fare_prediction|more_modeling|multivariate|polynomial_regression_et_all|univariate)|/app/experiments/)"
-)
-RETIRED_TAXI_CONFIGS = (
-    "configs/dataset/taxi.yaml",
-    "configs/analysis/taxi.yaml",
-    "configs/analysis/taxi_causal.yaml",
-    "configs/analysis/taxi_hypothesis.yaml",
-    "configs/experiment/taxi.yaml",
-    "configs/project/taxi.yaml",
-    "configs/sample/fare_prediction_1m.yaml",
-    "configs/sample/taxi_diagnostic.yaml",
-    "configs/sample/taxi_estimation.yaml",
-    "configs/slice/airport.yaml",
-    "configs/slice/distance_duration_inconsistent.yaml",
-    "configs/slice/passenger_out_of_range.yaml",
-    "configs/slice/pre_2024.yaml",
-)
 CHECKED_SUFFIXES = {".py", ".sh", ".yaml", ".yml"}
 EXCLUDED_DIRS = {".git", ".venv", "__pycache__", ".mypy_cache", ".pytest_cache", ".ruff_cache"}
+
+
+def _legacy_pattern(prefixes: tuple[str, ...], paths: tuple[str, ...]) -> re.Pattern[str]:
+    """Build the legacy-reference matcher from the SSOT retired declarations.
+
+    A prefix is a location the layout retired (old experiments/config roots);
+    a path is an exact retired config file. Root-scoped references are only
+    legacy when they are NOT under ``project/`` (the current layout) or
+    ``config/`` (the current ``project/config`` root).
+    """
+    parts: list[str] = []
+    for prefix in prefixes:
+        if prefix.startswith("/"):
+            parts.append(re.escape(prefix))
+        else:
+            parts.append(f"(?<!project/)(?<!config/){re.escape(prefix)}")
+    for path in paths:
+        parts.append(f"(?<!project/){re.escape(path)}")
+    return re.compile("|".join(parts))
 
 
 def runtime_files(root: Path) -> list[Path]:
@@ -49,8 +50,10 @@ def runtime_files(root: Path) -> list[Path]:
 
 
 def legacy_path_references(root: Path, paths: list[Path]) -> list[str]:
-    """Return tracked runtime references to the retired root experiments tree."""
-    return [str(path.relative_to(root)) for path in paths if LEGACY_PATH.search(path.read_text(encoding="utf-8"))]
+    """Return tracked runtime references to retired root-scoped locations."""
+    layout = load_project_paths()
+    pattern = _legacy_pattern(layout.retired_prefixes, layout.retired_paths)
+    return [str(path.relative_to(root)) for path in paths if pattern.search(path.read_text(encoding="utf-8"))]
 
 
 def main() -> None:
@@ -62,11 +65,12 @@ def main() -> None:
         if not path.is_dir()
     ]
     legacy = legacy_path_references(REPO, runtime_files(REPO))
-    retired_configs = [path for path in RETIRED_TAXI_CONFIGS if (REPO / path).exists()]
-    if missing or legacy or retired_configs or (REPO / "experiments").exists():
+    retired_configs = [path for path in paths.retired_paths if (REPO / path).exists()]
+    retired_roots = [path for path in paths.retired_roots if (REPO / path).exists()]
+    if missing or legacy or retired_configs or retired_roots:
         raise SystemExit(
             f"PROJECT PATH ERROR: missing={missing}; legacy={legacy}; "
-            f"retired_configs={retired_configs}"
+            f"retired_configs={retired_configs}; retired_roots={retired_roots}"
         )
     print(f"PROJECT PATHS OK: experiments={paths.experiments}; configs={paths.experiment_configs}")
 

@@ -100,6 +100,7 @@ gate_parity() {
   return "$rc"
 }
 run parity gate_parity
+# project/experiments mirrors project/config/layout.yaml ``experiments`` (SSOT).
 run ruff    dispatch bash scripts/uv.sh run --extra dev ruff check src tests project/experiments \
             scripts
 run mypy    dispatch bash scripts/uv.sh run --extra dev mypy src/broadway
@@ -112,6 +113,7 @@ ps = sorted(Path('configs/experiment').glob('*.yaml')); assert ps, 'no configs'
 # Gate-divergence law: keep command-identical to ci.yml's 'Shell scripts' step.
 # shellcheck disable=SC2016  # single quotes intended: globs must expand under bash -c
 run shell-scripts bash -c 'for f in scripts/*.sh; do bash -n "$f"; done; shellcheck scripts/*.sh'
+# data-refs enforces the build/deploy SSOT (project/config/layout.yaml build:*).
 run data-refs python3 scripts/check_data_refs.py
 if [[ $STATIC -eq 0 && $TIER == "full" ]]; then
   run pytest bash scripts/uv.sh run --extra dev pytest tests/ -n 4 --dist worksteal \

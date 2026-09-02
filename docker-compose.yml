@@ -1,5 +1,6 @@
 services:
   mlflow:
+    # SSOT: project/config/layout.yaml build.build_contexts (docker/mlflow)
     build: ./docker/mlflow
     ports:
       - "${MLFLOW_PORT:-5000}:5000"
@@ -13,6 +14,7 @@ services:
       --default-artifact-root /mlflow/artifacts
 
   postgres:
+    # SSOT: project/config/layout.yaml build.build_contexts (docker/postgres)
     build: ./docker/postgres
     ports:
       - "${DATABASE_PORT:-5432}:5432"

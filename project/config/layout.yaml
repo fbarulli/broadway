@@ -1,4 +1,80 @@
+# Project layout — the SINGLE SOURCE OF TRUTH for project-owned paths.
+#
+# The four top-level keys below are project-relative and resolve under
+# project/ (see project/paths.py). The ``build:`` and ``retired:`` blocks are
+# repo-root-relative and are consumed by the build/deploy layer's gates
+# (scripts/check_data_refs.py, scripts/check_project_paths.py). Keep every
+# path in ONE place here; Dockerfiles, ci.yml, docker-compose.yml and
+# .dockerignore must match these declarations, never redefine them.
 config: config
 experiments: experiments
 experiment_configs: config/experiments
 observations: artifacts/experiments/observations
+
+# Build-critical surfaces (repo-root-relative) referenced by the Docker/CI
+# layer. scripts/check_data_refs.py fails any Dockerfile COPY/ADD source or
+# ci.yml dockerfile/manifest reference that is NOT declared here.
+build:
+  # Top-level directories the images COPY into /app.
+  copy_dirs:
+    - src
+    - configs
+    - scripts
+    - project
+  # Individual files the images COPY (exact repo-root-relative paths).
+  copy_files:
+    - pyproject.toml
+    - uv.lock
+    - docker/postgres/init.sql
+  # Docker image build contexts (repo-root-relative).
+  build_contexts:
+    - .
+    - docker/mlflow
+    - docker/postgres
+  # Dockerfile locations (repo-root-relative).
+  dockerfiles:
+    - Dockerfile
+    - k8s/optuna/Dockerfile.base
+    - docker/mlflow/Dockerfile
+    - docker/postgres/Dockerfile
+  # Kubernetes manifests the CI/deploy layer references (repo-root-relative).
+  manifests:
+    - k8s/api-deployment.yaml
+    - k8s/mlflow-deployment.yaml
+    - k8s/postgres-deployment.yaml
+    - k8s/train-job.yaml
+
+# Retired root-scoped locations (repo-root-relative). These escaped the layout
+# when the experiment/config roots moved under project/ and the taxi dataset
+# was removed. scripts/check_project_paths.py derives its legacy-reference gate
+# and leftover-file checks from here instead of hardcoding them.
+retired:
+  # Repo-root directories that must no longer exist (moved under project/).
+  roots:
+    - experiments
+  # Location prefixes: any tracked reference to one of these is legacy.
+  prefixes:
+    - experiments/results/
+    - experiments/mlflow/
+    - experiments/fare_prediction/
+    - experiments/more_modeling/
+    - experiments/multivariate/
+    - experiments/polynomial_regression_et_all/
+    - experiments/univariate/
+    - configs/experiments/
+    - /app/experiments/
+  # Retired project config files (removed with the taxi dataset).
+  paths:
+    - configs/dataset/taxi.yaml
+    - configs/analysis/taxi.yaml
+    - configs/analysis/taxi_causal.yaml
+    - configs/analysis/taxi_hypothesis.yaml
+    - configs/experiment/taxi.yaml
+    - configs/project/taxi.yaml
+    - configs/sample/fare_prediction_1m.yaml
+    - configs/sample/taxi_diagnostic.yaml
+    - configs/sample/taxi_estimation.yaml
+    - configs/slice/airport.yaml
+    - configs/slice/distance_duration_inconsistent.yaml
+    - configs/slice/passenger_out_of_range.yaml
+    - configs/slice/pre_2024.yaml

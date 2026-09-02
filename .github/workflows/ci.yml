@@ -81,9 +81,11 @@ jobs:
           set -euo pipefail
 
           mkdir -p "${RUNNER_TEMP}/manifests"
+          # SSOT: project/config/layout.yaml build.manifests (k8s/train-job.yaml)
           sed 's/{{[^}]*}}/ci-placeholder/g' k8s/train-job.yaml \
             > "${RUNNER_TEMP}/manifests/train-job.yaml"
 
+          # SSOT: project/config/layout.yaml build.manifests (top-level api/mlflow/postgres)
           docker run --rm \
             -v "$PWD:/work" \
             -v "${RUNNER_TEMP}/manifests:/rendered" \
@@ -138,6 +140,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ runner.temp }}/broadway-base.tar.gz
+          # SSOT: project/config/layout.yaml build.copy_files/build.copy_dirs/build.dockerfiles
           key: broadway-base-${{ hashFiles('pyproject.toml', 'uv.lock', 'k8s/optuna/Dockerfile.base', 'src/**', 'project/**') }}
 
       - name: Load cached base image
@@ -153,6 +156,7 @@ jobs:
         # Tag :latest so worker/mlflow `FROM broadway-base:latest` resolves
         # locally on a cold cache (docker pulls from the registry otherwise).
         run: |
+          # SSOT: build.dockerfiles (k8s/optuna/Dockerfile.base) + build.build_contexts (.)
           docker build \
             -f k8s/optuna/Dockerfile.base \
             -t broadway-base:latest \
@@ -172,6 +176,7 @@ jobs:
       # broadway-postgres (k8s/postgres-deployment.yaml + docker-compose.yml).
       - name: Build platform image (root Dockerfile)
         run: |
+          # SSOT: build.dockerfiles (Dockerfile) + build.build_contexts (.)
           docker build \
             -f Dockerfile \
             -t broadway:${{ github.sha }} \
@@ -179,6 +184,7 @@ jobs:
 
       - name: Build manifest mlflow image (docker/mlflow)
         run: |
+          # SSOT: build.dockerfiles (docker/mlflow/Dockerfile) + build.build_contexts (.)
           docker build \
             -f docker/mlflow/Dockerfile \
             -t broadway-mlflow:${{ github.sha }} \
@@ -186,6 +192,7 @@ jobs:
 
       - name: Build manifest postgres image (docker/postgres)
         run: |
+          # SSOT: build.dockerfiles (docker/postgres/Dockerfile) + build.build_contexts (docker/postgres)
           docker build \
             -f docker/postgres/Dockerfile \
             -t broadway-postgres:${{ github.sha }} \

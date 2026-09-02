@@ -15,4 +15,5 @@ node_modules/
 .pytest_cache/
 diagnostics_experiment/
 legend_experiment/
+# SSOT: project/config/layout.yaml experiments → results (generated, not baked)
 project/experiments/results/

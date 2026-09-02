@@ -316,7 +316,7 @@ def _finetune(
                   f"loss {float(loss_val.detach()):.4f}", flush=True)
             return loss_val
 
-        train_loss.forward = _logging_forward  # type: ignore[method-assign]
+        train_loss.forward = _logging_forward
 
     fit_kwargs: dict = {
         "epochs": epochs,
