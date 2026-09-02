@@ -1,6 +1,6 @@
 """Hard-negative mining for euromonitor entity resolution.
 
-Mines cross-barcode pairs the bi-encoder finds confusing (the 0.5-0.75 cosine
+Mines cross-barcode pairs the bi-encoder finds confusing (the 0.45-0.80 cosine
 band) while EXCLUDING known label errors: same-title+brand rows carrying
 conflicting barcodes (the mislabeled-barcode groups). The output is auditable —
 a CSV with title/brand/barcode/cosine per pair — so a human can hand-label a
@@ -133,8 +133,8 @@ def mine_hard_negatives(
     *,
     seed: int = 42,
     n_target: int = 10_000,
-    cosine_lo: float = 0.5,
-    cosine_hi: float = 0.75,
+    cosine_lo: float = 0.45,
+    cosine_hi: float = 0.80,
     exclude_conflicting: bool = True,
     k: int = 40,
 ) -> tuple[np.ndarray, np.ndarray]:

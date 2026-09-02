@@ -262,7 +262,15 @@ def encode_corpus(
     return _encode_payload(model, payload, batch_size, cache_path, prompt)
 
 
-def _finetune(model, params: dict[str, float | int], examples, max_seq_length: int, loss: str = "mnrl") -> None:
+def _finetune(
+    model,
+    params: dict[str, float | int],
+    examples,
+    max_seq_length: int,
+    loss: str = "mnrl",
+    *,
+    log_steps: bool = False,
+) -> None:
     """Fine-tune a fresh base model in place (no disk save).
 
     The caller owns the model object; fit() mutates it, so encoding afterwards
@@ -274,6 +282,11 @@ def _finetune(model, params: dict[str, float | int], examples, max_seq_length: i
     is passed through optimizer_params (sentence-transformers has no top-level lr
     knob); when absent the library default is used, so the argument is omitted
     rather than passed as None.
+
+    ``log_steps`` prints one ``[step i/N] loss X`` line per training batch by
+    wrapping the loss module's forward — a live progress signal for long
+    CPU-only runs where fit() otherwise emits nothing between folds (its tqdm
+    bar shows position but not the loss).
     """
     from sentence_transformers.sentence_transformer import losses
     from torch.utils.data import DataLoader
@@ -290,6 +303,21 @@ def _finetune(model, params: dict[str, float | int], examples, max_seq_length: i
         train_loss = losses.TripletLoss(model)
     else:
         train_loss = losses.MultipleNegativesRankingLoss(model)
+
+    if log_steps:
+        num_steps = max(1, (len(examples) + batch_size - 1) // batch_size) * epochs
+        step_state = {"step": 0}
+        _orig_forward = train_loss.forward
+
+        def _logging_forward(sentence_features, labels):
+            step_state["step"] += 1
+            loss_val = _orig_forward(sentence_features, labels)
+            print(f"    [step {step_state['step']}/{num_steps}] "
+                  f"loss {float(loss_val.detach()):.4f}", flush=True)
+            return loss_val
+
+        train_loss.forward = _logging_forward  # type: ignore[method-assign]
+
     fit_kwargs: dict = {
         "epochs": epochs,
         "warmup_steps": warmup_steps,

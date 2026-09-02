@@ -53,7 +53,7 @@ def main() -> None:
 
     # mine hard negatives; both endpoints of every pair are held in the SAME
     # split (train pairs build triples, test pairs are the held-out hard eval).
-    hard_pairs, _ = mine_hard_negatives(df, emb0, n_target=10_000)
+    hard_pairs, _ = mine_hard_negatives(df, emb0, n_target=20_000, cosine_lo=0.45, cosine_hi=0.80)
     hard_train = hard_pairs[pairs_in_set(hard_pairs, row_bc, train_bc)]
     hard_test = hard_pairs[pairs_in_set(hard_pairs, row_bc, test_bc)]
 
