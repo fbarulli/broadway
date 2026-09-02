@@ -1,10 +1,10 @@
 # Gate registry SSOT — hand-maintained; the {01..09} gate fragments it consolidated predate git custody.
 meta:
-  head: '6e967d3'
+  head: '477cdaf'
   counts:
-    total: 134
-    gates_with_findings: 78
-    finding_strings: 103
+    total: 128
+    gates_with_findings: 75
+    finding_strings: 99
     by_band:
       01-ingest:
         gates: 8
@@ -39,15 +39,15 @@ meta:
         flagged: 10
         finding_strings: 13
       80-hpo-optuna:
-        gates: 11
-        flagged: 9
-        finding_strings: 13
+        gates: 10
+        flagged: 8
+        finding_strings: 11
       09-infra:
-        gates: 29
-        flagged: 16
-        finding_strings: 24
+        gates: 25
+        flagged: 14
+        finding_strings: 22
       81-object-custody:
-        gates: 4
+        gates: 3
         flagged: 0
         finding_strings: 0
   assembled: '2026-08-24'
@@ -2982,42 +2982,9 @@ gates:
   findings:
   - 'study_name COLLIDES across datasets/experiments — ''hpo-lgbm''-style names are globally unique keys in one storage, and load_if_exists makes re-use SILENT; pointing any second experiment at a persistent storage_url appends foreign trials to the existing studies, mixing datasets inside one leaderboard. root: src/broadway/training/hpo.py:139'
   - 'DB credentials reach pod LOGS — compose_db_url bakes the raw password into the URL (optuna_worker.py:21) and the worker prints the composed db_url to stdout as a deliberate ''visibility requirement'' (project/experiments/mlflow/03_optuna_worker.py:87); the 2026-08-24 secret-audit factsheet covered manifests/templates only, not this runtime print. root: project/experiments/mlflow/03_optuna_worker.py:87'
-- id: GATE-HPO-87
-  phase: hpo-optuna
-  order: 98
-  owner: k8s/optuna/render_worker_jobs.py:26 render_jobs()
-  inputs:
-  - CFG-HPO-SPEC hpo.models (ONE Job per model)
-  - CFG-K8S-OPTUNA-INFRA configmap inline config.yaml
-  - optuna-db Secret
-  outputs:
-  - Job manifests optuna-{display_name} applied by lifecycle.sh run_hpo (k8s/optuna/lifecycle.sh:136-138); optuna-init Job pre-creating studies
-  transforms:
-  - the HPO spec is the SINGLE SOURCE for which Jobs exist (docstring :3-5; static worker-jobs.yaml removed); renderer is the ONLY generator
-  - env BROADWAY_MLFLOW_CONFIG=/app/project/config/experiments/mlflow.yaml injected (k8s/optuna/render_worker_jobs.py:48-50); the worker branches on env presence with a parents[2] repo fallback (project/experiments/mlflow/03_optuna_worker.py:46-49)
-  - 'mounts: configMap optuna-config → /etc/broadway/config.yaml subPath readOnly (:52-53); Secret optuna-db → /etc/broadway/secret readOnly (:54-55) — FILE-based credentials, NEVER env vars (module docstring :3-5); load_secret reads DB_USER/DB_PASSWORD/DB_NAME files (03_optuna_worker.py:52-56)'
-  - 'Job semantics: restartPolicy Never, backoffLimit 2, ttlSecondsAfterFinished 120 (:36-40); init-Job twin ttl 600 with args [--init-only] materializing empty studies via _dummy_objective returning 0.0 (k8s/optuna/optuna-init.yaml:10-20; 03_optuna_worker.py:74-76, :165-171)'
-  - image tag injectable --image for CD pinning (:71; consumed via OPTUNA_WORKER_IMAGE at lifecycle.sh:135-137)
-  - 'image plane: Dockerfile.worker mirrors the repo layout and sets PYTHONPATH=/app/src:/app (:13-16), BAKES the dataset parquet (:11-12) plus project/config/experiments/{mlflow,working}.yaml (:9-10); base image uv sync --frozen (Dockerfile.base:10)'
-  - 'preflight loud-exit: SQLAlchemy connect + MlflowClient().search_experiments BEFORE any trial, sys.exit(1) with FATAL banner on either failure (03_optuna_worker.py:118-138)'
-  - 'orchestration: lifecycle.sh pipes renderer | kubectl apply (:136-138), waits condition=complete per job with 1200 s timeout, FAILED → job-log tail + exit 1 (:140-145); separate optuna/mlflow databases mandated because both use Alembic''s alembic_version (configmap.yaml:3-4, postgres.yaml:1-3)'
-  - kubeconform scope hole (k8s/optuna/-only) is GATE-INFRA-99's existing finding — referenced, NOT re-found
-  touched_by:
-  - pyyaml@6.0.2
-  - scikit-learn@1.7.2
-  - mlflow@3.15.1
-  validated_by: []
-  if_changed:
-  - Job manifest shape/env/mounts
-  - image layout contract (PYTHONPATH, baked parquet)
-  - preflight exit codes
-  - CI docker-only verdicts (scripts/run_local_ci.sh:57-104)
-  findings:
-  - 'the ENTIRE worker SCRIPT plane has zero pytest coverage — render_worker_jobs.py, 03_optuna_worker.py main/preflight/load_dataset/log_to_mlflow, and lifecycle.sh are exercised only by CI shell syntax checks + kubeconform shape validation; the LIBRARY functions beneath them (compose_db_url, run_worker, run_model_study, run_study_rdb) ARE pinned, so regressions in script wiring (arg names, env var names, mount paths, endpoint printing) land green. root: k8s/optuna/render_worker_jobs.py:69 main()'
-  - 'worker pods hold FULL MLflow write power — configmap tracking_uri http://mlflow:5000 plus allowed_hosts ''*'' (project/k8s/optuna/configmap.yaml:28, :30) hands every optuna worker ambient write access to the whole tracking store INCLUDING the champion alias, so any compromised/buggy pod can move production custody; single-writer custody for the champion alias is ALREADY PROPOSED upstream (cross-ref GH-5 / PROPOSE-GH5-01, agents/ledger/arbitration/2026-08-24/gap-cd-mlflow.md:108 — cited, not re-found). root: project/k8s/optuna/configmap.yaml:28'
 - id: GATE-HPO-88
   phase: hpo-optuna
-  order: 99
+  order: 98
   owner: src/broadway/training/hpo.py:204 _initial_round()
   inputs:
   - random_state base seed
@@ -3046,7 +3013,7 @@ gates:
   - 'the seed OFFSET couples determinism to MODEL LIST ORDER — inserting, removing, or reordering hpo.models shifts EVERY subsequent model''s sampler seed (:212-228), silently changing all trajectories while every determinism test stays green (they freeze the whole config, not the offset scheme); no test pins the offset convention itself. root: src/broadway/training/hpo.py:223'
 - id: GATE-HPO-89
   phase: hpo-optuna
-  order: 100
+  order: 99
   owner: src/broadway/config/schema.py:125 HPOConfig
   inputs:
   - 'configs/experiments/mlflow.yaml hpo: block (:14-44) = CFG-HPO-SPEC'
@@ -3075,7 +3042,7 @@ gates:
   - 'engine is DEAD CONFIG — declared REQUIRED (:126), set in both YAMLs (configs/experiments/mlflow.yaml:15, configs/experiment/hyperopt.yaml:24), echoed in fixtures (tests/test_config.py:138, :172), and READ BY NOTHING (repo-wide grep census finds no consumer of HPOConfig.engine); it implies a pluggable-engine surface that does not exist and would mask a future engine-vs-implementation mismatch. root: src/broadway/config/schema.py:126'
 - id: GATE-HPO-154
   phase: hpo-optuna
-  order: 101
+  order: 100
   owner: src/broadway/training/nlp.py:226 make_objective() + :286 run_nlp_hpo() + :340 run_nlp()
   inputs:
   - 'src/broadway/config/schema.py:135 NLPConfig (typed data-agnostic config: model_zoo + hpo + knobs)'
@@ -3107,7 +3074,7 @@ gates:
   findings: []
 - id: GATE-INFRA-90
   phase: infra-meta
-  order: 102
+  order: 101
   owner: scripts/run_local_ci.sh:16 case-dispatch STATIC/TIER/CLEAN_LINT (+ run() aggregator :26-31, banner law :23/:100)
   inputs:
   - argv[1] ∈ {unset, --static, --tier=fast, --tier=full, --clean-lint} (else usage exit 2)
@@ -3136,7 +3103,7 @@ gates:
   - --static alone skips pytest+cov on a nominally full tier; scope discipline ("static is for iteration, not landing") is contract prose, not enforced by code.
 - id: GATE-INFRA-91
   phase: infra-meta
-  order: 103
+  order: 102
   owner: scripts/run_local_ci.sh:30 gate_parity() (F1b pin-guard, wired at :43)
   inputs:
   - refs/remotes/origin/sklearn:scripts/check_branch_parity.sh via `git show` (:33)
@@ -3161,7 +3128,7 @@ gates:
   - validation extracts-and-executes the real function body against a PATH-shimmed git — the true `git show refs/remotes/origin/sklearn:...` network path is never exercised in CI.
 - id: GATE-INFRA-92
   phase: infra-meta
-  order: 104
+  order: 103
   owner: scripts/run_local_ci.sh:102 gate battery (ruff, mypy, Vulture, configs, shell-scripts, pytest+cov floor=95, project-tests)
   inputs:
   - src/** tests/test_project_paths.py project/experiments/** project/experiments.py project/dashboard.py project/paths.py project/working.py project/data.py scripts/check_project_paths.py scripts/ (ruff)
@@ -3212,7 +3179,7 @@ gates:
   - probes validate the floor NUMBER as text, not enforcement behavior — no test proves a sub-95 cov run actually fails.
 - id: GATE-INFRA-93
   phase: infra-meta
-  order: 105
+  order: 104
   owner: scripts/check_branch_parity.sh:71 check() (SHARED lockstep, list at :43-69) + sync_to_main() :89
   inputs:
   - '24-entry SHARED surface: src/ tests/ demo/ configs/dataset/test.yaml configs/experiment/{baseline,engineered,hyperopt}.yaml configs/analysis/{test,test_hypothesis,test_causal}.yaml configs/step/{causal,etl}.yaml configs/environment/ configs/flow/ k8s/ docker/ .github/workflows/ pyproject.toml Dockerfile docker-compose.yml .gitignore .dockerignore README.md scripts/'
@@ -3241,7 +3208,7 @@ gates:
   - sync_to_main() is still not executed against a disposable main worktree; its project-removal and generic-sample projection are statically pinned by tests/test_project_paths.py.
 - id: GATE-INFRA-94
   phase: infra-meta
-  order: 106
+  order: 105
   owner: scripts/check_branch_parity.sh:111 inline era declaration PARITY_ERA/PARITY_TRACK_BRANCH/PARITY_ALLOWLIST/PARITY_MAIN_ANCHOR (:111-114) + anchor guards :121-132 + dev-era dispatch :192-226
   inputs:
   - inline constants (no env dialect, D21)
@@ -3268,7 +3235,7 @@ gates:
   - anchor shape/resolution guards (:121-128) and both dev-era pass-along guards (:212,:218) are asserted nowhere — no test feeds a non-ancestor taxi or a drifted taxi tip through the dispatch.
 - id: GATE-INFRA-95
   phase: infra-meta
-  order: 107
+  order: 106
   owner: scripts/check_branch_parity.sh:134 custody() — layer 1 anchor-drift diff :146, freeze-intact shortcut :162, layer 2 blob-provenance comm -23 :166
   inputs:
   - PARITY_MAIN_ANCHOR=18607091ddbb2602ad4475341ad377bafee5ec4b (:114)
@@ -3296,7 +3263,7 @@ gates:
   - stale-pin failure direction is documented safe (false-red AFTER an unanchored ratified change), yet no test pins that behavior either.
 - id: GATE-INFRA-96
   phase: infra-meta
-  order: 108
+  order: 107
   owner: 'scripts/ship.sh:24 ship gate (`if ! bash scripts/run_local_ci.sh` → refuse :24-27; single push later) + WAVE-A teeth insertions (:15-19 tier_gate sourcing, :31-40 L1 hook guard, :42-53 TIER-GATE batch) mirrored by .git/hooks/pre-push:5'
   inputs:
   - argv remote/refspec (default origin sklearn:sklearn :14)
@@ -3327,7 +3294,7 @@ gates:
   - '.git/hooks/pre-push remains UNTRACKED machine-local (under .git/, invisible to git status; core.hooksPath unset) — every fresh clone ships with NO local gate; WAVE-A adds the tracked SSOT template (agents/contracts/hooks-pre-push.template) plus a ship-path REFUSAL when the live hook is missing/stale (:31-40), so the gap is now detected-and-named instead of procedural-only.'
 - id: GATE-INFRA-97
   phase: infra-meta
-  order: 109
+  order: 108
   owner: scripts/check_e2e_determinism.sh:106 compare_trees() (json_diff whitelist :35-46, compare_file :89, --run chain run_e2e :163)
   inputs:
   - two artifact trees (positional) or --run
@@ -3359,7 +3326,7 @@ gates:
   - the comparator core is well-tested but the --run runner (ephemeral MLflow boot, port pick, sed rewrite) has NO automated coverage; also this script is wired into NO tier of run_local_ci.sh nor ci.yml — determinism is checked only when someone remembers to run it.
 - id: GATE-INFRA-98
   phase: infra-meta
-  order: 110
+  order: 109
   owner: scripts/tier_classifier.py:104 classify() (triggers :51-64, parse_diff_payload :138, CLI main :162)
   inputs:
   - git-diff payload on stdin (files + added lines)
@@ -3389,7 +3356,7 @@ gates:
   - 'nothing enforces that committed commits actually CARRY a computed Tier: trailer — the classifier classifies when invoked, but no gate invokes it automatically on staging.'
 - id: GATE-INFRA-99
   phase: infra-meta
-  order: 111
+  order: 110
   owner: '.github/workflows/ci.yml:47 platform job step "Platform gates (SSOT)" (delegation law :42-46; docker-only checks :51-66; build-and-boot :151; CD job :310; concurrency :11-13)'
   inputs:
   - "push/PR to all branches (branches: ['**'], :3-7)"
@@ -3439,7 +3406,7 @@ gates:
 # when tracked_run exists with real owners + a named ledger consumer.
 - id: GATE-INFRA-123
   phase: infra-meta
-  order: 112
+  order: 111
   owner: 'project/dashboard.py:15 main() project composition entry'
   inputs:
   - host/port argv
@@ -3453,57 +3420,9 @@ gates:
   if_changed:
   - bind host/port defaults consumed by dashboard users
   findings: []
-- id: GATE-INFRA-124
-  phase: infra-meta
-  order: 113
-  owner: 'k8s/optuna/lifecycle.sh:221 train|up|view|dump|down case dispatch'
-  inputs:
-  - subcommand
-  outputs:
-  - cluster/state/view lifecycle actions (cluster_up/restore_state/run_hpo/dump_state/cluster_down/view_local)
-  transforms:
-  - 'command-surface gate incl SUBCOMMAND SYMMETRY LAW (packet H #124 AMENDMENT, binding): every host-object-creating verb must own its teardown pair — up↔down pairing exists; view↔stop pairing MISSING'
-  - 'view_local backgrounds mlflow server ( cd "$ROOT" && uv run mlflow server … & ) :205-208 with NO stop verb in the dispatch table; cleanup is an echoed hint only'
-  - 'AMENDMENT: the stop subcommand is a BINDING part of this gate, not a rider — capture child PID to $BACKUP_DIR/view.pid, keep pgrep fallback, and fix :215 where a doubled echo prints the hint literally'
-  touched_by: []
-  validated_by: []
-  if_changed:
-  - BACKUP_DIR generation layout (co-owned by GATE-CUST-151 keep-N cap)
-  findings:
-  - 'FINDING(:215): doubled-echo bug prints the stop hint literally instead of executing it. The orphaned broadway-view-pg container (gone by ruling time) was this function''s own product — the pairing gap is PROVEN, not hypothetical.'
-- id: GATE-INFRA-125
-  phase: infra-meta
-  order: 114
-  owner: 'k8s/optuna/optuna-init.yaml:19 init-job container command'
-  inputs:
-  - init-job manifest apply
-  outputs:
-  - 'python /app/worker.py --init-only execution (:19-20)'
-  transforms:
-  - 'container command custody: structurally kubeconform-valid today (inside k8s/optuna scope), semantically owned by nobody before this row (packet H #125)'
-  touched_by: []
-  validated_by: []
-  if_changed:
-  - worker.py --init-only contract
-  findings: []
-- id: GATE-INFRA-126
-  phase: infra-meta
-  order: 115
-  owner: 'k8s/optuna/Dockerfile.worker:16 CMD'
-  inputs:
-  - published worker image
-  outputs:
-  - 'CMD ["python", "/app/project/experiments/mlflow/03_optuna_worker.py"] — what EVERY Job runs'
-  transforms:
-  - 'entrypoint custody: CI builds worker at $sha (ci.yml:178-179) and CD pushes it; the CMD decides what every Job runs yet had no owner (packet H #126)'
-  touched_by: []
-  validated_by: []
-  if_changed:
-  - worker entrypoint consumed by k8s/train-job template
-  findings: []
 - id: GATE-INFRA-127
   phase: infra-meta
-  order: 116
+  order: 112
   owner: './Dockerfile:19 CMD bare deployable-image default entrypoint'
   inputs:
   - deployable image build
@@ -3518,7 +3437,7 @@ gates:
   findings: []
 - id: GATE-INFRA-128
   phase: infra-meta
-  order: 117
+  order: 113
   owner: 'docker-compose.yml:3 mlflow/postgres service command custody'
   inputs:
   - compose stack definition
@@ -3535,7 +3454,7 @@ gates:
   - 'D#17 broken-context fact rides as FINDING root (postgres context lacks Dockerfile).'
 - id: GATE-INFRA-131
   phase: infra-meta
-  order: 118
+  order: 114
   owner: 'k8s/api-deployment.yaml:40 HorizontalPodAutoscaler bounds'
   inputs:
   - api workload metrics
@@ -3550,7 +3469,7 @@ gates:
   findings: []
 - id: GATE-INFRA-133
   phase: infra-meta
-  order: 119
+  order: 115
   owner: 'k8s/postgres-deployment.yaml:2 StatefulSet durable-state workload'
   inputs:
   - postgres manifest apply
@@ -3565,7 +3484,7 @@ gates:
   findings: []
 - id: GATE-INFRA-137
   phase: infra-meta
-  order: 120
+  order: 116
   owner: 'docker-compose.yml:26 compose-stack build/volume FILE law'
   inputs:
   - compose stack definition
@@ -3581,7 +3500,7 @@ gates:
   findings: []
 - id: GATE-INFRA-138
   phase: infra-meta
-  order: 121
+  order: 117
   owner: 'tests/conftest.py:8 _SNAPSHOT_DIRS snapshot hygiene'
   inputs:
   - pytest session lifecycle
@@ -3596,7 +3515,7 @@ gates:
   findings: []
 - id: GATE-INFRA-139
   phase: infra-meta
-  order: 122
+  order: 118
   owner: 'tests/test_uv_probe_guard.py:27 package-discovery probe guard suite'
   inputs:
   - uv editable-install discovery behavior
@@ -3613,7 +3532,7 @@ gates:
   findings: []
 - id: GATE-INFRA-141
   phase: infra-meta
-  order: 123
+  order: 119
   owner: 'scripts/ship.sh push-path creator site for annotated tags (law: manual git tag -a mints ONLY via a named ledger-row procedure; NO scripted minter exists at HEAD)'
   inputs:
   - release/tag minting intent
@@ -3629,7 +3548,7 @@ gates:
   - 'Evidence CORRECTED (packet H DRIFT #4): the tag is ON ORIGIN, not local-only (ls-remote: tag object 015c5049, peeled 0d383125) — makes minting custody MORE urgent (published, unminted-law object). Credential rationale INADMISSIBLE: HC-1 VOIDED (00-resolutions.md §1); grounds survive on custody-hygiene law only.'
 - id: GATE-INFRA-142
   phase: infra-meta
-  order: 124
+  order: 120
   owner: 'scripts/check_branch_parity.sh:89 sync_to_main() ref-management site (stale-ref retirement law; objects: LOCAL refs refs/heads/pr-1 + pr-2, closed-unmerged snapshots)'
   inputs:
   - named local refs (pr-1/pr-2 and future strays)
@@ -3647,7 +3566,7 @@ gates:
   - 'owner-anchor judgment recorded: the gated objects are untracked .git-side refs with no in-repo declaring file; the law binds the scripted ref-management site plus the fetch/pull creator pattern rather than the ephemeral objects.'
 - id: GATE-INFRA-143
   phase: infra-meta
-  order: 125
+  order: 121
   owner: '.github/workflows/ci.yml:145 actions/cache@v4 cache retention/dedupe law'
   inputs:
   - CI cache key family (broadway-base hashFiles key)
@@ -3664,7 +3583,7 @@ gates:
   findings: []
 - id: GATE-INFRA-144
   phase: infra-meta
-  order: 126
+  order: 122
   owner: '.github/workflows/ci.yml:355 Push verified images to GHCR (CD single writer)'
   inputs:
   - verified image builds from the CD job
@@ -3679,27 +3598,9 @@ gates:
   - pushed image vocabulary ($sha/latest/taxi tag law)
   findings:
   - 'inventory honestly UNVERIFIABLE: package listing 403/404 (token lacks read:packages) — recorded, not invented. OPEN QUESTION carried: who executes the registry-side version cap?'
-- id: GATE-INFRA-145
-  phase: infra-meta
-  order: 127
-  owner: 'k8s/optuna/teardown.sh teardown zero-footprint creation-time law (HEAD has ZERO rmi/residual lines; codified shape = WIP worktree :63-73)'
-  inputs:
-  - teardown invocation after cluster/image-producing lanes
-  outputs:
-  - host returned to ZERO project containers/images/volumes, FAILING LOUD otherwise
-  transforms:
-  - 'LAW (packet H #145): teardown leaves ZERO project containers/images/volumes and FAILS LOUD otherwise — rmi across BOTH vocabularies (CI-minted broadway-base*/broadway-optuna-worker*/mlflow-server* + manifest-demanded broadway*/broadway-mlflow*/broadway-postgres* + judged postgres:16-alpine), volume prune, loud residual assertion exiting 1'
-  - 'at HEAD teardown.sh contains ZERO rmi/residual lines (grep count 0 verified) — census premise holds for the registry commit; the worktree WIP already implements exactly this shape and lands through normal tier gates'
-  - 'object deleted @ hygiene-exec, creator site persists ⇒ CREATION-TIME LAW: YES — six project images + broadway-view-pg destroyed between census and ruling (packet H DRIFT #1); creator sites: ci.yml builds (:164/:178/:185), lifecycle.sh:100 kind load, view_local docker run :187'
-  touched_by: []
-  validated_by: []
-  if_changed:
-  - image vocabulary coverage of the rmi sweep
-  findings:
-  - 'kindest/node:<none> remnant is machine-local tooling (accepted-local) — do NOT widen the grep pattern to chase it (explicit rider, packet H #145).'
 - id: GATE-INFRA-146
   phase: infra-meta
-  order: 128
+  order: 123
   owner: 'scripts/uv.sh:1 host-local cache selector — the sole UV_CACHE_DIR runtime owner'
   inputs:
   - HOME/XDG_CACHE_HOME/TMPDIR/UV_CACHE_DIR environment
@@ -3720,7 +3621,7 @@ gates:
   findings: []
 - id: GATE-INFRA-147
   phase: infra-meta
-  order: 129
+  order: 124
   owner: 'scripts/deadcode_census.py:1 module — teeth ⑥ DEADCODE-CENSUS advisory engine'
   inputs:
   - tracked *.py corpus via git ls-files (src/project/tests/scripts)
@@ -3738,7 +3639,7 @@ gates:
   findings: []
 - id: GATE-INFRA-148
   phase: infra-meta
-  order: 130
+  order: 125
   owner: agents/tools/state_records.py sync()
   inputs:
   - STATE CURRENT record and immutable EVENTS section
@@ -3759,7 +3660,7 @@ gates:
 # --- BAND 81-OBJECT-CUSTODY (minted per slate §0; header law above) ------
 - id: GATE-CUST-147
   phase: object-custody
-  order: 131
+  order: 126
   owner: 'src/broadway/training/mlflow_utils.py:162 promote_candidate()'
   inputs:
   - 'model_uri + alias="champion"'
@@ -3778,7 +3679,7 @@ gates:
   findings: []
 - id: GATE-CUST-148
   phase: object-custody
-  order: 132
+  order: 127
   owner: 'src/broadway/training/mlflow_utils.py:163 register_model call sites'
   inputs:
   - candidate model_uri + dataset name
@@ -3794,7 +3695,7 @@ gates:
   findings: []
 - id: GATE-CUST-150
   phase: object-custody
-  order: 133
+  order: 128
   owner: 'src/broadway/training/mlflow_utils.py:59 set_experiment auto-create chokepoint (inside setup_mlflow :54-63)'
   inputs:
   - experiment_name argument at setup time
@@ -3806,21 +3707,4 @@ gates:
   validated_by: []
   if_changed:
   - lawful-namespace vocabulary (battle family / dataset-name pattern)
-  findings: []
-- id: GATE-CUST-151
-  phase: object-custody
-  order: 134
-  owner: 'k8s/optuna/lifecycle.sh:149 dump_state() snapshot generations (keep-N cap) + training-plane registry-prune policy (non-champion versions)'
-  inputs:
-  - registry versions + $BACKUP_DIR snapshot generations
-  outputs:
-  - retention as INVOKED operations with logged outcomes (no accidental append-only)
-  transforms:
-  - 'append-only by accident across TWO stores (packet H #151): zero deletion calls repo-wide (census B1); dump_state appends unbounded $BACKUP_DIR tarballs (:149-165)'
-  - 'AMENDED: ONE gate with EXPLICIT CO-TENANCY declared per house law — (a) registry-prune policy owned at the training plane (non-champion version pruning), (b) snapshot-generation cap owned HERE (keep-N)'
-  - 'deletion-first governs the POLICY (smallest lawful keep-N), not the data; "accidental append-only" is the defect being outlawed'
-  touched_by: []
-  validated_by: []
-  if_changed:
-  - keep-N budget vs restore needs (view_local reads generations)
   findings: []

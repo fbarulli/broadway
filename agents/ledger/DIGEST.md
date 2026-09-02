@@ -1,6 +1,6 @@
 # DIGEST.md — rendered from agents/ledger/gates.yaml · NEVER HAND-EDIT ·
 
-> 134 gates · rendered 2026-09-01 @ HEAD 6e967d3 · load THIS into context;
+> 128 gates · rendered 2026-09-02 @ HEAD 477cdaf · load THIS into context;
 > gates.yaml is the sole SSOT; the retired GATES.md/gates/*.md markdown world survives in agents/ledger/arbitration/2026-08-24/surface-and-analysis-preservation.md.
 
 | band | phase | gates | findings |
@@ -13,10 +13,10 @@
 | 06-timeline | timeline-lineage | 11 | 7 |
 | 07-surfaces | surfaces | 14 | 1 |
 | 08-config | config-schema | 15 | 10 |
-| 80-hpo-optuna | hpo-optuna | 11 | 9 |
-| 09-infra | infra-meta | 29 | 16 |
-| 81-object-custody | object-custody | 4 | 0 |
-| **total** | | **134** | **78** |
+| 80-hpo-optuna | hpo-optuna | 10 | 8 |
+| 09-infra | infra-meta | 25 | 14 |
+| 81-object-custody | object-custody | 3 | 0 |
+| **total** | | **128** | **75** |
 
 ### 01-ingest — ingest
 
@@ -238,8 +238,6 @@
   [leaderboard {model: best objective} (lower=better for minimize, higher=better for maximize), remaining trial budget (:330), top_k (CFG-HPO-SPEC), direction str (:184, default minimize)] → [{model: n_trials} allocation dict fed to _bandit_round (:333)] · pins: 10
 - **GATE-HPO-86** `src/broadway/training/optuna.py:48 run_study_rdb()` ⚠FINDING
   [storage_url string (sqlite:/// locally; postgresql://…:5432/optuna in k8s via compose_db_url), study_name, direction, optional random_state] → [durable Optuna schema in the RDB (ARTIFACT-OPTUNA-STUDY at rest); stale RUNNING trials flipped FAIL on resume, ARTIFACT-OPTUNA-SNAPSHOT dumps under gitignored data/optuna-backup/] · pins: 5
-- **GATE-HPO-87** `k8s/optuna/render_worker_jobs.py:26 render_jobs()` ⚠FINDING
-  [CFG-HPO-SPEC hpo.models (ONE Job per model), CFG-K8S-OPTUNA-INFRA configmap inline config.yaml, optuna-db Secret] → [Job manifests optuna-{display_name} applied by lifecycle.sh run_hpo (k8s/optuna/lifecycle.sh:136-138); optuna-init Job pre-creating studies] · pins: none direct
 - **GATE-HPO-88** `src/broadway/training/hpo.py:204 _initial_round()` ⚠FINDING
   [random_state base seed, hpo.models list ORDER, CFG-HPO-SPEC / CFG-HPO-EXPERIMENT seed literals upstream] → [deterministic per-model sampler seeds; reproducible trajectories across runs/processes] · pins: 3
 - **GATE-HPO-89** `src/broadway/config/schema.py:125 HPOConfig` ⚠FINDING
@@ -271,12 +269,6 @@
   [push/PR to all branches (branches: ['**'], :3-7), fetch-depth 0 for parity tips (:28), uv sync --all-extras --frozen (:40), bash scripts/run_local_ci.sh (no args ⇒ full tier), k8s/optuna/ + project/k8s/optuna/configmap.yaml (Kubernetes manifest inputs)] → [platform job verdict (parity+ruff+mypy+configs+shell-scripts+pytest+cov≥95+project-tests via SSOT script), docker-only verdicts: sh -n + shellcheck k8s/optuna/*.sh AND scripts/*.sh (:57-66), kubeconform -strict k8s/optuna/ plus project/k8s/optuna/configmap.yaml minus kind-config.yaml (:79), orchestrator dry-run render+kubeconform (:104), sha-tagged images built/boot-tested; CD publishes bit-for-bit verified tarball to GHCR on main/taxi pushes only (:290-376)] · pins: none direct
 - **GATE-INFRA-123** `project/dashboard.py:15 main() project composition entry`
   [host/port argv] → [dashboard server (uvicorn.run(app, host="127.0.0.1", port=8000) :19)] · pins: 1
-- **GATE-INFRA-124** `k8s/optuna/lifecycle.sh:221 train|up|view|dump|down case dispatch` ⚠FINDING
-  [subcommand] → [cluster/state/view lifecycle actions (cluster_up/restore_state/run_hpo/dump_state/cluster_down/view_local)] · pins: none direct
-- **GATE-INFRA-125** `k8s/optuna/optuna-init.yaml:19 init-job container command`
-  [init-job manifest apply] → [python /app/worker.py --init-only execution (:19-20)] · pins: none direct
-- **GATE-INFRA-126** `k8s/optuna/Dockerfile.worker:16 CMD`
-  [published worker image] → [CMD ["python", "/app/project/experiments/mlflow/03_optuna_worker.py"] — what EVERY Job runs] · pins: none direct
 - **GATE-INFRA-127** `./Dockerfile:19 CMD bare deployable-image default entrypoint`
   [deployable image build] → [CMD ["ds-pipeline"] default entrypoint (:19)] · pins: none direct
 - **GATE-INFRA-128** `docker-compose.yml:3 mlflow/postgres service command custody` ⚠FINDING
@@ -299,8 +291,6 @@
   [CI cache key family (broadway-base hashFiles key)] → [one save-site per key family; size-budget watch; purge as invoked workflow step] · pins: none direct
 - **GATE-INFRA-144** `.github/workflows/ci.yml:355 Push verified images to GHCR (CD single writer)` ⚠FINDING
   [verified image builds from the CD job] → [registry writes: broadway-optuna-worker + mlflow-server ONLY, $sha always; :latest main-only; :taxi taxi-only] · pins: none direct
-- **GATE-INFRA-145** `k8s/optuna/teardown.sh teardown zero-footprint creation-time law (HEAD has ZERO rmi/residual lines; codified shape = WIP worktree :63-73)` ⚠FINDING
-  [teardown invocation after cluster/image-producing lanes] → [host returned to ZERO project containers/images/volumes, FAILING LOUD otherwise] · pins: none direct
 - **GATE-INFRA-146** `scripts/uv.sh:1 host-local cache selector — the sole UV_CACHE_DIR runtime owner`
   [HOME/XDG_CACHE_HOME/TMPDIR/UV_CACHE_DIR environment] → [writable host-local uv cache or loud nonzero failure] · pins: 3
 - **GATE-INFRA-147** `scripts/deadcode_census.py:1 module — teeth ⑥ DEADCODE-CENSUS advisory engine`
@@ -316,5 +306,3 @@
   [candidate model_uri + dataset name] → [registered model name pinned to cfg.dataset.name (= configmap dataset.name)] · pins: none direct
 - **GATE-CUST-150** `src/broadway/training/mlflow_utils.py:59 set_experiment auto-create chokepoint (inside setup_mlflow :54-63)`
   [experiment_name argument at setup time] → [experiment created/reopened ONLY within lawful namespaces: ratecode1_model_battle family ∪ dataset-name experiments; orphans refused loudly] · pins: none direct
-- **GATE-CUST-151** `k8s/optuna/lifecycle.sh:149 dump_state() snapshot generations (keep-N cap) + training-plane registry-prune policy (non-champion versions)`
-  [registry versions + $BACKUP_DIR snapshot generations] → [retention as INVOKED operations with logged outcomes (no accidental append-only)] · pins: none direct

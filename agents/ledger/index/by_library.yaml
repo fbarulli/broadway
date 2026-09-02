@@ -304,7 +304,6 @@ mlflow:
 - GATE-TRAIN-39
 - GATE-HPO-83
 - GATE-HPO-84
-- GATE-HPO-87
 mlflow.exceptions.MlflowException:
 - GATE-TRAIN-120
 mlflow.tracking.MlflowClient:
@@ -434,7 +433,6 @@ python -m broadway.cli equivalent:
 pyyaml:
 - GATE-INGEST-04
 - GATE-INGEST-09
-- GATE-HPO-87
 - GATE-HPO-89
 re:
 - GATE-ETL-10
@@ -455,7 +453,6 @@ scikit-learn:
 - GATE-TRAIN-34
 - GATE-TRAIN-36
 - GATE-HPO-81
-- GATE-HPO-87
 scipy.stats:
 - GATE-STATS-45
 scipy.stats (levene/skew/kurtosis/shapiro):

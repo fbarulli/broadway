@@ -136,11 +136,9 @@ CFG-HPO-SPEC:
 - GATE-HPO-80
 - GATE-HPO-81
 - GATE-HPO-85
-- GATE-HPO-87
 - GATE-HPO-88
 - GATE-HPO-89
 CFG-K8S-OPTUNA-INFRA:
-- GATE-HPO-87
 - GATE-HPO-89
 CFG-STEP-EVALUATE:
 - GATE-TRAIN-35
@@ -152,8 +150,6 @@ CI cache key family (broadway-base hashFiles key):
 - GATE-INFRA-143
 CMD ["ds-pipeline"] default entrypoint (:19):
 - GATE-INFRA-127
-CMD ["python", "/app/project/experiments/mlflow/03_optuna_worker.py"] — what EVERY Job runs:
-- GATE-INFRA-126
 CV folds via cross_validate (src/broadway/evaluate/validation.py:42):
 - GATE-TRAIN-36
 ChampionArtifact records bucketed bare_model / pipeline_signature / ambiguous (:21-23):
@@ -208,8 +204,6 @@ HOME/XDG_CACHE_HOME/TMPDIR/UV_CACHE_DIR environment:
 : - GATE-SURF-100
 JSON leaves after canonical sorted-keys re-dump:
 - GATE-INFRA-97
-? Job manifests optuna-{display_name} applied by lifecycle.sh run_hpo (k8s/optuna/lifecycle.sh:136-138); optuna-init Job pre-creating studies
-: - GATE-HPO-87
 JoinAudit{rows_attempted, matched, unmatched, null_keys, unmatched_rate}:
 - GATE-ETL-13
 LineageGraph from lineage/graph.build_graph + scope_graph:
@@ -427,8 +421,6 @@ champion via models:/<dataset>@champion:
 - GATE-TRAIN-35
 champion_score (None when no champion):
 - GATE-TRAIN-37
-cluster/state/view lifecycle actions (cluster_up/restore_state/run_hpo/dump_state/cluster_down/view_local):
-- GATE-INFRA-124
 coef/HC3_SE/CI_low/CI_high DataFrame:
 - GATE-TRAIN-38
 coerce=False strict dtypes:
@@ -590,16 +582,12 @@ groups from GATE-STATS-42:
 - GATE-STATS-43
 groups; shapiro_max_n default 5000 (:20); run_levene(groups) plain:
 - GATE-STATS-46
-host returned to ZERO project containers/images/volumes, FAILING LOUD otherwise:
-- GATE-INFRA-145
 host/port argv:
 - GATE-INFRA-123
 hpo.models list ORDER:
 - GATE-HPO-88
 hypothesis-block ValueError (:125-126):
 - GATE-STATS-49
-init-job manifest apply:
-- GATE-INFRA-125
 inline constants (no env dialect, D21):
 - GATE-INFRA-94
 k8s/optuna/ + project/k8s/optuna/configmap.yaml (Kubernetes manifest inputs):
@@ -717,8 +705,6 @@ optional val parquet (:27):
 - GATE-FEAT-25
 optional val_features_file parquet:
 - GATE-TRAIN-31
-optuna-db Secret:
-- GATE-HPO-87
 or ValueError naming offending step/columns/schema_contract:
 - GATE-CFG-77
 or raised gate failure:
@@ -818,16 +804,12 @@ provenance JSON sidecar:
 - GATE-CFG-79
 published annotated tag with a ledger row naming its procedure:
 - GATE-INFRA-141
-published worker image:
-- GATE-INFRA-126
 'push/PR to all branches (branches: [''**''], :3-7)':
 - GATE-INFRA-99
 pyproject [project.scripts] entrypoint table:
 - GATE-INFRA-147
 pytest session lifecycle:
 - GATE-INFRA-138
-python /app/worker.py --init-only execution (:19-20):
-- GATE-INFRA-125
 random_state base seed:
 - GATE-HPO-88
 random_state seed int:
@@ -852,8 +834,6 @@ registered model name pinned to cfg.dataset.name (= configmap dataset.name):
 - GATE-CUST-148
 registered version + alias move; elsewhere loud refusal:
 - GATE-CUST-147
-registry versions + $BACKUP_DIR snapshot generations:
-- GATE-CUST-151
 'registry writes: broadway-optuna-worker + mlflow-server ONLY, $sha always; :latest main-only; :taxi taxi-only':
 - GATE-INFRA-144
 registry=BUILDERS∪extra_builders (builders.py:115-117):
@@ -922,8 +902,6 @@ require_mode HYPOTHESIS (:124):
 - GATE-STATS-49
 'result dict {''models'': {name: {best_params, best_value, n_trials}}, ''best_model'', ''best_params'', ''best_value''}':
 - GATE-HPO-84
-retention as INVOKED operations with logged outcomes (no accidental append-only):
-- GATE-CUST-151
 retire-or-own verdict per named ref; detect-and-retire loop execution record:
 - GATE-INFRA-142
 runner-computed result_summary dicts:
@@ -994,8 +972,6 @@ study_name:
 - GATE-HPO-86
 sub-gate verdicts via run() <name> <cmd...>:
 - GATE-INFRA-90
-subcommand:
-- GATE-INFRA-124
 suggest.suggest_next (suggest.py:312 decided_ids):
 - GATE-TLINE-51
 suggestion pass:
@@ -1008,8 +984,6 @@ target (dataset target name):
 - GATE-FEAT-21
 target column name:
 - GATE-STATS-42
-teardown invocation after cluster/image-producing lanes:
-- GATE-INFRA-145
 tests/** (pytest -n 4 --dist worksteal, --cov-fail-under=95):
 - GATE-INFRA-92
 threshold flags:

@@ -14,17 +14,6 @@ docker-compose.yml:
 - GATE-INFRA-137
 k8s/api-deployment.yaml:
 - GATE-INFRA-131
-k8s/optuna/Dockerfile.worker:
-- GATE-INFRA-126
-k8s/optuna/lifecycle.sh:
-- GATE-INFRA-124
-- GATE-CUST-151
-k8s/optuna/optuna-init.yaml:
-- GATE-INFRA-125
-k8s/optuna/render_worker_jobs.py:
-- GATE-HPO-87
-k8s/optuna/teardown.sh:
-- GATE-INFRA-145
 k8s/postgres-deployment.yaml:
 - GATE-INFRA-133
 project/dashboard.py:

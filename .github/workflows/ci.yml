@@ -92,8 +92,6 @@ jobs:
             -strict \
             -summary \
             -ignore-filename-pattern "kind-config\\.yaml" \
-            k8s/optuna/ \
-            project/k8s/optuna/configmap.yaml \
             k8s/api-deployment.yaml \
             k8s/mlflow-deployment.yaml \
             k8s/postgres-deployment.yaml \
@@ -102,34 +100,7 @@ jobs:
       # CI-only — named in scripts/run_local_ci.sh header.
       # Orchestrator dry-run: render the worker Jobs for the HPO spec's models
       # and assert they are valid Kubernetes with the right image/env/args.
-      - name: Orchestrator dry-run (render worker jobs)
-        run: |
-          set -euo pipefail
-
-          mkdir -p "${RUNNER_TEMP}/jobs"
-
-          bash scripts/uv.sh run python k8s/optuna/render_worker_jobs.py \
-            --image broadway-optuna-worker:ci \
-            > "${RUNNER_TEMP}/jobs/jobs.yaml"
-
-          grep -q "broadway-optuna-worker:ci" "${RUNNER_TEMP}/jobs/jobs.yaml"
-          grep -q "BROADWAY_MLFLOW_CONFIG" "${RUNNER_TEMP}/jobs/jobs.yaml"
-          grep -q -- "--model" "${RUNNER_TEMP}/jobs/jobs.yaml"
-
-          docker run --rm \
-            -v "${RUNNER_TEMP}/jobs:/work" \
-            ghcr.io/yannh/kubeconform:v0.6.7 \
-            -strict \
-            -summary \
-            /work/jobs.yaml
-
       # CI-only — named in scripts/run_local_ci.sh header.
-      - name: Experiment smoke (taxi branch only — project dispatcher)
-        if: github.ref == 'refs/heads/taxi' || (github.event_name == 'pull_request' && github.base_ref == 'taxi')
-        env:
-          MPLCONFIGDIR: "${{ runner.temp }}/mplconfig"
-        run: bash scripts/uv.sh run python project/experiments.py verify
-
   # CI-only — named in scripts/run_local_ci.sh header.
   # Build & Boot — structural determinism of the deployment images WITHOUT a
   # cluster. Catches missing files / broken COPY paths / PYTHONPATH and import
@@ -194,20 +165,6 @@ jobs:
 
       # Thin COPY-only layers over the base — rebuilt unconditionally so they
       # always carry this exact commit's code under an immutable sha tag.
-      - name: Build worker image
-        run: |
-          docker build \
-            -f k8s/optuna/Dockerfile.worker \
-            -t broadway-optuna-worker:${{ github.sha }} \
-            .
-
-      - name: Build mlflow image
-        run: |
-          docker build \
-            -f k8s/optuna/Dockerfile.mlflow \
-            -t mlflow-server:${{ github.sha }} \
-            .
-
       # Top-level-manifest images — the tags the top-level manifests demand
       # must always have a build source in-tree: root Dockerfile → broadway
       # (k8s/api-deployment.yaml + k8s/train-job.yaml), docker/mlflow →
@@ -237,28 +194,10 @@ jobs:
       # Imports _common -> project.working (working.yaml), resolves
       # HPO_CONFIG_PATH via parents[] at the mirrored pod path, parses the HPO
       # spec and builds CLI choices. Catches the layout/import bug class.
-      - name: Boot — worker imports + CLI
-        run: docker run --rm broadway-optuna-worker:${{ github.sha }} python /app/project/experiments/mlflow/03_optuna_worker.py --help
-
       # Config-load simulation with the committed fixture: verifies the
       # configmap structure + the HPO spec both parse inside the pod layout.
       # Literal block (run: |) — folded scalars collapse the newlines the
       # python -c string needs.
-      - name: Boot — config-load simulation
-        run: |
-          docker run --rm -v "$PWD/.github/ci-fixtures/k8s-config.yaml:/etc/broadway/config.yaml" broadway-optuna-worker:${{ github.sha }} python -c "
-          import yaml
-          from pathlib import Path
-          from broadway.config.schema import HPOConfig
-          cfg = yaml.safe_load(Path('/etc/broadway/config.yaml').read_text())
-          assert {'dataset','databases','mlflow'} <= set(cfg), 'configmap structure'
-          hpo = HPOConfig(**yaml.safe_load(
-              Path('/app/project/config/experiments/mlflow.yaml').read_text())['hpo'])
-          print('config load OK — models:', [m.name for m in hpo.models])"
-
-      - name: Boot — mlflow image health
-        run: docker run --rm --entrypoint python mlflow-server:${{ github.sha }} -c "import mlflow; print('mlflow', mlflow.__version__)"
-
       # IMPORT-PATH WIRING ONLY — NOT A SERVING CHECK. The api target
       # `broadway.inference.api:app` (k8s/api-deployment.yaml) is a DEFERRED
       # STUB: src/broadway/inference/api.py is docstring-only and exposes NO
@@ -292,8 +231,9 @@ jobs:
         if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/taxi')
         run: |
           docker save \
-            broadway-optuna-worker:${{ github.sha }} \
-            mlflow-server:${{ github.sha }} \
+            broadway:${{ github.sha }} \
+            broadway-mlflow:${{ github.sha }} \
+            broadway-postgres:${{ github.sha }} \
             -o "${{ runner.temp }}/verified-images.tar"
 
       # compression-level: 0 — Docker layers arrive compressed; don't pay CPU
@@ -361,7 +301,7 @@ jobs:
           ref="${{ github.ref }}"
           registry="ghcr.io/${{ github.repository }}"
 
-          for img in broadway-optuna-worker mlflow-server; do
+          for img in broadway broadway-mlflow broadway-postgres; do
             docker tag "$img:${{ github.sha }}" "$registry/$img:${{ github.sha }}"
             docker push "$registry/$img:${{ github.sha }}"
 

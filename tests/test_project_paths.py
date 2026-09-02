@@ -61,24 +61,11 @@ def test_path_checker_detects_a_retired_taxi_config(tmp_path: Path) -> None:
     assert checker.legacy_path_references(tmp_path, [source]) == ["consumer.py"]
 
 
-def test_worker_image_copies_the_project_path_import_closure() -> None:
-    base = (REPO / "k8s" / "optuna" / "Dockerfile.base").read_text(encoding="utf-8")
-    worker = (REPO / "k8s" / "optuna" / "Dockerfile.worker").read_text(encoding="utf-8")
-    assert "COPY project/ /app/project/" in base
-    assert "FROM broadway-base:latest" in worker
-
-
 def test_main_day_sync_removes_project_surfaces_and_keeps_generic_sample() -> None:
     sync = (REPO / "scripts" / "main_day_sync.sh").read_text(encoding="utf-8")
     assert "git rm -r --ignore-unmatch project experiments configs/project configs/experiments" in sync
     assert "configs/sample/fare_prediction_1m.yaml" not in sync
     assert "configs/sample/demo.yaml" in sync
-
-
-def test_ci_smoke_uses_the_moved_project_dispatcher() -> None:
-    workflow = (REPO / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
-    assert "python project/experiments.py verify" in workflow
-    assert "python experiments.py verify" not in workflow
 
 
 def test_reusable_source_never_imports_the_project_layer() -> None:

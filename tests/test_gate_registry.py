@@ -507,8 +507,8 @@ def test_query_findings_sheet_matches_meta_counts(capsys):
     assert code == 0 and err == ""
     body = [l for l in out.splitlines() if l.startswith("GATE-")]
     footer = out.strip().splitlines()[-1]
-    assert len(body) == REG["meta"]["counts"]["gates_with_findings"] == 78
-    assert footer == (f"== 78 flagged gate(s) · "
+    assert len(body) == REG["meta"]["counts"]["gates_with_findings"] == 75
+    assert footer == (f"== 75 flagged gate(s) · "
                       f"{REG['meta']['counts']['finding_strings']} finding(s) ==")
     parts = body[0].split(" · ")
     assert len(parts) == 4

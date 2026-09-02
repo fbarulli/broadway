@@ -2,7 +2,7 @@
 # sources behind configs/environment/production.yaml's ${VARS}. Every value is
 # derived from landed surfaces: data_dir → train PVC mount
 # (k8s/train-job.yaml); mlflow_tracking_uri → Service `mlflow`
-# (k8s/mlflow-deployment.yaml, same value as project/k8s/optuna/configmap.yaml);
+# (k8s/mlflow-deployment.yaml);
 # database_host → Service `postgres` below; database_port → docker-compose.yml
 # default ${DATABASE_PORT:-5432}; database_user/name → documented development
 # defaults (configs/environment/development.yaml).

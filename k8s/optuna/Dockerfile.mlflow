@@ -1,7 +1,0 @@
-# MLflow server image: backend URI composed by the entrypoint from the
-# mounted ConfigMap/Secret FILES. mlflow 3.15.1 comes from the base image.
-FROM broadway-base:latest
-COPY k8s/optuna/entrypoint-mlflow.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
-EXPOSE 5000
-CMD ["/entrypoint.sh"]

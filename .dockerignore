@@ -1,4 +1,4 @@
-# Docker build context exclusions — keep the worker image lean.
+# Docker build context exclusions — keep the build context lean.
 # .env + deepseek-harness/ hold live credentials/harness material — never
 # stream them into a build context (Scout-1 F4, 2026-08-25).
 .env
@@ -15,8 +15,4 @@ node_modules/
 .pytest_cache/
 diagnostics_experiment/
 legend_experiment/
-project/experiments/results/*
-!project/experiments/results/univariate/
-!project/experiments/results/univariate/sample_evidence/
-!project/experiments/results/univariate/sample_evidence/sample_evidence.parquet
-!project/experiments/results/univariate/sample_evidence/sample_evidence.json
+project/experiments/results/

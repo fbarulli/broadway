@@ -61,11 +61,13 @@ def _normalize(ref: str) -> str | None:
     return ref
 
 
-def _dockerfile_refs() -> list[str]:
-    refs: list[str] = []
+def _dockerfile_refs() -> list[tuple[str, str]]:
+    """(source, dockerfile_parent) for every COPY/ADD source token."""
+    refs: list[tuple[str, str]] = []
     for df in sorted(REPO.rglob("Dockerfile*")):
         if _SKIP_PARTS & set(df.parts):
             continue
+        parent = str(df.parent.relative_to(REPO))
         for line in df.read_text(encoding="utf-8").splitlines():
             m = re.match(r"^\s*(?:COPY|ADD)\s+(.+)$", line)
             if not m:
@@ -74,9 +76,17 @@ def _dockerfile_refs() -> list[str]:
                 # multi-stage (--from=), image-absolute (/uv, /app), and env ($) tokens
                 if tok.startswith(("--", "/", "$", "~")):
                     continue
-                if Path(tok).suffix.lower() in DATA_SUFFIXES:
-                    refs.append(tok)
+                refs.append((tok, parent))
     return refs
+
+
+def _committed(rel: str) -> bool:
+    """A Docker COPY source must be git-tracked: the build context is a fresh
+    checkout, so a gitignored/untracked file is absent at COPY time."""
+    return subprocess.run(
+        ["git", "ls-files", "--error-unmatch", "--", rel],
+        cwd=REPO, check=False, capture_output=True,
+    ).returncode == 0
 
 
 def _yaml_parquet_refs() -> list[str]:
@@ -98,15 +108,28 @@ def _yaml_parquet_refs() -> list[str]:
 
 
 def main() -> int:
-    refs = {r for r in (_normalize(x) for x in _dockerfile_refs() + _yaml_parquet_refs()) if r}
-    missing = sorted(r for r in refs if not _exists(r) and not _git_ignored(r))
+    # Docker COPY sources must be committed (build context = git checkout);
+    # a source may be repo-rooted or relative to its Dockerfile's directory.
+    missing: list[str] = []
+    seen: set[str] = set()
+    for tok, parent in _dockerfile_refs():
+        norm = _normalize(tok)
+        if norm is None:
+            continue
+        candidates = [norm] if parent == "." else [norm, f"{parent}/{norm}"]
+        if not any(_committed(c) for c in candidates) and norm not in seen:
+            missing.append(norm)
+            seen.add(norm)
+    yaml_refs = {r for r in (_normalize(x) for x in _yaml_parquet_refs()) if r}
+    # YAML data paths may legitimately be gitignored generated artifacts.
+    missing += sorted(r for r in yaml_refs if not _exists(r) and not _git_ignored(r))
     if missing:
         for rel in missing:
             print(f"dangling data reference: {rel}", file=sys.stderr)
         print(f"{len(missing)} dangling data reference(s) — referenced but neither "
-              f"present nor gitignored", file=sys.stderr)
+              f"committed nor present", file=sys.stderr)
         return 1
-    print(f"data-refs OK: {len(refs)} referenced data path(s) resolve")
+    print("data-refs OK: COPY/ADD sources committed, config paths resolve")
     return 0
 
 
