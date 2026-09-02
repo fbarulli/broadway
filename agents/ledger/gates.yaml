@@ -1,6 +1,6 @@
 # Gate registry SSOT — hand-maintained; the {01..09} gate fragments it consolidated predate git custody.
 meta:
-  head: '7d63d55'
+  head: '7cd706f'
   counts:
     total: 161
     gates_with_findings: 75
@@ -2892,14 +2892,14 @@ gates:
 - id: GATE-SURF-131
   phase: surfaces
   order: 103
-  owner: project/experiments/euromonitor/07b_finetune.py:49 main()
+  owner: project/experiments/euromonitor/07b_finetune.py:135 main()
   inputs:
   - project/data/euromonitor/dataset_deduped.csv
   - project/experiments/results/euromonitor/07_nlp_hpo_benchmark.csv
   outputs:
-  - project/experiments/results/euromonitor/07b_finetune.csv
+  - project/experiments/results/euromonitor/07b_four_pop_scores.csv
   transforms:
-  - TripletLoss fine-tune (round 1) on mined hard negatives with conflicting-barcode exclusion; barcode-level train/test split; reports AUC + precision@target-recall on hard band
+  - 'TripletLoss fine-tune on mined hard negatives (widened 0.45-0.80 band, conflicting-barcode exclusion); barcode-level K-fold CV; auditable per-fold + pooled TP/FP/threshold and band-crossing counts; in-country vs cross-country precision@90R; per-fold AUC mean/std; fine-tuned encode_s; optional MLflow logging; writes the four-population score-distribution CSV'
   touched_by:
   - numpy
   - scikit-learn
@@ -2957,6 +2957,7 @@ gates:
   - project/data/euromonitor/dataset_deduped.csv
   - project/experiments/results/euromonitor/07c_field_ablation.csv
   - project/experiments/results/euromonitor/07d_data_scaling.csv
+  - project/experiments/results/euromonitor/07b_four_pop_scores.csv
   outputs:
   - project/experiments/results/euromonitor/07_report_score_dist.png
   - project/experiments/results/euromonitor/07_report_pr_curve.png
@@ -2964,8 +2965,9 @@ gates:
   - project/experiments/results/euromonitor/07_report_error_breakdown.png
   - project/experiments/results/euromonitor/07_report_field_ablation.png
   - project/experiments/results/euromonitor/07_report_data_scaling.png
+  - project/experiments/results/euromonitor/07_report_four_pop_dist.png
   transforms:
-  - 'report plots: score distribution, PR curve, threshold sweep, error breakdown by attribute; reads cached zero-shot embeddings; field-ablation + data-scaling curves from 07c/07d CSVs'
+  - 'report plots: score distribution, PR curve, threshold sweep, error breakdown by attribute; reads cached zero-shot embeddings; field-ablation + data-scaling curves from 07c/07d CSVs + fine-tuned four-population distribution from 07b_four_pop_scores.csv'
   touched_by:
   - numpy
   - pandas@2.3.3
@@ -3723,7 +3725,7 @@ gates:
 - id: GATE-HPO-154
   phase: hpo-optuna
   order: 133
-  owner: src/broadway/training/nlp.py:226 make_objective() + :286 run_nlp_hpo() + :340 run_nlp()
+  owner: src/broadway/training/nlp.py:380 make_objective() + :519 run_nlp_hpo() + :586 run_nlp()
   inputs:
   - 'src/broadway/config/schema.py:135 NLPConfig (typed data-agnostic config: model_zoo + hpo + knobs)'
   - 'project/config/experiments/nlp.yaml model_zoo + hpo: block (bi-encoder zoo SSOT, direction: maximize)'

@@ -64,7 +64,9 @@ def main() -> None:
         m = entity_resolution_metrics(pos_s, neg_s)
         records.append({"variant": name, "encode_s": round(encode_s, 1), **m})
         print(f"{name:<22} AUC={m['auc']:.4f}  AP={m['average_precision']:.4f}  "
-              f"P@90R={m['precision_at_90pct_recall']:.4f}  F1@5%FPR={m['f1_at_5pct_fpr']:.4f}", flush=True)
+              f"P@90R={m['precision_at_90pct_recall']:.4f}  F1@5%FPR={m['f1_at_5pct_fpr']:.4f}  "
+              f"TP@90R={m['tp_at_90pct_recall']:.0f} FP@90R={m['fp_at_90pct_recall']:.0f} "
+              f"thr={m['threshold_at_90pct_recall']:.4f}", flush=True)
 
     out = pd.DataFrame(records)
     out.to_csv(RESULTS / "07c_field_ablation.csv", index=False)

@@ -1,6 +1,6 @@
 # DIGEST.md — rendered from agents/ledger/gates.yaml · NEVER HAND-EDIT ·
 
-> 161 gates · rendered 2026-09-02 @ HEAD 7d63d55 · load THIS into context;
+> 161 gates · rendered 2026-09-02 @ HEAD 7cd706f · load THIS into context;
 > gates.yaml is the sole SSOT; the retired GATES.md/gates/*.md markdown world survives in agents/ledger/arbitration/2026-08-24/surface-and-analysis-preservation.md.
 
 | band | phase | gates | findings |
@@ -242,14 +242,14 @@
   [project/data/euromonitor/dataset_deduped.csv] → [project/experiments/results/euromonitor/06c_validation_summary.csv, project/experiments/results/euromonitor/06c_hard_validation_pairs.csv] · pins: none direct
 - **GATE-SURF-130** `project/experiments/euromonitor/07_nlp_hpo.py:50 main()`
   [project/data/euromonitor/dataset_deduped.csv, project/config/experiments/nlp.yaml] → [project/experiments/results/euromonitor/07_nlp_hpo_benchmark.csv, project/experiments/results/euromonitor/07_nlp_hpo_timing.csv, project/experiments/results/euromonitor/07_nlp_hpo_pareto.png] · pins: none direct
-- **GATE-SURF-131** `project/experiments/euromonitor/07b_finetune.py:49 main()`
-  [project/data/euromonitor/dataset_deduped.csv, project/experiments/results/euromonitor/07_nlp_hpo_benchmark.csv] → [project/experiments/results/euromonitor/07b_finetune.csv] · pins: none direct
+- **GATE-SURF-131** `project/experiments/euromonitor/07b_finetune.py:135 main()`
+  [project/data/euromonitor/dataset_deduped.csv, project/experiments/results/euromonitor/07_nlp_hpo_benchmark.csv] → [project/experiments/results/euromonitor/07b_four_pop_scores.csv] · pins: none direct
 - **GATE-SURF-132** `project/experiments/euromonitor/07c_field_ablation.py:30 main()`
   [project/data/euromonitor/dataset_deduped.csv] → [project/experiments/results/euromonitor/07c_field_ablation.csv] · pins: none direct
 - **GATE-SURF-133** `project/experiments/euromonitor/07d_data_scaling.py:35 main()`
   [project/data/euromonitor/dataset_deduped.csv] → [project/experiments/results/euromonitor/07d_data_scaling.csv] · pins: none direct
 - **GATE-SURF-134** `project/experiments/euromonitor/07_report_plots.py:34 main()`
-  [project/data/euromonitor/dataset_deduped.csv, project/experiments/results/euromonitor/07c_field_ablation.csv, project/experiments/results/euromonitor/07d_data_scaling.csv] → [project/experiments/results/euromonitor/07_report_score_dist.png, project/experiments/results/euromonitor/07_report_pr_curve.png, project/experiments/results/euromonitor/07_report_threshold_sweep.png, project/experiments/results/euromonitor/07_report_error_breakdown.png, project/experiments/results/euromonitor/07_report_field_ablation.png, project/experiments/results/euromonitor/07_report_data_scaling.png] · pins: none direct
+  [project/data/euromonitor/dataset_deduped.csv, project/experiments/results/euromonitor/07c_field_ablation.csv, project/experiments/results/euromonitor/07d_data_scaling.csv, project/experiments/results/euromonitor/07b_four_pop_scores.csv] → [project/experiments/results/euromonitor/07_report_score_dist.png, project/experiments/results/euromonitor/07_report_pr_curve.png, project/experiments/results/euromonitor/07_report_threshold_sweep.png, project/experiments/results/euromonitor/07_report_error_breakdown.png, project/experiments/results/euromonitor/07_report_field_ablation.png, project/experiments/results/euromonitor/07_report_data_scaling.png, project/experiments/results/euromonitor/07_report_four_pop_dist.png] · pins: none direct
 - **GATE-SURF-135** `project/experiments/euromonitor/make_notebook.py:11 md()`
   [project/data/euromonitor/sku_to_rep.csv, project/data/euromonitor/dataset_deduped.csv, project/experiments/results/euromonitor/07_nlp_hpo_benchmark.csv] → [project/experiments/euromonitor/entity_resolution.ipynb] · pins: none direct
 - **GATE-SURF-136** `project/experiments/euromonitor/entity_resolution.ipynb:1 Euromonitor`
@@ -308,7 +308,7 @@
   [random_state base seed, hpo.models list ORDER, CFG-HPO-SPEC / CFG-HPO-EXPERIMENT seed literals upstream] → [deterministic per-model sampler seeds; reproducible trajectories across runs/processes] · pins: 3
 - **GATE-HPO-89** `src/broadway/config/schema.py:125 HPOConfig` ⚠FINDING
   [configs/experiments/mlflow.yaml hpo: block (:14-44) = CFG-HPO-SPEC, ExperimentConfig.hpo (experiment-embedded twin, e.g. configs/experiment/hyperopt.yaml:23-36) = CFG-HPO-EXPERIMENT, k8s configmap inline config.yaml = CFG-K8S-OPTUNA-INFRA (infra keys only)] → [typed HPOConfig{engine, direction, total_trials, initial_trials_per_model, top_k, target_metric, models[].search_space, storage_url}] · pins: 3
-- **GATE-HPO-154** `src/broadway/training/nlp.py:226 make_objective() + :286 run_nlp_hpo() + :340 run_nlp()`
+- **GATE-HPO-154** `src/broadway/training/nlp.py:380 make_objective() + :519 run_nlp_hpo() + :586 run_nlp()`
   [src/broadway/config/schema.py:135 NLPConfig (typed data-agnostic config: model_zoo + hpo + knobs), project/config/experiments/nlp.yaml model_zoo + hpo: block (bi-encoder zoo SSOT, direction: maximize), sentence-transformers bi-encoders resolved via model_zoo (zero-shot; optional contrastive fine-tune examples), project/experiments/euromonitor/07_nlp_hpo.py pair construction (same 10,891 pos / 10,000 neg population as step 04)] → [per-model entity-resolution metrics (auc, recall_at_5pct_fpr, pos_median, neg_p90, encode_s) via trial broadway_metrics user attr, bandit result {models, best_model, best_params, best_value, metrics} (direction: maximize, reused run_hpo_bandit)] · pins: 5
 
 ### 09-infra — infra-meta
