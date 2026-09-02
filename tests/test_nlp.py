@@ -637,6 +637,41 @@ def test_precision_at_recall_empty_positives_returns_nan() -> None:
     assert np.isnan(precision_at_recall(np.array([]), np.array([0.1, 0.2])))
 
 
+def test_calibrate_isotonic_monotone_probabilities_and_rank_preserving() -> None:
+    """Isotonic regression remaps scores onto [0, 1] probabilities, monotone
+    non-decreasing and rank-preserving (AUC unchanged by monotonicity)."""
+    from broadway.training.nlp import calibrate_isotonic
+
+    rng = np.random.default_rng(0)
+    scores = rng.uniform(0.0, 1.0, size=200)
+    labels = rng.integers(0, 2, size=200)
+    cal = calibrate_isotonic(scores, labels)
+    assert isinstance(cal, np.ndarray)
+    assert cal.shape == scores.shape
+    # values are calibrated probabilities in [0, 1]
+    assert np.isfinite(cal).all()
+    assert bool(((cal >= 0.0) & (cal <= 1.0)).all())
+    # monotone non-decreasing in the input scores
+    order = np.argsort(scores)
+    assert np.all(np.diff(cal[order]) >= -1e-12)
+    # rank-order preservation: score_i <= score_j implies cal_i <= cal_j
+    for i, j in ((0, 1), (1, 2), (50, 51), (198, 199)):
+        a, b = int(order[i]), int(order[j])
+        assert (scores[a] <= scores[b]) == (cal[a] <= cal[b])
+
+
+def test_calibrate_isotonic_constant_input_returns_unchanged() -> None:
+    """Degenerate constant (or empty) scores have no monotone map to learn."""
+    from broadway.training.nlp import calibrate_isotonic
+
+    const = np.full(5, 0.5)
+    out = calibrate_isotonic(const, np.array([0, 1, 0, 1, 0]))
+    assert np.array_equal(out, const)
+
+    empty = calibrate_isotonic(np.array([]), np.array([]))
+    assert empty.size == 0
+
+
 def test_log_nlp_eval_noop_without_tracking_uri(monkeypatch: pytest.MonkeyPatch) -> None:
     """A None tracking URI short-circuits before the lazy mlflow_utils import."""
     calls: list = []

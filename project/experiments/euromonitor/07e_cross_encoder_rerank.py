@@ -55,6 +55,7 @@ from _text import MACRO_MAP
 
 from broadway.training.nlp import (
     _cosine,
+    calibrate_isotonic,
     encode_corpus,
     precision_at_recall,
     precision_at_recall_breakdown,
@@ -84,12 +85,13 @@ RERANK_COLUMNS = [
     "scorer", "metric", "country_stratum", "n_pos", "n_neg",
     "precision", "tp", "fp", "threshold", "recall", "ci_lo", "ci_hi",
     "tp_recovered", "fp_removed", "tp_lost", "fp_added", "tau_bi", "tau_hybrid",
+    "final_score", "brier",
 ]
 
 PAIRS_COLUMNS = [
     "title_a", "title_b", "brand_a", "brand_b", "barcode_a", "barcode_b",
     "macro_a", "macro_b", "country_a", "country_b", "country_stratum",
-    "cosine", "in_band", "cross_score", "hybrid_score", "label",
+    "cosine", "in_band", "cross_score", "hybrid_score", "final_score", "label",
 ]
 
 
@@ -362,6 +364,20 @@ def main() -> None:
     _assert_finite_in_unit("pos cross", ce_pos)
     _assert_finite_in_unit("hard cross", ce_hard)
 
+    # ---- isotonic calibration: monotone remap of hybrid scores -> [0, 1] ----
+    # Thin post-processing layer after the encoder: fit a non-parametric
+    # monotone regression on the hybrid POSITIVE (label 1) vs NEGATIVE (label 0)
+    # scores. Monotonicity preserves rank order (ROC AUC unchanged); it only
+    # remaps the raw score axis onto calibrated probabilities in [0, 1].
+    cal_scores = np.r_[pos_hybrid, hard_hybrid]
+    cal_labels = np.r_[np.ones(len(pos_hybrid)), np.zeros(len(hard_hybrid))]
+    cal_all = calibrate_isotonic(cal_scores, cal_labels)
+    pos_final = cal_all[: len(pos_hybrid)]
+    hard_final = cal_all[len(pos_hybrid):]
+    brier = float(np.mean((cal_all - cal_labels) ** 2))
+    print(f"isotonic calibration: ranking preserved (AUC unchanged by monotonicity) "
+          f"| brier {brier:.4f}", flush=True)
+
     # ---- metric rows (bi-only vs hybrid vs in-band-only cross-encoder) ----
     scorers = {
         "bi_encoder": (pos_s, hard_s, pos),
@@ -400,6 +416,16 @@ def main() -> None:
         "tau_bi": tau_bi,
         "tau_hybrid": tau_hybrid,
     })
+    # One calibration-quality number on the rerank rollup (the per-pair
+    # final_score lives in 07e_cross_encoder_pairs.csv).
+    rows.append({
+        "scorer": "hybrid",
+        "metric": "isotonic_calibration",
+        "country_stratum": "pooled",
+        "n_pos": len(pos_hybrid),
+        "n_neg": len(hard_hybrid),
+        "brier": round(brier, 4),
+    })
 
     rerank_df = pd.DataFrame(rows)
     for col in RERANK_COLUMNS:
@@ -414,7 +440,7 @@ def main() -> None:
     barcode = df["barcode"].fillna("").astype(str).to_numpy()
     macro = df["category"].fillna("").map(lambda c: MACRO_MAP.get(c, "?")).to_numpy()
 
-    def pair_frame(pairs, cosine, in_band, cross_full, hybrid, label):
+    def pair_frame(pairs, cosine, in_band, cross_full, hybrid, final, label):
         a, b = pairs[:, 0], pairs[:, 1]
         return pd.DataFrame({
             "title_a": title[a], "title_b": title[b],
@@ -427,11 +453,12 @@ def main() -> None:
             "in_band": in_band.astype(bool),
             "cross_score": np.round(cross_full, 4),
             "hybrid_score": np.round(hybrid, 4),
+            "final_score": np.round(final, 4),
             "label": label,
         })
 
-    pos_df = pair_frame(pos, pos_s, pos_in_band, ce_pos_full, pos_hybrid, 1)
-    neg_df = pair_frame(hard_pairs, hard_s, hard_in_band, ce_hard_full, hard_hybrid, 0)
+    pos_df = pair_frame(pos, pos_s, pos_in_band, ce_pos_full, pos_hybrid, pos_final, 1)
+    neg_df = pair_frame(hard_pairs, hard_s, hard_in_band, ce_hard_full, hard_hybrid, hard_final, 0)
     pairs_df = pd.concat([pos_df, neg_df], ignore_index=True)[PAIRS_COLUMNS]
     pairs_df.to_csv(RESULTS / "07e_cross_encoder_pairs.csv", index=False)
 

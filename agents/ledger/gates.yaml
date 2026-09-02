@@ -1,6 +1,6 @@
 # Gate registry SSOT — hand-maintained; the {01..09} gate fragments it consolidated predate git custody.
 meta:
-  head: '2ebdd9f'
+  head: '45473d9'
   counts:
     total: 162
     gates_with_findings: 75
@@ -3031,6 +3031,7 @@ gates:
   - 'two-stage rerank: bi-encoder (all-MiniLM-L6-v2) cosine scores candidate pairs; in-band pairs (0.5-0.75 cosine) re-scored by cross-encoder (ms-marco-MiniLM-L-6-v2); mining band stays 0.45-0.80'
   - 'reports precision@90%recall + fixed-threshold precision + raw TP/FP/threshold + band-crossing counts, bi-encoder-only vs bi-encoder+cross-encoder on the hard-negative pool (mine_hard_negatives + build_pairs)'
   - 'country-stratified eval: precision@90%recall + fixed-threshold precision split by in-country vs cross-country POSITIVE pairs (country[a] != country[b]); per-stratum pair count + bootstrap CI-or-raw TP/FP; country logic per 01h_cross_country_probe.py + 01g_ground_truth_funnel.py'
+  - 'isotonic calibration: monotone remap of the hybrid pos/neg scores onto [0,1] probabilities (rank-preserving, AUC unchanged); emits a per-pair final_score output column + one brier calibration-quality number'
   touched_by:
   - numpy
   - pandas@2.3.3
@@ -3750,7 +3751,7 @@ gates:
 - id: GATE-HPO-154
   phase: hpo-optuna
   order: 134
-  owner: src/broadway/training/nlp.py:380 make_objective() + :519 run_nlp_hpo() + :586 run_nlp()
+  owner: src/broadway/training/nlp.py:405 make_objective() + :544 run_nlp_hpo() + :611 run_nlp() + :125 calibrate_isotonic()
   inputs:
   - 'src/broadway/config/schema.py:135 NLPConfig (typed data-agnostic config: model_zoo + hpo + knobs)'
   - 'project/config/experiments/nlp.yaml model_zoo + hpo: block (bi-encoder zoo SSOT, direction: maximize)'
@@ -3764,6 +3765,7 @@ gates:
   - 'run_nlp(cfg, payload, pos_pairs, neg_pairs) is the data-agnostic entry point (parallel to broadway.training.module.run): the typed NLPConfig carries the zoo + bandit spec, the caller supplies payload/pairs'
   - 'zero-shot when search_space is empty (one trial); contrastive fine-tune (MultipleNegativesRankingLoss) when params carry epochs/learning_rate/warmup_steps/batch_size'
   - 'model_zoo name resolution is loud — unknown hpo.models names raise ValueError (nlp.py:166-167)'
+  - 'calibrate_isotonic(scores, labels) fits sklearn IsotonicRegression(y_min=0.0, y_max=1.0, out_of_bounds=clip) on binary {0,1} labels -> monotone non-decreasing [0,1] probabilities (rank-preserving, AUC unchanged); empty/constant scores fall back to the input unchanged'
   touched_by:
   - sentence-transformers@6.0.1
   - optuna@4.4.0

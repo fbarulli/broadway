@@ -1,6 +1,6 @@
 # DIGEST.md — rendered from agents/ledger/gates.yaml · NEVER HAND-EDIT ·
 
-> 162 gates · rendered 2026-09-02 @ HEAD 2ebdd9f · load THIS into context;
+> 162 gates · rendered 2026-09-02 @ HEAD 45473d9 · load THIS into context;
 > gates.yaml is the sole SSOT; the retired GATES.md/gates/*.md markdown world survives in agents/ledger/arbitration/2026-08-24/surface-and-analysis-preservation.md.
 
 | band | phase | gates | findings |
@@ -310,7 +310,7 @@
   [random_state base seed, hpo.models list ORDER, CFG-HPO-SPEC / CFG-HPO-EXPERIMENT seed literals upstream] → [deterministic per-model sampler seeds; reproducible trajectories across runs/processes] · pins: 3
 - **GATE-HPO-89** `src/broadway/config/schema.py:125 HPOConfig` ⚠FINDING
   [configs/experiments/mlflow.yaml hpo: block (:14-44) = CFG-HPO-SPEC, ExperimentConfig.hpo (experiment-embedded twin, e.g. configs/experiment/hyperopt.yaml:23-36) = CFG-HPO-EXPERIMENT, k8s configmap inline config.yaml = CFG-K8S-OPTUNA-INFRA (infra keys only)] → [typed HPOConfig{engine, direction, total_trials, initial_trials_per_model, top_k, target_metric, models[].search_space, storage_url}] · pins: 3
-- **GATE-HPO-154** `src/broadway/training/nlp.py:380 make_objective() + :519 run_nlp_hpo() + :586 run_nlp()`
+- **GATE-HPO-154** `src/broadway/training/nlp.py:405 make_objective() + :544 run_nlp_hpo() + :611 run_nlp() + :125 calibrate_isotonic()`
   [src/broadway/config/schema.py:135 NLPConfig (typed data-agnostic config: model_zoo + hpo + knobs), project/config/experiments/nlp.yaml model_zoo + hpo: block (bi-encoder zoo SSOT, direction: maximize), sentence-transformers bi-encoders resolved via model_zoo (zero-shot; optional contrastive fine-tune examples), project/experiments/euromonitor/07_nlp_hpo.py pair construction (same 10,891 pos / 10,000 neg population as step 04)] → [per-model entity-resolution metrics (auc, recall_at_5pct_fpr, pos_median, neg_p90, encode_s) via trial broadway_metrics user attr, bandit result {models, best_model, best_params, best_value, metrics} (direction: maximize, reused run_hpo_bandit)] · pins: 5
 
 ### 09-infra — infra-meta

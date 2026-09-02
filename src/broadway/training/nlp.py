@@ -122,6 +122,31 @@ def precision_at_recall_breakdown(
     return precision, tp, fp, threshold, recall
 
 
+def calibrate_isotonic(scores: np.ndarray, labels: np.ndarray) -> np.ndarray:
+    """Monotone isotonic regression of binary labels on scores -> probabilities.
+
+    A thin post-processing layer for a reranker: fit sklearn's
+    ``IsotonicRegression(y_min=0.0, y_max=1.0, out_of_bounds="clip")`` on
+    ``(scores, labels)`` with labels in {0, 1} and return the transformed
+    scores. Isotonic regression is a non-parametric monotone fit, so it
+    preserves the rank order of the input scores (ROC AUC is unchanged) while
+    remapping the raw score axis onto calibrated probabilities in [0, 1].
+
+    Degenerate fallback (documented): when ``scores`` is empty or constant
+    (fewer than two distinct values) there is no monotone map to learn, so the
+    input scores are returned unchanged instead of crashing.
+    """
+    scores = np.asarray(scores, dtype=float)
+    labels = np.asarray(labels, dtype=float)
+    if scores.size == 0 or np.unique(scores).size < 2:
+        return scores
+    from sklearn.isotonic import IsotonicRegression
+
+    iso = IsotonicRegression(y_min=0.0, y_max=1.0, out_of_bounds="clip")
+    iso.fit(scores, labels)
+    return iso.predict(scores)
+
+
 def precision_at_recall(pos_scores: np.ndarray, neg_scores: np.ndarray, target_recall: float = 0.90) -> float:
     """Precision at the score threshold keeping exactly target_recall of positives.
 
