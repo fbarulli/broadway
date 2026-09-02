@@ -1,7 +1,8 @@
 """07_report: report plots — score distribution, PR curve, threshold sweep,
-error breakdown by attribute, field-ablation bars, and the data-scaling curve.
+error breakdown by attribute, FN characterization + country slice, field-ablation
+bars, and the data-scaling curve.
 
-Reads the zero-shot bi-encoder embeddings (cached) for the first four; the
+Reads the zero-shot bi-encoder embeddings (cached) for the first five; the
 field-ablation and data-scaling plots read 07c_field_ablation.csv and
 07d_data_scaling.csv when they exist.
 """
@@ -87,6 +88,8 @@ def main() -> None:
     cat = df["category"].fillna("").astype(str).to_numpy()
     macro = df["category"].fillna("").map(lambda c: MACRO_MAP.get(c, "?")).to_numpy()
     vol = df["title"].fillna("").map(extract_volume_ml).map(lambda t: t[0]).to_numpy()
+    title_len = df["title"].fillna("").astype(str).str.len().to_numpy()
+    country = df["country"].fillna("").astype(str).to_numpy()
 
     def shares(pairs, mask):
         a, b = pairs[mask][:, 0], pairs[mask][:, 1]
@@ -111,6 +114,81 @@ def main() -> None:
     ax.set_ylabel("share of errors"); ax.set_xlabel("")
     ax.set_title("Error breakdown by attribute")
     fig.savefig(RESULTS / "07_report_error_breakdown.png", dpi=150); plt.close(fig)
+
+    # ---- 4b. FN characterization (missed true matches) + country slice ----
+    # Same zero-shot pos/neg/emb as above: characterize WHAT the false negatives
+    # look like, and slice the positive/FN side by in-country vs cross-country.
+    def bucket_masks(pairs):
+        a, b = pairs[:, 0], pairs[:, 1]
+        return {
+            "missing brand": (brand[a] == "") | (brand[b] == ""),
+            "short title": (title_len[a] < 20) | (title_len[b] < 20),
+            "cross-country": (country[a] != "") & (country[b] != "") & (country[a] != country[b]),
+        }
+
+    pos_buckets = bucket_masks(pos)
+    n_fn = int(fn.sum())
+    rows: list[dict] = []
+    fn_shares: list[float] = []
+    tp_shares: list[float] = []
+    print("FN characterization (missed true matches, cosine < thr):", flush=True)
+    for name, mask in pos_buckets.items():
+        fn_mask = mask & fn
+        fn_share = float(fn_mask.sum() / n_fn) if n_fn else float("nan")
+        tp_share = float(mask.mean())
+        fn_shares.append(fn_share)
+        tp_shares.append(tp_share)
+        rows.append({
+            "bucket/slice": f"FN: {name}",
+            "n": int(fn_mask.sum()),
+            "share": round(fn_share, 4),
+            "median_cosine": round(float(np.median(pos_s[fn_mask])), 4) if fn_mask.any() else float("nan"),
+        })
+        print(f"  FN  {name:<14} {fn_share:6.1%}  (TP baseline {tp_share:6.1%})", flush=True)
+    for name, mask in pos_buckets.items():
+        rows.append({
+            "bucket/slice": f"TP: {name}",
+            "n": int(mask.sum()),
+            "share": round(float(mask.mean()), 4),
+            "median_cosine": round(float(np.median(pos_s[mask])), 4) if mask.any() else float("nan"),
+        })
+
+    # Country slice of the positive/FN side only: cross-barcode negatives are not
+    # country-defined (a negative is two DIFFERENT products), so there is no
+    # in-country vs cross-country split for the FP side — state that explicitly.
+    a, b = pos[:, 0], pos[:, 1]
+    ca, cb = country[a], country[b]
+    both_country = (ca != "") & (cb != "")
+    slices = {
+        "pos: in-country": both_country & (ca == cb),
+        "pos: cross-country": both_country & (ca != cb),
+    }
+    print("country slice (positive/FN side only; cross-barcode negatives carry no country label):", flush=True)
+    slice_fn_rates: dict[str, float] = {}
+    for label, mask in slices.items():
+        n = int(mask.sum())
+        fn_rate = float((pos_s[mask] < thr).mean()) if n else float("nan")
+        med = float(np.median(pos_s[mask])) if n else float("nan")
+        slice_fn_rates[label] = fn_rate
+        rows.append({"bucket/slice": label, "n": n, "share": round(fn_rate, 4), "median_cosine": round(med, 4)})
+        print(f"  {label:<18} n={n:<6} FN rate={fn_rate:6.1%}  median pos cosine={med:.4f}", flush=True)
+    print(f"FN rate: in-country {slice_fn_rates['pos: in-country']:.1%} vs "
+          f"cross-country {slice_fn_rates['pos: cross-country']:.1%}", flush=True)
+
+    fndf = pd.DataFrame(rows)
+    fndf.to_csv(RESULTS / "07_report_fn_analysis.csv", index=False)
+
+    fig, ax = plt.subplots(figsize=(6.5, 4), constrained_layout=True)
+    x = np.arange(len(fn_shares))
+    w = 0.38
+    ax.bar(x - w / 2, fn_shares, w, color="#C44E52", label="FN (missed matches)")
+    ax.bar(x + w / 2, tp_shares, w, color="#4C72B0", label="TP baseline (all positives)")
+    ax.set_xticks(x)
+    ax.set_xticklabels(list(pos_buckets), rotation=0)
+    ax.set_ylabel("share"); ax.set_xlabel("")
+    ax.set_title("FN characterization vs positive baseline")
+    ax.legend()
+    fig.savefig(RESULTS / "07_report_fn_breakdown.png", dpi=150); plt.close(fig)
 
     # ---- 5. field-ablation bars (if CSV exists) ----
     fab = RESULTS / "07c_field_ablation.csv"

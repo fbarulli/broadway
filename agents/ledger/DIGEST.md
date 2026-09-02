@@ -1,6 +1,6 @@
 # DIGEST.md — rendered from agents/ledger/gates.yaml · NEVER HAND-EDIT ·
 
-> 163 gates · rendered 2026-09-02 @ HEAD 3c52d39 · load THIS into context;
+> 163 gates · rendered 2026-09-02 @ HEAD de16693 · load THIS into context;
 > gates.yaml is the sole SSOT; the retired GATES.md/gates/*.md markdown world survives in agents/ledger/arbitration/2026-08-24/surface-and-analysis-preservation.md.
 
 | band | phase | gates | findings |
@@ -249,7 +249,7 @@
 - **GATE-SURF-133** `project/experiments/euromonitor/07d_data_scaling.py:35 main()`
   [project/data/euromonitor/dataset_deduped.csv] → [project/experiments/results/euromonitor/07d_data_scaling.csv] · pins: none direct
 - **GATE-SURF-134** `project/experiments/euromonitor/07_report_plots.py:34 main()`
-  [project/data/euromonitor/dataset_deduped.csv, project/experiments/results/euromonitor/07c_field_ablation.csv, project/experiments/results/euromonitor/07d_data_scaling.csv, project/experiments/results/euromonitor/07b_four_pop_scores.csv] → [project/experiments/results/euromonitor/07_report_score_dist.png, project/experiments/results/euromonitor/07_report_pr_curve.png, project/experiments/results/euromonitor/07_report_threshold_sweep.png, project/experiments/results/euromonitor/07_report_error_breakdown.png, project/experiments/results/euromonitor/07_report_field_ablation.png, project/experiments/results/euromonitor/07_report_data_scaling.png, project/experiments/results/euromonitor/07_report_four_pop_dist.png] · pins: none direct
+  [project/data/euromonitor/dataset_deduped.csv, project/experiments/results/euromonitor/07c_field_ablation.csv, project/experiments/results/euromonitor/07d_data_scaling.csv, project/experiments/results/euromonitor/07b_four_pop_scores.csv] → [project/experiments/results/euromonitor/07_report_score_dist.png, project/experiments/results/euromonitor/07_report_pr_curve.png, project/experiments/results/euromonitor/07_report_threshold_sweep.png, project/experiments/results/euromonitor/07_report_error_breakdown.png, project/experiments/results/euromonitor/07_report_fn_analysis.csv, project/experiments/results/euromonitor/07_report_fn_breakdown.png, project/experiments/results/euromonitor/07_report_field_ablation.png, project/experiments/results/euromonitor/07_report_data_scaling.png, project/experiments/results/euromonitor/07_report_four_pop_dist.png] · pins: none direct
 - **GATE-SURF-135** `project/experiments/euromonitor/make_notebook.py:11 md()`
   [project/data/euromonitor/sku_to_rep.csv, project/data/euromonitor/dataset_deduped.csv, project/experiments/results/euromonitor/07_nlp_hpo_benchmark.csv] → [project/experiments/euromonitor/entity_resolution.ipynb] · pins: none direct
 - **GATE-SURF-136** `project/experiments/euromonitor/entity_resolution.ipynb:1 Euromonitor`

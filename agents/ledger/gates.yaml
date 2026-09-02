@@ -1,6 +1,6 @@
 # Gate registry SSOT — hand-maintained; the {01..09} gate fragments it consolidated predate git custody.
 meta:
-  head: '3c52d39'
+  head: 'de16693'
   counts:
     total: 163
     gates_with_findings: 75
@@ -2962,11 +2962,13 @@ gates:
   - project/experiments/results/euromonitor/07_report_pr_curve.png
   - project/experiments/results/euromonitor/07_report_threshold_sweep.png
   - project/experiments/results/euromonitor/07_report_error_breakdown.png
+  - project/experiments/results/euromonitor/07_report_fn_analysis.csv
+  - project/experiments/results/euromonitor/07_report_fn_breakdown.png
   - project/experiments/results/euromonitor/07_report_field_ablation.png
   - project/experiments/results/euromonitor/07_report_data_scaling.png
   - project/experiments/results/euromonitor/07_report_four_pop_dist.png
   transforms:
-  - 'report plots: score distribution, PR curve, threshold sweep, error breakdown by attribute; reads cached zero-shot embeddings; field-ablation + data-scaling curves from 07c/07d CSVs + fine-tuned four-population distribution from 07b_four_pop_scores.csv'
+  - 'report plots: score distribution, PR curve, threshold sweep, error breakdown by attribute, FN characterization + in-country vs cross-country FN slice; reads cached zero-shot embeddings; field-ablation + data-scaling curves from 07c/07d CSVs + fine-tuned four-population distribution from 07b_four_pop_scores.csv'
   touched_by:
   - numpy
   - pandas@2.3.3
@@ -2988,7 +2990,7 @@ gates:
   outputs:
   - project/experiments/euromonitor/entity_resolution.ipynb
   transforms:
-  - builds the entity-resolution deliverable notebook (SKU_ID -> ITEM_ID) from step-06 sku_to_rep.csv single source of truth; notebook is generated, never hand-edited
+  - builds the entity-resolution deliverable notebook (SKU_ID -> ITEM_ID) from step-06 sku_to_rep.csv single source of truth; adds a worked-example section (one cross-country success + one genuine failure from the zero-shot scores); notebook is generated, never hand-edited
   touched_by:
   - matplotlib
   - numpy
