@@ -1,6 +1,6 @@
 # Gate registry SSOT — hand-maintained; the {01..09} gate fragments it consolidated predate git custody.
 meta:
-  head: '2ebdd9f'
+  head: '45473d9'
   counts:
     total: 162
     gates_with_findings: 75
@@ -3836,23 +3836,26 @@ gates:
 - id: GATE-INFRA-92
   phase: infra-meta
   order: 137
-  owner: scripts/run_local_ci.sh:102 gate battery (ruff, mypy, Vulture, configs, shell-scripts, pytest+cov floor=95, project-tests)
+  owner: scripts/run_local_ci.sh:102 gate battery (ruff, mypy, Vulture, configs, shell-scripts, data-refs, pytest+cov floor=95, project-tests)
   inputs:
   - src/** tests/test_project_paths.py project/experiments/** project/experiments.py project/dashboard.py project/paths.py project/working.py project/data.py scripts/check_project_paths.py scripts/ (ruff)
   - project/config/ (project-owned layout, experiment, and config-overlay SSOT)
   - src/broadway/** (mypy)
   - configs/experiment/*.yaml via load_config(dataset='test') (configs)
   - k8s/optuna/*.sh + scripts/*.sh via sh -n + shellcheck (shell-scripts)
+  - Dockerfile COPY/ADD sources + ci.yml -f dockerfile + k8s/*.yaml + config parquet/path/file refs via scripts/check_data_refs.py against project/config/layout.yaml build:* (data-refs)
   - src/broadway project scripts via Vulture --min-confidence 95 (vulture)
   - tests/** (pytest -n 4 --dist worksteal, --cov-fail-under=95)
   - 'project/tests/** (project-tests: full tier only, -q --dist worksteal, NO coverage flags)'
   outputs:
-  - PASS/FAIL ruff|mypy|configs|project-paths|shell-scripts|vulture|pytest|project-tests banners + 40-line tails
+  - PASS/FAIL ruff|mypy|configs|project-paths|shell-scripts|data-refs|vulture|pytest|project-tests banners + 40-line tails
   - cov floor breach ⇒ FAIL pytest
   transforms:
   - ruff/mypy/Vulture/configs/shell-scripts run in EVERY tier incl. fast/static
   - 'shell-scripts widened to BOTH glob dirs (:93) — sh -n + shellcheck over k8s/optuna/*.sh AND scripts/*.sh, command-identical to ci.yml ''Shell scripts'' step (gate-divergence law comment :91)'
   - 'Vulture is fail-closed at 95% confidence through the direct scripts/uv.sh invocation: a finding is printed and exits non-zero; no allowlist or wrapper exists'
+  - 'data-refs (:117) runs `bash scripts/uv.sh run --extra dev python scripts/check_data_refs.py` — NOT bare `python3` — matching every other python gate; bare python3 was the CI failure (a491162 layout-SSOT rewrite made the checker import project.paths, unresolvable on the CI system interpreter)'
+  - 'scripts/check_data_refs.py is self-contained: it computes REPO = Path(__file__).resolve().parents[1] and inserts it into sys.path BEFORE `from project.paths import load_project_paths`, so the project import resolves regardless of ambient PYTHONPATH or an editable install'
   - 'project-tests step (:97, full-tier-only): uv run pytest project/tests -q --dist worksteal with NO coverage flags — the >=95 floor deliberately stays on tests/ (header :7-8); closes the data-gate hole (human ruling): 26 tests / 6 files collected+passing at HEAD eb9ea18'
   - coverage floor value 95 owned here; docs must quote it identically
   - configs gate asserts non-empty glob then loads every experiment config
@@ -3876,6 +3879,7 @@ gates:
   - project/config/
   - project/experiments/
   - scripts/check_project_paths.py
+  - scripts/check_data_refs.py
   - configs/experiment/
   - configs/dataset/test.yaml
   - scripts/
