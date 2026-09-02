@@ -341,6 +341,35 @@ def encode_corpus(
     return _encode_payload(model, payload, batch_size, cache_path, prompt)
 
 
+def load_cached_corpus(
+    model_id: str,
+    payload: list[str],
+    *,
+    batch_size: int = 256,
+    max_seq_length: int = 128,
+    cache_dir: str | None = None,
+    prompt: str | None = None,
+) -> tuple[np.ndarray, float]:
+    """Read a previously-cached embedding matrix WITHOUT loading the model.
+
+    Companion to ``encode_corpus`` for lightweight consumers (deliverable
+    notebooks, report steps) that must NOT pull model weights: it resolves the
+    same deterministic cache path and ``np.load``s it directly. Raises
+    FileNotFoundError when the entry is missing — run the encode step first
+    (``encode_corpus`` once, in the pipeline, not in the notebook).
+    """
+    cache_path = _embedding_cache_path(
+        cache_dir, model_id, payload, max_seq_length, batch_size, prompt
+    )
+    if cache_path is None or not cache_path.exists():
+        raise FileNotFoundError(
+            f"no cached embeddings for this payload at {cache_path} — "
+            "run the encode step (encode_corpus) first"
+        )
+    with np.load(cache_path) as cached:
+        return cached["emb"], float(cached["encode_s"])
+
+
 def _finetune(
     model,
     params: dict[str, float | int],

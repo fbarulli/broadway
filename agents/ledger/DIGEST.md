@@ -1,6 +1,6 @@
 # DIGEST.md — rendered from agents/ledger/gates.yaml · NEVER HAND-EDIT ·
 
-> 163 gates · rendered 2026-09-02 @ HEAD c94c7f5 · load THIS into context;
+> 165 gates · rendered 2026-09-02 @ HEAD b9100f3 · load THIS into context;
 > gates.yaml is the sole SSOT; the retired GATES.md/gates/*.md markdown world survives in agents/ledger/arbitration/2026-08-24/surface-and-analysis-preservation.md.
 
 | band | phase | gates | findings |
@@ -11,12 +11,12 @@
 | 04-training | training-eval | 12 | 11 |
 | 05-stats | stats | 11 | 7 |
 | 06-timeline | timeline-lineage | 11 | 7 |
-| 07-surfaces | surfaces | 48 | 1 |
+| 07-surfaces | surfaces | 50 | 1 |
 | 08-config | config-schema | 15 | 10 |
 | 80-hpo-optuna | hpo-optuna | 10 | 8 |
 | 09-infra | infra-meta | 26 | 14 |
 | 81-object-custody | object-custody | 3 | 0 |
-| **total** | | **163** | **75** |
+| **total** | | **165** | **75** |
 
 ### 01-ingest — ingest
 
@@ -256,6 +256,10 @@
   [project/experiments/euromonitor/make_notebook.py] → [project/experiments/results/euromonitor/sku_to_item.csv] · pins: none direct
 - **GATE-SURF-137** `project/experiments/euromonitor/07e_cross_encoder_rerank.py:229 main()`
   [project/data/euromonitor/dataset_deduped.csv, project/data/euromonitor/embeddings_cache (bi-encoder .npz, all-MiniLM-L6-v2)] → [project/experiments/results/euromonitor/07e_cross_encoder_rerank.csv, project/experiments/results/euromonitor/07e_cross_encoder_pairs.csv] · pins: none direct
+- **GATE-SURF-138** `project/experiments/euromonitor/_link.py:23 resolve_items()`
+  [] → [(shared) rep-level ITEM_ID + linking stats (n_items, edges, soft admitted/blocked, cand_pairs)] · pins: none direct
+- **GATE-SURF-139** `project/experiments/euromonitor/08_pipeline.py:33 main()`
+  [project/data/euromonitor/dataset.csv, project/data/euromonitor/sku_to_rep.csv] → [project/experiments/results/euromonitor/sku_to_item.csv] · pins: none direct
 
 ### 08-config — config-schema
 

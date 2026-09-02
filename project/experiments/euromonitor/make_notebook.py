@@ -39,7 +39,7 @@ sys.path.insert(0, str(SERIES))
 from _common import PATHS, SEED, load_dataset, load_dataset_deduped
 from _text import MACRO_MAP, extract_volume_ml, flavor_from_name
 
-from broadway.training.nlp import _cosine, encode_corpus
+from broadway.training.nlp import _cosine, load_cached_corpus
 
 MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 CACHE = str(PATHS.experiments.parent / "data" / "euromonitor" / "embeddings_cache")
@@ -139,10 +139,10 @@ assert set(sku_to_rep["product_id"]) == set(raw["product_id"]), "product_id mism
 
     md("""## 6. Embed the representatives
 
-A bi-encoder turns each representative's `title | brand | category` into a 384-dim vector. Cosine similarity between two vectors is our "same product" score. (The encode is cached, so re-runs are instant.)"""),
+A bi-encoder turns each representative's `title | brand | category` into a 384-dim vector; cosine similarity between two vectors is our "same product" score. The embeddings are **precomputed once by the pipeline** and cached to disk, so this notebook only *loads* them — it never pulls model weights."""),
 
     code("""payload = (reps["title"].fillna("") + " | " + reps["brand"].fillna("") + " | " + reps["category"].fillna("")).tolist()
-emb, _ = encode_corpus(MODEL, payload, batch_size=256, max_seq_length=128, cache_dir=CACHE)
+emb, _ = load_cached_corpus(MODEL, payload, batch_size=256, max_seq_length=128, cache_dir=CACHE)
 print(f"embeddings: {emb.shape}")"""),
 
     md("""## 7. Link — hard (barcode) + soft (cosine) edges

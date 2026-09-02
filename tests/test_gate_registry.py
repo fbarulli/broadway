@@ -49,10 +49,10 @@ INDEX_FILES = [
 # appended ids 100…154 continue the GLOBAL dense order prefixed by the owning
 # band, so several prefixes carry a second (appended) range. Burned ids
 # (121,130,132,134,135,136,140,153 + not-landed 106/109/110/115) simply hold
-# no rows; SURF appended range extended to 104…137 for the euromonitor
-# experiment surfaces (surfaces-fix); INFRA appended range extended to 121…149
-# for the graphify surface-reconciliation gate (GATE-INFRA-149); future mints
-# append ≥155 (HPO) / ≥138 (SURF) / ≥150 (INFRA).
+# no rows; SURF appended range extended to 104…139 for the euromonitor
+# experiment surfaces (surfaces-fix + _link/08_pipeline); INFRA appended range
+# extended to 121…149 for the graphify surface-reconciliation gate
+# (GATE-INFRA-149); future mints append ≥155 (HPO) / ≥140 (SURF) / ≥150 (INFRA).
 BAND_RANGES = {
     "INGEST": [(1, 9)],
     "ETL": [(10, 19), (115, 117)],
@@ -60,7 +60,7 @@ BAND_RANGES = {
     "TRAIN": [(30, 39), (118, 120)],
     "STATS": [(40, 49), (113, 113)],
     "TLINE": [(50, 59), (114, 114)],
-    "SURF": [(60, 69), (100, 103), (104, 137)],
+    "SURF": [(60, 69), (100, 103), (104, 139)],
     "CFG": [(70, 79), (103, 112)],
     "HPO": [(80, 89), (154, 154)],
     "INFRA": [(90, 99), (121, 149)],

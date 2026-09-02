@@ -19,6 +19,8 @@
 - GATE-SURF-105
 (shared) hard-negative pairs + triplets + conflicting-barcode exclusion set:
 - GATE-SURF-108
+(shared) rep-level ITEM_ID + linking stats (n_items, edges, soft admitted/blocked, cand_pairs):
+- GATE-SURF-138
 (shared) true pairs + negative pairs + blocking recall/candidates:
 - GATE-SURF-106
 --force flag:
@@ -828,6 +830,7 @@ project/data/euromonitor/dataset.csv:
 - GATE-SURF-126
 - GATE-SURF-127
 - GATE-SURF-128
+- GATE-SURF-139
 project/data/euromonitor/dataset_deduped.csv:
 - GATE-SURF-104
 - GATE-SURF-106
@@ -848,6 +851,7 @@ project/data/euromonitor/embeddings_cache (bi-encoder .npz, all-MiniLM-L6-v2):
 project/data/euromonitor/sku_to_rep.csv:
 - GATE-SURF-127
 - GATE-SURF-135
+- GATE-SURF-139
 project/experiments/euromonitor/07_nlp_hpo.py pair construction (same 10,891 pos / 10,000 neg population as step 04):
 - GATE-HPO-154
 project/experiments/euromonitor/entity_resolution.ipynb:
@@ -1013,6 +1017,7 @@ project/experiments/results/euromonitor/07e_cross_encoder_rerank.csv:
 - GATE-SURF-137
 project/experiments/results/euromonitor/sku_to_item.csv:
 - GATE-SURF-136
+- GATE-SURF-139
 project/experiments/results/univariate/fare_amount_trip_distance/ratecode1_sample.parquet|.json (pinned, tracked):
 - GATE-SURF-68
 'project/tests/** (project-tests: full tier only, -q --dist worksteal, NO coverage flags)':
