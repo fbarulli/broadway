@@ -1,6 +1,6 @@
 # DIGEST.md — rendered from agents/ledger/gates.yaml · NEVER HAND-EDIT ·
 
-> 163 gates · rendered 2026-09-02 @ HEAD 9ab5215 · load THIS into context;
+> 163 gates · rendered 2026-09-02 @ HEAD 3c52d39 · load THIS into context;
 > gates.yaml is the sole SSOT; the retired GATES.md/gates/*.md markdown world survives in agents/ledger/arbitration/2026-08-24/surface-and-analysis-preservation.md.
 
 | band | phase | gates | findings |
@@ -310,8 +310,8 @@
   [random_state base seed, hpo.models list ORDER, CFG-HPO-SPEC / CFG-HPO-EXPERIMENT seed literals upstream] → [deterministic per-model sampler seeds; reproducible trajectories across runs/processes] · pins: 3
 - **GATE-HPO-89** `src/broadway/config/schema.py:125 HPOConfig` ⚠FINDING
   [configs/experiments/mlflow.yaml hpo: block (:14-44) = CFG-HPO-SPEC, ExperimentConfig.hpo (experiment-embedded twin, e.g. configs/experiment/hyperopt.yaml:23-36) = CFG-HPO-EXPERIMENT, k8s configmap inline config.yaml = CFG-K8S-OPTUNA-INFRA (infra keys only)] → [typed HPOConfig{engine, direction, total_trials, initial_trials_per_model, top_k, target_metric, models[].search_space, storage_url}] · pins: 3
-- **GATE-HPO-154** `src/broadway/training/nlp.py:106 precision_at_recall_breakdown() + :131 calibrate_isotonic() + :156 calibrate_isotonic_heldout() + :209 precision_ci() + :236 split_pos_by_country() + :257 log_nlp_eval() + :500 make_objective() + :639 run_nlp_hpo() + :706 run_nlp()`
-  [src/broadway/config/schema.py:135 NLPConfig (typed data-agnostic config: model_zoo + hpo + knobs), project/config/experiments/nlp.yaml model_zoo + hpo: block (bi-encoder zoo SSOT, direction: maximize), sentence-transformers bi-encoders resolved via model_zoo (zero-shot; optional contrastive fine-tune examples), project/experiments/euromonitor/07_nlp_hpo.py pair construction (same 10,891 pos / 10,000 neg population as step 04)] → [per-model entity-resolution metrics (auc, average_precision, recall_at_5pct_fpr, precision_at_90pct_recall, f1_at_5pct_fpr, tp_at_90pct_recall, fp_at_90pct_recall, threshold_at_90pct_recall, tp_at_5pct_fpr, fp_at_5pct_fpr, threshold_at_5pct_fpr, pos_median, neg_p90, encode_s) via trial broadway_metrics user attr, bandit result {models, best_model, best_params, best_value, metrics} (direction: maximize, reused run_hpo_bandit)] · pins: 5
+- **GATE-HPO-154** `src/broadway/training/nlp.py:97 precision_at_recall_breakdown() + :122 calibrate_isotonic() + :147 calibrate_isotonic_heldout() + :200 precision_ci() + :227 split_pos_by_country() + :248 log_nlp_eval() + :411 make_objective() + :464 run_nlp_hpo() + :514 run_nlp()`
+  [src/broadway/config/schema.py:135 NLPConfig (typed data-agnostic config: model_zoo + hpo + knobs), project/config/experiments/nlp.yaml model_zoo + hpo: block (bi-encoder zoo SSOT, direction: maximize), sentence-transformers bi-encoders resolved via model_zoo (zero-shot), project/experiments/euromonitor/07_nlp_hpo.py pair construction (same 10,891 pos / 10,000 neg population as step 04)] → [per-model entity-resolution metrics (auc, average_precision, recall_at_5pct_fpr, precision_at_90pct_recall, f1_at_5pct_fpr, tp_at_90pct_recall, fp_at_90pct_recall, threshold_at_90pct_recall, tp_at_5pct_fpr, fp_at_5pct_fpr, threshold_at_5pct_fpr, pos_median, neg_p90, encode_s) via trial broadway_metrics user attr, bandit result {models, best_model, best_params, best_value, metrics} (direction: maximize, reused run_hpo_bandit)] · pins: 5
 
 ### 09-infra — infra-meta
 

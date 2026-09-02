@@ -1129,7 +1129,7 @@ sample.column_mapping logical→source resolution (:132):
 - GATE-STATS-49
 sample_name/sample_role:
 - GATE-TLINE-58
-sentence-transformers bi-encoders resolved via model_zoo (zero-shot; optional contrastive fine-tune examples):
+sentence-transformers bi-encoders resolved via model_zoo (zero-shot):
 - GATE-HPO-154
 sha-tagged images built/boot-tested; CD publishes bit-for-bit verified tarball to GHCR on main/taxi pushes only (:290-376):
 - GATE-INFRA-99

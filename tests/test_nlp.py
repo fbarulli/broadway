@@ -23,22 +23,6 @@ from broadway.training import nlp
 from broadway.training.nlp import entity_resolution_metrics, load_pairs_csv
 
 
-class _CaptureTrial:
-    """Minimal optuna-trial stand-in that records the broadway_metrics user attr."""
-
-    def __init__(self) -> None:
-        self.attrs: dict = {}
-
-    def set_user_attr(self, key, value) -> None:
-        self.attrs[key] = value
-
-
-def _circle_embeddings(n: int) -> np.ndarray:
-    """Replicate the fake encoder's noise-free embeddings (index on the unit circle)."""
-    angle = 2.0 * np.pi * np.arange(n) / n
-    return np.column_stack([np.cos(angle), np.sin(angle)])
-
-
 def _install_fake_sentence_transformers(monkeypatch: pytest.MonkeyPatch, noise_map: dict) -> None:
     """Stub the sentence_transformers module with a deterministic fake encoder."""
     st = types.ModuleType("sentence_transformers")
@@ -277,197 +261,10 @@ def _install_fake_finetune_modules(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setitem(sys.modules, "torch.utils.data", torch_data)
 
 
-def test_make_objective_finetune_branch(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The fine-tune branch (finetune_examples + fine-tune params) still scores."""
-    _install_fake_sentence_transformers(monkeypatch, {"m": 0.0})
-    _install_fake_finetune_modules(monkeypatch)
-    payload = [f"s{i}" for i in range(20)]
-    pos = np.array([[i, i + 1] for i in range(0, 18, 2)])
-    neg = np.array([[i, i + 10] for i in range(10)])
-    objective = nlp.make_objective("m", payload, pos, neg, finetune_examples=["a", "b"])
-    value = objective({"epochs": 1, "learning_rate": 1e-4, "batch_size": 8, "warmup_steps": 0})
-    assert isinstance(value, float) and 0.0 <= value <= 1.0
-
-
-def test_group_kfold_no_group_spans_two_folds() -> None:
-    """The splitter puts each group (barcode) in exactly one fold, ~balanced."""
-    from broadway.training.nlp import group_kfold
-
-    group_ids = [0, 0, 0, 1, 1, 2, 2, 2, 2, 3, 4, 4]
-    k = 3
-    masks = group_kfold(group_ids, k, seed=42)
-    assert len(masks) == k
-    # every pair belongs to exactly one fold
-    membership = np.column_stack([m.astype(int) for m in masks])
-    assert np.all(membership.sum(axis=1) == 1)
-    # no group is split across folds: each group's pairs sit in a single fold
-    for group in sorted(set(group_ids)):
-        idx = np.array([i for i, g in enumerate(group_ids) if g == group])
-        folds_with_group = [m for m in masks if m[idx].any()]
-        assert len(folds_with_group) == 1
-        assert folds_with_group[0][idx].all()
-    # ~balanced: greedy largest-first on these counts yields 4/4/4
-    sizes = [int(m.sum()) for m in masks]
-    assert max(sizes) - min(sizes) <= 1
-    assert all(size > 0 for size in sizes)
-    # deterministic for a fixed seed
-    assert all(
-        np.array_equal(a, b)
-        for a, b in zip(masks, group_kfold(group_ids, k, seed=42), strict=True)
-    )
-
-
-def test_make_objective_cv_returns_mean_std(monkeypatch: pytest.MonkeyPatch) -> None:
-    """CV objective scores each held-out fold and reports mean/std of the AUCs."""
-    from broadway.training.nlp import _cosine, group_kfold
-
-    _install_fake_sentence_transformers(monkeypatch, {"m": 0.0})
-    n = 24
-    payload = [f"s{i}" for i in range(n)]
-    pos_rows: list[list[int]] = []
-    neg_rows: list[list[int]] = []
-    pos_groups: list[int] = []
-    neg_groups: list[int] = []
-    for g in range(6):
-        base = g * 4
-        pos_rows += [[base, base + 1], [base + 2, base + 3]]
-        pos_groups += [g, g]
-        neg_rows.append([base, (base + 8) % n])
-        neg_groups.append(g)
-    pos_pairs = np.array(pos_rows)
-    neg_pairs = np.array(neg_rows)
-
-    k = 3
-    objective = nlp.make_objective(
-        "m", payload, pos_pairs, neg_pairs,
-        cv_folds=k, pos_groups=pos_groups, neg_groups=neg_groups, cv_seed=7,
-    )
-    trial = _CaptureTrial()
-    value = objective({}, trial)
-    metrics = trial.attrs["broadway_metrics"]
-
-    # expected per-fold AUCs: score the fold's held-out pairs with the same
-    # noise-free circle embeddings the fake encoder produces.
-    combined = np.concatenate([np.asarray(pos_groups), np.asarray(neg_groups)]).tolist()
-    masks = group_kfold(combined, k, seed=7)
-    emb = _circle_embeddings(n)
-    p, nneg = len(pos_groups), len(neg_groups)
-    fold_aucs = []
-    for f in range(k):
-        fold_metrics = entity_resolution_metrics(
-            _cosine(emb, pos_pairs[masks[f][:p]]), _cosine(emb, neg_pairs[masks[f][p:p + nneg]])
-        )
-        fold_aucs.append(fold_metrics["auc"])
-
-    expected_mean = round(float(np.mean(fold_aucs)), 4)
-    expected_std = round(float(np.std(fold_aucs)), 4)
-    assert value == pytest.approx(expected_mean)
-    assert metrics["auc_mean"] == pytest.approx(expected_mean)
-    assert metrics["auc_std"] == pytest.approx(expected_std)
-    for f in range(k):
-        assert metrics[f"fold_{f}_auc"] == pytest.approx(round(fold_aucs[f], 4))
-    # mean/std (and per-fold) are reported for every fold metric, not just auc
-    assert "average_precision_mean" in metrics
-    assert "average_precision_std" in metrics
-    assert "fold_0_average_precision" in metrics
-
-
-def test_make_objective_cv_folds_none_preserves_single_score(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """cv_folds=None keeps the original full-set single-score contract."""
-    from broadway.training.nlp import _cosine
-
-    _install_fake_sentence_transformers(monkeypatch, {"m": 0.0})
-    payload = [f"s{i}" for i in range(20)]
-    pos = np.array([[i, i + 1] for i in range(0, 18, 2)])
-    neg = np.array([[i, i + 10] for i in range(10)])
-    objective = nlp.make_objective("m", payload, pos, neg, cv_folds=None)
-    trial = _CaptureTrial()
-    value = objective({}, trial)
-    metrics = trial.attrs["broadway_metrics"]
-
-    expected = entity_resolution_metrics(_cosine(_circle_embeddings(20), pos), _cosine(_circle_embeddings(20), neg))
-    assert value == pytest.approx(expected["auc"])
-    assert metrics["auc"] == pytest.approx(expected["auc"])
-    assert set(metrics) == {
-        "auc", "average_precision", "recall_at_5pct_fpr",
-        "precision_at_90pct_recall", "f1_at_5pct_fpr",
-        "tp_at_90pct_recall", "fp_at_90pct_recall", "threshold_at_90pct_recall",
-        "tp_at_5pct_fpr", "fp_at_5pct_fpr", "threshold_at_5pct_fpr",
-        "pos_median", "neg_p90", "encode_s",
-    }
-    assert "auc_mean" not in metrics and "auc_std" not in metrics
-
-
-def test_make_objective_cv_finetune_fits_on_other_folds(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Fine-tune CV fits each fold on every example EXCEPT the held-out group's."""
-    from broadway.training.nlp import group_kfold
-
-    _install_fake_sentence_transformers(monkeypatch, {"m": 0.0})
-    _install_fake_finetune_modules(monkeypatch)
-
-    n = 24
-    payload = [f"s{i}" for i in range(n)]
-    pos_rows: list[list[int]] = []
-    neg_rows: list[list[int]] = []
-    pos_groups: list[int] = []
-    neg_groups: list[int] = []
-    for g in range(6):
-        base = g * 4
-        pos_rows += [[base, base + 1], [base + 2, base + 3]]
-        pos_groups += [g, g]
-        neg_rows.append([base, (base + 8) % n])
-        neg_groups.append(g)
-    pos_pairs = np.array(pos_rows)
-    neg_pairs = np.array(neg_rows)
-
-    finetune_examples = [f"ex_{g}" for g in range(6)]
-    finetune_groups = list(range(6))
-
-    # record the example list each fold's fit() receives
-    loader_calls: list[list[str]] = []
-
-    class _RecLoader:
-        def __init__(self, examples, shuffle=True, batch_size=32) -> None:
-            loader_calls.append(list(examples))
-
-    sys.modules["torch.utils.data"].DataLoader = _RecLoader
-
-    k = 3
-    objective = nlp.make_objective(
-        "m", payload, pos_pairs, neg_pairs,
-        finetune_examples=finetune_examples,
-        finetune_groups=finetune_groups,
-        cv_folds=k, pos_groups=pos_groups, neg_groups=neg_groups, cv_seed=7,
-    )
-    trial = _CaptureTrial()
-    value = objective({"epochs": 1, "learning_rate": 1e-4, "batch_size": 8, "warmup_steps": 0}, trial)
-    metrics = trial.attrs["broadway_metrics"]
-
-    assert value == pytest.approx(metrics["auc_mean"])
-    assert "auc_std" in metrics and "fold_0_auc" in metrics
-
-    combined = np.concatenate([
-        np.asarray(pos_groups), np.asarray(neg_groups), np.asarray(finetune_groups),
-    ]).tolist()
-    masks = group_kfold(combined, k, seed=7)
-    n_ft = len(finetune_groups)
-    assert len(loader_calls) == k
-    for f in range(k):
-        ft_mask = masks[f][-n_ft:]
-        expected_train = [ex for i, ex in enumerate(finetune_examples) if not ft_mask[i]]
-        held_out = {ex for i, ex in enumerate(finetune_examples) if ft_mask[i]}
-        assert set(loader_calls[f]) == set(expected_train)
-        assert held_out.isdisjoint(loader_calls[f])
-
-
 def test_finetune_calls_model_fit_with_params(monkeypatch: pytest.MonkeyPatch) -> None:
     """_finetune maps search-space params onto sentence-transformers fit() and
     passes learning_rate through optimizer_params (no top-level lr knob)."""
-    from broadway.training.nlp import _finetune, _has_finetune_params
+    from broadway.training.nlp import _finetune
 
     captured: dict = {}
 
@@ -504,8 +301,6 @@ def test_finetune_calls_model_fit_with_params(monkeypatch: pytest.MonkeyPatch) -
     assert captured["warmup_steps"] == 10
     assert captured["optimizer_params"] == {"lr": 1e-4}
     assert captured["output_path"] is None
-    assert _has_finetune_params({"epochs": 1}) is True
-    assert _has_finetune_params({}) is False
 
 
 def test_finetune_without_learning_rate_omits_optimizer_params(

@@ -236,7 +236,7 @@ def main() -> None:
     print(f"  band crossing: above {above_all} | below {below_all}", flush=True)
     print(f"pooled AUC (held-out pos vs random neg)  {_auc(pos_all, rand_all):.4f}",
           flush=True)
-    # population std (ddof=0) to match _aggregate_fold_metrics in nlp.py
+    # population std (ddof=0) for the honest held-out per-fold AUC variance
     auc_mean = float(np.mean(fold_aucs))
     auc_std = float(np.std(fold_aucs))
     print(f"per-fold AUC: {', '.join(f'{a:.4f}' for a in fold_aucs)}", flush=True)
