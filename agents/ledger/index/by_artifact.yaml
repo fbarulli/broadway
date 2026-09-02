@@ -986,6 +986,10 @@ project/experiments/results/euromonitor/07_report_error_breakdown.png:
 - GATE-SURF-134
 project/experiments/results/euromonitor/07_report_field_ablation.png:
 - GATE-SURF-134
+project/experiments/results/euromonitor/07_report_fn_analysis.csv:
+- GATE-SURF-134
+project/experiments/results/euromonitor/07_report_fn_breakdown.png:
+- GATE-SURF-134
 project/experiments/results/euromonitor/07_report_four_pop_dist.png:
 - GATE-SURF-134
 project/experiments/results/euromonitor/07_report_pr_curve.png:

@@ -337,7 +337,80 @@ print(ranking.to_string(index=False))"""),
 
     md("""**Readout.** `precision@0.85` is computed at the **actual link threshold**, not a quantile operating point. The number that matters is the **soft-link candidate** row: among same-brand × same-macro pairs at cosine ≥ 0.85 (the pairs the soft rule could actually link), the barcode-labeled precision is the fraction that are genuinely the same product. The random cross-barcode negatives are easy, and the mined hard negatives sit in the 0.45–0.80 confusion band — below the link threshold — so they contribute no false positives at 0.85."""),
 
-    md("""## 10. Field ablation — which encode fields carry the decision?
+    md("""## 10. Worked example — a cross-country success and a genuine failure
+
+The bi-encoder pays a **translation tax**: the same physical product listed in two countries often has a differently-worded title, so its cosine drops. Two same-barcode pairs — pulled straight from the zero-shot scores — make that tax concrete:
+
+- **cross-country SUCCESS** — one product whose two listings live in different countries, yet the encoder still scores it high enough to match.
+- **genuine FAILURE** — one same-barcode pair the encoder scores just below the operating threshold (the 5% false-positive-rate point on the cross-barcode negatives — the same threshold `07_report_plots.py` uses; *not* the 0.85 soft-link threshold).
+
+Each pair shows the two titles, the brand, the two countries, and the cosine, plus one plain-English *why*. The "why" is **inferred** from the pair's attributes (missing brand, very short title, or wording divergence) — not proven to be the cause. A miss whose two titles are *very* different may in fact be a mislabeled barcode (two products sharing a GTIN, ~0.6% of cross-retailer groups) — a label error the encoder is arguably right about — rather than a wording gap it failed to bridge."""),
+
+    code("""# worked example: one cross-country SUCCESS and one genuine FAILURE from the
+# zero-shot bi-encoder's own scores. Same-barcode pairs are ground-truth matches;
+# the operating threshold mirrors 07_report_plots.py (5% FPR on cross-barcode
+# negatives), NOT the 0.85 soft-link threshold.
+thr = float(np.quantile(neg_s, 0.95))
+title = reps["title"].fillna("").astype(str).to_numpy()
+brand = reps["brand"].fillna("").astype(str).to_numpy()
+country = reps["country"].fillna("").astype(str).to_numpy()
+a, b = pos[:, 0], pos[:, 1]
+cross = (country[a] != "") & (country[b] != "") & (country[a] != country[b])
+
+# 1. cross-country SUCCESS: the highest-scoring same-barcode pair across two
+#    countries whose titles genuinely differ once case and whitespace are
+#    normalized — a match earned in spite of the wording gap, not a trivially
+#    identical title. Falls back to the plain argmax if none exists.
+norm = np.array([" ".join(t.split()).lower() for t in title])
+cross_diff = cross & (norm[a] != norm[b])
+best_pick = cross_diff if cross_diff.any() else cross
+best = int(np.flatnonzero(best_pick)[np.argmax(pos_s[best_pick])])
+
+# 2. genuine FAILURE: a same-barcode positive below the operating threshold,
+#    prefer cross-country. Take the CLOSEST miss (highest score below thr):
+#    the pair the tax most plausibly cost, rather than a near-0.3 mislabeled
+#    barcode (a label error, not a matching miss).
+fn = pos_s < thr
+fn_pick = (fn & cross) if (fn & cross).any() else fn
+fail = int(np.flatnonzero(fn_pick)[np.argmax(pos_s[fn_pick])])
+
+def _why(i):
+    x, y = pos[i]
+    va, vb = vol_arr[x], vol_arr[y]
+    no_brand = brand[x] == "" or brand[y] == ""
+    short = len(title[x]) < 20 or len(title[y]) < 20
+    same_vol = bool(pd.notna(va) and pd.notna(vb) and va == vb)
+    if pos_s[i] >= thr:
+        reasons = []
+        if not no_brand:
+            reasons.append("a shared brand")
+        if same_vol:
+            reasons.append("matching volume")
+        tail = (" + " + " + ".join(reasons)) if reasons else ""
+        return "near-identical titles" + tail + " carry the match across the language/formatting gap"
+    if no_brand:
+        return "missing brand leaves the encoder no brand signal to lean on"
+    if short:
+        return "very short title text gives the encoder too little to latch onto"
+    return "heavy wording divergence between the two listings"
+
+def _describe(i):
+    x, y = pos[i]
+    return {
+        "title_a": title[x],
+        "title_b": title[y],
+        "brand": brand[x] if brand[x] else brand[y],
+        "country_a": country[x],
+        "country_b": country[y],
+        "cosine": round(float(pos_s[i]), 4),
+        "why (inferred)": _why(i),
+    }
+
+example = pd.DataFrame({label: _describe(i) for i, label in [(best, "cross-country SUCCESS"), (fail, "genuine FAILURE")]})
+print(f"operating threshold (5% FPR): {thr:.3f}")
+print(example.to_string(max_colwidth=42))"""),
+
+    md("""## 11. Field ablation — which encode fields carry the decision?
 
 Step 07c re-scored the bi-encoder after dropping each text field from the encode payload. AUC is the ranking objective, but the operating metric is **precision @ 90% recall** — how precise the score is at the decision threshold. At 90% recall the near-perfect full precision (0.9992) is a ground-truth-ease artifact, not brand leakage: **brand alone is strong (0.9982), but removing brand only drops the full precision@90%recall 0.9992 → 0.9950**, so no single field is load-bearing."""),
 
@@ -356,7 +429,7 @@ for y, v in enumerate(abl["precision_at_90pct_recall"]):
 plt.show()
 abl[["variant", "precision_at_90pct_recall"]]"""),
 
-    md("""## 11. Caveats & known limits
+    md("""## 12. Caveats & known limits
 
 - **Barcode coverage is 42%**, so the hard-link signal is partial; the fuzzy bi-encoder link carries the rest.
 - **Mislabeled barcodes** (~0.6% of cross-retailer exact-title groups carry conflicting barcodes) can over-merge distinct products — the two-stage closure stops a mislabeled barcode from chaining distinct clusters, but it is flagged, not auto-resolved.
