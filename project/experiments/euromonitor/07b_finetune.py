@@ -11,7 +11,7 @@ Round 3 adds auditable diagnostics on top of the round-2 K-fold pooling:
   - raw TP/FP/threshold counts per fold and pooled (precision_at_recall_breakdown),
   - band-crossing counts (how many held-out hard negatives fine-tuning pushed
     above 0.80 or below 0.45),
-  - precision@90R stratified by in-country vs cross-country positives,
+  - precision@90R stratified by in-country / cross-country / unknown-country positives,
   - per-fold AUC with population mean ± std,
   - a four-population score-distribution CSV (in/cross-country pos, hard neg,
     random neg) for the report step,
@@ -49,8 +49,9 @@ from broadway.training.nlp import (
     _cosine,
     encode_corpus,
     log_nlp_eval,
-    precision_at_recall,
     precision_at_recall_breakdown,
+    precision_ci,
+    split_pos_by_country,
 )
 
 MODEL = "sentence-transformers/all-MiniLM-L6-v2"
@@ -75,47 +76,6 @@ def _auc(pos_s: np.ndarray, neg_s: np.ndarray) -> float:
     return float(roc_auc_score(
         np.r_[np.ones(len(pos_s)), np.zeros(len(neg_s))],
         np.r_[pos_s, neg_s]))
-
-
-def _precision_ci(
-    pos_s: np.ndarray,
-    neg_s: np.ndarray,
-    target_recall: float = 0.90,
-    n_boot: int = BOOTSTRAP,
-    seed: int = SEED,
-) -> tuple[float, float, float]:
-    """precision@target-recall point estimate + bootstrap 95% CI (resample both sides)."""
-    point = float(precision_at_recall(pos_s, neg_s, target_recall=target_recall))
-    if not np.isfinite(point):
-        return point, float("nan"), float("nan")
-    rng = np.random.default_rng(seed)
-    boots = np.empty(n_boot)
-    for b in range(n_boot):
-        i = rng.integers(0, len(neg_s), len(neg_s))
-        j = rng.integers(0, len(pos_s), len(pos_s))
-        boots[b] = precision_at_recall(pos_s[j], neg_s[i], target_recall=target_recall)
-    return point, float(np.percentile(boots, 2.5)), float(np.percentile(boots, 97.5))
-
-
-def split_pos_by_country(
-    test_pos: np.ndarray, country: np.ndarray
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Return (cross_mask, same_mask, unlabeled_mask) over positive pairs.
-
-    Classifies each positive pair by the ``country`` of its two rows:
-    - cross-country: both sides NON-EMPTY and DIFFERENT (same barcode, different
-      country — the true cross-country ground truth, NOT 01h's brand+cat proxy),
-    - in-country:    both sides NON-EMPTY and EQUAL,
-    - unlabeled:     either side EMPTY — excluded from BOTH strata so empty ==
-      empty never silently classifies as same-country.
-    """
-    a = test_pos[:, 0]
-    b = test_pos[:, 1]
-    has_country = (country[a] != "") & (country[b] != "")
-    cross = has_country & (country[a] != country[b])
-    same = has_country & (country[a] == country[b])
-    unlabeled = ~has_country
-    return cross, same, unlabeled
 
 
 def kfold_barcodes(df, k: int, seed: int = SEED) -> list[set[str]]:
@@ -204,12 +164,12 @@ def main() -> None:
         fold_auc = _auc(pos_s, rand_s)
         fold_aucs.append(fold_auc)
         encode_s_folds.append(encode_s)
-        p, lo, hi = _precision_ci(pos_s, hard_s)
+        p, lo, hi = precision_ci(pos_s, hard_s, n_boot=BOOTSTRAP, seed=SEED)
         _, tp, fp, thr, rec = precision_at_recall_breakdown(pos_s, hard_s)
         above = int((hard_s > COSINE_HI).sum())   # > 0.80 — looks like a match
         below = int((hard_s < COSINE_LO).sum())   # < 0.45 — clearly not a match
-        cross, same, unlabeled = split_pos_by_country(test_pos, country)
-        n_unlabeled = int(unlabeled.sum())
+        same, cross, unknown = split_pos_by_country(test_pos, country)
+        n_unknown = int(unknown.sum())
         pooled_pos.append(pos_s)
         pooled_hard.append(hard_s)
         pooled_rand.append(rand_s)
@@ -220,7 +180,8 @@ def main() -> None:
         four_pop_rows += [("hard_neg", s) for s in hard_s]
         four_pop_rows += [("random_neg", s) for s in rand_s]
         # per-stratum precision@90R (never pooled across strata)
-        for label, mask in (("in_country", same), ("cross_country", cross)):
+        for label, mask in (("in_country", same), ("cross_country", cross),
+                            ("unknown_country", unknown)):
             n_pos = int(mask.sum())
             if n_pos == 0:
                 sp, stp, sfp, sthr, srec = float("nan"), 0, 0, float("nan"), float("nan")
@@ -238,7 +199,7 @@ def main() -> None:
                 tracking_uri, experiment_name,
             )
         print(f"fold {f}: test_pos {len(test_pos):,} | hard_test {len(hard_test):,} "
-              f"| unlabeled {n_unlabeled} | P@90R {p:.4f} [{lo:.4f}, {hi:.4f}] "
+              f"| unknown {n_unknown} | P@90R {p:.4f} [{lo:.4f}, {hi:.4f}] "
               f"| TP {tp} FP {fp} thr {thr:.4f} recall {rec:.4f} "
               f"| band above {above} below {below} "
               f"| encode_s {encode_s:.1f}s | fold AUC {fold_auc:.4f} "
@@ -261,7 +222,7 @@ def main() -> None:
     hard_all = np.concatenate(pooled_hard)
     rand_all = np.concatenate(pooled_rand)
     test_pos_all = np.concatenate(pooled_test_pos)
-    p, lo, hi = _precision_ci(pos_all, hard_all)
+    p, lo, hi = precision_ci(pos_all, hard_all, n_boot=BOOTSTRAP, seed=SEED)
     _, tp_all, fp_all, thr_all, rec_all = precision_at_recall_breakdown(pos_all, hard_all)
     above_all = int((hard_all > COSINE_HI).sum())
     below_all = int((hard_all < COSINE_LO).sum())
@@ -285,10 +246,11 @@ def main() -> None:
     print(f"encode_s (fine-tuned, per fold): {', '.join(f'{s:.1f}' for s in encode_s_folds)} "
           f"| mean ± std: {enc_mean:.1f} ± {enc_std:.1f}s", flush=True)
     # pooled country strata (stratify the concatenated held-out positives)
-    cross_all, same_all, unlabeled_all = split_pos_by_country(test_pos_all, country)
-    n_unlabeled_all = int(unlabeled_all.sum())
+    same_all, cross_all, unknown_all = split_pos_by_country(test_pos_all, country)
+    n_unknown_all = int(unknown_all.sum())
     print("pooled country strata:", flush=True)
-    for label, mask in (("in_country", same_all), ("cross_country", cross_all)):
+    for label, mask in (("in_country", same_all), ("cross_country", cross_all),
+                        ("unknown_country", unknown_all)):
         n_pos = int(mask.sum())
         if n_pos == 0:
             sp, stp, sfp, sthr, srec = float("nan"), 0, 0, float("nan"), float("nan")
@@ -305,7 +267,7 @@ def main() -> None:
             {**base_params, "fold": "pooled", "stratum": label},
             tracking_uri, experiment_name,
         )
-    print(f"  pooled unlabeled: {n_unlabeled_all}", flush=True)
+    print(f"  pooled unknown: {n_unknown_all}", flush=True)
     pooled_metrics = {
         "precision_at_90pct_recall": round(p, 4),
         "tp_at_90pct_recall": float(tp_all),

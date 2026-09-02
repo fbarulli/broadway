@@ -55,10 +55,11 @@ from _text import MACRO_MAP
 
 from broadway.training.nlp import (
     _cosine,
-    calibrate_isotonic,
+    calibrate_isotonic_heldout,
     encode_corpus,
-    precision_at_recall,
     precision_at_recall_breakdown,
+    precision_ci,
+    split_pos_by_country,
 )
 
 MODEL = "sentence-transformers/all-MiniLM-L6-v2"
@@ -95,29 +96,6 @@ PAIRS_COLUMNS = [
 ]
 
 
-def _precision_ci(
-    pos_s: np.ndarray,
-    neg_s: np.ndarray,
-    target_recall: float = TARGET_RECALL,
-    n_boot: int = BOOTSTRAP,
-    seed: int = SEED,
-) -> tuple[float, float, float]:
-    """precision@target-recall point estimate + bootstrap 95% CI (resample both sides).
-
-    Ported from 07b_finetune.py (not exported from nlp.py).
-    """
-    point = float(precision_at_recall(pos_s, neg_s, target_recall=target_recall))
-    if not np.isfinite(point):
-        return point, float("nan"), float("nan")
-    rng = np.random.default_rng(seed)
-    boots = np.empty(n_boot)
-    for b in range(n_boot):
-        i = rng.integers(0, len(neg_s), len(neg_s))
-        j = rng.integers(0, len(pos_s), len(pos_s))
-        boots[b] = precision_at_recall(pos_s[j], neg_s[i], target_recall=target_recall)
-    return point, float(np.percentile(boots, 2.5)), float(np.percentile(boots, 97.5))
-
-
 def _fixed_breakdown(
     pos_s: np.ndarray, neg_s: np.ndarray, tau: float
 ) -> tuple[float, int, int, float, float]:
@@ -131,38 +109,20 @@ def _fixed_breakdown(
     return precision, tp, fp, float(tau), recall
 
 
-def split_pos_by_country(
-    pos_pairs: np.ndarray, country: np.ndarray
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Split positive pairs into (in_country, cross_country, unknown_country).
-
-    Per-pair, per spec: a pair is cross-country iff ``country[a] != country[b]``
-    with BOTH sides non-empty; in-country iff both non-empty and equal;
-    unknown-country iff either side is empty (never folded into in-country, never
-    mislabeled as cross-country).
-    """
-    a = pos_pairs[:, 0]
-    b = pos_pairs[:, 1]
-    has_country = (country[a] != "") & (country[b] != "")
-    cross = has_country & (country[a] != country[b])
-    same = has_country & (country[a] == country[b])
-    unknown = ~has_country
-    return same, cross, unknown
-
-
 def country_stratum_vector(
     pairs: np.ndarray, country: np.ndarray, positive: bool
 ) -> np.ndarray:
-    """Per-pair country_stratum label (positive pairs only; negatives are n/a)."""
+    """Per-pair country_stratum label (positive pairs only; negatives are n/a).
+
+    Delegates to the shared ``broadway.training.nlp.split_pos_by_country`` so
+    the country-classification logic has a single source.
+    """
     if not positive:
         return np.full(len(pairs), "n/a-for-negatives", dtype=object)
-    a = pairs[:, 0]
-    b = pairs[:, 1]
-    has_country = (country[a] != "") & (country[b] != "")
+    same, cross, _ = split_pos_by_country(pairs, country)
     out = np.full(len(pairs), "unknown-country", dtype=object)
-    cross = has_country & (country[a] != country[b])
     out[cross] = "cross-country"
-    out[has_country & ~cross] = "in-country"
+    out[same] = "in-country"
     return out
 
 
@@ -227,7 +187,10 @@ def eval_scorer(
                 pos_s[mask], neg_s, target_recall=TARGET_RECALL
             )
             if n_pos >= CI_FLOOR and np.isfinite(p90):
-                _, ci_lo, ci_hi = _precision_ci(pos_s[mask], neg_s)
+                _, ci_lo, ci_hi = precision_ci(
+                    pos_s[mask], neg_s, target_recall=TARGET_RECALL,
+                    n_boot=BOOTSTRAP, seed=SEED,
+                )
             else:
                 ci_lo = ci_hi = float("nan")
         rows.append({
@@ -365,18 +328,17 @@ def main() -> None:
     _assert_finite_in_unit("hard cross", ce_hard)
 
     # ---- isotonic calibration: monotone remap of hybrid scores -> [0, 1] ----
-    # Thin post-processing layer after the encoder: fit a non-parametric
-    # monotone regression on the hybrid POSITIVE (label 1) vs NEGATIVE (label 0)
-    # scores. Monotonicity preserves rank order (ROC AUC unchanged); it only
-    # remaps the raw score axis onto calibrated probabilities in [0, 1].
+    # Honest held-out calibration: fit the monotone map on a deterministic 70%
+    # fit split, apply it to the FULL set (rank order preserved -> ranking
+    # metrics unchanged), and report Brier on the held-out 30% ONLY (never
+    # in-sample).
     cal_scores = np.r_[pos_hybrid, hard_hybrid]
     cal_labels = np.r_[np.ones(len(pos_hybrid)), np.zeros(len(hard_hybrid))]
-    cal_all = calibrate_isotonic(cal_scores, cal_labels)
+    cal_all, brier = calibrate_isotonic_heldout(cal_scores, cal_labels)
     pos_final = cal_all[: len(pos_hybrid)]
     hard_final = cal_all[len(pos_hybrid):]
-    brier = float(np.mean((cal_all - cal_labels) ** 2))
     print(f"isotonic calibration: ranking preserved (AUC unchanged by monotonicity) "
-          f"| brier {brier:.4f}", flush=True)
+          f"| held-out brier {brier:.4f}", flush=True)
 
     # ---- metric rows (bi-only vs hybrid vs in-band-only cross-encoder) ----
     scorers = {
@@ -416,7 +378,7 @@ def main() -> None:
         "tau_bi": tau_bi,
         "tau_hybrid": tau_hybrid,
     })
-    # One calibration-quality number on the rerank rollup (the per-pair
+    # One held-out calibration-quality number on the rerank rollup (the per-pair
     # final_score lives in 07e_cross_encoder_pairs.csv).
     rows.append({
         "scorer": "hybrid",

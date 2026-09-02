@@ -37,6 +37,12 @@ from broadway.training.hpo import Objective, run_hpo_bandit
 # learning_rate via optimizer_params).
 _FINETUNE_PARAMS = ("epochs", "learning_rate", "warmup_steps", "batch_size")
 
+# Honest isotonic calibration: fit on a deterministic fraction of the
+# calibration input and report Brier on the HELD-OUT fraction only, so the
+# reported calibration quality is never in-sample (see calibrate_isotonic_heldout).
+CALIBRATION_SEED = 42
+CALIBRATION_FRAC = 0.70
+
 
 def _cosine(emb: np.ndarray, pairs: np.ndarray) -> np.ndarray:
     """Cosine similarity for index-aligned pair arrays (rows of a matrix)."""
@@ -147,6 +153,47 @@ def calibrate_isotonic(scores: np.ndarray, labels: np.ndarray) -> np.ndarray:
     return iso.predict(scores)
 
 
+def calibrate_isotonic_heldout(
+    scores: np.ndarray,
+    labels: np.ndarray,
+    *,
+    seed: int = CALIBRATION_SEED,
+    frac: float = CALIBRATION_FRAC,
+) -> tuple[np.ndarray, float]:
+    """Honest isotonic calibration with a held-out Brier score.
+
+    Splits the calibration input into a deterministic fit split (``frac`` of the
+    rows) and a held-out split (the rest). Isotonic regression is fit on the fit
+    split ONLY and then applied to the FULL input, so the returned ``final``
+    scores are monotone in the input (rank order preserved -> ranking metrics
+    unchanged) while the returned ``brier`` is computed exclusively on the
+    held-out split — never in-sample.
+
+    Degenerate fallback: when the input is empty, constant, or too small to
+    leave a non-empty holdout there is no honest held-out estimate, so the input
+    scores are returned unchanged with ``brier = NaN``.
+    """
+    scores = np.asarray(scores, dtype=float)
+    labels = np.asarray(labels, dtype=float)
+    n = scores.size
+    if n == 0 or np.unique(scores).size < 2:
+        return scores, float("nan")
+    rng = np.random.default_rng(seed)
+    perm = rng.permutation(n)
+    n_fit = int(n * frac)
+    if n_fit < 1 or n_fit >= n:
+        return scores, float("nan")
+    fit_idx = perm[:n_fit]
+    hold_idx = perm[n_fit:]
+    from sklearn.isotonic import IsotonicRegression
+
+    iso = IsotonicRegression(y_min=0.0, y_max=1.0, out_of_bounds="clip")
+    iso.fit(scores[fit_idx], labels[fit_idx])
+    final = iso.predict(scores)
+    brier = float(np.mean((iso.predict(scores[hold_idx]) - labels[hold_idx]) ** 2))
+    return final, brier
+
+
 def precision_at_recall(pos_scores: np.ndarray, neg_scores: np.ndarray, target_recall: float = 0.90) -> float:
     """Precision at the score threshold keeping exactly target_recall of positives.
 
@@ -157,6 +204,54 @@ def precision_at_recall(pos_scores: np.ndarray, neg_scores: np.ndarray, target_r
         pos_scores, neg_scores, target_recall=target_recall
     )
     return precision
+
+
+def precision_ci(
+    pos_s: np.ndarray,
+    neg_s: np.ndarray,
+    target_recall: float = 0.90,
+    n_boot: int = 2000,
+    seed: int = 42,
+) -> tuple[float, float, float]:
+    """precision@target-recall point estimate + bootstrap 95% CI.
+
+    Resamples the positive and negative score populations independently
+    ``n_boot`` times and reports the 2.5/97.5 percentiles of the resampled
+    precision-at-recall. A non-finite point estimate short-circuits to
+    ``(point, NaN, NaN)``. Single source for the euromonitor 07b/07e eval
+    steps (previously duplicated as ``_precision_ci`` in both scripts).
+    """
+    point = float(precision_at_recall(pos_s, neg_s, target_recall=target_recall))
+    if not np.isfinite(point):
+        return point, float("nan"), float("nan")
+    rng = np.random.default_rng(seed)
+    boots = np.empty(n_boot)
+    for b in range(n_boot):
+        i = rng.integers(0, len(neg_s), len(neg_s))
+        j = rng.integers(0, len(pos_s), len(pos_s))
+        boots[b] = precision_at_recall(pos_s[j], neg_s[i], target_recall=target_recall)
+    return point, float(np.percentile(boots, 2.5)), float(np.percentile(boots, 97.5))
+
+
+def split_pos_by_country(
+    pos_pairs: np.ndarray, country: np.ndarray
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Split positive pairs into (same, cross, unknown) country strata, in order.
+
+    Per-pair, per spec: ``same`` (in-country) iff both sides have a non-empty
+    country and the values are equal; ``cross`` (cross-country) iff both sides
+    non-empty and different; ``unknown`` iff either side is empty. The unknown
+    stratum is a SEPARATE scored stratum — empty country is never folded into
+    in-country and never mislabeled as cross-country. Single source shared by
+    the euromonitor 07b and 07e steps.
+    """
+    a = pos_pairs[:, 0]
+    b = pos_pairs[:, 1]
+    has_country = (country[a] != "") & (country[b] != "")
+    cross = has_country & (country[a] != country[b])
+    same = has_country & (country[a] == country[b])
+    unknown = ~has_country
+    return same, cross, unknown
 
 
 def log_nlp_eval(

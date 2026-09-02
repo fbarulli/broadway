@@ -672,6 +672,59 @@ def test_calibrate_isotonic_constant_input_returns_unchanged() -> None:
     assert empty.size == 0
 
 
+def test_calibrate_isotonic_heldout_brier_on_holdout_and_monotone() -> None:
+    """Brier is computed on the HELD-OUT split only; final scores stay monotone."""
+    from broadway.training.nlp import (
+        CALIBRATION_FRAC,
+        CALIBRATION_SEED,
+        calibrate_isotonic_heldout,
+    )
+
+    rng = np.random.default_rng(0)
+    scores = rng.uniform(0.0, 1.0, size=200)
+    labels = rng.integers(0, 2, size=200)
+    final, brier = calibrate_isotonic_heldout(scores, labels)
+
+    assert isinstance(final, np.ndarray)
+    assert final.shape == scores.shape
+    assert np.isfinite(final).all()
+    assert bool(((final >= 0.0) & (final <= 1.0)).all())
+    # monotone non-decreasing in the input (rank-preserving -> ranking unchanged)
+    order = np.argsort(scores)
+    assert np.all(np.diff(final[order]) >= -1e-12)
+
+    # Re-derive the deterministic split and confirm brier is the held-out error,
+    # NOT the full-set (in-sample) error.
+    assert np.isfinite(brier)
+    perm = np.random.default_rng(CALIBRATION_SEED).permutation(len(scores))
+    n_fit = int(len(scores) * CALIBRATION_FRAC)
+    hold = perm[n_fit:]
+    from sklearn.isotonic import IsotonicRegression
+
+    iso = IsotonicRegression(y_min=0.0, y_max=1.0, out_of_bounds="clip")
+    iso.fit(scores[perm[:n_fit]], labels[perm[:n_fit]])
+    expected = float(np.mean((iso.predict(scores[hold]) - labels[hold]) ** 2))
+    assert brier == pytest.approx(expected)
+    full_brier = float(np.mean((iso.predict(scores) - labels) ** 2))
+    assert brier != pytest.approx(full_brier)
+
+
+def test_calibrate_isotonic_heldout_degenerate_empty_holdout_noop() -> None:
+    """A degenerate (empty) holdout no-ops: input unchanged + NaN brier."""
+    from broadway.training.nlp import calibrate_isotonic_heldout
+
+    scores = np.array([0.1, 0.2, 0.3])
+    labels = np.array([0, 1, 0])
+
+    final, brier = calibrate_isotonic_heldout(scores, labels, frac=1.0)
+    assert np.array_equal(final, scores)
+    assert np.isnan(brier)
+
+    final0, brier0 = calibrate_isotonic_heldout(scores, labels, frac=0.0)
+    assert np.array_equal(final0, scores)
+    assert np.isnan(brier0)
+
+
 def test_log_nlp_eval_noop_without_tracking_uri(monkeypatch: pytest.MonkeyPatch) -> None:
     """A None tracking URI short-circuits before the lazy mlflow_utils import."""
     calls: list = []
@@ -724,18 +777,30 @@ def _load_07b_finetune_module():
 
 
 def test_split_pos_by_country_stratifies_pairs() -> None:
-    """same -> same; cross -> cross; empty-country side -> unlabeled (neither)."""
-    fb = _load_07b_finetune_module()
-    split = fb.split_pos_by_country
+    """Unified (same, cross, unknown) order; empty-country side -> unknown."""
+    from broadway.training.nlp import split_pos_by_country
+
     country = np.array(["US", "US", "GB", "GB", "", "US"])
     pairs = np.array([[0, 1], [0, 2], [0, 4]])
-    cross, same, unlabeled = split(pairs, country)
+    same, cross, unknown = split_pos_by_country(pairs, country)
     assert np.array_equal(same, [True, False, False])       # [0,1] both "US"
     assert np.array_equal(cross, [False, True, False])      # [0,2] "US" vs "GB"
-    assert np.array_equal(unlabeled, [False, False, True])  # [0,4] side 4 empty
-    # unlabeled lands in NEITHER stratum
-    assert not (same & unlabeled).any()
-    assert not (cross & unlabeled).any()
+    assert np.array_equal(unknown, [False, False, True])    # [0,4] side 4 empty
+    # the three strata are mutually exclusive and exhaustive
+    assert not (same & cross).any()
+    assert not (same & unknown).any()
+    assert not (cross & unknown).any()
+    assert np.array_equal(same | cross | unknown, [True, True, True])
+
+
+def test_split_pos_by_country_single_source_across_scripts() -> None:
+    """07b and 07e import the SAME split_pos_by_country (no local copies)."""
+    from broadway.training.nlp import split_pos_by_country
+
+    fb = _load_07b_finetune_module()
+    e = _load_07e_module()
+    assert fb.split_pos_by_country is split_pos_by_country
+    assert e.split_pos_by_country is split_pos_by_country
 
 
 def test_cosine_shared_scorer() -> None:
