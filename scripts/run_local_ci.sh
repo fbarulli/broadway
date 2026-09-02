@@ -114,7 +114,7 @@ ps = sorted(Path('configs/experiment').glob('*.yaml')); assert ps, 'no configs'
 # shellcheck disable=SC2016  # single quotes intended: globs must expand under bash -c
 run shell-scripts bash -c 'for f in scripts/*.sh; do bash -n "$f"; done; shellcheck scripts/*.sh'
 # data-refs enforces the build/deploy SSOT (project/config/layout.yaml build:*).
-run data-refs python3 scripts/check_data_refs.py
+run data-refs bash scripts/uv.sh run --extra dev python scripts/check_data_refs.py
 if [[ $STATIC -eq 0 && $TIER == "full" ]]; then
   run pytest bash scripts/uv.sh run --extra dev pytest tests/ -n 4 --dist worksteal \
              --cov=src/broadway --cov-report=term-missing --cov-fail-under=95

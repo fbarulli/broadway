@@ -27,9 +27,12 @@ import subprocess
 import sys
 from pathlib import Path
 
-from project.paths import load_project_paths
-
+# Self-contained under a bare `python3` (CI's system interpreter has no
+# editable install): make the repo root importable BEFORE importing `project`.
 REPO = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO))
+
+from project.paths import load_project_paths
 
 # Data-asset suffixes worth closing. Source/config files (.py/.sh/.yaml) are
 # already owned by ruff + shell checks; these are the ones nothing else pins.

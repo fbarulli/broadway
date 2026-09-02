@@ -181,6 +181,8 @@ DatasetContract.path (csv/parquet/xlsx via READERS dict keyed on suffix):
 - GATE-ETL-11
 DerivedFeature(name,func,source):
 - GATE-FEAT-20
+? Dockerfile COPY/ADD sources + ci.yml -f dockerfile + k8s/*.yaml + config parquet/path/file refs via scripts/check_data_refs.py against project/config/layout.yaml build:* (data-refs)
+: - GATE-INFRA-92
 'FAIL parity (F1b): origin/sklearn unavailable | legacy pre-D16 checker on track ref':
 - GATE-INFRA-91
 'FILE law: build contexts resolve, volumes declared (:3/:16/:26)':
@@ -236,7 +238,7 @@ PARITY_ALLOWLIST=() prefix skips (:168-177):
 - GATE-INFRA-95
 PARITY_MAIN_ANCHOR=18607091ddbb2602ad4475341ad377bafee5ec4b (:114):
 - GATE-INFRA-95
-PASS/FAIL ruff|mypy|configs|project-paths|shell-scripts|vulture|pytest|project-tests banners + 40-line tails:
+PASS/FAIL ruff|mypy|configs|project-paths|shell-scripts|data-refs|vulture|pytest|project-tests banners + 40-line tails:
 - GATE-INFRA-92
 PipelineConfig (cfg.dataset + cfg.etl + cfg.experiment):
 - GATE-ETL-10
