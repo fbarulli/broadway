@@ -1,6 +1,6 @@
 # Gate registry SSOT — hand-maintained; the {01..09} gate fragments it consolidated predate git custody.
 meta:
-  head: '5f3cf5f'
+  head: '9ab5215'
   counts:
     total: 163
     gates_with_findings: 75
@@ -2892,10 +2892,9 @@ gates:
 - id: GATE-SURF-131
   phase: surfaces
   order: 103
-  owner: project/experiments/euromonitor/07b_finetune.py:135 main()
+  owner: project/experiments/euromonitor/07b_finetune.py:95 main()
   inputs:
   - project/data/euromonitor/dataset_deduped.csv
-  - project/experiments/results/euromonitor/07_nlp_hpo_benchmark.csv
   outputs:
   - project/experiments/results/euromonitor/07b_four_pop_scores.csv
   transforms:
@@ -3020,7 +3019,7 @@ gates:
 - id: GATE-SURF-137
   phase: surfaces
   order: 109
-  owner: project/experiments/euromonitor/07e_cross_encoder_rerank.py:249 main()
+  owner: project/experiments/euromonitor/07e_cross_encoder_rerank.py:229 main()
   inputs:
   - project/data/euromonitor/dataset_deduped.csv
   - project/data/euromonitor/embeddings_cache (bi-encoder .npz, all-MiniLM-L6-v2)
@@ -3028,7 +3027,7 @@ gates:
   - project/experiments/results/euromonitor/07e_cross_encoder_rerank.csv
   - project/experiments/results/euromonitor/07e_cross_encoder_pairs.csv
   transforms:
-  - 'two-stage rerank: bi-encoder (all-MiniLM-L6-v2) cosine scores candidate pairs; in-band pairs (0.5-0.75 cosine) re-scored by cross-encoder (ms-marco-MiniLM-L-6-v2); mining band stays 0.45-0.80'
+  - 'two-stage rerank: bi-encoder (all-MiniLM-L6-v2) cosine scores candidate pairs; in-band pairs (0.5-0.75 cosine) re-scored by cross-encoder (ms-marco-MiniLM-L-6-v2) through _sigmoid, then blended with the bi-encoder cosine via _hybrid_score; mining band stays 0.45-0.80'
   - 'reports precision@90%recall + fixed-threshold precision + raw TP/FP/threshold + band-crossing counts, bi-encoder-only vs bi-encoder+cross-encoder on the hard-negative pool (mine_hard_negatives + build_pairs)'
   - 'country-stratified eval: precision@90%recall + fixed-threshold precision split by in-country vs cross-country POSITIVE pairs (country[a] != country[b]); per-stratum pair count + bootstrap CI-or-raw TP/FP; country logic per 01h_cross_country_probe.py + 01g_ground_truth_funnel.py'
   - 'isotonic calibration: monotone remap of the hybrid pos/neg scores onto [0,1] probabilities (rank-preserving, AUC unchanged); emits a per-pair final_score output column + one brier calibration-quality number'
@@ -3036,7 +3035,7 @@ gates:
   - numpy
   - pandas@2.3.3
   - sentence-transformers@6.0.1
-  - broadway.training.nlp@encode_corpus/_cosine/precision_at_recall
+  - broadway.training.nlp@encode_corpus/_cosine/precision_at_recall_breakdown/calibrate_isotonic_heldout
   validated_by: []
   if_changed:
   - project/experiments/euromonitor/_hard_negatives.py
@@ -3751,20 +3750,20 @@ gates:
 - id: GATE-HPO-154
   phase: hpo-optuna
   order: 134
-  owner: src/broadway/training/nlp.py:405 make_objective() + :544 run_nlp_hpo() + :611 run_nlp() + :125 calibrate_isotonic()
+  owner: src/broadway/training/nlp.py:106 precision_at_recall_breakdown() + :131 calibrate_isotonic() + :156 calibrate_isotonic_heldout() + :209 precision_ci() + :236 split_pos_by_country() + :257 log_nlp_eval() + :500 make_objective() + :639 run_nlp_hpo() + :706 run_nlp()
   inputs:
   - 'src/broadway/config/schema.py:135 NLPConfig (typed data-agnostic config: model_zoo + hpo + knobs)'
   - 'project/config/experiments/nlp.yaml model_zoo + hpo: block (bi-encoder zoo SSOT, direction: maximize)'
   - sentence-transformers bi-encoders resolved via model_zoo (zero-shot; optional contrastive fine-tune examples)
   - project/experiments/euromonitor/07_nlp_hpo.py pair construction (same 10,891 pos / 10,000 neg population as step 04)
   outputs:
-  - 'per-model entity-resolution metrics (auc, recall_at_5pct_fpr, pos_median, neg_p90, encode_s) via trial broadway_metrics user attr'
+  - 'per-model entity-resolution metrics (auc, average_precision, recall_at_5pct_fpr, precision_at_90pct_recall, f1_at_5pct_fpr, tp_at_90pct_recall, fp_at_90pct_recall, threshold_at_90pct_recall, tp_at_5pct_fpr, fp_at_5pct_fpr, threshold_at_5pct_fpr, pos_median, neg_p90, encode_s) via trial broadway_metrics user attr'
   - 'bandit result {models, best_model, best_params, best_value, metrics} (direction: maximize, reused run_hpo_bandit)'
   transforms:
   - 'adapts the sklearn bandit to NLP: each HPO model is a bi-encoder, objective = ROC AUC on title-pair ground truth (maximize), corpus encode latency recorded per trial'
   - 'run_nlp(cfg, payload, pos_pairs, neg_pairs) is the data-agnostic entry point (parallel to broadway.training.module.run): the typed NLPConfig carries the zoo + bandit spec, the caller supplies payload/pairs'
   - 'zero-shot when search_space is empty (one trial); contrastive fine-tune (MultipleNegativesRankingLoss) when params carry epochs/learning_rate/warmup_steps/batch_size'
-  - 'model_zoo name resolution is loud — unknown hpo.models names raise ValueError (nlp.py:166-167)'
+  - 'model_zoo name resolution is loud — unknown hpo.models names raise ValueError (nlp.py:676-678)'
   - 'calibrate_isotonic(scores, labels) fits sklearn IsotonicRegression(y_min=0.0, y_max=1.0, out_of_bounds=clip) on binary {0,1} labels -> monotone non-decreasing [0,1] probabilities (rank-preserving, AUC unchanged); empty/constant scores fall back to the input unchanged'
   touched_by:
   - sentence-transformers@6.0.1
@@ -3855,12 +3854,12 @@ gates:
   - cov floor breach ⇒ FAIL pytest
   transforms:
   - ruff/mypy/Vulture/configs/shell-scripts run in EVERY tier incl. fast/static
-  - 'shell-scripts widened to BOTH glob dirs (:93) — sh -n + shellcheck over k8s/optuna/*.sh AND scripts/*.sh, command-identical to ci.yml ''Shell scripts'' step (gate-divergence law comment :91)'
+  - 'shell-scripts widened to BOTH glob dirs (:115) — sh -n + shellcheck over k8s/optuna/*.sh AND scripts/*.sh, command-identical to ci.yml ''Shell scripts'' step (gate-divergence law comment :113)'
   - 'Vulture is fail-closed at 95% confidence through the direct scripts/uv.sh invocation: a finding is printed and exits non-zero; no allowlist or wrapper exists'
   - 'data-refs (:117) runs `bash scripts/uv.sh run --extra dev python scripts/check_data_refs.py` — NOT bare `python3` — matching every other python gate; bare python3 was the CI failure (a491162 layout-SSOT rewrite made the checker import project.paths, unresolvable on the CI system interpreter)'
   - 'scripts/check_data_refs.py is self-contained: it computes REPO = Path(__file__).resolve().parents[1] and inserts it into sys.path BEFORE `from project.paths import load_project_paths`, so the project import resolves regardless of ambient PYTHONPATH or an editable install'
-  - 'graphify (:119) runs `bash scripts/uv.sh run --extra dev python scripts/check_graphify_surfaces.py` — reconciles callables in graphify-out/graph.json (deterministic `graphify extract . --code-only --no-cluster`, scope pinned by .graphifyignore) against gates.yaml owner fields; FAIL = governed src/ or project/ file with callables and no owner (KNOWN_UNMAPPED baseline recorded by STATE-20260902-010), WARN = helper not individually named'
-  - 'project-tests step (:97, full-tier-only): uv run pytest project/tests -q --dist worksteal with NO coverage flags — the >=95 floor deliberately stays on tests/ (header :7-8); closes the data-gate hole (human ruling): 26 tests / 6 files collected+passing at HEAD eb9ea18'
+  - 'graphify (:121) runs `bash scripts/uv.sh run --extra dev python scripts/check_graphify_surfaces.py` — reconciles callables in graphify-out/graph.json (deterministic `graphify extract . --code-only --no-cluster`, scope pinned by .graphifyignore) against gates.yaml owner fields; FAIL = governed src/ or project/ file with callables and no owner (KNOWN_UNMAPPED baseline recorded by STATE-20260902-010), WARN = helper not individually named'
+  - 'project-tests step (:125, full-tier-only): uv run pytest project/tests -q --dist worksteal with NO coverage flags — the >=95 floor deliberately stays on tests/ (header :7-8); closes the data-gate hole (human ruling): 26 tests / 6 files collected+passing at HEAD eb9ea18'
   - coverage floor value 95 owned here; docs must quote it identically
   - configs gate asserts non-empty glob then loads every experiment config
   - project-paths fails if a runtime surface or file restores retired root experiment config paths, or the project layout is incomplete

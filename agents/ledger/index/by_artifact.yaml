@@ -765,7 +765,7 @@ pending CURRENT intent followed by one synced mirror item:
 - GATE-INFRA-148
 ? per-group {skew, kurtosis, shapiro_p} (:31-35); levene {statistic, p_value} (:15-16); ValueError "normality checks require non-constant groups" (:23-24); ValueError "Levene's test requires non-zero variance in every group" (:13-14)
 : - GATE-STATS-46
-? per-model entity-resolution metrics (auc, recall_at_5pct_fpr, pos_median, neg_p90, encode_s) via trial broadway_metrics user attr
+? per-model entity-resolution metrics (auc, average_precision, recall_at_5pct_fpr, precision_at_90pct_recall, f1_at_5pct_fpr, tp_at_90pct_recall, fp_at_90pct_recall, threshold_at_90pct_recall, tp_at_5pct_fpr, fp_at_5pct_fpr, threshold_at_5pct_fpr, pos_median, neg_p90, encode_s) via trial broadway_metrics user attr
 : - GATE-HPO-154
 ? per-order executor dispatch through _STEP_RUNNERS (walkthrough.py:281-288); step JSONs saved (walkthrough.py:384); DECISION REQUIRED console panels (walkthrough.py:138-189); reports regenerated via _write_timeline (walkthrough.py:71-91 -> reports/timeline.md, reports/index.md, reports/results/*); stale-decision warnings (walkthrough.py:192-201)
 : - GATE-TLINE-54
@@ -975,7 +975,6 @@ project/experiments/results/euromonitor/06c_validation_summary.csv:
 - GATE-SURF-129
 project/experiments/results/euromonitor/07_nlp_hpo_benchmark.csv:
 - GATE-SURF-130
-- GATE-SURF-131
 - GATE-SURF-135
 project/experiments/results/euromonitor/07_nlp_hpo_pareto.png:
 - GATE-SURF-130

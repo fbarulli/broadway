@@ -315,9 +315,9 @@ precision = pd.DataFrame([
     {"population": "soft-link candidates (same brand x macro)",
      "positives": n_same, "negatives": n_cross, "precision@0.85": round(precision_candidates, 4)},
     {"population": "random cross-barcode negatives",
-     "positives": int(len(pos_s)), "negatives": int(len(neg_s)), "precision@0.85": round(precision_easy, 4)},
+     "positives": len(pos_s), "negatives": len(neg_s), "precision@0.85": round(precision_easy, 4)},
     {"population": "mined hard negatives (diff brand)",
-     "positives": int(len(pos_s)), "negatives": int(len(hard_s)), "precision@0.85": round(precision_hard, 4)},
+     "positives": len(pos_s), "negatives": len(hard_s), "precision@0.85": round(precision_hard, 4)},
 ])
 
 # ranking context (AUC / PR-AUC) — no quantile-based precision_at_90pct_recall
