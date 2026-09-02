@@ -49,8 +49,8 @@ INDEX_FILES = [
 # appended ids 100…154 continue the GLOBAL dense order prefixed by the owning
 # band, so several prefixes carry a second (appended) range. Burned ids
 # (121,130,132,134,135,136,140,153 + not-landed 106/109/110/115) simply hold
-# no rows; SURF appended range extended to 104…136 for the euromonitor
-# experiment surfaces (surfaces-fix); future mints append ≥155 (HPO) / ≥137
+# no rows; SURF appended range extended to 104…137 for the euromonitor
+# experiment surfaces (surfaces-fix); future mints append ≥155 (HPO) / ≥138
 # (SURF).
 BAND_RANGES = {
     "INGEST": [(1, 9)],
@@ -59,7 +59,7 @@ BAND_RANGES = {
     "TRAIN": [(30, 39), (118, 120)],
     "STATS": [(40, 49), (113, 113)],
     "TLINE": [(50, 59), (114, 114)],
-    "SURF": [(60, 69), (100, 103), (104, 136)],
+    "SURF": [(60, 69), (100, 103), (104, 137)],
     "CFG": [(70, 79), (103, 112)],
     "HPO": [(80, 89), (154, 154)],
     "INFRA": [(90, 99), (121, 148)],

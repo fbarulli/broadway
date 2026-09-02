@@ -830,8 +830,11 @@ project/data/euromonitor/dataset_deduped.csv:
 - GATE-SURF-133
 - GATE-SURF-134
 - GATE-SURF-135
+- GATE-SURF-137
 project/data/euromonitor/eda.parquet (evidence):
 - GATE-SURF-103
+project/data/euromonitor/embeddings_cache (bi-encoder .npz, all-MiniLM-L6-v2):
+- GATE-SURF-137
 project/data/euromonitor/sku_to_rep.csv:
 - GATE-SURF-127
 - GATE-SURF-135
@@ -991,6 +994,10 @@ project/experiments/results/euromonitor/07c_field_ablation.csv:
 project/experiments/results/euromonitor/07d_data_scaling.csv:
 - GATE-SURF-133
 - GATE-SURF-134
+project/experiments/results/euromonitor/07e_cross_encoder_pairs.csv:
+- GATE-SURF-137
+project/experiments/results/euromonitor/07e_cross_encoder_rerank.csv:
+- GATE-SURF-137
 project/experiments/results/euromonitor/sku_to_item.csv:
 - GATE-SURF-136
 project/experiments/results/univariate/fare_amount_trip_distance/ratecode1_sample.parquet|.json (pinned, tracked):

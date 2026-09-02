@@ -75,6 +75,8 @@ project/experiments/euromonitor/07c_field_ablation.py:
 - GATE-SURF-132
 project/experiments/euromonitor/07d_data_scaling.py:
 - GATE-SURF-133
+project/experiments/euromonitor/07e_cross_encoder_rerank.py:
+- GATE-SURF-137
 project/experiments/euromonitor/_blocking.py:
 - GATE-SURF-106
 project/experiments/euromonitor/_common.py:

@@ -211,6 +211,7 @@ broadway.training.nlp:
 - GATE-SURF-133
 - GATE-SURF-134
 - GATE-SURF-135
+- GATE-SURF-137
 broadway.viz.palette_colors (:112 — indirect viz.yaml disk read, see GATE-STATS-48 FINDING):
 - GATE-STATS-49
 broadway.viz.palette_colors — INDIRECT CONFIG READ (see FINDING):
@@ -347,6 +348,7 @@ numpy:
 - GATE-SURF-133
 - GATE-SURF-134
 - GATE-SURF-135
+- GATE-SURF-137
 - GATE-HPO-81
 - GATE-HPO-88
 numpy(np.isinf sibling require_finite):
@@ -425,6 +427,7 @@ pandas:
 - GATE-SURF-133
 - GATE-SURF-134
 - GATE-SURF-135
+- GATE-SURF-137
 - GATE-HPO-81
 - GATE-HPO-84
 pandas (df ops):
@@ -559,6 +562,7 @@ seaborn:
 sentence-transformers:
 - GATE-SURF-131
 - GATE-SURF-133
+- GATE-SURF-137
 - GATE-HPO-154
 sklearn.metrics:
 - GATE-STATS-48
