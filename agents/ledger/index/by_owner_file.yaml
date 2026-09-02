@@ -23,6 +23,72 @@ project/etl/process.py:
 - GATE-ETL-17
 project/experiments/euromonitor/01_eda.py:
 - GATE-SURF-103
+project/experiments/euromonitor/01b_data_views.py:
+- GATE-SURF-109
+project/experiments/euromonitor/01c_sparsity_noise.py:
+- GATE-SURF-110
+project/experiments/euromonitor/01d_description_missingness.py:
+- GATE-SURF-111
+project/experiments/euromonitor/01e_barcode_analysis.py:
+- GATE-SURF-112
+project/experiments/euromonitor/01f_barcode_bias.py:
+- GATE-SURF-113
+project/experiments/euromonitor/01g_ground_truth_funnel.py:
+- GATE-SURF-114
+project/experiments/euromonitor/01h_cross_country_probe.py:
+- GATE-SURF-115
+project/experiments/euromonitor/02_volume_normalize.py:
+- GATE-SURF-116
+project/experiments/euromonitor/02b_volume_disagreement_split.py:
+- GATE-SURF-117
+project/experiments/euromonitor/02c_case_analysis.py:
+- GATE-SURF-118
+project/experiments/euromonitor/02d_measurement_validation.py:
+- GATE-SURF-119
+project/experiments/euromonitor/03_pack_reconcile.py:
+- GATE-SURF-120
+project/experiments/euromonitor/03b_disposition.py:
+- GATE-SURF-121
+project/experiments/euromonitor/04_tfidf_matching.py:
+- GATE-SURF-122
+project/experiments/euromonitor/04b_category_utility.py:
+- GATE-SURF-123
+project/experiments/euromonitor/04c_blocking_ab.py:
+- GATE-SURF-124
+project/experiments/euromonitor/05_blocking_feature_selection.py:
+- GATE-SURF-125
+project/experiments/euromonitor/05b_exact_duplicates.py:
+- GATE-SURF-126
+project/experiments/euromonitor/06_dedupe.py:
+- GATE-SURF-127
+project/experiments/euromonitor/06b_mislabeled_barcode_report.py:
+- GATE-SURF-128
+project/experiments/euromonitor/06c_validation_sets.py:
+- GATE-SURF-129
+project/experiments/euromonitor/07_nlp_hpo.py:
+- GATE-SURF-130
+project/experiments/euromonitor/07_report_plots.py:
+- GATE-SURF-134
+project/experiments/euromonitor/07b_finetune.py:
+- GATE-SURF-131
+project/experiments/euromonitor/07c_field_ablation.py:
+- GATE-SURF-132
+project/experiments/euromonitor/07d_data_scaling.py:
+- GATE-SURF-133
+project/experiments/euromonitor/_blocking.py:
+- GATE-SURF-106
+project/experiments/euromonitor/_common.py:
+- GATE-SURF-104
+project/experiments/euromonitor/_hard_negatives.py:
+- GATE-SURF-108
+project/experiments/euromonitor/_matching.py:
+- GATE-SURF-107
+project/experiments/euromonitor/_text.py:
+- GATE-SURF-105
+project/experiments/euromonitor/entity_resolution.ipynb:
+- GATE-SURF-136
+project/experiments/euromonitor/make_notebook.py:
+- GATE-SURF-135
 scripts/check_branch_parity.sh:
 - GATE-INFRA-93
 - GATE-INFRA-94

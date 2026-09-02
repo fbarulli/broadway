@@ -1,6 +1,6 @@
 # DIGEST.md — rendered from agents/ledger/gates.yaml · NEVER HAND-EDIT ·
 
-> 128 gates · rendered 2026-09-02 @ HEAD 477cdaf · load THIS into context;
+> 161 gates · rendered 2026-09-02 @ HEAD 7d63d55 · load THIS into context;
 > gates.yaml is the sole SSOT; the retired GATES.md/gates/*.md markdown world survives in agents/ledger/arbitration/2026-08-24/surface-and-analysis-preservation.md.
 
 | band | phase | gates | findings |
@@ -11,12 +11,12 @@
 | 04-training | training-eval | 12 | 11 |
 | 05-stats | stats | 11 | 7 |
 | 06-timeline | timeline-lineage | 11 | 7 |
-| 07-surfaces | surfaces | 14 | 1 |
+| 07-surfaces | surfaces | 47 | 1 |
 | 08-config | config-schema | 15 | 10 |
 | 80-hpo-optuna | hpo-optuna | 10 | 8 |
 | 09-infra | infra-meta | 25 | 14 |
 | 81-object-custody | object-custody | 3 | 0 |
-| **total** | | **128** | **75** |
+| **total** | | **161** | **75** |
 
 ### 01-ingest — ingest
 
@@ -188,6 +188,72 @@
   [project-provided experiment results CSVs via BROADWAY_EXPERIMENTS_ROOT] → [dashboard series endpoints served by the FastAPI app object] · pins: 3
 - **GATE-SURF-103** `project/experiments/euromonitor/01_eda.py:38 plot_barcode_coverage()`
   [project/data/euromonitor/dataset.csv] → [project/data/euromonitor/eda.parquet (evidence)] · pins: 1
+- **GATE-SURF-104** `project/experiments/euromonitor/_common.py:49 load_dataset()`
+  [project/data/euromonitor/dataset.csv, project/data/euromonitor/dataset_deduped.csv, project/config/experiments/euromonitor.yaml] → [project/experiments/results/euromonitor/**/* (shared RESULTS convention)] · pins: none direct
+- **GATE-SURF-105** `project/experiments/euromonitor/_text.py:197 extract_volume_ml()`
+  [] → [(shared) canonical volume ml, bucket_ml, validate_measurement, flavor/pack/disposition heuristics] · pins: 9
+- **GATE-SURF-106** `project/experiments/euromonitor/_blocking.py:33 build_pairs()`
+  [project/data/euromonitor/dataset_deduped.csv] → [(shared) true pairs + negative pairs + blocking recall/candidates] · pins: none direct
+- **GATE-SURF-107** `project/experiments/euromonitor/_matching.py:16 build_vectorizer()`
+  [] → [(shared) TF-IDF title vectors + cosine score_pairs] · pins: 3
+- **GATE-SURF-108** `project/experiments/euromonitor/_hard_negatives.py:130 mine_hard_negatives()`
+  [] → [(shared) hard-negative pairs + triplets + conflicting-barcode exclusion set] · pins: none direct
+- **GATE-SURF-109** `project/experiments/euromonitor/01b_data_views.py:168 main()`
+  [project/data/euromonitor/dataset.csv, project/experiments/results/euromonitor/01_dtypes.csv] → [project/experiments/results/euromonitor/01b_column_scatter.png, project/experiments/results/euromonitor/01b_product_space.png, project/experiments/results/euromonitor/01b_price_strip.png, project/experiments/results/euromonitor/01b_product_space.csv, project/experiments/results/euromonitor/01b_product_space_plot_data.csv] · pins: none direct
+- **GATE-SURF-110** `project/experiments/euromonitor/01c_sparsity_noise.py:38 main()`
+  [project/data/euromonitor/dataset.csv] → [project/experiments/results/euromonitor/01c_sparsity_noise.csv, project/experiments/results/euromonitor/01c_price_outliers.png, project/experiments/results/euromonitor/01c_brand_long_tail.png, project/experiments/results/euromonitor/01c_cardinality.png] · pins: none direct
+- **GATE-SURF-111** `project/experiments/euromonitor/01d_description_missingness.py:34 main()`
+  [project/data/euromonitor/dataset.csv] → [project/experiments/results/euromonitor/01d_description_missing.csv, project/experiments/results/euromonitor/01d_missing_by_category.png, project/experiments/results/euromonitor/01d_missing_by_retailer.png] · pins: none direct
+- **GATE-SURF-112** `project/experiments/euromonitor/01e_barcode_analysis.py:23 main()`
+  [project/data/euromonitor/dataset.csv] → [project/experiments/results/euromonitor/01e_barcode_analysis.png] · pins: none direct
+- **GATE-SURF-113** `project/experiments/euromonitor/01f_barcode_bias.py:35 main()`
+  [project/data/euromonitor/dataset.csv] → [project/experiments/results/euromonitor/01f_barcode_bias.csv] · pins: none direct
+- **GATE-SURF-114** `project/experiments/euromonitor/01g_ground_truth_funnel.py:21 main()`
+  [project/data/euromonitor/dataset.csv] → [project/experiments/results/euromonitor/01g_ground_truth_funnel.png, project/experiments/results/euromonitor/01g_usable_by_country.png] · pins: none direct
+- **GATE-SURF-115** `project/experiments/euromonitor/01h_cross_country_probe.py:31 main()`
+  [project/data/euromonitor/dataset_deduped.csv, project/config/experiments/nlp.yaml] → [project/experiments/results/euromonitor/01h_cross_country_probe.png, project/experiments/results/euromonitor/01h_cross_country_spotcheck.csv] · pins: none direct
+- **GATE-SURF-116** `project/experiments/euromonitor/02_volume_normalize.py:171 main()`
+  [project/data/euromonitor/dataset.csv] → [project/experiments/results/euromonitor/02_volume_normalize.csv, project/experiments/results/euromonitor/02_volume_agreement_before_after.csv, project/experiments/results/euromonitor/02_volume_disagreement.png, project/experiments/results/euromonitor/02_flavor_vocab.png, project/experiments/results/euromonitor/02_volume_agreement_before_after.png] · pins: none direct
+- **GATE-SURF-117** `project/experiments/euromonitor/02b_volume_disagreement_split.py:55 main()`
+  [project/experiments/results/euromonitor/02_volume_normalize.csv] → [project/experiments/results/euromonitor/02b_volume_disagreement_split.csv, project/experiments/results/euromonitor/02b_disagreement_summary.csv] · pins: none direct
+- **GATE-SURF-118** `project/experiments/euromonitor/02c_case_analysis.py:61 main()`
+  [project/data/euromonitor/dataset.csv] → [project/experiments/results/euromonitor/02c_uppercase_letters.csv, project/experiments/results/euromonitor/02c_case_match_summary.csv, project/experiments/results/euromonitor/02c_case_normalization.png] · pins: none direct
+- **GATE-SURF-119** `project/experiments/euromonitor/02d_measurement_validation.py:64 main()`
+  [project/data/euromonitor/dataset.csv] → [project/experiments/results/euromonitor/02d_measurement_status.csv, project/experiments/results/euromonitor/02d_sanity_checks.csv, project/experiments/results/euromonitor/02d_flagged_examples.csv, project/experiments/results/euromonitor/02d_measurement_status.png] · pins: 2
+- **GATE-SURF-120** `project/experiments/euromonitor/03_pack_reconcile.py:32 main()`
+  [project/experiments/results/euromonitor/02b_volume_disagreement_split.csv] → [project/experiments/results/euromonitor/03_pack_reconcile.csv] · pins: none direct
+- **GATE-SURF-121** `project/experiments/euromonitor/03b_disposition.py:86 main()`
+  [project/experiments/results/euromonitor/03_pack_reconcile.csv] → [project/experiments/results/euromonitor/03b_disposition.csv] · pins: none direct
+- **GATE-SURF-122** `project/experiments/euromonitor/04_tfidf_matching.py:53 main()`
+  [project/data/euromonitor/dataset.csv] → [project/experiments/results/euromonitor/04_tfidf_stats.csv, project/experiments/results/euromonitor/04_tfidf_threshold.csv, project/experiments/results/euromonitor/04_tfidf_scores.png, project/experiments/results/euromonitor/04_tfidf_threshold.png] · pins: 2
+- **GATE-SURF-123** `project/experiments/euromonitor/04b_category_utility.py:65 main()`
+  [project/data/euromonitor/dataset.csv] → [project/experiments/results/euromonitor/04b_macro_mapping.csv, project/experiments/results/euromonitor/04b_category_audit.csv, project/experiments/results/euromonitor/04b_category_audit.png] · pins: none direct
+- **GATE-SURF-124** `project/experiments/euromonitor/04c_blocking_ab.py:44 main()`
+  [project/data/euromonitor/dataset.csv] → [project/experiments/results/euromonitor/04c_blocking_ab.csv, project/experiments/results/euromonitor/04c_blocking_ab.png] · pins: none direct
+- **GATE-SURF-125** `project/experiments/euromonitor/05_blocking_feature_selection.py:59 main()`
+  [project/data/euromonitor/dataset.csv] → [project/experiments/results/euromonitor/05_blocking_feature_audit.csv, project/experiments/results/euromonitor/05_blocking_feature_audit.png] · pins: none direct
+- **GATE-SURF-126** `project/experiments/euromonitor/05b_exact_duplicates.py:38 main()`
+  [project/data/euromonitor/dataset.csv] → [project/experiments/results/euromonitor/05b_exact_duplicates.csv, project/experiments/results/euromonitor/05b_duplicate_examples.csv, project/experiments/results/euromonitor/05b_exact_duplicates.png] · pins: none direct
+- **GATE-SURF-127** `project/experiments/euromonitor/06_dedupe.py:39 main()`
+  [project/data/euromonitor/dataset.csv] → [project/data/euromonitor/dataset_deduped.csv, project/data/euromonitor/sku_to_rep.csv, project/experiments/results/euromonitor/06_dedupe_summary.csv, project/experiments/results/euromonitor/06_ambiguous_offer_groups.csv] · pins: none direct
+- **GATE-SURF-128** `project/experiments/euromonitor/06b_mislabeled_barcode_report.py:25 main()`
+  [project/data/euromonitor/dataset.csv] → [project/experiments/results/euromonitor/06b_conflicting_barcode_groups.csv, project/experiments/results/euromonitor/06b_conflicting_summary.csv] · pins: none direct
+- **GATE-SURF-129** `project/experiments/euromonitor/06c_validation_sets.py:33 main()`
+  [project/data/euromonitor/dataset_deduped.csv] → [project/experiments/results/euromonitor/06c_validation_summary.csv, project/experiments/results/euromonitor/06c_hard_validation_pairs.csv] · pins: none direct
+- **GATE-SURF-130** `project/experiments/euromonitor/07_nlp_hpo.py:50 main()`
+  [project/data/euromonitor/dataset_deduped.csv, project/config/experiments/nlp.yaml] → [project/experiments/results/euromonitor/07_nlp_hpo_benchmark.csv, project/experiments/results/euromonitor/07_nlp_hpo_timing.csv, project/experiments/results/euromonitor/07_nlp_hpo_pareto.png] · pins: none direct
+- **GATE-SURF-131** `project/experiments/euromonitor/07b_finetune.py:49 main()`
+  [project/data/euromonitor/dataset_deduped.csv, project/experiments/results/euromonitor/07_nlp_hpo_benchmark.csv] → [project/experiments/results/euromonitor/07b_finetune.csv] · pins: none direct
+- **GATE-SURF-132** `project/experiments/euromonitor/07c_field_ablation.py:30 main()`
+  [project/data/euromonitor/dataset_deduped.csv] → [project/experiments/results/euromonitor/07c_field_ablation.csv] · pins: none direct
+- **GATE-SURF-133** `project/experiments/euromonitor/07d_data_scaling.py:35 main()`
+  [project/data/euromonitor/dataset_deduped.csv] → [project/experiments/results/euromonitor/07d_data_scaling.csv] · pins: none direct
+- **GATE-SURF-134** `project/experiments/euromonitor/07_report_plots.py:34 main()`
+  [project/data/euromonitor/dataset_deduped.csv, project/experiments/results/euromonitor/07c_field_ablation.csv, project/experiments/results/euromonitor/07d_data_scaling.csv] → [project/experiments/results/euromonitor/07_report_score_dist.png, project/experiments/results/euromonitor/07_report_pr_curve.png, project/experiments/results/euromonitor/07_report_threshold_sweep.png, project/experiments/results/euromonitor/07_report_error_breakdown.png, project/experiments/results/euromonitor/07_report_field_ablation.png, project/experiments/results/euromonitor/07_report_data_scaling.png] · pins: none direct
+- **GATE-SURF-135** `project/experiments/euromonitor/make_notebook.py:11 md()`
+  [project/data/euromonitor/sku_to_rep.csv, project/data/euromonitor/dataset_deduped.csv, project/experiments/results/euromonitor/07_nlp_hpo_benchmark.csv] → [project/experiments/euromonitor/entity_resolution.ipynb] · pins: none direct
+- **GATE-SURF-136** `project/experiments/euromonitor/entity_resolution.ipynb:1 Euromonitor`
+  [project/experiments/euromonitor/make_notebook.py] → [project/experiments/results/euromonitor/sku_to_item.csv] · pins: none direct
 
 ### 08-config — config-schema
 

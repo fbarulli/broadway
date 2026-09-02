@@ -13,6 +13,14 @@
 - GATE-ETL-11
 ? (dict[str, np.ndarray] containing EVERY declared value in declared order, sorted absent list); a value with no matching rows OR all-NaN target maps to size-0 array (:28-31)
 : - GATE-STATS-42
+(shared) TF-IDF title vectors + cosine score_pairs:
+- GATE-SURF-107
+(shared) canonical volume ml, bucket_ml, validate_measurement, flavor/pack/disposition heuristics:
+- GATE-SURF-105
+(shared) hard-negative pairs + triplets + conflicting-barcode exclusion set:
+- GATE-SURF-108
+(shared) true pairs + negative pairs + blocking recall/candidates:
+- GATE-SURF-106
 --force flag:
 - GATE-TLINE-54
 ? '24-entry SHARED surface: src/ tests/ demo/ configs/dataset/test.yaml configs/experiment/{baseline,engineered,hyperopt}.yaml configs/analysis/{test,test_hypothesis,test_causal}.yaml configs/step/{causal,etl}.yaml configs/environment/ configs/flow/ k8s/ docker/ .github/workflows/ pyproject.toml Dockerfile docker-compose.yml .gitignore .dockerignore README.md scripts/'
@@ -784,18 +792,204 @@ project/config/ (project-owned layout, experiment, and config-overlay SSOT):
 - GATE-INFRA-92
 ? 'project/config/dataset/*.yaml (column pins: dtype/null_count/role per column, e.g. project/config/dataset/euromonitor.yaml:1-29; lookup_tables with value_policies/sentinel_values euromonitor.yaml:31-59)'
 : - GATE-CFG-74
+project/config/experiments/euromonitor.yaml:
+- GATE-SURF-104
+project/config/experiments/nlp.yaml:
+- GATE-SURF-115
+- GATE-SURF-130
 'project/config/experiments/nlp.yaml model_zoo + hpo: block (bi-encoder zoo SSOT, direction: maximize)':
 - GATE-HPO-154
 project/data/euromonitor/dataset.csv:
 - GATE-SURF-103
+- GATE-SURF-104
+- GATE-SURF-109
+- GATE-SURF-110
+- GATE-SURF-111
+- GATE-SURF-112
+- GATE-SURF-113
+- GATE-SURF-114
+- GATE-SURF-116
+- GATE-SURF-118
+- GATE-SURF-119
+- GATE-SURF-122
+- GATE-SURF-123
+- GATE-SURF-124
+- GATE-SURF-125
+- GATE-SURF-126
+- GATE-SURF-127
+- GATE-SURF-128
+project/data/euromonitor/dataset_deduped.csv:
+- GATE-SURF-104
+- GATE-SURF-106
+- GATE-SURF-115
+- GATE-SURF-127
+- GATE-SURF-129
+- GATE-SURF-130
+- GATE-SURF-131
+- GATE-SURF-132
+- GATE-SURF-133
+- GATE-SURF-134
+- GATE-SURF-135
 project/data/euromonitor/eda.parquet (evidence):
 - GATE-SURF-103
+project/data/euromonitor/sku_to_rep.csv:
+- GATE-SURF-127
+- GATE-SURF-135
 project/experiments/euromonitor/07_nlp_hpo.py pair construction (same 10,891 pos / 10,000 neg population as step 04):
 - GATE-HPO-154
+project/experiments/euromonitor/entity_resolution.ipynb:
+- GATE-SURF-135
+project/experiments/euromonitor/make_notebook.py:
+- GATE-SURF-136
 project/experiments/mlflow/_common.py RESULTS convention:
 - GATE-SURF-68
 project/experiments/results/**/*.csv (tracked):
 - GATE-SURF-68
+project/experiments/results/euromonitor/**/* (shared RESULTS convention):
+- GATE-SURF-104
+project/experiments/results/euromonitor/01_dtypes.csv:
+- GATE-SURF-109
+project/experiments/results/euromonitor/01b_column_scatter.png:
+- GATE-SURF-109
+project/experiments/results/euromonitor/01b_price_strip.png:
+- GATE-SURF-109
+project/experiments/results/euromonitor/01b_product_space.csv:
+- GATE-SURF-109
+project/experiments/results/euromonitor/01b_product_space.png:
+- GATE-SURF-109
+project/experiments/results/euromonitor/01b_product_space_plot_data.csv:
+- GATE-SURF-109
+project/experiments/results/euromonitor/01c_brand_long_tail.png:
+- GATE-SURF-110
+project/experiments/results/euromonitor/01c_cardinality.png:
+- GATE-SURF-110
+project/experiments/results/euromonitor/01c_price_outliers.png:
+- GATE-SURF-110
+project/experiments/results/euromonitor/01c_sparsity_noise.csv:
+- GATE-SURF-110
+project/experiments/results/euromonitor/01d_description_missing.csv:
+- GATE-SURF-111
+project/experiments/results/euromonitor/01d_missing_by_category.png:
+- GATE-SURF-111
+project/experiments/results/euromonitor/01d_missing_by_retailer.png:
+- GATE-SURF-111
+project/experiments/results/euromonitor/01e_barcode_analysis.png:
+- GATE-SURF-112
+project/experiments/results/euromonitor/01f_barcode_bias.csv:
+- GATE-SURF-113
+project/experiments/results/euromonitor/01g_ground_truth_funnel.png:
+- GATE-SURF-114
+project/experiments/results/euromonitor/01g_usable_by_country.png:
+- GATE-SURF-114
+project/experiments/results/euromonitor/01h_cross_country_probe.png:
+- GATE-SURF-115
+project/experiments/results/euromonitor/01h_cross_country_spotcheck.csv:
+- GATE-SURF-115
+project/experiments/results/euromonitor/02_flavor_vocab.png:
+- GATE-SURF-116
+project/experiments/results/euromonitor/02_volume_agreement_before_after.csv:
+- GATE-SURF-116
+project/experiments/results/euromonitor/02_volume_agreement_before_after.png:
+- GATE-SURF-116
+project/experiments/results/euromonitor/02_volume_disagreement.png:
+- GATE-SURF-116
+project/experiments/results/euromonitor/02_volume_normalize.csv:
+- GATE-SURF-116
+- GATE-SURF-117
+project/experiments/results/euromonitor/02b_disagreement_summary.csv:
+- GATE-SURF-117
+project/experiments/results/euromonitor/02b_volume_disagreement_split.csv:
+- GATE-SURF-117
+- GATE-SURF-120
+project/experiments/results/euromonitor/02c_case_match_summary.csv:
+- GATE-SURF-118
+project/experiments/results/euromonitor/02c_case_normalization.png:
+- GATE-SURF-118
+project/experiments/results/euromonitor/02c_uppercase_letters.csv:
+- GATE-SURF-118
+project/experiments/results/euromonitor/02d_flagged_examples.csv:
+- GATE-SURF-119
+project/experiments/results/euromonitor/02d_measurement_status.csv:
+- GATE-SURF-119
+project/experiments/results/euromonitor/02d_measurement_status.png:
+- GATE-SURF-119
+project/experiments/results/euromonitor/02d_sanity_checks.csv:
+- GATE-SURF-119
+project/experiments/results/euromonitor/03_pack_reconcile.csv:
+- GATE-SURF-120
+- GATE-SURF-121
+project/experiments/results/euromonitor/03b_disposition.csv:
+- GATE-SURF-121
+project/experiments/results/euromonitor/04_tfidf_scores.png:
+- GATE-SURF-122
+project/experiments/results/euromonitor/04_tfidf_stats.csv:
+- GATE-SURF-122
+project/experiments/results/euromonitor/04_tfidf_threshold.csv:
+- GATE-SURF-122
+project/experiments/results/euromonitor/04_tfidf_threshold.png:
+- GATE-SURF-122
+project/experiments/results/euromonitor/04b_category_audit.csv:
+- GATE-SURF-123
+project/experiments/results/euromonitor/04b_category_audit.png:
+- GATE-SURF-123
+project/experiments/results/euromonitor/04b_macro_mapping.csv:
+- GATE-SURF-123
+project/experiments/results/euromonitor/04c_blocking_ab.csv:
+- GATE-SURF-124
+project/experiments/results/euromonitor/04c_blocking_ab.png:
+- GATE-SURF-124
+project/experiments/results/euromonitor/05_blocking_feature_audit.csv:
+- GATE-SURF-125
+project/experiments/results/euromonitor/05_blocking_feature_audit.png:
+- GATE-SURF-125
+project/experiments/results/euromonitor/05b_duplicate_examples.csv:
+- GATE-SURF-126
+project/experiments/results/euromonitor/05b_exact_duplicates.csv:
+- GATE-SURF-126
+project/experiments/results/euromonitor/05b_exact_duplicates.png:
+- GATE-SURF-126
+project/experiments/results/euromonitor/06_ambiguous_offer_groups.csv:
+- GATE-SURF-127
+project/experiments/results/euromonitor/06_dedupe_summary.csv:
+- GATE-SURF-127
+project/experiments/results/euromonitor/06b_conflicting_barcode_groups.csv:
+- GATE-SURF-128
+project/experiments/results/euromonitor/06b_conflicting_summary.csv:
+- GATE-SURF-128
+project/experiments/results/euromonitor/06c_hard_validation_pairs.csv:
+- GATE-SURF-129
+project/experiments/results/euromonitor/06c_validation_summary.csv:
+- GATE-SURF-129
+project/experiments/results/euromonitor/07_nlp_hpo_benchmark.csv:
+- GATE-SURF-130
+- GATE-SURF-131
+- GATE-SURF-135
+project/experiments/results/euromonitor/07_nlp_hpo_pareto.png:
+- GATE-SURF-130
+project/experiments/results/euromonitor/07_nlp_hpo_timing.csv:
+- GATE-SURF-130
+project/experiments/results/euromonitor/07_report_data_scaling.png:
+- GATE-SURF-134
+project/experiments/results/euromonitor/07_report_error_breakdown.png:
+- GATE-SURF-134
+project/experiments/results/euromonitor/07_report_field_ablation.png:
+- GATE-SURF-134
+project/experiments/results/euromonitor/07_report_pr_curve.png:
+- GATE-SURF-134
+project/experiments/results/euromonitor/07_report_score_dist.png:
+- GATE-SURF-134
+project/experiments/results/euromonitor/07_report_threshold_sweep.png:
+- GATE-SURF-134
+project/experiments/results/euromonitor/07b_finetune.csv:
+- GATE-SURF-131
+project/experiments/results/euromonitor/07c_field_ablation.csv:
+- GATE-SURF-132
+- GATE-SURF-134
+project/experiments/results/euromonitor/07d_data_scaling.csv:
+- GATE-SURF-133
+- GATE-SURF-134
+project/experiments/results/euromonitor/sku_to_item.csv:
+- GATE-SURF-136
 project/experiments/results/univariate/fare_amount_trip_distance/ratecode1_sample.parquet|.json (pinned, tracked):
 - GATE-SURF-68
 'project/tests/** (project-tests: full tier only, -q --dist worksteal, NO coverage flags)':

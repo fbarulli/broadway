@@ -201,6 +201,16 @@ broadway.timeline.runners.run_posthoc (:396):
 - GATE-STATS-47
 broadway.training.hpo.run_hpo_bandit:
 - GATE-HPO-154
+broadway.training.mlflow_utils:
+- GATE-SURF-130
+broadway.training.nlp:
+- GATE-SURF-115
+- GATE-SURF-130
+- GATE-SURF-131
+- GATE-SURF-132
+- GATE-SURF-133
+- GATE-SURF-134
+- GATE-SURF-135
 broadway.viz.palette_colors (:112 — indirect viz.yaml disk read, see GATE-STATS-48 FINDING):
 - GATE-STATS-49
 broadway.viz.palette_colors — INDIRECT CONFIG READ (see FINDING):
@@ -293,6 +303,9 @@ logging:
 - GATE-STATS-40
 lookup value audit (data/lookup_value_audit.py:48):
 - GATE-CFG-74
+matplotlib:
+- GATE-SURF-114
+- GATE-SURF-135
 matplotlib (Agg):
 - GATE-STATS-48
 matplotlib Agg (:8):
@@ -316,6 +329,24 @@ numpy:
 - GATE-STATS-44
 - GATE-STATS-45
 - GATE-STATS-48
+- GATE-SURF-106
+- GATE-SURF-107
+- GATE-SURF-108
+- GATE-SURF-109
+- GATE-SURF-110
+- GATE-SURF-112
+- GATE-SURF-113
+- GATE-SURF-115
+- GATE-SURF-116
+- GATE-SURF-122
+- GATE-SURF-123
+- GATE-SURF-125
+- GATE-SURF-129
+- GATE-SURF-131
+- GATE-SURF-132
+- GATE-SURF-133
+- GATE-SURF-134
+- GATE-SURF-135
 - GATE-HPO-81
 - GATE-HPO-88
 numpy(np.isinf sibling require_finite):
@@ -365,6 +396,35 @@ pandas:
 - GATE-STATS-49
 - GATE-SURF-101
 - GATE-SURF-103
+- GATE-SURF-104
+- GATE-SURF-106
+- GATE-SURF-108
+- GATE-SURF-109
+- GATE-SURF-110
+- GATE-SURF-111
+- GATE-SURF-112
+- GATE-SURF-113
+- GATE-SURF-114
+- GATE-SURF-115
+- GATE-SURF-116
+- GATE-SURF-117
+- GATE-SURF-118
+- GATE-SURF-119
+- GATE-SURF-120
+- GATE-SURF-121
+- GATE-SURF-122
+- GATE-SURF-123
+- GATE-SURF-124
+- GATE-SURF-125
+- GATE-SURF-126
+- GATE-SURF-127
+- GATE-SURF-128
+- GATE-SURF-129
+- GATE-SURF-130
+- GATE-SURF-132
+- GATE-SURF-133
+- GATE-SURF-134
+- GATE-SURF-135
 - GATE-HPO-81
 - GATE-HPO-84
 pandas (df ops):
@@ -433,6 +493,8 @@ python -m broadway.cli equivalent:
 pyyaml:
 - GATE-INGEST-04
 - GATE-INGEST-09
+- GATE-SURF-104
+- GATE-SURF-130
 - GATE-HPO-89
 re:
 - GATE-ETL-10
@@ -452,7 +514,21 @@ scikit-learn:
 - GATE-TRAIN-31
 - GATE-TRAIN-34
 - GATE-TRAIN-36
+- GATE-SURF-107
+- GATE-SURF-108
+- GATE-SURF-109
+- GATE-SURF-113
+- GATE-SURF-122
+- GATE-SURF-123
+- GATE-SURF-131
+- GATE-SURF-134
+- GATE-SURF-135
 - GATE-HPO-81
+scipy:
+- GATE-SURF-110
+- GATE-SURF-113
+- GATE-SURF-123
+- GATE-SURF-135
 scipy.stats:
 - GATE-STATS-45
 scipy.stats (levene/skew/kurtosis/shapiro):
@@ -475,7 +551,14 @@ scripts/run_local_ci.sh:47-51 configs gate:
 - GATE-CFG-70
 scripts/ship.sh:24:
 - GATE-INFRA-90
+seaborn:
+- GATE-SURF-109
+- GATE-SURF-110
+- GATE-SURF-116
+- GATE-SURF-118
 sentence-transformers:
+- GATE-SURF-131
+- GATE-SURF-133
 - GATE-HPO-154
 sklearn.metrics:
 - GATE-STATS-48
