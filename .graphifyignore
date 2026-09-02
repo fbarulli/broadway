@@ -1,0 +1,20 @@
+# graphify scan scope — index ONLY the governed code-bearing surfaces.
+#
+# The graphify surface-reconciliation gate (scripts/check_graphify_surfaces.py)
+# reconciles callable symbols from src/ + project/ (non-test) against
+# agents/ledger/gates.yaml owners. Everything else is deliberately out of the
+# code graph: tests self-describe via validated_by pins, scripts/k8s/docker are
+# governed by the run_local_ci.sh battery + their own probe, and agents/docs are
+# ledger surface, not application code. Keep this in sync with the gate.
+agents/
+configs/
+demo/
+docker/
+k8s/
+readmore/
+reports/
+scratch/
+scripts/
+tests/
+experiments_ui.py
+project/tests/

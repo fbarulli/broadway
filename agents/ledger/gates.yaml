@@ -1,8 +1,8 @@
 # Gate registry SSOT — hand-maintained; the {01..09} gate fragments it consolidated predate git custody.
 meta:
-  head: '9e97079'
+  head: '1bed31e'
   counts:
-    total: 162
+    total: 163
     gates_with_findings: 75
     finding_strings: 99
     by_band:
@@ -43,7 +43,7 @@ meta:
         flagged: 8
         finding_strings: 11
       09-infra:
-        gates: 25
+        gates: 26
         flagged: 14
         finding_strings: 22
       81-object-custody:
@@ -3838,7 +3838,7 @@ gates:
 - id: GATE-INFRA-92
   phase: infra-meta
   order: 137
-  owner: scripts/run_local_ci.sh:102 gate battery (ruff, mypy, Vulture, configs, shell-scripts, data-refs, pytest+cov floor=95, project-tests)
+  owner: scripts/run_local_ci.sh:102 gate battery (ruff, mypy, Vulture, configs, shell-scripts, data-refs, graphify, pytest+cov floor=95, project-tests)
   inputs:
   - src/** tests/test_project_paths.py project/experiments/** project/experiments.py project/dashboard.py project/paths.py project/working.py project/data.py scripts/check_project_paths.py scripts/ (ruff)
   - project/config/ (project-owned layout, experiment, and config-overlay SSOT)
@@ -3846,11 +3846,12 @@ gates:
   - configs/experiment/*.yaml via load_config(dataset='test') (configs)
   - k8s/optuna/*.sh + scripts/*.sh via sh -n + shellcheck (shell-scripts)
   - Dockerfile COPY/ADD sources + ci.yml -f dockerfile + k8s/*.yaml + config parquet/path/file refs via scripts/check_data_refs.py against project/config/layout.yaml build:* (data-refs)
+  - 'graphify-out/graph.json callables vs agents/ledger/gates.yaml owner fields via scripts/check_graphify_surfaces.py (graphify)'
   - src/broadway project scripts via Vulture --min-confidence 95 (vulture)
   - tests/** (pytest -n 4 --dist worksteal, --cov-fail-under=95)
   - 'project/tests/** (project-tests: full tier only, -q --dist worksteal, NO coverage flags)'
   outputs:
-  - PASS/FAIL ruff|mypy|configs|project-paths|shell-scripts|data-refs|vulture|pytest|project-tests banners + 40-line tails
+  - PASS/FAIL ruff|mypy|configs|project-paths|shell-scripts|data-refs|graphify|vulture|pytest|project-tests banners + 40-line tails
   - cov floor breach ⇒ FAIL pytest
   transforms:
   - ruff/mypy/Vulture/configs/shell-scripts run in EVERY tier incl. fast/static
@@ -3858,6 +3859,7 @@ gates:
   - 'Vulture is fail-closed at 95% confidence through the direct scripts/uv.sh invocation: a finding is printed and exits non-zero; no allowlist or wrapper exists'
   - 'data-refs (:117) runs `bash scripts/uv.sh run --extra dev python scripts/check_data_refs.py` — NOT bare `python3` — matching every other python gate; bare python3 was the CI failure (a491162 layout-SSOT rewrite made the checker import project.paths, unresolvable on the CI system interpreter)'
   - 'scripts/check_data_refs.py is self-contained: it computes REPO = Path(__file__).resolve().parents[1] and inserts it into sys.path BEFORE `from project.paths import load_project_paths`, so the project import resolves regardless of ambient PYTHONPATH or an editable install'
+  - 'graphify (:119) runs `bash scripts/uv.sh run --extra dev python scripts/check_graphify_surfaces.py` — reconciles callables in graphify-out/graph.json (deterministic `graphify extract . --code-only --no-cluster`, scope pinned by .graphifyignore) against gates.yaml owner fields; FAIL = governed src/ or project/ file with callables and no owner (KNOWN_UNMAPPED baseline recorded by STATE-20260902-010), WARN = helper not individually named'
   - 'project-tests step (:97, full-tier-only): uv run pytest project/tests -q --dist worksteal with NO coverage flags — the >=95 floor deliberately stays on tests/ (header :7-8); closes the data-gate hole (human ruling): 26 tests / 6 files collected+passing at HEAD eb9ea18'
   - coverage floor value 95 owned here; docs must quote it identically
   - configs gate asserts non-empty glob then loads every experiment config
@@ -4370,10 +4372,38 @@ gates:
   - tests/test_state_records.py
   - GitHub Project #4 draft-issue lifecycle
   findings: []
+- id: GATE-INFRA-149
+  phase: infra-meta
+  order: 160
+  owner: 'scripts/check_graphify_surfaces.py:1 main() graphify surface-reconciliation gate (callables vs gates.yaml owners)'
+  inputs:
+  - graphify-out/graph.json (deterministic --code-only AST graph over src/ + project/)
+  - agents/ledger/gates.yaml owner fields
+  outputs:
+  - PASS/FAIL graphify banner + KNOWN_UNMAPPED baseline report
+  transforms:
+  - 'HARD FAIL: a governed file (src/ or project/, non-test) with callable symbols referenced by NO gate owner: field — KNOWN_UNMAPPED is the dated baseline (STATE-20260902-010); a NEW unowned file trips the gate'
+  - 'WARN (never fail): a callable in an OWNED file not individually named by that file''s owner — the registry names entry points, not every helper'
+  - 'graph regenerated deterministically via `graphify extract . --code-only --no-cluster` (byte-identical; scope pinned by .graphifyignore to src/ + project/, non-test)'
+  - 'owner coverage: exact file, directory prefix, X/__init__.py package marker, or glob; owner: field ONLY — inputs/outputs never register here'
+  touched_by:
+  - graphify
+  validated_by:
+  - tests/test_graphify_surfaces.py::test_live_reconciliation_green_at_head
+  - tests/test_graphify_surfaces.py::test_synthetic_unmapped_file_fails
+  - tests/test_graphify_surfaces.py::test_known_unmapped_baseline_is_the_exact_unmapped_set
+  if_changed:
+  - scripts/check_graphify_surfaces.py
+  - graphify-out/graph.json
+  - agents/ledger/gates.yaml
+  - src/
+  - project/
+  - .graphifyignore
+  findings: []
 # --- BAND 81-OBJECT-CUSTODY (minted per slate §0; header law above) ------
 - id: GATE-CUST-147
   phase: object-custody
-  order: 160
+  order: 161
   owner: 'src/broadway/training/mlflow_utils.py:162 promote_candidate()'
   inputs:
   - 'model_uri + alias="champion"'
@@ -4392,7 +4422,7 @@ gates:
   findings: []
 - id: GATE-CUST-148
   phase: object-custody
-  order: 161
+  order: 162
   owner: 'src/broadway/training/mlflow_utils.py:163 register_model call sites'
   inputs:
   - candidate model_uri + dataset name
@@ -4408,7 +4438,7 @@ gates:
   findings: []
 - id: GATE-CUST-150
   phase: object-custody
-  order: 162
+  order: 163
   owner: 'src/broadway/training/mlflow_utils.py:59 set_experiment auto-create chokepoint (inside setup_mlflow :54-63)'
   inputs:
   - experiment_name argument at setup time

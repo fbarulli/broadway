@@ -50,8 +50,9 @@ INDEX_FILES = [
 # band, so several prefixes carry a second (appended) range. Burned ids
 # (121,130,132,134,135,136,140,153 + not-landed 106/109/110/115) simply hold
 # no rows; SURF appended range extended to 104…137 for the euromonitor
-# experiment surfaces (surfaces-fix); future mints append ≥155 (HPO) / ≥138
-# (SURF).
+# experiment surfaces (surfaces-fix); INFRA appended range extended to 121…149
+# for the graphify surface-reconciliation gate (GATE-INFRA-149); future mints
+# append ≥155 (HPO) / ≥138 (SURF) / ≥150 (INFRA).
 BAND_RANGES = {
     "INGEST": [(1, 9)],
     "ETL": [(10, 19), (115, 117)],
@@ -62,7 +63,7 @@ BAND_RANGES = {
     "SURF": [(60, 69), (100, 103), (104, 137)],
     "CFG": [(70, 79), (103, 112)],
     "HPO": [(80, 89), (154, 154)],
-    "INFRA": [(90, 99), (121, 148)],
+    "INFRA": [(90, 99), (121, 149)],
     "CUST": [(147, 153)],
 }
 ID_RX = re.compile(r"^GATE-[A-Z]+-\d{2,3}$")

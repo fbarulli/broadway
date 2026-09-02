@@ -21,7 +21,8 @@ project/experiments/results/**
 # Generated results CSVs are derived data, not source (regenerated per run).
 *.png
 !reports/figures/*.png
-graphify-out/
+graphify-out/*
+!graphify-out/graph.json
 .mplconfig/
 diagnostics_experiment/
 legend_experiment/
