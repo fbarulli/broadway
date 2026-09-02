@@ -363,16 +363,20 @@ cross = (country[a] != "") & (country[b] != "") & (country[a] != country[b])
 #    identical title. Falls back to the plain argmax if none exists.
 norm = np.array([" ".join(t.split()).lower() for t in title])
 cross_diff = cross & (norm[a] != norm[b])
-best_pick = cross_diff if cross_diff.any() else cross
-best = int(np.flatnonzero(best_pick)[np.argmax(pos_s[best_pick])])
+best_pool = cross_diff if cross_diff.any() else cross
+if not best_pool.any():
+    raise RuntimeError("no cross-country positive pair to show as a success")
+best = int(np.flatnonzero(best_pool)[np.argmax(pos_s[best_pool])])
 
 # 2. genuine FAILURE: a same-barcode positive below the operating threshold,
 #    prefer cross-country. Take the CLOSEST miss (highest score below thr):
 #    the pair the tax most plausibly cost, rather than a near-0.3 mislabeled
 #    barcode (a label error, not a matching miss).
 fn = pos_s < thr
-fn_pick = (fn & cross) if (fn & cross).any() else fn
-fail = int(np.flatnonzero(fn_pick)[np.argmax(pos_s[fn_pick])])
+fn_pool = (fn & cross) if (fn & cross).any() else fn
+if not fn_pool.any():
+    raise RuntimeError("no same-barcode positive scores below thr — no genuine failure to show")
+fail = int(np.flatnonzero(fn_pool)[np.argmax(pos_s[fn_pool])])
 
 def _why(i):
     x, y = pos[i]

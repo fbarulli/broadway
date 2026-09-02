@@ -174,43 +174,64 @@ def main() -> None:
     def n_groups(mask):
         return int(np.unique(bc_arr[pos[mask][:, 0]]).size)
 
+    def _exact_ci(k, n):
+        """Clopper-Pearson 95% interval (exact binomial); NaN when n == 0."""
+        if n:
+            ci = binomtest(k, n).proportion_ci()
+            return ci.low, ci.high
+        return float("nan"), float("nan")
+
     bcs = df["barcode"].fillna("").astype(str)
     known = df[bcs.str.len() > 0]
     multi = known[known.groupby("barcode")["retailer"].transform("nunique") > 1]
     n_cross_groups_full = int((multi.groupby("barcode")["country"].nunique() > 1).sum())
     print("country slice (positive/FN side only; cross-barcode negatives carry no country label):", flush=True)
     slice_fn_rates: dict[str, float] = {}
+    entity: dict[str, dict] = {}
     for label, mask in slices.items():
         n = int(mask.sum())
         fn_rate = float((pos_s[mask] < thr).mean()) if n else float("nan")
         med = float(np.median(pos_s[mask])) if n else float("nan")
+        g = n_groups(mask)
+        fg = n_groups(mask & fn)
+        erate = fg / g if g else float("nan")
+        elo, ehi = _exact_ci(fg, g)
         slice_fn_rates[label] = fn_rate
-        rows.append({"bucket/slice": label, "n": n, "share": round(fn_rate, 4), "median_cosine": round(med, 4)})
-        print(f"  {label:<18} n={n:<6} groups={n_groups(mask):<5} FN rate={fn_rate:6.1%}  median pos cosine={med:.4f}", flush=True)
+        entity[label] = {"groups": g, "fn_groups": fg, "rate": erate, "lo": elo, "hi": ehi}
+        rows.append({
+            "bucket/slice": label, "n": n, "groups": g,
+            "share": round(fn_rate, 4), "entity_fn_rate": round(erate, 6),
+            "ci_low": round(elo, 6), "ci_high": round(ehi, 6),
+            "median_cosine": round(med, 4),
+        })
+        print(f"  {label:<18} n={n:<6} groups={g:<5} pair FN rate={fn_rate:6.1%}  median pos cosine={med:.4f}", flush=True)
     print(f"FN rate: in-country {slice_fn_rates['pos: in-country']:.1%} vs "
           f"cross-country {slice_fn_rates['pos: cross-country']:.1%}", flush=True)
+    cc = entity["pos: cross-country"]
+    ic = entity["pos: in-country"]
     cc_fn_pairs = int((slices["pos: cross-country"] & fn).sum())
-    cc_groups = n_groups(slices["pos: cross-country"])
-    cc_fn_groups = n_groups(slices["pos: cross-country"] & fn)
-    ic_groups = n_groups(slices["pos: in-country"])
-    ic_fn_groups = n_groups(slices["pos: in-country"] & fn)
-    cc_ci = binomtest(cc_fn_groups, cc_groups).proportion_ci()
-    ic_ci = binomtest(ic_fn_groups, ic_groups).proportion_ci()
-    _, fisher_p = fisher_exact(
-        [[cc_fn_groups, cc_groups - cc_fn_groups], [ic_fn_groups, ic_groups - ic_fn_groups]],
-        alternative="two-sided",
-    )
-    print(f"  n: cross-country FN = {cc_fn_pairs} pairs on {cc_fn_groups} barcode groups "
-          f"(sampled {cc_groups} / {n_cross_groups_full} deduped multi-country groups); "
-          f"in-country FN = {ic_fn_groups} groups of {ic_groups:,}.", flush=True)
-    print(f"  entity-level FN rate (Clopper-Pearson 95% CI): cross-country {cc_fn_groups / cc_groups:.1%} "
-          f"[{cc_ci.low:.1%}–{cc_ci.high:.1%}, {cc_fn_groups}/{cc_groups} groups] vs in-country "
-          f"{ic_fn_groups / ic_groups:.2%} [{ic_ci.low:.2%}–{ic_ci.high:.2%}, {ic_fn_groups}/{ic_groups:,} groups] — "
+    if cc["groups"] and ic["groups"]:
+        _, fisher_p = fisher_exact(
+            [[cc["fn_groups"], cc["groups"] - cc["fn_groups"]],
+             [ic["fn_groups"], ic["groups"] - ic["fn_groups"]]],
+            alternative="two-sided",
+        )
+    else:
+        fisher_p = float("nan")
+    ratio = cc["rate"] / ic["rate"] if ic["rate"] else float("nan")
+    print(f"  n: cross-country FN = {cc_fn_pairs} pairs on {cc['fn_groups']} barcode groups "
+          f"(sampled {cc['groups']} / {n_cross_groups_full} deduped multi-country groups); "
+          f"in-country FN = {ic['fn_groups']} groups of {ic['groups']:,}.", flush=True)
+    print(f"  entity-level FN rate (Clopper-Pearson 95% CI): cross-country {cc['rate']:.1%} "
+          f"[{cc['lo']:.1%}–{cc['hi']:.1%}, {cc['fn_groups']}/{cc['groups']} groups] vs in-country "
+          f"{ic['rate']:.2%} [{ic['lo']:.2%}–{ic['hi']:.2%}, {ic['fn_groups']}/{ic['groups']:,} groups] — "
           f"Fisher's exact p={fisher_p:.3f} (nominally higher), but the interval spans "
-          f"{cc_ci.low:.1%}–{cc_ci.high:.1%} from n={cc_fn_groups} FN groups, so the gap is fragile, not a precise "
-          f"{cc_fn_groups / cc_groups / (ic_fn_groups / ic_groups):.0f}x.", flush=True)
+          f"{cc['lo']:.1%}–{cc['hi']:.1%} from n={cc['fn_groups']} FN groups, so the gap is fragile, not a precise "
+          f"{ratio:.0f}x.", flush=True)
 
-    fndf = pd.DataFrame(rows)
+    fndf = pd.DataFrame(rows)[["bucket/slice", "n", "groups", "share",
+                               "entity_fn_rate", "ci_low", "ci_high", "median_cosine"]]
+    fndf["groups"] = fndf["groups"].astype("Int64")
     fndf.to_csv(RESULTS / "07_report_fn_analysis.csv", index=False)
 
     fig, ax = plt.subplots(figsize=(6.5, 4), constrained_layout=True)
