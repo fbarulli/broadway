@@ -163,6 +163,20 @@ def main() -> None:
         "pos: in-country": both_country & (ca == cb),
         "pos: cross-country": both_country & (ca != cb),
     }
+    # Entity-level n: pairs inside one barcode group are correlated, so the
+    # stable unit is the DISTINCT barcode (product), not the pair count. This is
+    # the same few-hundred-group cross-country population as the earlier census
+    # (01g/07e: 349 multi-country barcode groups in the raw export; 292 in the
+    # deduped frame this step consumes).
+    bc_arr = df["barcode"].fillna("").astype(str).to_numpy()
+
+    def n_groups(mask):
+        return int(np.unique(bc_arr[pos[mask][:, 0]]).size)
+
+    bcs = df["barcode"].fillna("").astype(str)
+    known = df[bcs.str.len() > 0]
+    multi = known[known.groupby("barcode")["retailer"].transform("nunique") > 1]
+    n_cross_groups_full = int((multi.groupby("barcode")["country"].nunique() > 1).sum())
     print("country slice (positive/FN side only; cross-barcode negatives carry no country label):", flush=True)
     slice_fn_rates: dict[str, float] = {}
     for label, mask in slices.items():
@@ -171,9 +185,14 @@ def main() -> None:
         med = float(np.median(pos_s[mask])) if n else float("nan")
         slice_fn_rates[label] = fn_rate
         rows.append({"bucket/slice": label, "n": n, "share": round(fn_rate, 4), "median_cosine": round(med, 4)})
-        print(f"  {label:<18} n={n:<6} FN rate={fn_rate:6.1%}  median pos cosine={med:.4f}", flush=True)
+        print(f"  {label:<18} n={n:<6} groups={n_groups(mask):<5} FN rate={fn_rate:6.1%}  median pos cosine={med:.4f}", flush=True)
     print(f"FN rate: in-country {slice_fn_rates['pos: in-country']:.1%} vs "
           f"cross-country {slice_fn_rates['pos: cross-country']:.1%}", flush=True)
+    print(f"  n: cross-country FN = {int((slices['pos: cross-country'] & fn).sum())} pairs on "
+          f"{n_groups(slices['pos: cross-country'] & fn)} barcode groups "
+          f"(sampled {n_groups(slices['pos: cross-country'])} / {n_cross_groups_full} deduped multi-country groups) — "
+          f"too few for a stable rate; in-country FN = {n_groups(slices['pos: in-country'] & fn)} groups of "
+          f"{n_groups(slices['pos: in-country']):,}.", flush=True)
 
     fndf = pd.DataFrame(rows)
     fndf.to_csv(RESULTS / "07_report_fn_analysis.csv", index=False)
