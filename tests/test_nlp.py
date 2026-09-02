@@ -44,7 +44,7 @@ def _install_fake_sentence_transformers(monkeypatch: pytest.MonkeyPatch, noise_m
     st = types.ModuleType("sentence_transformers")
 
     class _FakeModel:
-        def __init__(self, model_id: str, device: str = "cpu") -> None:
+        def __init__(self, model_id: str, device: str = "cpu", model_kwargs=None) -> None:
             self.model_id = model_id
 
         def encode(self, payload, **kwargs):
@@ -170,7 +170,7 @@ def test_make_objective_passes_prompt(monkeypatch: pytest.MonkeyPatch) -> None:
     st = types.ModuleType("sentence_transformers")
 
     class _PromptModel:
-        def __init__(self, model_id: str, device: str = "cpu") -> None:
+        def __init__(self, model_id: str, device: str = "cpu", model_kwargs=None) -> None:
             self.model_id = model_id
 
         def encode(self, payload, **kwargs):
@@ -506,7 +506,7 @@ def test_encode_corpus_returns_embeddings_and_reuses_cache(
     st = types.ModuleType("sentence_transformers")
 
     class _Model:
-        def __init__(self, model_id: str, device: str = "cpu") -> None:
+        def __init__(self, model_id: str, device: str = "cpu", model_kwargs=None) -> None:
             self.model_id = model_id
             self.max_seq_length = None
 

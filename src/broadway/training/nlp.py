@@ -26,6 +26,7 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+import torch
 
 from broadway.config.schema import HPOConfig, NLPConfig
 from broadway.training.hpo import Objective, run_hpo_bandit
@@ -253,7 +254,7 @@ def encode_corpus(
     """
     from sentence_transformers import SentenceTransformer
 
-    model = SentenceTransformer(model_id, device=device)
+    model = SentenceTransformer(model_id, device=device, model_kwargs={"torch_dtype": torch.float32})
     model.max_seq_length = max_seq_length
     cache_path = _embedding_cache_path(
         cache_dir, model_id, payload, max_seq_length, batch_size, prompt
@@ -384,7 +385,7 @@ def make_objective(
 
     def objective(params: dict[str, float | int], trial=None) -> float:
         if folds is None:
-            model = SentenceTransformer(model_id, device=device)
+            model = SentenceTransformer(model_id, device=device, model_kwargs={"torch_dtype": torch.float32})
             if finetune_examples is not None and _has_finetune_params(params):
                 _finetune(model, params, finetune_examples, max_seq_length, loss)
                 emb, encode_s = _encode_payload(model, payload, batch_size, None, prompt)
@@ -404,7 +405,7 @@ def make_objective(
                 train_examples = [
                     example for example, keep in zip(finetune_examples, train_mask) if keep
                 ]
-                model = SentenceTransformer(model_id, device=device)
+                model = SentenceTransformer(model_id, device=device, model_kwargs={"torch_dtype": torch.float32})
                 _finetune(model, params, train_examples, max_seq_length, loss)
                 emb, encode_s = _encode_payload(model, payload, batch_size, None, prompt)
                 metrics = entity_resolution_metrics(
@@ -413,7 +414,7 @@ def make_objective(
                 metrics["encode_s"] = round(encode_s, 3)
                 fold_metrics.append(metrics)
         else:
-            model = SentenceTransformer(model_id, device=device)
+            model = SentenceTransformer(model_id, device=device, model_kwargs={"torch_dtype": torch.float32})
             model.max_seq_length = max_seq_length
             emb, encode_s = _encode_payload(model, payload, batch_size, cache_path, prompt)
             fold_metrics = []
