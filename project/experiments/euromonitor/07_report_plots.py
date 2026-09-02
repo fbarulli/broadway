@@ -122,6 +122,11 @@ def main() -> None:
         ax.set_title("Field ablation — AP and precision@90%recall per variant")
         fig.savefig(RESULTS / "07_report_field_ablation.png", dpi=150); plt.close(fig)
         print(f"field ablation plot written (n={len(fdf)})", flush=True)
+        print("field ablation TP/FP/threshold (audit):", flush=True)
+        for variant, row in fdf.iterrows():
+            print(f"  {variant:<22} TP@90R={row['tp_at_90pct_recall']:.0f} "
+                  f"FP@90R={row['fp_at_90pct_recall']:.0f} "
+                  f"thr={row['threshold_at_90pct_recall']:.4f}", flush=True)
     else:
         print("field ablation CSV not ready yet", flush=True)
 
@@ -136,8 +141,36 @@ def main() -> None:
         ax.set_title("Data-scaling curve — hard-band performance vs train size"); ax.legend()
         fig.savefig(RESULTS / "07_report_data_scaling.png", dpi=150); plt.close(fig)
         print(f"data-scaling plot written (n={len(ddf)})", flush=True)
+        print("data-scaling TP/FP/threshold (audit):", flush=True)
+        for _, row in ddf.iterrows():
+            print(f"  n_triples={int(row['n_triples']):<6} TP@90R={row['tp_at_90pct_recall']:.0f} "
+                  f"FP@90R={row['fp_at_90pct_recall']:.0f} "
+                  f"thr={row['threshold_at_90pct_recall']:.4f}", flush=True)
     else:
         print("data-scaling CSV not ready yet", flush=True)
+
+    # ---- 7. four-population score distribution (fine-tuned, if CSV exists) ----
+    # 01h's "cross-country proxy" (silver, brand+category) is NOT the same as
+    # 07b's "cross-country positives" (true same-barcode ground truth); keep the
+    # two population names distinct so the artifacts are not confused.
+    four = RESULTS / "07b_four_pop_scores.csv"
+    if four.exists():
+        fdf = pd.read_csv(four)
+        fig, ax = plt.subplots(figsize=(9, 4.5), constrained_layout=True)
+        bins = np.linspace(0, 1, 51)
+        colors = {"in_country_pos": "#4C72B0", "cross_country_pos": "#55A868",
+                  "hard_neg": "#C44E52", "random_neg": "#BBBBBB"}
+        for name, grp in fdf.groupby("population"):
+            ax.hist(grp["cosine"], bins=bins, alpha=0.55, color=colors.get(name, "#999"),
+                    label=f"{name} (n={len(grp):,})")
+        ax.axvline(0.55, color="k", ls="--", lw=1, label="operating threshold 0.55")
+        ax.set_xlabel("cosine similarity"); ax.set_ylabel("pairs")
+        ax.set_title("Fine-tuned four-population score distribution (07b)")
+        ax.legend(fontsize=7)
+        fig.savefig(RESULTS / "07_report_four_pop_dist.png", dpi=150); plt.close(fig)
+        print("four-population distribution plot written", flush=True)
+    else:
+        print("four-population scores CSV not ready yet", flush=True)
 
     print("report plots done", flush=True)
 

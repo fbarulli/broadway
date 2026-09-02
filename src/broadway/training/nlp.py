@@ -75,36 +75,84 @@ def entity_resolution_metrics(
     f1_op = (2 * precision_op * recall_op / (precision_op + recall_op)
              if (precision_op + recall_op) > 0 else 0.0)
 
+    prec90, tp90, fp90, thr90, _ = precision_at_recall_breakdown(
+        pos_scores, neg_scores, target_recall=target_recall
+    )
+
     return {
         "auc": round(auc, 4),
         "average_precision": round(ap, 4),
         f"recall_at_{int(fpr * 100)}pct_fpr": round(recall_op, 4),
-        f"precision_at_{int(target_recall * 100)}pct_recall": round(
-            float(precision_at_recall(pos_scores, neg_scores, target_recall=target_recall)), 4),
+        f"precision_at_{int(target_recall * 100)}pct_recall": round(float(prec90), 4),
         "f1_at_5pct_fpr": round(f1_op, 4),
+        # NEW — auditable raw counts / thresholds (backward-compatible additions):
+        "tp_at_90pct_recall": round(float(tp90), 4),
+        "fp_at_90pct_recall": round(float(fp90), 4),
+        "threshold_at_90pct_recall": round(thr90, 4),
+        "tp_at_5pct_fpr": round(float(tp_op), 4),
+        "fp_at_5pct_fpr": round(float(fp_op), 4),
+        "threshold_at_5pct_fpr": round(thr, 4),
         "pos_median": round(float(np.median(pos_scores)), 4),
         "neg_p90": round(float(np.quantile(neg_scores, 0.9)), 4),
     }
 
 
-def precision_at_recall(pos_scores: np.ndarray, neg_scores: np.ndarray, target_recall: float = 0.90) -> float:
-    """Precision at the score threshold that keeps exactly target_recall of positives.
+def precision_at_recall_breakdown(
+    pos_scores: np.ndarray,
+    neg_scores: np.ndarray,
+    target_recall: float = 0.90,
+) -> tuple[float, int, int, float, float]:
+    """(precision, TP, FP, threshold, recall) at the target-recall operating point.
 
-    The threshold is set on the POSITIVE score distribution (the quantile that
-    retains target_recall of true pairs), then precision = TP / (TP + FP) at
-    that threshold. This is the business-relevant number for the scoring stage:
-    at target recall, how many of the flagged pairs are actually the same product.
+    Threshold is the positive-score quantile that retains exactly target_recall
+    of positives; TP/FP are the >= threshold counts; precision = TP/(TP+FP)
+    (0.0 when no pair clears the threshold); recall = TP/len(pos_scores).
 
-    Returns NaN when either score population is empty: an empty negative set
-    would otherwise make precision spuriously 1.0 (a division with no false
-    positives), and an empty positive set has no threshold to define.
+    Empty-population semantics match precision_at_recall: an empty positive
+    set has no threshold and an empty negative set would make precision
+    spuriously perfect, so both return (NaN, 0, 0, NaN, NaN).
     """
     if len(pos_scores) == 0 or len(neg_scores) == 0:
-        return float("nan")
+        return float("nan"), 0, 0, float("nan"), float("nan")
     threshold = float(np.quantile(pos_scores, 1 - target_recall))
-    pos_at = float((pos_scores >= threshold).sum())
-    neg_at = float((neg_scores >= threshold).sum())
-    return pos_at / (pos_at + neg_at) if (pos_at + neg_at) > 0 else 0.0
+    tp = int((pos_scores >= threshold).sum())
+    fp = int((neg_scores >= threshold).sum())
+    precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+    recall = tp / len(pos_scores)
+    return precision, tp, fp, threshold, recall
+
+
+def precision_at_recall(pos_scores: np.ndarray, neg_scores: np.ndarray, target_recall: float = 0.90) -> float:
+    """Precision at the score threshold keeping exactly target_recall of positives.
+
+    See precision_at_recall_breakdown for the formula and empty-population
+    NaN semantics. Backward-compatible wrapper returning only the precision.
+    """
+    precision, _, _, _, _ = precision_at_recall_breakdown(
+        pos_scores, neg_scores, target_recall=target_recall
+    )
+    return precision
+
+
+def log_nlp_eval(
+    metrics: dict[str, float],
+    params: dict[str, float | int | str],
+    tracking_uri: str | None = None,
+    experiment_name: str | None = None,
+) -> None:
+    """Log one NLP eval run to MLflow; a no-op when no tracking URI is set.
+
+    When tracking_uri is None, do nothing (the euromonitor experiments read
+    MLFLOW_TRACKING_URI from the environment and must stay runnable without a
+    server). Otherwise set up the store and log params + metrics.
+    """
+    if tracking_uri is None:
+        return
+    from broadway.training.mlflow_utils import log_metrics, log_params, setup_mlflow
+
+    setup_mlflow(tracking_uri, experiment_name or "nlp-eval")
+    log_params(params)
+    log_metrics(metrics)
 
 
 def group_kfold(

@@ -84,6 +84,59 @@ def test_entity_resolution_metrics_empty_raises() -> None:
         entity_resolution_metrics(np.array([1.0]), np.array([]))
 
 
+def test_precision_at_recall_breakdown_nonempty() -> None:
+    """The breakdown returns precision/TP/FP/threshold/recall; the wrapper matches."""
+    from broadway.training.nlp import precision_at_recall, precision_at_recall_breakdown
+
+    pos = np.array([0.60, 0.70, 0.80, 0.90])
+    neg = np.array([0.10, 0.20])
+    threshold = float(np.quantile(pos, 0.10))
+    tp = int((pos >= threshold).sum())
+    fp = int((neg >= threshold).sum())
+    precision, tp_out, fp_out, thr_out, recall_out = precision_at_recall_breakdown(pos, neg, 0.90)
+    assert precision == pytest.approx(tp / (tp + fp))
+    assert tp_out == tp
+    assert fp_out == fp
+    assert thr_out == pytest.approx(threshold)
+    assert recall_out == pytest.approx(tp / len(pos))
+    # wrapper parity: precision_at_recall delegates to the breakdown
+    assert precision_at_recall(pos, neg, 0.90) == precision
+
+
+def test_precision_at_recall_breakdown_empty_populations_nan() -> None:
+    """An empty positive or negative population yields (nan, 0, 0, nan, nan)."""
+    from broadway.training.nlp import precision_at_recall_breakdown
+
+    pos = np.array([0.60, 0.70, 0.80])
+    neg = np.array([0.10, 0.20])
+    for empty_pos, empty_neg in ((np.array([]), neg), (pos, np.array([]))):
+        precision, tp, fp, thr, recall = precision_at_recall_breakdown(empty_pos, empty_neg, 0.90)
+        assert np.isnan(precision)
+        assert tp == 0 and fp == 0
+        assert np.isnan(thr)
+        assert np.isnan(recall)
+
+
+def test_entity_resolution_metrics_new_audit_keys() -> None:
+    """The six auditable TP/FP/threshold keys match the breakdown + 5% FPR formula."""
+    from broadway.training.nlp import precision_at_recall_breakdown
+
+    pos = np.array([0.60, 0.70, 0.80, 0.90])
+    neg = np.array([0.10, 0.20, 0.30, 0.40])
+    m = entity_resolution_metrics(pos, neg)
+    prec90, tp90, fp90, thr90, _ = precision_at_recall_breakdown(pos, neg, 0.90)
+    assert m["precision_at_90pct_recall"] == pytest.approx(round(float(prec90), 4))
+    assert m["tp_at_90pct_recall"] == pytest.approx(float(tp90))
+    assert m["fp_at_90pct_recall"] == pytest.approx(float(fp90))
+    assert m["threshold_at_90pct_recall"] == pytest.approx(round(thr90, 4))
+    thr = float(np.quantile(neg, 0.95))
+    tp_op = float((pos >= thr).sum())
+    fp_op = float((neg >= thr).sum())
+    assert m["tp_at_5pct_fpr"] == pytest.approx(float(tp_op))
+    assert m["fp_at_5pct_fpr"] == pytest.approx(float(fp_op))
+    assert m["threshold_at_5pct_fpr"] == pytest.approx(round(thr, 4))
+
+
 def test_make_objective_returns_auc_and_attaches_metrics(monkeypatch: pytest.MonkeyPatch) -> None:
     _install_fake_sentence_transformers(monkeypatch, {"m": 0.0})
     payload = [f"s{i}" for i in range(20)]
@@ -104,6 +157,8 @@ def test_make_objective_returns_auc_and_attaches_metrics(monkeypatch: pytest.Mon
     assert set(trial.attrs["broadway_metrics"]) == {
         "auc", "average_precision", "recall_at_5pct_fpr",
         "precision_at_90pct_recall", "f1_at_5pct_fpr",
+        "tp_at_90pct_recall", "fp_at_90pct_recall", "threshold_at_90pct_recall",
+        "tp_at_5pct_fpr", "fp_at_5pct_fpr", "threshold_at_5pct_fpr",
         "pos_median", "neg_p90", "encode_s",
     }
 
@@ -338,6 +393,8 @@ def test_make_objective_cv_folds_none_preserves_single_score(
     assert set(metrics) == {
         "auc", "average_precision", "recall_at_5pct_fpr",
         "precision_at_90pct_recall", "f1_at_5pct_fpr",
+        "tp_at_90pct_recall", "fp_at_90pct_recall", "threshold_at_90pct_recall",
+        "tp_at_5pct_fpr", "fp_at_5pct_fpr", "threshold_at_5pct_fpr",
         "pos_median", "neg_p90", "encode_s",
     }
     assert "auc_mean" not in metrics and "auc_std" not in metrics
@@ -578,6 +635,72 @@ def test_precision_at_recall_empty_positives_returns_nan() -> None:
     from broadway.training.nlp import precision_at_recall
 
     assert np.isnan(precision_at_recall(np.array([]), np.array([0.1, 0.2])))
+
+
+def test_log_nlp_eval_noop_without_tracking_uri(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A None tracking URI short-circuits before the lazy mlflow_utils import."""
+    calls: list = []
+    mlflow_utils = types.ModuleType("broadway.training.mlflow_utils")
+    mlflow_utils.setup_mlflow = lambda *a, **k: calls.append("setup")
+    mlflow_utils.log_params = lambda *a, **k: calls.append("params")
+    mlflow_utils.log_metrics = lambda *a, **k: calls.append("metrics")
+    monkeypatch.setitem(sys.modules, "broadway.training.mlflow_utils", mlflow_utils)
+
+    nlp.log_nlp_eval({"auc": 1.0}, {"seed": 42}, tracking_uri=None)
+    assert calls == []
+
+
+def test_log_nlp_eval_happy_path_mocked_mlflow(monkeypatch: pytest.MonkeyPatch) -> None:
+    """setup_mlflow -> log_params -> log_metrics in order; None name falls back."""
+    calls: list = []
+    mlflow_utils = types.ModuleType("broadway.training.mlflow_utils")
+    mlflow_utils.setup_mlflow = lambda uri, name: calls.append(("setup", uri, name))
+    mlflow_utils.log_params = lambda params: calls.append(("params", params))
+    mlflow_utils.log_metrics = lambda metrics: calls.append(("metrics", metrics))
+    monkeypatch.setitem(sys.modules, "broadway.training.mlflow_utils", mlflow_utils)
+
+    nlp.log_nlp_eval({"auc": 0.9}, {"seed": 42}, "file:///tmp/mlruns", "test-exp")
+    assert calls == [
+        ("setup", "file:///tmp/mlruns", "test-exp"),
+        ("params", {"seed": 42}),
+        ("metrics", {"auc": 0.9}),
+    ]
+
+    calls.clear()
+    nlp.log_nlp_eval({"auc": 0.9}, {"seed": 42}, "file:///tmp/mlruns", None)
+    assert calls == [
+        ("setup", "file:///tmp/mlruns", "nlp-eval"),
+        ("params", {"seed": 42}),
+        ("metrics", {"auc": 0.9}),
+    ]
+
+
+def _load_07b_finetune_module():
+    import importlib.util
+
+    path = (
+        Path(__file__).resolve().parents[1]
+        / "project" / "experiments" / "euromonitor" / "07b_finetune.py"
+    )
+    spec = importlib.util.spec_from_file_location("_07b_finetune_under_test", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_split_pos_by_country_stratifies_pairs() -> None:
+    """same -> same; cross -> cross; empty-country side -> unlabeled (neither)."""
+    fb = _load_07b_finetune_module()
+    split = fb.split_pos_by_country
+    country = np.array(["US", "US", "GB", "GB", "", "US"])
+    pairs = np.array([[0, 1], [0, 2], [0, 4]])
+    cross, same, unlabeled = split(pairs, country)
+    assert np.array_equal(same, [True, False, False])       # [0,1] both "US"
+    assert np.array_equal(cross, [False, True, False])      # [0,2] "US" vs "GB"
+    assert np.array_equal(unlabeled, [False, False, True])  # [0,4] side 4 empty
+    # unlabeled lands in NEITHER stratum
+    assert not (same & unlabeled).any()
+    assert not (cross & unlabeled).any()
 
 
 def test_cosine_shared_scorer() -> None:

@@ -974,14 +974,17 @@ project/experiments/results/euromonitor/07_report_error_breakdown.png:
 - GATE-SURF-134
 project/experiments/results/euromonitor/07_report_field_ablation.png:
 - GATE-SURF-134
+project/experiments/results/euromonitor/07_report_four_pop_dist.png:
+- GATE-SURF-134
 project/experiments/results/euromonitor/07_report_pr_curve.png:
 - GATE-SURF-134
 project/experiments/results/euromonitor/07_report_score_dist.png:
 - GATE-SURF-134
 project/experiments/results/euromonitor/07_report_threshold_sweep.png:
 - GATE-SURF-134
-project/experiments/results/euromonitor/07b_finetune.csv:
+project/experiments/results/euromonitor/07b_four_pop_scores.csv:
 - GATE-SURF-131
+- GATE-SURF-134
 project/experiments/results/euromonitor/07c_field_ablation.csv:
 - GATE-SURF-132
 - GATE-SURF-134
