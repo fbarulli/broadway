@@ -712,3 +712,53 @@ def test_cosine_shared_scorer() -> None:
     scores = _cosine(emb, pairs)
     assert scores[0] == pytest.approx(0.0)
     assert scores[1] == pytest.approx(1.0)
+
+
+def _load_07e_module():
+    import importlib.util
+
+    path = (
+        Path(__file__).resolve().parents[1]
+        / "project" / "experiments" / "euromonitor" / "07e_cross_encoder_rerank.py"
+    )
+    spec = importlib.util.spec_from_file_location("_07e_under_test", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_hybrid_score_clamps_float32_cosine_overflow() -> None:
+    """Identical float32 unit vectors round their dot product above 1.0.
+
+    The bi-encoder cosine is the raw dot product of L2-normalized float32
+    embeddings; a near-identical pair yields 1.0000002 (> 1.0). That value used
+    to escape through the out-of-band branch of the hybrid ``np.where`` and trip
+    ``_assert_finite_in_unit("pos hybrid")`` before either CSV was written. The
+    hybrid must clamp the cosine branch into [0, 1].
+    """
+    from broadway.training.nlp import _cosine
+
+    e = _load_07e_module()
+    # L2-normalized float32 vector whose self-dot rounds to 1.0000002 (> 1.0).
+    v = np.array([-0.7591758966445923, 0.6508856415748596], dtype=np.float32)
+    emb = np.vstack([v, v, np.array([0.0, 0.0], dtype=np.float32)])
+    pairs = np.array([[0, 1], [0, 2]])
+
+    cosine = _cosine(emb, pairs)
+    assert cosine[0] > 1.0  # documents the float32 overflow the clamp guards
+
+    # Identical pair sits OUT of the re-score band, so the out-of-band branch
+    # carries the overflowing cosine — the exact path that failed before the fix.
+    in_band = np.array([False, True])
+    ce_scores = np.array([np.nan, 0.9])
+    hybrid = e._hybrid_score(in_band, ce_scores, cosine)
+
+    e._assert_finite_in_unit("hybrid", hybrid)
+    assert hybrid[0] == pytest.approx(1.0)  # overflow cosine clamped to 1.0
+    assert hybrid[1] == pytest.approx(0.9)  # in-band cross-encoder score passes through
+
+    # The source-level clamp (applied in main) also pins the bi-encoder scorer
+    # itself within [0, 1].
+    clamped = np.clip(cosine, 0.0, 1.0)
+    e._assert_finite_in_unit("bi-encoder cosine", clamped)
+    assert clamped[0] == pytest.approx(1.0)

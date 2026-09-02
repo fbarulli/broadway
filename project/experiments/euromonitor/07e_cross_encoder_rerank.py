@@ -182,6 +182,21 @@ def _assert_finite_in_unit(name: str, arr: np.ndarray) -> None:
     assert bool(((arr >= 0.0) & (arr <= 1.0)).all()), f"{name} scores out of [0, 1]"
 
 
+def _hybrid_score(
+    in_band: np.ndarray, ce_scores: np.ndarray, cosine_scores: np.ndarray
+) -> np.ndarray:
+    """In-band pairs take the cross-encoder score; out-of-band keep the cosine.
+
+    The bi-encoder cosine is the raw dot product of L2-normalized float32
+    embeddings, which can round just above 1.0 (or below 0.0) for a
+    near-identical pair. Clamp it into [0, 1] here so the hybrid score is always
+    a valid probability-like value. ``pos_s``/``hard_s`` are also clamped at
+    their source so the bi-encoder scorer and the per-pair audit share the same
+    scale.
+    """
+    return np.where(in_band, ce_scores, np.clip(cosine_scores, 0.0, 1.0))
+
+
 def eval_scorer(
     scorer: str,
     pos_s: np.ndarray,
@@ -290,8 +305,12 @@ def main() -> None:
     print(f"hard negatives mined (band {MINING_LO}-{MINING_HI}, target {N_TARGET:,}): "
           f"{len(hard_pairs):,} in {time.perf_counter() - t_mine:.1f}s", flush=True)
 
-    pos_s = _cosine(emb, pos)
-    hard_s = _cosine(emb, hard_pairs)
+    # Bi-encoder cosine is a raw dot product of L2-normalized float32 embeddings:
+    # a near-identical pair can round slightly above 1.0 (or negative). Clamp to
+    # [0, 1] so the band mask, bi-encoder scorer, and per-pair audit stay on one
+    # consistent probability-like scale.
+    pos_s = np.clip(_cosine(emb, pos), 0.0, 1.0)
+    hard_s = np.clip(_cosine(emb, hard_pairs), 0.0, 1.0)
 
     # ---- application band mask (0.5-0.75) over BOTH labels ----
     pos_in_band = (pos_s >= APP_LO) & (pos_s <= APP_HI)
@@ -335,8 +354,8 @@ def main() -> None:
     ce_hard_full[hard_in_idx] = ce_hard
 
     # ---- hybrid score: in-band -> cross-encoder, out-of-band -> cosine ----
-    pos_hybrid = np.where(pos_in_band, ce_pos_full, pos_s)
-    hard_hybrid = np.where(hard_in_band, ce_hard_full, hard_s)
+    pos_hybrid = _hybrid_score(pos_in_band, ce_pos_full, pos_s)
+    hard_hybrid = _hybrid_score(hard_in_band, ce_hard_full, hard_s)
 
     _assert_finite_in_unit("pos hybrid", pos_hybrid)
     _assert_finite_in_unit("hard hybrid", hard_hybrid)
