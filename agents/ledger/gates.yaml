@@ -1,6 +1,6 @@
 # Gate registry SSOT — hand-maintained; the {01..09} gate fragments it consolidated predate git custody.
 meta:
-  head: '81cb2db'
+  head: 'c94c7f5'
   counts:
     total: 163
     gates_with_findings: 75
@@ -2973,6 +2973,7 @@ gates:
   - numpy
   - pandas@2.3.3
   - scikit-learn
+  - scipy
   - broadway.training.nlp@encode_corpus/_cosine
   validated_by: []
   if_changed:

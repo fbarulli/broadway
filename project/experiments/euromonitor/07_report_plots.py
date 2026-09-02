@@ -24,6 +24,7 @@ import pandas as pd
 from _blocking import build_pairs
 from _common import PATHS, RESULTS, SEED, load_dataset_deduped
 from _text import MACRO_MAP, extract_volume_ml
+from scipy.stats import binomtest, fisher_exact
 from sklearn.metrics import average_precision_score, precision_recall_curve
 
 from broadway.training.nlp import _cosine, encode_corpus
@@ -188,11 +189,26 @@ def main() -> None:
         print(f"  {label:<18} n={n:<6} groups={n_groups(mask):<5} FN rate={fn_rate:6.1%}  median pos cosine={med:.4f}", flush=True)
     print(f"FN rate: in-country {slice_fn_rates['pos: in-country']:.1%} vs "
           f"cross-country {slice_fn_rates['pos: cross-country']:.1%}", flush=True)
-    print(f"  n: cross-country FN = {int((slices['pos: cross-country'] & fn).sum())} pairs on "
-          f"{n_groups(slices['pos: cross-country'] & fn)} barcode groups "
-          f"(sampled {n_groups(slices['pos: cross-country'])} / {n_cross_groups_full} deduped multi-country groups) — "
-          f"too few for a stable rate; in-country FN = {n_groups(slices['pos: in-country'] & fn)} groups of "
-          f"{n_groups(slices['pos: in-country']):,}.", flush=True)
+    cc_fn_pairs = int((slices["pos: cross-country"] & fn).sum())
+    cc_groups = n_groups(slices["pos: cross-country"])
+    cc_fn_groups = n_groups(slices["pos: cross-country"] & fn)
+    ic_groups = n_groups(slices["pos: in-country"])
+    ic_fn_groups = n_groups(slices["pos: in-country"] & fn)
+    cc_ci = binomtest(cc_fn_groups, cc_groups).proportion_ci()
+    ic_ci = binomtest(ic_fn_groups, ic_groups).proportion_ci()
+    _, fisher_p = fisher_exact(
+        [[cc_fn_groups, cc_groups - cc_fn_groups], [ic_fn_groups, ic_groups - ic_fn_groups]],
+        alternative="two-sided",
+    )
+    print(f"  n: cross-country FN = {cc_fn_pairs} pairs on {cc_fn_groups} barcode groups "
+          f"(sampled {cc_groups} / {n_cross_groups_full} deduped multi-country groups); "
+          f"in-country FN = {ic_fn_groups} groups of {ic_groups:,}.", flush=True)
+    print(f"  entity-level FN rate (Clopper-Pearson 95% CI): cross-country {cc_fn_groups / cc_groups:.1%} "
+          f"[{cc_ci.low:.1%}–{cc_ci.high:.1%}, {cc_fn_groups}/{cc_groups} groups] vs in-country "
+          f"{ic_fn_groups / ic_groups:.2%} [{ic_ci.low:.2%}–{ic_ci.high:.2%}, {ic_fn_groups}/{ic_groups:,} groups] — "
+          f"Fisher's exact p={fisher_p:.3f} (nominally higher), but the interval spans "
+          f"{cc_ci.low:.1%}–{cc_ci.high:.1%} from n={cc_fn_groups} FN groups, so the gap is fragile, not a precise "
+          f"{cc_fn_groups / cc_groups / (ic_fn_groups / ic_groups):.0f}x.", flush=True)
 
     fndf = pd.DataFrame(rows)
     fndf.to_csv(RESULTS / "07_report_fn_analysis.csv", index=False)
