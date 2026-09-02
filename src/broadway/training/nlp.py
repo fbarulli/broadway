@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import hashlib
 import time
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
@@ -103,6 +104,82 @@ def precision_at_recall(pos_scores: np.ndarray, neg_scores: np.ndarray, target_r
     pos_at = float((pos_scores >= threshold).sum())
     neg_at = float((neg_scores >= threshold).sum())
     return pos_at / (pos_at + neg_at) if (pos_at + neg_at) > 0 else 0.0
+
+
+def group_kfold(
+    group_ids: Sequence[int],
+    k: int,
+    *,
+    seed: int | None = None,
+) -> list[np.ndarray]:
+    """Split pair indices into k folds such that no group spans two folds.
+
+    Contract: ``group_ids[i]`` is the group label of the i-th PAIR — one label
+    per pair. For entity resolution the group is the barcode: a positive
+    (same-barcode) pair carries the single shared barcode; a negative
+    (cross-barcode) pair is labeled by the barcode of its FIRST row (the
+    caller decides this convention; the splitter only guarantees that pairs
+    sharing a label stay together). Every unique group is assigned to exactly
+    one fold, so two rows that share a barcode are never split across
+    train/val.
+
+    Folds are balanced by pair count, not group count: groups are ordered
+    largest-first and greedily assigned to the currently smallest fold (the
+    classic greedy number-partitioning heuristic). ``seed`` only shuffles
+    ties (equal-size groups) for reproducibility — set it to get a
+    deterministic fold layout, or leave it None for a deterministic
+    first-appearance tie order.
+
+    Returns a list of k boolean masks over ``group_ids``: ``masks[f][i]`` is
+    True iff pair ``i`` belongs to fold ``f``. Each pair is in exactly one fold.
+    """
+    if k < 2:
+        raise ValueError(f"group_kfold requires k >= 2, got {k}")
+    ids = np.asarray(group_ids)
+    if ids.ndim != 1:
+        raise ValueError("group_ids must be a 1-dimensional sequence")
+    if ids.size == 0:
+        raise ValueError("group_ids must be non-empty")
+    unique, counts = np.unique(ids, return_counts=True)
+    if len(unique) < k:
+        raise ValueError(
+            f"cannot build {k} folds from only {len(unique)} distinct groups"
+        )
+    groups = list(zip(unique.tolist(), counts.tolist()))
+    if seed is not None:
+        rng = np.random.default_rng(seed)
+        rng.shuffle(groups)
+    # Stable sort keeps the (possibly shuffled) tie order while still putting
+    # the largest groups first for greedy balance.
+    groups.sort(key=lambda group_count: -group_count[1])
+    fold_totals = np.zeros(k, dtype=int)
+    group_to_fold: dict[int, int] = {}
+    for group, count in groups:
+        fold = int(np.argmin(fold_totals))
+        fold_totals[fold] += count
+        group_to_fold[group] = fold
+    fold_of_pair = np.array([group_to_fold[int(g)] for g in ids], dtype=int)
+    return [fold_of_pair == f for f in range(k)]
+
+
+def _aggregate_fold_metrics(fold_metrics: list[dict[str, float]]) -> dict[str, float]:
+    """Collapse per-fold metric dicts into mean/std plus per-fold values.
+
+    Each per-fold dict has identical keys (entity_resolution_metrics + encode_s);
+    the aggregate adds ``{key}_mean``, ``{key}_std`` and ``fold_{f}_{key}`` for
+    every key, so MLflow logs the honest held-out estimate plus its variance.
+    """
+    if not fold_metrics:
+        raise ValueError("fold_metrics must be non-empty")
+    keys = list(fold_metrics[0])
+    out: dict[str, float] = {}
+    for key in keys:
+        values = [fold[key] for fold in fold_metrics]
+        out[f"{key}_mean"] = round(float(np.mean(values)), 4)
+        out[f"{key}_std"] = round(float(np.std(values)), 4)
+        for f, value in enumerate(values):
+            out[f"fold_{f}_{key}"] = round(float(value), 4)
+    return out
 
 
 def _has_finetune_params(params: dict[str, float | int]) -> bool:
@@ -236,6 +313,11 @@ def make_objective(
     cache_dir: str | None = None,
     prompt: str | None = None,
     loss: str = "mnrl",
+    cv_folds: int | None = None,
+    pos_groups: Sequence[int] | None = None,
+    neg_groups: Sequence[int] | None = None,
+    finetune_groups: Sequence[int] | None = None,
+    cv_seed: int | None = None,
 ) -> Objective:
     """Build the NLP objective for one bi-encoder: encode -> score -> AUC.
 
@@ -251,6 +333,19 @@ def make_objective(
     encode-once/score-many: zero-shot embeddings are cached to .npz so a warm
     re-run skips the encode but still reports the original encode latency.
     ``prompt`` is prepended to every text before encoding (e5-family models).
+
+    ``cv_folds >= 2`` switches from the single full-set score to group-aware
+    K-fold cross-validation. The group is the barcode: ``pos_groups``/``neg_groups``
+    carry one label per positive/negative pair (negatives labeled by the
+    barcode of their first row — see group_kfold), and ``finetune_groups``
+    carries one label per finetune example (required only for the fine-tune
+    path). Each fold is scored on its held-out pairs alone — zero-shot: encode
+    once, score the fold's pairs; fine-tune: fit on the OTHER folds'
+    finetune_examples, then evaluate — and the objective returns the fold-AUC
+    mean while reporting ``auc_mean``/``auc_std`` plus per-fold values (and the
+    same mean/std for every metric) in ``broadway_metrics``. ``cv_seed`` seeds
+    the fold assignment. With ``cv_folds=None`` the original byte-for-byte
+    single-score path is used.
     """
     from sentence_transformers import SentenceTransformer
 
@@ -258,19 +353,80 @@ def make_objective(
         cache_dir, model_id, payload, max_seq_length, batch_size, prompt
     )
 
+    folds: list[tuple[np.ndarray, np.ndarray, np.ndarray]] | None = None
+    if cv_folds is not None:
+        if cv_folds < 2:
+            raise ValueError(f"cv_folds must be >= 2 or None, got {cv_folds}")
+        if pos_groups is None or neg_groups is None:
+            raise ValueError(
+                "cv_folds requires pos_groups and neg_groups (one group label per pair)"
+            )
+        if finetune_examples is not None and finetune_groups is None:
+            raise ValueError(
+                "cv_folds fine-tune requires finetune_groups (one group label per example)"
+            )
+        pos_g = np.asarray(pos_groups)
+        neg_g = np.asarray(neg_groups)
+        if pos_g.ndim != 1 or len(pos_g) != len(pos_pairs):
+            raise ValueError("pos_groups must have one label per positive pair")
+        if neg_g.ndim != 1 or len(neg_g) != len(neg_pairs):
+            raise ValueError("neg_groups must have one label per negative pair")
+        ft_g = np.asarray(finetune_groups) if finetune_groups is not None else np.empty(0, dtype=int)
+        if ft_g.ndim != 1 or (finetune_groups is not None and len(ft_g) != len(finetune_examples)):
+            raise ValueError("finetune_groups must have one label per finetune example")
+        combined = np.concatenate([pos_g, neg_g, ft_g]).tolist()
+        masks = group_kfold(combined, cv_folds, seed=cv_seed)
+        n_pos, n_neg = len(pos_g), len(neg_g)
+        folds = [
+            (masks[f][:n_pos], masks[f][n_pos:n_pos + n_neg], masks[f][n_pos + n_neg:])
+            for f in range(cv_folds)
+        ]
+
     def objective(params: dict[str, float | int], trial=None) -> float:
-        model = SentenceTransformer(model_id, device=device)
+        if folds is None:
+            model = SentenceTransformer(model_id, device=device)
+            if finetune_examples is not None and _has_finetune_params(params):
+                _finetune(model, params, finetune_examples, max_seq_length, loss)
+                emb, encode_s = _encode_payload(model, payload, batch_size, None, prompt)
+            else:
+                model.max_seq_length = max_seq_length
+                emb, encode_s = _encode_payload(model, payload, batch_size, cache_path, prompt)
+            metrics = entity_resolution_metrics(_cosine(emb, pos_pairs), _cosine(emb, neg_pairs))
+            metrics["encode_s"] = round(encode_s, 3)
+            if trial is not None:
+                trial.set_user_attr("broadway_metrics", metrics)
+            return metrics["auc"]
+
         if finetune_examples is not None and _has_finetune_params(params):
-            _finetune(model, params, finetune_examples, max_seq_length, loss)
-            emb, encode_s = _encode_payload(model, payload, batch_size, None, prompt)
+            fold_metrics: list[dict[str, float]] = []
+            for pos_mask, neg_mask, ft_mask in folds:
+                train_mask = ~ft_mask
+                train_examples = [
+                    example for example, keep in zip(finetune_examples, train_mask) if keep
+                ]
+                model = SentenceTransformer(model_id, device=device)
+                _finetune(model, params, train_examples, max_seq_length, loss)
+                emb, encode_s = _encode_payload(model, payload, batch_size, None, prompt)
+                metrics = entity_resolution_metrics(
+                    _cosine(emb, pos_pairs[pos_mask]), _cosine(emb, neg_pairs[neg_mask])
+                )
+                metrics["encode_s"] = round(encode_s, 3)
+                fold_metrics.append(metrics)
         else:
+            model = SentenceTransformer(model_id, device=device)
             model.max_seq_length = max_seq_length
             emb, encode_s = _encode_payload(model, payload, batch_size, cache_path, prompt)
-        metrics = entity_resolution_metrics(_cosine(emb, pos_pairs), _cosine(emb, neg_pairs))
-        metrics["encode_s"] = round(encode_s, 3)
+            fold_metrics = []
+            for pos_mask, neg_mask, _ft_mask in folds:
+                metrics = entity_resolution_metrics(
+                    _cosine(emb, pos_pairs[pos_mask]), _cosine(emb, neg_pairs[neg_mask])
+                )
+                metrics["encode_s"] = round(encode_s, 3)
+                fold_metrics.append(metrics)
+        aggregated = _aggregate_fold_metrics(fold_metrics)
         if trial is not None:
-            trial.set_user_attr("broadway_metrics", metrics)
-        return metrics["auc"]
+            trial.set_user_attr("broadway_metrics", aggregated)
+        return aggregated["auc_mean"]
 
     return objective
 
@@ -298,6 +454,11 @@ def run_nlp_hpo(
     cache_dir: str | None = None,
     prompts: dict[str, str] | None = None,
     loss: str = "mnrl",
+    cv_folds: int | None = None,
+    pos_groups: Sequence[int] | None = None,
+    neg_groups: Sequence[int] | None = None,
+    finetune_groups: Sequence[int] | None = None,
+    cv_seed: int | None = None,
     mlflow_tracking: bool = False,
     mlflow_tags: dict[str, str] | None = None,
 ) -> dict:
@@ -310,6 +471,9 @@ def run_nlp_hpo(
     mlflow callback, and RDB contract are reused from run_hpo_bandit unchanged.
     The returned dict adds a "metrics" map (name -> the best trial's
     broadway_metrics) so callers can build the benchmark table from plain data.
+    ``cv_folds``/``pos_groups``/``neg_groups``/``finetune_groups``/``cv_seed``
+    are forwarded to make_objective (see its docstring for the group-aware CV
+    contract); they default to None = the original full-set scoring.
     """
     prompts = prompts or {}
     unknown = [spec.name for spec in hpo_cfg.models if spec.name not in model_zoo]
@@ -328,6 +492,11 @@ def run_nlp_hpo(
             cache_dir=cache_dir,
             prompt=prompts.get(spec.name),
             loss=loss,
+            cv_folds=cv_folds,
+            pos_groups=pos_groups,
+            neg_groups=neg_groups,
+            finetune_groups=finetune_groups,
+            cv_seed=cv_seed,
         )
         for spec in hpo_cfg.models
     }
@@ -344,6 +513,9 @@ def run_nlp(
     neg_pairs: np.ndarray,
     *,
     finetune_examples=None,
+    pos_groups: Sequence[int] | None = None,
+    neg_groups: Sequence[int] | None = None,
+    finetune_groups: Sequence[int] | None = None,
     mlflow_tracking: bool = False,
     mlflow_tags: dict[str, str] | None = None,
 ) -> dict:
@@ -354,6 +526,11 @@ def run_nlp(
     and ground-truth pair indices, so this module stays dataset-agnostic. Returns
     the plain-data result ({models, best_model, best_params, best_value,
     metrics, and a failed map when some model raised}).
+
+    When ``cfg.cv_folds`` is set, ``pos_groups``/``neg_groups`` carry one
+    barcode label per pair (and ``finetune_groups`` one per finetune example)
+    and the CV fold split is seeded with ``pair_seed`` (falling back to ``seed``)
+    so it is reproducible and independent of the TPE sampler seed.
     """
     return run_nlp_hpo(
         cfg.model_zoo,
@@ -369,6 +546,11 @@ def run_nlp(
         cache_dir=cfg.cache_dir,
         prompts=cfg.prompts,
         loss=getattr(cfg, "loss", "mnrl"),
+        cv_folds=cfg.cv_folds,
+        pos_groups=pos_groups,
+        neg_groups=neg_groups,
+        finetune_groups=finetune_groups,
+        cv_seed=cfg.pair_seed if cfg.pair_seed is not None else cfg.seed,
         mlflow_tracking=mlflow_tracking,
         mlflow_tags=mlflow_tags,
     )

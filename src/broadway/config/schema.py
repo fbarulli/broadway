@@ -141,7 +141,11 @@ class NLPConfig(BaseModel):
     ``query: `` for e5-family bi-encoders). ``pair_seed`` seeds the ground-truth
     pair sampling independently of ``seed`` (the TPE sampler), defaulting to
     ``seed`` when unset so changing the HPO seed never silently changes the
-    evaluation pairs. The payload/pairs themselves are supplied by the caller
+    evaluation pairs. ``cv_folds`` optionally enables group-aware K-fold
+    cross-validation (default None = the original single full-set score); when
+    >= 2 the objective is scored once per held-out barcode fold and reports the
+    metric mean/std instead of one optimistic full-set AUC. The payload/pairs
+    (and their per-pair barcode labels) are supplied by the caller
     (see broadway.training.nlp.run_nlp), so this config carries no
     dataset-specific fields.
     """
@@ -149,6 +153,7 @@ class NLPConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     seed: int
     pair_seed: int | None = None
+    cv_folds: int | None = Field(default=None, ge=2)
     target_metric: str = "auc"
     device: str = "cpu"
     batch_size: int = 256
