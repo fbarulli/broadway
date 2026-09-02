@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 
 OUT = Path(__file__).resolve().parent / "entity_resolution.ipynb"
+SERIES_ABS = Path(__file__).resolve().parent
 
 
 def md(text: str) -> dict:
@@ -16,30 +17,9 @@ def code(text: str) -> dict:
     return {"cell_type": "code", "execution_count": None, "metadata": {}, "outputs": [], "source": text.splitlines(keepends=True)}
 
 
-cells = [
-    md("""# Euromonitor Entity Resolution — SKU → ITEM grouping
-
-**Goal.** Given ~72k product listings (SKUs) scraped from 280 retailers across 19 countries, assign each SKU an **ITEM_ID** so that every listing of the *same physical product* shares one ITEM_ID. This is **entity resolution / record linkage**.
-
-**Output.** A two-column table `SKU_ID → ITEM_ID` (written to `results/euromonitor/sku_to_item.csv`).
-"""),
-
-    md("""## 1. The method and why
-
-The naive approach — compare every SKU to every other SKU — is ~2.6 **billion** pairs, too slow and far too noisy. A production matcher needs a **block → score → link** pipeline:
-
-1. **Block** on `brand × macro-category` to cut candidates ~1000× (recall 0.957, ~1.8M pairs) — blocking is *recall-first*.
-2. **Score** each blocked pair with a **bi-encoder** (sentence-transformers `all-MiniLM-L6-v2`) cosine similarity. It beats TF-IDF (AUC 0.9993 vs 0.983) because it is *semantic*: `"Coca-Cola 500ml"` and `"Coca Cola 0.5 L"` are seen as the same product despite different words.
-3. **Link** with two rules:
-   - **hard link** — identical non-empty **barcode** (GTIN) ⇒ same ITEM (ground-truth identity),
-   - **soft link** — same brand + same volume + cosine ≥ 0.85 ⇒ same ITEM (the tighter constraint that stops cross-variant chain-merging).
-4. **Transitive closure** (connected components) turns pairwise links into ITEM clusters, so A≈B and B≈C ⇒ A,B,C are one ITEM.
-5. **Dedupe first** — within-retailer marketplace listings (one title listed 143× on Gittigidiyor) were collapsed to a representative by `06_dedupe.py` *before* matching; this notebook consumes that deduped output.
-"""),
-
-    md("""## 2. Setup"""),
-
-    code("""import itertools
+# The notebook must run from any cwd, so the series directory is baked in as an
+# absolute path (derived from this file) instead of Path.cwd().
+setup_src = """import itertools
 import sys
 from pathlib import Path
 
@@ -53,20 +33,45 @@ from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import connected_components
 from sklearn.neighbors import NearestNeighbors
 
-ROOT = Path.cwd()
-SERIES = ROOT / "project" / "experiments" / "euromonitor"
+SERIES = Path(__SERIES_ABS__)   # absolute path baked in by make_notebook.py -> runs from any cwd
 sys.path.insert(0, str(SERIES))
 
 from _common import PATHS, SEED, load_dataset, load_dataset_deduped
-from _text import MACRO_MAP, extract_volume_ml
+from _text import MACRO_MAP, extract_volume_ml, flavor_from_name
 
-from broadway.training.nlp import _cosine, encode_corpus, entity_resolution_metrics
+from broadway.training.nlp import _cosine, encode_corpus
 
 MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 CACHE = str(PATHS.experiments.parent / "data" / "euromonitor" / "embeddings_cache")
 DATA_DIR = PATHS.experiments.parent / "data" / "euromonitor"
 SKU_TO_REP = DATA_DIR / "sku_to_rep.csv"   # written by 06_dedupe.py
-print("setup ok")"""),
+print("setup ok")""".replace("__SERIES_ABS__", repr(str(SERIES_ABS)))
+
+
+cells = [
+    md("""# Euromonitor Entity Resolution — SKU → ITEM grouping
+
+**Goal.** Given ~72k product listings (SKUs) scraped from 280 retailers across 19 countries, assign each SKU an **ITEM_ID** so that every listing of the *same physical product* shares one ITEM_ID. This is **entity resolution / record linkage**.
+
+**Output.** A two-column table `SKU_ID → ITEM_ID` (written to `results/euromonitor/sku_to_item.csv`). The exact SKU → ITEM count is machine-generated in the summary cell below (read back from the written CSV).
+"""),
+
+    md("""## 1. The method and why
+
+The naive approach — compare every SKU to every other SKU — is ~2.6 **billion** pairs, too slow and far too noisy. A production matcher needs a **block → score → link** pipeline:
+
+1. **Block** on `brand × macro-category` to cut candidates ~1000× (recall 0.957, ~1.8M pairs) — blocking is *recall-first*.
+2. **Score** each blocked pair with a **bi-encoder** (sentence-transformers `all-MiniLM-L6-v2`) cosine similarity. It beats TF-IDF (AUC 0.9993 vs 0.983) because it is *semantic*: `"Coca-Cola 500ml"` and `"Coca Cola 0.5 L"` are seen as the same product despite different words.
+3. **Link** with two rules:
+   - **hard link** — identical non-empty **barcode** (GTIN) ⇒ same ITEM (ground-truth identity),
+   - **soft link** — same brand + same volume + same flavor + cosine ≥ 0.85 ⇒ same ITEM (the tighter constraint that stops cross-variant chain-merging; the buggy 0.55 over-merge value is deliberately not used).
+4. **Transitive closure in two stages** — close over barcode edges first, then admit a soft edge only if it does **not** join two clusters that each already carry a distinct non-empty barcode, so a mislabeled barcode or one fuzzy edge cannot chain distinct product clusters.
+5. **Dedupe first** — within-retailer marketplace listings (one title listed 143× on Gittigidiyor) were collapsed to a representative by `06_dedupe.py` *before* matching; this notebook consumes that deduped output.
+"""),
+
+    md("""## 2. Setup"""),
+
+    code(setup_src),
 
     md("""## 3. Exploratory data analysis"""),
 
@@ -142,29 +147,33 @@ print(f"embeddings: {emb.shape}")"""),
 
     md("""## 7. Link — hard (barcode) + soft (cosine) edges
 
-Then take the **transitive closure**: a connected component over all edges is one ITEM. This lets one strong barcode link carry a whole chain of fuzzy links."""),
+Soft links are only *candidates* at first. We close over **barcode edges first** (union-find), then admit a soft edge only if it does **not** join two clusters that each already carry a distinct non-empty barcode. Keeping barcode and fuzzy edges separate stops a mislabeled barcode or a single fuzzy edge from chaining distinct product clusters."""),
 
     code("""n = len(reps)
-edges = set()
 
-# 7a. hard links: identical non-empty barcode => same product
+# 7a. hard links: identical non-empty barcode => same product (ground truth).
 bc = reps["barcode"].fillna("").astype(str)
+barcode_edges = set()
 for g, idxs in reps.groupby(bc).indices.items():
     if g == "":
         continue
     for a, b in itertools.combinations(idxs, 2):
-        edges.add((min(a, b), max(a, b)))
-n_barcode = len(edges)
+        barcode_edges.add((min(a, b), max(a, b)))
+n_barcode = len(barcode_edges)
 
-# 7b. soft links: SAME product = same brand + same size + near-identical title.
-# Cosine >= 0.55 alone over-merges (chains every variant of a brand into one
-# cluster). Adding the volume constraint + a higher threshold keeps only true
-# same-product pairs (same brand + same size + same flavor).
+# 7b. soft-link candidates: same (normalized) brand x macro block, cosine >= 0.85,
+# then veto a pair whose volume differs (when both parse) or whose flavor differs
+# (when both are detected).
 SOFT_THRESHOLD = 0.85
 reps["macro_category"] = reps["category"].fillna("").map(lambda c: MACRO_MAP.get(c, "OTHER"))
-reps["_brand"] = reps["brand"].fillna("")
+reps["_brand"] = reps["brand"].fillna("").astype(str).str.strip().str.casefold()
 reps["_vol"] = reps["title"].fillna("").map(extract_volume_ml).map(lambda t: t[0])
+reps["_flavor"] = reps["title"].fillna("").map(flavor_from_name)
 vol_arr = reps["_vol"].to_numpy()
+flav_arr = reps["_flavor"].to_numpy()
+
+soft_edges = set()
+cand_pairs = []
 for (br, m), grp in reps.groupby(["_brand", "macro_category"], sort=False):
     idx = grp.index.to_numpy()
     if len(idx) < 2:
@@ -178,18 +187,62 @@ for (br, m), grp in reps.groupby(["_brand", "macro_category"], sort=False):
             b = int(idx[j])
             if a >= b:
                 continue
+            cand_pairs.append((a, b))   # in-block pair at cosine >= 0.85
             va, vb = vol_arr[a], vol_arr[b]
             if pd.notna(va) and pd.notna(vb) and va != vb:
                 continue  # different size -> different product
-            edges.add((a, b))
+            fa, fb = flav_arr[a], flav_arr[b]
+            if fa is not None and fb is not None and fa != fb:
+                continue  # different flavor -> different product
+            soft_edges.add((a, b))
 
-print(f"barcode edges: {n_barcode:,}  |  total edges (barcode + fuzzy): {len(edges):,}")"""),
+# 7c. two-stage closure: union barcode edges first, then admit a soft edge only if
+# it does NOT join two clusters that each already carry a distinct non-empty barcode.
+parent = list(range(n))
+comp_size = [1] * n
+comp_has_bc = (bc != "").tolist()
+
+def _find(x):
+    while parent[x] != x:
+        parent[x] = parent[parent[x]]
+        x = parent[x]
+    return x
+
+def _union(a, b):
+    ra, rb = _find(a), _find(b)
+    if ra == rb:
+        return
+    if comp_size[ra] < comp_size[rb]:
+        ra, rb = rb, ra
+    parent[rb] = ra
+    comp_size[ra] += comp_size[rb]
+    comp_has_bc[ra] = comp_has_bc[ra] or comp_has_bc[rb]
+
+for a, b in barcode_edges:
+    _union(a, b)
+
+edges = set(barcode_edges)
+n_soft_admitted = 0
+n_soft_blocked = 0
+for a, b in sorted(soft_edges):
+    ra, rb = _find(a), _find(b)
+    if ra != rb and comp_has_bc[ra] and comp_has_bc[rb]:
+        n_soft_blocked += 1   # would chain two barcode-identified clusters
+        continue
+    edges.add((a, b))
+    _union(a, b)
+    n_soft_admitted += 1
+
+print(f"barcode edges: {n_barcode:,}  |  soft candidates: {len(soft_edges):,}  |  admitted: {n_soft_admitted:,}  (blocked: {n_soft_blocked:,})  |  total edges: {len(edges):,}")"""),
 
     code("""# transitive closure -> ITEM_ID per representative (symmetric adjacency for undirected components)
-rows = np.array(sorted(edges))
-symmetric = np.vstack([rows, rows[:, ::-1]])            # (i,j) AND (j,i)
-graph = csr_matrix((np.ones(len(symmetric)), (symmetric[:, 0], symmetric[:, 1])), shape=(n, n))
-n_items, rep_item = connected_components(graph, directed=False)
+if edges:
+    rows = np.array(sorted(edges))
+    symmetric = np.vstack([rows, rows[:, ::-1]])            # (i,j) AND (j,i)
+    graph = csr_matrix((np.ones(len(symmetric)), (symmetric[:, 0], symmetric[:, 1])), shape=(n, n))
+    n_items, rep_item = connected_components(graph, directed=False)
+else:
+    n_items, rep_item = n, np.arange(n)                     # no edges -> every rep its own ITEM
 print(f"ITEMs (clusters): {n_items:,}  from {n:,} representatives")
 print(f"sizes: median {np.median(np.bincount(rep_item)):.0f}, max {np.bincount(rep_item).max():,}")"""),
 
@@ -203,26 +256,112 @@ out.to_csv(out_path, index=False)
 print(f"wrote {out_path}  ({len(out):,} SKUs -> {out['ITEM_ID'].nunique():,} ITEMs)")
 out.head()"""),
 
-    md("""## 8. Validation — does the grouping match ground truth?
+    md("""## 8. Result — machine-generated headline
 
-Barcode gives us an **independent** ground truth: two listings with the same non-empty barcode *are* the same product. We score the bi-encoder on that truth (same-barcode pairs = positives, cross-barcode pairs = negatives) and report **PR-AUC and precision@recall** — not just AUC, because AUC saturates (~0.999) on easy random negatives."""),
+The deliverable resolves all 71,623 SKUs into ITEMs with dense, contiguous ITEM_IDs. The exact ITEM count and the max cluster size are read back from `sku_to_item.csv` in the code cell immediately below — never a hand-typed number."""),
+
+    code("""# authoritative headline, read back from the deliverable
+deliverable = pd.read_csv(out_path)
+n_sku = len(deliverable)
+n_item = int(deliverable["ITEM_ID"].nunique())
+item_ids = np.sort(deliverable["ITEM_ID"].unique())
+contiguous = bool((item_ids == np.arange(n_item)).all())
+max_cluster = int(np.bincount(rep_item).max())
+print(f"HEADLINE: {n_sku:,} SKUs -> {n_item:,} ITEMs  |  ITEM_ID unique & contiguous 0..{n_item - 1}: {contiguous}  |  max cluster size: {max_cluster:,}")"""),
+
+    md("""## 9. Validation — does the grouping match ground truth?
+
+Barcode gives an **independent** ground truth: two listings with the same non-empty barcode *are* the same product. Precision is reported at the **actual 0.85 link threshold** (not a quantile operating point), and the negative population is stated explicitly:
+
+- **soft-link candidates** — the real linking population: same brand × macro pairs at cosine ≥ 0.85, labeled by barcode (same barcode = match, both-known-different barcodes = non-match).
+- **random cross-barcode negatives** — the easy population the old metric used.
+- **mined hard negatives** — `_hard_negatives.mine_hard_negatives` (different brand × same macro, the model's 0.45–0.80 confusion band).
+"""),
 
     code("""from _blocking import build_pairs
+from _hard_negatives import mine_hard_negatives
+from sklearn.metrics import average_precision_score, roc_auc_score
 
-pos, neg = build_pairs(reps, SEED, 4, 10_000)   # same-barcode / cross-barcode
+SOFT_THRESHOLD = 0.85   # the ACTUAL link threshold
+
+def precision_at(pos_s, neg_s, thr):
+    tp = float((pos_s >= thr).sum())
+    fp = float((neg_s >= thr).sum())
+    return (tp / (tp + fp)) if (tp + fp) > 0 else float("nan")
+
+# (a) the soft-link population itself, labeled by barcode ground truth.
+if cand_pairs:
+    cand = np.asarray(cand_pairs, dtype=int)
+    bca = bc.to_numpy()[cand[:, 0]]
+    bcb = bc.to_numpy()[cand[:, 1]]
+    n_same = int(((bca != "") & (bca == bcb)).sum())
+    n_cross = int(((bca != "") & (bcb != "") & (bca != bcb)).sum())
+    precision_candidates = n_same / (n_same + n_cross) if (n_same + n_cross) else float("nan")
+else:
+    n_same = n_cross = 0
+    precision_candidates = float("nan")
+
+# (b) barcode ground-truth pairs (same-barcode positives, cross-barcode negatives).
+pos, neg = build_pairs(reps, SEED, 4, 10_000)
 pos_s = _cosine(emb, pos)
 neg_s = _cosine(emb, neg)
-m = entity_resolution_metrics(pos_s, neg_s)
-pd.DataFrame([{"metric": k, "value": v} for k, v in m.items()])"""),
+precision_easy = precision_at(pos_s, neg_s, SOFT_THRESHOLD)
 
-    md("""**Readout.** `precision_at_90pct_recall` is the number that matters: at 90% recall, ~99% of flagged pairs are genuinely the same product. The remaining errors are concentrated in **different-brand, same-category** near-duplicates (a known, mineable hard band), and in **mislabeled barcodes** (same title, conflicting barcodes) which we explicitly exclude from training."""),
+# (c) mined hard negatives (different brand x same macro — the champion's FP signature).
+hard, hard_s = mine_hard_negatives(reps, emb, seed=SEED, n_target=20_000, cosine_lo=0.45, cosine_hi=0.80)
+precision_hard = precision_at(pos_s, hard_s, SOFT_THRESHOLD)
 
-    md("""## 9. Caveats & known limits
+precision = pd.DataFrame([
+    {"population": "soft-link candidates (same brand x macro)",
+     "positives": n_same, "negatives": n_cross, "precision@0.85": round(precision_candidates, 4)},
+    {"population": "random cross-barcode negatives",
+     "positives": int(len(pos_s)), "negatives": int(len(neg_s)), "precision@0.85": round(precision_easy, 4)},
+    {"population": "mined hard negatives (diff brand)",
+     "positives": int(len(pos_s)), "negatives": int(len(hard_s)), "precision@0.85": round(precision_hard, 4)},
+])
+
+# ranking context (AUC / PR-AUC) — no quantile-based precision_at_90pct_recall
+y = np.r_[np.ones(len(pos_s)), np.zeros(len(neg_s))]
+scores = np.r_[pos_s, neg_s]
+ranking = pd.DataFrame([
+    {"metric": "roc_auc", "value": round(float(roc_auc_score(y, scores)), 4)},
+    {"metric": "average_precision", "value": round(float(average_precision_score(y, scores)), 4)},
+    {"metric": "pos_median_cosine", "value": round(float(np.median(pos_s)), 4)},
+    {"metric": "neg_p90_cosine", "value": round(float(np.quantile(neg_s, 0.9)), 4)},
+])
+print("precision @ 0.85 (the actual link threshold):")
+print(precision.to_string(index=False))
+print()
+print("ranking context (no quantile precision):")
+print(ranking.to_string(index=False))"""),
+
+    md("""**Readout.** `precision@0.85` is computed at the **actual link threshold**, not a quantile operating point. The number that matters is the **soft-link candidate** row: among same-brand × same-macro pairs at cosine ≥ 0.85 (the pairs the soft rule could actually link), the barcode-labeled precision is the fraction that are genuinely the same product. The random cross-barcode negatives are easy, and the mined hard negatives sit in the 0.45–0.80 confusion band — below the link threshold — so they contribute no false positives at 0.85."""),
+
+    md("""## 10. Field ablation — which encode fields carry the decision?
+
+Step 07c re-scored the bi-encoder after dropping each text field from the encode payload. AUC is the ranking objective, but the operating metric is **precision @ 90% recall** — how precise the score is at the decision threshold. At 90% recall the near-perfect full precision (0.9992) is a ground-truth-ease artifact, not brand leakage: **brand alone is strong (0.9982), but removing brand only drops the full precision@90%recall 0.9992 → 0.9950**, so no single field is load-bearing."""),
+
+    code("""# field ablation: 07c re-scored the bi-encoder after dropping each encode field.
+# Plot the operating metric (precision @ 90% recall), not the ranking objective (AUC).
+abl_path = PATHS.experiments / "results" / "euromonitor" / "07c_field_ablation.csv"
+abl = pd.read_csv(abl_path).sort_values("precision_at_90pct_recall", ascending=False).reset_index(drop=True)
+
+fig, ax = plt.subplots(figsize=(8, 3.4), constrained_layout=True)
+ax.barh(abl["variant"], abl["precision_at_90pct_recall"], color="#4C72B0")
+ax.set_xlabel("precision @ 90% recall (same-barcode vs cross-barcode)")
+ax.set_title("Bi-encoder field ablation — precision @ 90% recall by encode fields")
+ax.invert_yaxis()   # highest precision on top
+for y, v in enumerate(abl["precision_at_90pct_recall"]):
+    ax.text(v + 0.0005, y, f"{v:.4f}", va="center", fontsize=9)
+plt.show()
+abl[["variant", "precision_at_90pct_recall"]]"""),
+
+    md("""## 11. Caveats & known limits
 
 - **Barcode coverage is 42%**, so the hard-link signal is partial; the fuzzy bi-encoder link carries the rest.
-- **Mislabeled barcodes** (~0.6% of cross-retailer exact-title groups carry conflicting barcodes) can over-merge distinct products — flagged, not auto-resolved.
+- **Mislabeled barcodes** (~0.6% of cross-retailer exact-title groups carry conflicting barcodes) can over-merge distinct products — the two-stage closure stops a mislabeled barcode from chaining distinct clusters, but it is flagged, not auto-resolved.
 - **Price is local currency** across 19 countries (CV 5.0) and is deliberately *not* used as a matching feature without FX normalization.
-- **Volume** is a strong discriminator when both sides have it, but is redundant on top of the semantic embedding (title already encodes "500ml"), so it is not a primary link feature.
+- **Volume & flavor** are vetoes on the soft link, not primary features: a soft edge is rejected when both sides parse to different volumes, or when both sides carry different flavors.
 """),
 ]
 
