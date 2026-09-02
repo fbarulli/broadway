@@ -1,6 +1,6 @@
 # DIGEST.md — rendered from agents/ledger/gates.yaml · NEVER HAND-EDIT ·
 
-> 162 gates · rendered 2026-09-02 @ HEAD 9e97079 · load THIS into context;
+> 163 gates · rendered 2026-09-02 @ HEAD 1bed31e · load THIS into context;
 > gates.yaml is the sole SSOT; the retired GATES.md/gates/*.md markdown world survives in agents/ledger/arbitration/2026-08-24/surface-and-analysis-preservation.md.
 
 | band | phase | gates | findings |
@@ -14,9 +14,9 @@
 | 07-surfaces | surfaces | 48 | 1 |
 | 08-config | config-schema | 15 | 10 |
 | 80-hpo-optuna | hpo-optuna | 10 | 8 |
-| 09-infra | infra-meta | 25 | 14 |
+| 09-infra | infra-meta | 26 | 14 |
 | 81-object-custody | object-custody | 3 | 0 |
-| **total** | | **162** | **75** |
+| **total** | | **163** | **75** |
 
 ### 01-ingest — ingest
 
@@ -319,8 +319,8 @@
   [argv[1] ∈ {unset, --static, --tier=fast, --tier=full, --clean-lint} (else usage exit 2), sub-gate verdicts via run() <name> <cmd...>] → [banner FAST-GREEN | LOCAL-CI GREEN | LOCAL-CI RED, exit 0 green / 1 red / 2 usage] · pins: none direct
 - **GATE-INFRA-91** `scripts/run_local_ci.sh:30 gate_parity() (F1b pin-guard, wired at :43)` ⚠FINDING
   [refs/remotes/origin/sklearn:scripts/check_branch_parity.sh via `git show` (:33)] → [parity sub-verdict to run() aggregator, FAIL parity (F1b): origin/sklearn unavailable | legacy pre-D16 checker on track ref] · pins: 3
-- **GATE-INFRA-92** `scripts/run_local_ci.sh:102 gate battery (ruff, mypy, Vulture, configs, shell-scripts, data-refs, pytest+cov floor=95, project-tests)` ⚠FINDING
-  [src/** tests/test_project_paths.py project/experiments/** project/experiments.py project/dashboard.py project/paths.py project/working.py project/data.py scripts/check_project_paths.py scripts/ (ruff), project/config/ (project-owned layout, experiment, and config-overlay SSOT), src/broadway/** (mypy), configs/experiment/*.yaml via load_config(dataset='test') (configs), k8s/optuna/*.sh + scripts/*.sh via sh -n + shellcheck (shell-scripts), Dockerfile COPY/ADD sources + ci.yml -f dockerfile + k8s/*.yaml + config parquet/path/file refs via scripts/check_data_refs.py against project/config/layout.yaml build:* (data-refs), src/broadway project scripts via Vulture --min-confidence 95 (vulture), tests/** (pytest -n 4 --dist worksteal, --cov-fail-under=95), project/tests/** (project-tests: full tier only, -q --dist worksteal, NO coverage flags)] → [PASS/FAIL ruff|mypy|configs|project-paths|shell-scripts|data-refs|vulture|pytest|project-tests banners + 40-line tails, cov floor breach ⇒ FAIL pytest] · pins: 4
+- **GATE-INFRA-92** `scripts/run_local_ci.sh:102 gate battery (ruff, mypy, Vulture, configs, shell-scripts, data-refs, graphify, pytest+cov floor=95, project-tests)` ⚠FINDING
+  [src/** tests/test_project_paths.py project/experiments/** project/experiments.py project/dashboard.py project/paths.py project/working.py project/data.py scripts/check_project_paths.py scripts/ (ruff), project/config/ (project-owned layout, experiment, and config-overlay SSOT), src/broadway/** (mypy), configs/experiment/*.yaml via load_config(dataset='test') (configs), k8s/optuna/*.sh + scripts/*.sh via sh -n + shellcheck (shell-scripts), Dockerfile COPY/ADD sources + ci.yml -f dockerfile + k8s/*.yaml + config parquet/path/file refs via scripts/check_data_refs.py against project/config/layout.yaml build:* (data-refs), graphify-out/graph.json callables vs agents/ledger/gates.yaml owner fields via scripts/check_graphify_surfaces.py (graphify), src/broadway project scripts via Vulture --min-confidence 95 (vulture), tests/** (pytest -n 4 --dist worksteal, --cov-fail-under=95), project/tests/** (project-tests: full tier only, -q --dist worksteal, NO coverage flags)] → [PASS/FAIL ruff|mypy|configs|project-paths|shell-scripts|data-refs|graphify|vulture|pytest|project-tests banners + 40-line tails, cov floor breach ⇒ FAIL pytest] · pins: 4
 - **GATE-INFRA-93** `scripts/check_branch_parity.sh:71 check() (SHARED lockstep, list at :43-69) + sync_to_main() :89` ⚠FINDING
   [24-entry SHARED surface: src/ tests/ demo/ configs/dataset/test.yaml configs/experiment/{baseline,engineered,hyperopt}.yaml configs/analysis/{test,test_hypothesis,test_causal}.yaml configs/step/{causal,etl}.yaml configs/environment/ configs/flow/ k8s/ docker/ .github/workflows/ pyproject.toml Dockerfile docker-compose.yml .gitignore .dockerignore README.md scripts/, origin/main vs origin/taxi tips] → [PARITY OK | DRIFT: <path> differs … PARITY FAILED — run $0 --sync, sync mode: taxi→main checkout + deletion mirror (:89-103)] · pins: 3
 - **GATE-INFRA-94** `scripts/check_branch_parity.sh:111 inline era declaration PARITY_ERA/PARITY_TRACK_BRANCH/PARITY_ALLOWLIST/PARITY_MAIN_ANCHOR (:111-114) + anchor guards :121-132 + dev-era dispatch :192-226` ⚠FINDING
@@ -365,6 +365,8 @@
   [tracked *.py corpus via git ls-files (src/project/tests/scripts), pyproject [project.scripts] entrypoint table] → [data/processed/deadcode_census.md suspicion report (gitignored sink); stdout default] · pins: none direct
 - **GATE-INFRA-148** `agents/tools/state_records.py sync()`
   [STATE CURRENT record and immutable EVENTS section, GitHub Project] → [pending CURRENT intent followed by one synced mirror item] · pins: 1
+- **GATE-INFRA-149** `scripts/check_graphify_surfaces.py:1 main() graphify surface-reconciliation gate (callables vs gates.yaml owners)`
+  [graphify-out/graph.json (deterministic --code-only AST graph over src/ + project/), agents/ledger/gates.yaml owner fields] → [PASS/FAIL graphify banner + KNOWN_UNMAPPED baseline report] · pins: 3
 
 ### 81-object-custody — object-custody
 

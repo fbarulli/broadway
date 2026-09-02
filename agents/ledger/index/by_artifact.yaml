@@ -238,8 +238,10 @@ PARITY_ALLOWLIST=() prefix skips (:168-177):
 - GATE-INFRA-95
 PARITY_MAIN_ANCHOR=18607091ddbb2602ad4475341ad377bafee5ec4b (:114):
 - GATE-INFRA-95
-PASS/FAIL ruff|mypy|configs|project-paths|shell-scripts|data-refs|vulture|pytest|project-tests banners + 40-line tails:
-- GATE-INFRA-92
+PASS/FAIL graphify banner + KNOWN_UNMAPPED baseline report:
+- GATE-INFRA-149
+? PASS/FAIL ruff|mypy|configs|project-paths|shell-scripts|data-refs|graphify|vulture|pytest|project-tests banners + 40-line tails
+: - GATE-INFRA-92
 PipelineConfig (cfg.dataset + cfg.etl + cfg.experiment):
 - GATE-ETL-10
 PipelineConfig (cfg.dataset/cfg.stats/cfg.analysis):
@@ -328,6 +330,8 @@ _warn_stale_decisions (walkthrough.py:192-201):
 - GATE-TLINE-51
 absent = sorted size-0 names (:32):
 - GATE-STATS-42
+agents/ledger/gates.yaml owner fields:
+- GATE-INFRA-149
 alias default 'champion':
 - GATE-TRAIN-39
 all three report renderers:
@@ -582,6 +586,10 @@ git-diff payload on stdin (files + added lines):
 - GATE-INFRA-98
 ? governance basenames {CONTRACT_TEMPLATE,WORKER_CONTRACT,MAIN_AGENT_CONTRACT,DECISIONS,FIXES}.md + agents/ledger/STATE.md (:34-37)
 : - GATE-INFRA-98
+graphify-out/graph.json (deterministic --code-only AST graph over src/ + project/):
+- GATE-INFRA-149
+? graphify-out/graph.json callables vs agents/ledger/gates.yaml owner fields via scripts/check_graphify_surfaces.py (graphify)
+: - GATE-INFRA-92
 group figures PNG (:98-118, savefig :117):
 - GATE-STATS-49
 groups:
