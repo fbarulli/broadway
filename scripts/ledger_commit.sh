@@ -97,7 +97,7 @@ if [[ -z "$state_ids" ]]; then
 fi
 while IFS= read -r sid; do
   [[ -n "$sid" ]] || continue
-  if ! grep -Eq "^\|[[:space:]]*$sid[[:space:]]*\|" "$STATE_FILE"; then
+  if ! grep -Eq "^\|[[:space:]]*${sid}[[:space:]]*\|" "$STATE_FILE"; then
     die "cited $sid is not a row in $STATE_FILE CURRENT (create it first via: agents/tools/state_records.py record add)."
   fi
 done <<< "$state_ids"

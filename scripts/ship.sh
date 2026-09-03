@@ -1,94 +1,347 @@
 #!/usr/bin/env bash
-# ship.sh — THE push path. Full tier gates; exit codes decide; no prose parsing.
-# Born from two push-on-red recurrences (2026-08-24): keyword-grep gating and
-# unconditional newline-chained pushes. This wrapper makes both impossible:
-# the push lines execute ONLY if run_local_ci.sh exits 0.
+# ship.sh — THE push path.
 #
-# Usage: bash scripts/ship.sh [remote] [refspec...]   (default: origin +refs/heads/sklearn)
-set -euo pipefail
-cd "$(dirname "$0")/.."
-# Single sanctioned uv cache root: $HOME/.cache/uv — a repo-local UV_CACHE_DIR
-# export is prohibited (MAIN_AGENT_CONTRACT "Ledger & artifact hygiene").
-# MPLCONFIGDIR stays: matplotlib font-cache determinism for the plotting path.
-export MPLCONFIGDIR="${MPLCONFIGDIR:-$PWD/.mplconfig}"
+# Contract:
+#   1. Local CI must exit 0.
+#   2. The configured pre-push guard must be installed.
+#   3. The exact unpushed batch must pass the tier gate.
+#   4. The exact unpushed batch must show ledger activity: >=1 STATE row
+#      added AND >=1 STATE row terminally dispositioned (closed/void).
+#   5. Exactly one non-deletion branch refspec is pushed.
+#   6. The exact pushed commit is monitored in GitHub Actions when possible.
+#
+# Usage:
+#   bash scripts/ship.sh [remote] [refspec]
+#
+# Default:
+#   remote  = origin
+#   refspec = HEAD:<current branch>
+#
+# Important:
+#   A successful git push followed by a red/unknown Actions result is reported
+#   as a POST-PUSH failure. The remote has already accepted the push.
 
-# --- TIER-GATE machinery (D34/D35 teeth ①): one grammar, shared with hooks ---
+set -Eeuo pipefail
+
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || {
+  echo "SHIP REFUSED: not inside a Git repository." >&2
+  exit 1
+}
+cd "$REPO_ROOT"
+
+on_err() {
+  local rc=$?
+  echo "SHIP FAILED: unexpected command failure (exit $rc) at line ${BASH_LINENO[0]:-unknown}." >&2
+  exit "$rc"
+}
+trap on_err ERR
+
+# Single sanctioned uv cache root:
+#   $HOME/.cache/uv
+#
+# Do not export UV_CACHE_DIR here; repository contract prohibits it.
+export MPLCONFIGDIR="${MPLCONFIGDIR:-$PWD/.mplconfig}"
+mkdir -p "$MPLCONFIGDIR"
+
 # shellcheck source=scripts/tier_gate.sh
 . scripts/tier_gate.sh
 
-REMOTE="${1:-origin}"; shift || true
-REFSPECS=("$@")
-[ ${#REFSPECS[@]} -eq 0 ] && REFSPECS=("sklearn:sklearn")
+die() {
+  echo "SHIP REFUSED: $*" >&2
+  exit 1
+}
+
+REMOTE="${1:-origin}"
+if (($# > 0)); then
+  shift
+fi
+
+# Exactly one refspec. Multiple pushes must be separate invocations so every
+# invocation gets its own complete gate + monitoring lifecycle.
+if (($# > 1)); then
+  die "multiple refspecs provided ($#); exactly one is allowed per invocation."
+fi
+
+if (($# == 0)); then
+  current_branch="$(git symbolic-ref --quiet --short HEAD)" || {
+    die "detached HEAD and no refspec was supplied."
+  }
+  REFSPEC="HEAD:refs/heads/$current_branch"
+else
+  REFSPEC="$1"
+fi
+
+# ---------------------------------------------------------------------------
+# REFSPEC VALIDATION
+# ---------------------------------------------------------------------------
+
+# Supported forms:
+#   source:refs/heads/branch
+#   source:branch
+#   HEAD:branch
+#
+# Deletions, tags, and arbitrary refs are deliberately rejected.
+normalized_refspec="${REFSPEC#+}"
+
+[[ "$normalized_refspec" != :* ]] ||
+  die "deletion refspec '$REFSPEC' is forbidden."
+
+if [[ "$normalized_refspec" != *:* ]]; then
+  source_ref="$normalized_refspec"
+  destination_ref="$normalized_refspec"
+else
+  source_ref="${normalized_refspec%%:*}"
+  destination_ref="${normalized_refspec#*:}"
+fi
+
+[[ -n "$source_ref" ]] ||
+  die "empty source in refspec '$REFSPEC'."
+
+[[ -n "$destination_ref" ]] ||
+  die "empty destination in refspec '$REFSPEC'."
+
+destination_ref="${destination_ref#refs/heads/}"
+
+git check-ref-format --branch "$destination_ref" >/dev/null 2>&1 || {
+  die "destination '$destination_ref' is not a valid branch name."
+}
+
+[[ "$destination_ref" != refs/* ]] ||
+  die "destination '$destination_ref' is not an ordinary branch."
+
+branch="$destination_ref"
+
+# Resolve the exact object that will be pushed BEFORE git push.
+PUSH_SHA="$(git rev-parse --verify "${source_ref}^{commit}" 2>/dev/null)" || {
+  die "source '$source_ref' does not resolve to a commit."
+}
+
+# ---------------------------------------------------------------------------
+# REMOTE VALIDATION
+# ---------------------------------------------------------------------------
+
+git remote get-url "$REMOTE" >/dev/null 2>&1 || {
+  die "remote '$REMOTE' does not exist."
+}
+
+# ---------------------------------------------------------------------------
+# FULL LOCAL CI
+# ---------------------------------------------------------------------------
 
 echo "== ship.sh: full tier gates every push =="
+
 if ! bash scripts/run_local_ci.sh; then
-  echo "" >&2
-  echo "SHIP REFUSED: LOCAL-CI RED. Fix above. No flag exists to override this;" >&2
-  echo "raw 'git push' is a policy violation (MAIN_AGENT_CONTRACT §push-custody)." >&2
+  echo >&2
+  echo "SHIP REFUSED: LOCAL-CI RED. No push was attempted." >&2
+  echo "Fix the failures above; there is no override flag." >&2
   exit 1
 fi
+
+# ---------------------------------------------------------------------------
+# L1 PRE-PUSH GUARD
+# ---------------------------------------------------------------------------
 
 echo "== ship.sh: L1 pre-push hook guard =="
-# L1 (Scout-4 / D34 teeth ①): VERIFICATION, not auto-install — core.hooksPath
-# is machine-local by design, so ship.sh only verifies the guard is in place.
-if ! { [ -x .git/hooks/pre-push ] && grep -q run_local_ci.sh .git/hooks/pre-push; }; then
-  echo "SHIP REFUSED: .git/hooks/pre-push missing or stale (must exec scripts/run_local_ci.sh)." >&2
-  echo "Remediation — install manually from the tracked template:" >&2
-  echo "  cp agents/contracts/hooks-pre-push.template .git/hooks/pre-push" >&2
-  echo "  chmod +x .git/hooks/pre-push" >&2
+
+# Respect core.hooksPath instead of assuming .git/hooks.
+HOOK_PATH="$(git rev-parse --git-path hooks/pre-push)" || {
+  die "could not resolve Git's pre-push hook path."
+}
+
+if [[ ! -x "$HOOK_PATH" ]]; then
+  echo "SHIP REFUSED: pre-push hook missing or not executable: $HOOK_PATH" >&2
+  echo "Remediation — install the tracked template:" >&2
+  echo "  cp agents/contracts/hooks-pre-push.template \"$HOOK_PATH\"" >&2
+  echo "  chmod +x \"$HOOK_PATH\"" >&2
   exit 1
 fi
 
-echo "== ship.sh: TIER-GATE on the unpushed batch (D34/D35) =="
-branch="${REFSPECS[0]##*:}"; branch="${branch#refs/heads/}"
-if git rev-parse --verify -q "origin/$branch" >/dev/null 2>&1; then
-  if ! git rev-list "origin/$branch..HEAD" | tg_run; then
-    echo "SHIP REFUSED: TIER-GATE rejected the batch (offender + missing piece above)." >&2
-    echo "The batch ships atomically, all-or-nothing — amend/rebase the offending" >&2
-    echo "commit(s) or land the missing EVENTS row first. No flag overrides this." >&2
-    exit 1
-  fi
-else
-  echo "SHIP NOTICE: origin/$branch does not exist yet — TIER-GATE skipped (no baseline)." >&2
+if ! grep -Fq 'scripts/run_local_ci.sh' "$HOOK_PATH"; then
+  echo "SHIP REFUSED: pre-push hook does not invoke scripts/run_local_ci.sh." >&2
+  echo "Hook: $HOOK_PATH" >&2
+  exit 1
 fi
 
-echo "== pushing $REMOTE ${REFSPECS[*]} (single invocation -> one hook gate) =="
-git push "$REMOTE" "${REFSPECS[@]}"
-# --- POST-PUSH MONITOR (#5/D25): watch the pushed tip's Actions run -------
-# Best-effort by law: absent gh, unparsable remote, or a silent API degrade
-# to a notice + exit 0; only an OBSERVED red/cancelled run exits non-zero.
-if ! command -v gh >/dev/null 2>&1; then
-  echo "SHIP MONITOR SKIPPED: gh CLI absent — post-push Actions watch off"
-elif ! slug="$(git remote get-url "$REMOTE" \
-      | sed -E 's#^(https?://[^/]+/|git@[^:]+:)##; s#[.]git$##')" || [[ "$slug" != */* ]]; then
-  echo "SHIP MONITOR SKIPPED: cannot derive owner/repo from '$REMOTE' URL"
+# ---------------------------------------------------------------------------
+# TIER GATE ON EXACT BATCH
+# ---------------------------------------------------------------------------
+
+echo "== ship.sh: TIER-GATE on unpushed batch =="
+
+REMOTE_BRANCH="$REMOTE/$branch"
+
+if git rev-parse --verify -q "$REMOTE_BRANCH" >/dev/null 2>&1; then
+  commits="$(git rev-list "$REMOTE_BRANCH..$PUSH_SHA")" || {
+    die "failed to enumerate '$REMOTE_BRANCH..$PUSH_SHA'."
+  }
+
+  if [[ -z "$commits" ]]; then
+    echo "== ship.sh: no commits ahead of $REMOTE_BRANCH; TIER-GATE skipped =="
+  else
+    if ! printf '%s\n' "$commits" | tg_run; then
+      echo "SHIP REFUSED: TIER-GATE rejected the batch." >&2
+      echo "No push was attempted." >&2
+      exit 1
+    fi
+  fi
+
+  # -------------------------------------------------------------------------
+  # LEDGER BATCH LAW: the batch must add >=1 STATE row AND terminally
+  # disposition >=1 (close/void). The law and its vocabulary live in
+  # scripts/tier_gate.sh (tg_ledger_batch) so the pre-push hook and this
+  # script share one grammar — one law, two doors.
+  # -------------------------------------------------------------------------
+  echo "== ship.sh: LEDGER-GATE on unpushed batch =="
+
+  if [[ -n "$commits" ]]; then
+    if ! ledger_reason="$(tg_ledger_batch "$REMOTE_BRANCH" "$PUSH_SHA")"; then
+      echo "SHIP REFUSED: LEDGER-GATE rejected the batch." >&2
+      echo "  $ledger_reason" >&2
+      echo "No push was attempted." >&2
+      exit 1
+    fi
+  fi
 else
-  branch="${REFSPECS[0]##*:}"; branch="${branch#refs/heads/}"
-  PUSHED_SHA="$(git rev-parse --short HEAD)"
-  echo "== ship monitor: Actions for $slug@$PUSHED_SHA (branch $branch) =="
-  appeared=0; polls=0
-  while [ "$polls" -lt 20 ]; do
+  echo "SHIP NOTICE: $REMOTE_BRANCH does not exist locally." >&2
+  echo "TIER-GATE cannot compare against a remote baseline; continuing because" >&2
+  echo "this appears to be the first push of this remote branch." >&2
+fi
+
+# ---------------------------------------------------------------------------
+# PUSH
+# ---------------------------------------------------------------------------
+
+echo "== pushing $REMOTE $REFSPEC =="
+echo "== exact pushed commit: $PUSH_SHA =="
+
+git push "$REMOTE" "$REFSPEC"
+
+# ---------------------------------------------------------------------------
+# POST-PUSH ACTIONS MONITOR
+# ---------------------------------------------------------------------------
+
+# Best effort by policy, but never silently swallow CLI/API failures.
+if ! command -v gh >/dev/null 2>&1; then
+  echo "SHIP MONITOR SKIPPED: gh CLI absent — post-push Actions watch off" >&2
+else
+  remote_url="$(git remote get-url "$REMOTE" 2>/dev/null)" || {
+    echo "SHIP MONITOR SKIPPED: cannot read URL for remote '$REMOTE'" >&2
+    echo "Push succeeded; CI status is UNKNOWN." >&2
+    exit 0
+  }
+
+  # Handle:
+  #   https://github.com/owner/repo.git
+  #   http://github.com/owner/repo.git
+  #   git@github.com:owner/repo.git
+  #   ssh://git@github.com:owner/repo.git
+  slug="$(
+    printf '%s\n' "$remote_url" |
+      sed -E \
+        -e 's#^[^@]+@[^:]+:##' \
+        -e 's#^[a-zA-Z][a-zA-Z0-9+.-]*://[^/]+/##' \
+        -e 's#[.]git$##'
+  )"
+
+  if [[ ! "$slug" =~ ^[^/[:space:]]+/[^/[:space:]]+$ ]]; then
+    echo "SHIP MONITOR SKIPPED: cannot derive owner/repo from remote URL." >&2
+    echo "Remote URL: $remote_url" >&2
+    echo "Push succeeded; CI status is UNKNOWN." >&2
+    exit 0
+  fi
+
+  echo "== ship monitor: Actions for $slug@$PUSH_SHA (branch $branch) =="
+
+  appeared=0
+  polls=0
+  seen=""
+  monitor_failed=0
+
+  while ((polls < 20)); do
     polls=$((polls + 1))
-    seen="$(gh api "repos/$slug/actions/runs?branch=$branch&per_page=3" \
-      --jq "[.workflow_runs[] | select(.head_sha | startswith(\"$PUSHED_SHA\"))][0] | .status + \" \" + (.conclusion // \"none\")" 2>/dev/null || true)"
-    if [ -n "$seen" ]; then appeared=1; fi
+
+    api_err="$(mktemp)"
+    api_out=""
+
+    # Deliberately put the command in an if-condition so set -e does not
+    # terminate the script before we can report the API failure.
+    if api_out="$(
+      gh api "repos/$slug/actions/runs?branch=$branch&per_page=10" \
+        --jq "[.workflow_runs[] | select(.head_sha == \"$PUSH_SHA\")][0] |
+              if . == null then
+                \"\"
+              else
+                .status + \" \" + (.conclusion // \"none\")
+              end" \
+        2>"$api_err"
+    )"; then
+      api_exit=0
+    else
+      api_exit=$?
+    fi
+
+    api_err_content="$(cat "$api_err")"
+    rm -f "$api_err"
+
+    if ((api_exit != 0)); then
+      echo "SHIP MONITOR ERROR: 'gh api' failed (exit $api_exit)." >&2
+      if [[ -n "$api_err_content" ]]; then
+        echo "$api_err_content" >&2
+      fi
+      echo "Push STANDS, but CI status is UNKNOWN." >&2
+      echo "Check the Actions page for $slug manually." >&2
+      monitor_failed=1
+      break
+    fi
+
+    seen="$api_out"
+
+    if [[ -n "$seen" ]]; then
+      appeared=1
+    fi
+
     case "$seen" in
-      "") ;;                                # run not created yet — keep polling
+      "")
+        # Run has not been created yet.
+        ;;
+
       "completed success")
-        echo "SHIP MONITOR OK: $slug@$PUSHED_SHA green on $branch"
-        break ;;
-      completed*)
-        echo "SHIP MONITOR RED: $slug@$PUSHED_SHA reported '$seen'" >&2
-        echo "Push landed red — D25 fix-forward duty: reconcile before next ship." >&2
-        exit 1 ;;
-      *) ;;                                 # queued/in_progress — keep polling
+        echo "SHIP MONITOR OK: $slug@$PUSH_SHA green on $branch"
+        break
+        ;;
+
+      completed\ *)
+        echo "SHIP MONITOR RED: $slug@$PUSH_SHA reported '$seen'" >&2
+        echo "Push landed red — fix forward before the next ship." >&2
+        exit 1
+        ;;
+
+      *)
+        # queued / in_progress / waiting / etc.
+        ;;
     esac
-    sleep 45
+
+    if ((polls < 20)); then
+      sleep 45
+    fi
   done
-  if [ "$appeared" -eq 0 ]; then
-    echo "WARNING: monitor exhausted 20x45s; NO Actions run for $PUSHED_SHA ever appeared (Actions slow/down?). Push STANDS — check github.com/$slug/actions manually." >&2
-  elif [ "$seen" != "completed success" ]; then
-    echo "WARNING: monitor exhausted 20x45s; run still '$seen' (incomplete). Push STANDS — check github.com/$slug/actions manually." >&2
+
+  if ((monitor_failed == 0)); then
+    if ((appeared == 0)); then
+      echo "WARNING: monitor exhausted 20 polls (~15 minutes)." >&2
+      echo "No Actions run for exact SHA $PUSH_SHA appeared." >&2
+      echo "Push STANDS; check $slug Actions manually." >&2
+    elif [[ "$seen" != "completed success" ]]; then
+      if [[ "$seen" == completed\ * ]]; then
+        echo "SHIP MONITOR RED: $slug@$PUSH_SHA reported '$seen'" >&2
+        exit 1
+      else
+        echo "WARNING: monitor exhausted 20 polls (~15 minutes)." >&2
+        echo "Actions run is still '$seen'." >&2
+        echo "Push STANDS; check $slug Actions manually." >&2
+      fi
+    fi
   fi
 fi
+
 echo "SHIP OK"

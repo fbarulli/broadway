@@ -14,9 +14,10 @@ close. Three guards here:
   patch cannot silently drop the entry.
 * ``test_scripts_diff_empty_vs_main`` (era-gated) — runs its body ONLY when
   the declared era is ``main``; otherwise it skips. On ``dev`` the
-  sklearn-vs-main shared surface diverges by design until the human-declared
+  track-vs-main shared surface diverges by design until the human-declared
   main-day flip (``PARITY_ERA=dev`` → ``main`` edited in ONE commit citing
-  D16c/D21).
+  D16c/D21). The track branch is SAID ONCE — parsed from the checker's
+  ``^PARITY_TRACK_BRANCH=`` declaration, never hard-coded here.
 * ``test_f1b_guard_rejects_legacy_checker_without_era_marker`` — proves the
   F1b guard in ``scripts/run_local_ci.sh`` refuses to gate CI with a stale
   pre-D16/D21 checker (see its docstring for the mechanism).
@@ -34,13 +35,11 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 CHECKER = REPO_ROOT / "scripts" / "check_branch_parity.sh"
 RUN_CI = REPO_ROOT / "scripts" / "run_local_ci.sh"
 
-
 def _shared_entries() -> list[str]:
     """Parse the checker's SHARED array body into its entry strings."""
     text = CHECKER.read_text(encoding="utf-8")
     body = text.split("SHARED=(", 1)[1].split(")", 1)[0]
     return [line.strip() for line in body.splitlines() if line.strip()]
-
 
 def _declared_era() -> str:
     """Parse PARITY_ERA from the checker's INLINE declaration (D21).
@@ -62,6 +61,25 @@ def _declared_era() -> str:
         "(D16a/D21)"
     )
 
+def _declared_track_branch() -> str:
+    """Parse PARITY_TRACK_BRANCH from the checker's INLINE declaration.
+
+    Say-it-once companion to _declared_era: the same single declaration every
+    runtime consumer (F1b pin, main-day sync, this suite) reads — never a
+    second copy in this file.
+    """
+    for raw_line in CHECKER.read_text(encoding="utf-8").splitlines():
+        if not raw_line.startswith("PARITY_TRACK_BRANCH="):
+            continue
+        value = raw_line.split("=", 1)[1].split("#", 1)[0].strip()
+        if value:
+            return value
+        break
+    raise AssertionError(
+        f"{CHECKER.relative_to(REPO_ROOT)} carries no parsable inline "
+        "`^PARITY_TRACK_BRANCH=` declaration — it is the single track-name "
+        "declaration (say-it-once law 2026-09-02)"
+    )
 
 def test_parity_surface_includes_scripts() -> None:
     """The checker's watched surface names scripts/ (directory + header)."""
@@ -82,13 +100,13 @@ def test_parity_surface_includes_scripts() -> None:
         "declaration into the checker — drop the line (zero lines to maintain)"
     )
 
-
 def test_scripts_diff_empty_vs_main() -> None:
-    """The sklearn-vs-main scripts/ diff must be empty (era-gated, main day).
+    """The euromonitor-vs-main scripts/ diff must be empty (era-gated, main day).
 
     Mirrors the checker's own comparison (``git diff --exit-code --quiet
-    origin/main origin/taxi -- scripts/``); sklearn tracks taxi, so this
-    asserts the pair origin/main vs origin/taxi is in sync for ``scripts/``.
+    origin/main origin/$PARITY_TRACK_BRANCH -- scripts/``): the track name is
+    read from the single ``^PARITY_TRACK_BRANCH=`` declaration (say-it-once
+    law 2026-09-02), so this test survives rename-day without edits.
 
     Gating reads the INLINE ``^PARITY_ERA=`` declaration in the checker
     working-tree text (D21) — never an environment variable. The body runs
@@ -102,8 +120,9 @@ def test_scripts_diff_empty_vs_main() -> None:
             f"pre-main-day: era={era} (inline declaration in "
             "scripts/check_branch_parity.sh)"
         )
+    track = _declared_track_branch()
     result = subprocess.run(
-        ["git", "diff", "--exit-code", "--quiet", "origin/main", "origin/taxi", "--", "scripts/"],
+        ["git", "diff", "--exit-code", "--quiet", "origin/main", f"origin/{track}", "--", "scripts/"],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
@@ -111,13 +130,12 @@ def test_scripts_diff_empty_vs_main() -> None:
         timeout=60,
     )
     assert result.returncode == 0, (
-        "scripts/ differs between origin/main and origin/taxi — origin/main is "
+        "scripts/ differs between origin/main and the track ref — origin/main is "
         "missing scripts/check_e2e_determinism.sh and/or "
-        "scripts/check_champion_manifest.sh (sklearn tracks taxi); run the "
+        "scripts/check_champion_manifest.sh; run the "
         "human-gated main-day sync so the shared surface is identical"
         + (f"\ngit stderr: {result.stderr.strip()}" if result.stderr.strip() else "")
     )
-
 
 def _gate_parity_source() -> str:
     """Extract the REAL gate_parity function body from run_local_ci.sh.
@@ -137,15 +155,14 @@ def _gate_parity_source() -> str:
     end = text.index("\n}", start)
     return text[start : end + 2]
 
-
 def _git_show_stub(bin_dir: Path, fixture: Path) -> None:
     """Install a PATH-shim `git` whose `show <track-ref>:<checker>` emits fixture."""
     bin_dir.mkdir(parents=True, exist_ok=True)
     shim = bin_dir / "git"
     shim.write_text(
         "#!/usr/bin/env bash\n"
-        'if [[ "$1 $2" == "show refs/remotes/origin/sklearn:'
-        'scripts/check_branch_parity.sh" ]]; then\n'
+        'if [[ "$1" == "show" && "$2" == refs/remotes/origin/trackstub:'
+        'scripts/check_branch_parity.sh ]]; then\n'
         f'  cat "{fixture}"\n'
         "  exit 0\n"
         "fi\n"
@@ -155,7 +172,6 @@ def _git_show_stub(bin_dir: Path, fixture: Path) -> None:
     )
     shim.chmod(0o755)
 
-
 @pytest.mark.parametrize("with_marker", [False, True], ids=["legacy", "post-D21"])
 def test_f1b_guard_rejects_legacy_checker_without_era_marker(
     tmp_path: Path, with_marker: bool
@@ -164,10 +180,12 @@ def test_f1b_guard_rejects_legacy_checker_without_era_marker(
 
     Mechanism: the real ``gate_parity`` body extracted from
     ``scripts/run_local_ci.sh`` is executed under bash with a stub ``git``
-    on PATH, so ``git show refs/remotes/origin/sklearn:…`` yields our
-    fixture instead of the network truth. Choice documented per contract:
-    extract-and-execute over replicate, so the test cannot outlive the
-    guard's actual semantics.
+    on PATH, so ``git show refs/remotes/origin/<track>:…`` yields our
+    fixture instead of the network truth. The track name is parsed by the
+    guard itself from the tree-local checker at REPO_ROOT (say-it-once
+    law), so the harness copies the real checker text to the sandbox cwd.
+    Choice documented per contract: extract-and-execute over replicate, so
+    the test cannot outlive the guard's actual semantics.
 
     * legacy fixture (pre-D16 shape: no ``^PARITY_ERA=`` line) ⇒ guard exits
       non-zero naming the legacy checker — RED demonstrated.
@@ -178,7 +196,7 @@ def test_f1b_guard_rejects_legacy_checker_without_era_marker(
     fixture = tmp_path / "checker_under_test.sh"
     marker_block = (
         "PARITY_ERA=dev\n"
-        "PARITY_TRACK_BRANCH=sklearn\n"
+        f"PARITY_TRACK_BRANCH={_declared_track_branch()}\n"
         "PARITY_ALLOWLIST=()\n"
         f"PARITY_MAIN_ANCHOR={'a' * 40}\n"
     ) if with_marker else ""
@@ -189,6 +207,21 @@ def test_f1b_guard_rejects_legacy_checker_without_era_marker(
         + marker_block,
         encoding="utf-8",
     )
+    # Say-it-once: the guard parses the track name from a tree-local checker
+    # named scripts/check_branch_parity.sh relative to ITS cwd — plant a
+    # sandbox copy of the REAL checker whose track declaration is rewritten
+    # to the stub ref name, so parse→stub is a closed loop (and the test
+    # stays rename-proof: no real branch name appears anywhere here).
+    sandbox = tmp_path / "repo"
+    (sandbox / "scripts").mkdir(parents=True, exist_ok=True)
+    sandbox_checker = CHECKER.read_text(encoding="utf-8").replace(
+        f"PARITY_TRACK_BRANCH={_declared_track_branch()}",
+        "PARITY_TRACK_BRANCH=trackstub",
+    )
+    assert "PARITY_TRACK_BRANCH=trackstub" in sandbox_checker  # rewrite landed
+    (sandbox / "scripts" / "check_branch_parity.sh").write_text(
+        sandbox_checker, encoding="utf-8"
+    )
 
     bin_dir = tmp_path / "bin"
     _git_show_stub(bin_dir, fixture)
@@ -198,7 +231,7 @@ def test_f1b_guard_rejects_legacy_checker_without_era_marker(
     env["TMPDIR"] = str(tmp_path)
     result = subprocess.run(
         ["bash", "-c", f"{_gate_parity_source()}\ngate_parity\n"],
-        cwd=tmp_path,
+        cwd=sandbox,
         capture_output=True,
         text=True,
         env=env,

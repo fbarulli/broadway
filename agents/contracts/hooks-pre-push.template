@@ -1,9 +1,14 @@
 #!/bin/sh
 # hooks-pre-push.template — SSOT for this repository's pre-push hook contract.
 #
-# Class declaration: L1 LOCAL GUARD. Contract: a push is admitted only if the
-# full-tier local CI gate passes first — this hook exits non-zero exactly when
-# scripts/run_local_ci.sh does (mirrors the live .git/hooks/pre-push).
+# Class declaration: L1 LOCAL GUARD. Contract: a push is admitted only if
+# BOTH local gates pass first (exit non-zero exactly when either does):
+#   1. FULL-TIER local CI  — scripts/run_local_ci.sh
+#   2. LEDGER BATCH LAW    — scripts/tier_gate.sh tg_ledger_batch over the
+#      exact unpushed batch (>=1 STATE row added AND >=1 terminally
+#      dispositioned close/void). The law lives in tier_gate.sh so this
+#      hook and scripts/ship.sh enforce the identical grammar — one law,
+#      two doors; a raw 'git push' cannot bypass what ship.sh checks.
 #
 # Installation is a DOCUMENTED MANUAL STEP by design: core.hooksPath is
 # machine-local, and L1's remedy is VERIFICATION (scripts/ship.sh refuses to
@@ -11,6 +16,41 @@
 #   cp agents/contracts/hooks-pre-push.template .git/hooks/pre-push
 #   chmod +x .git/hooks/pre-push
 #
-# Provenance: D34 teeth ① (TIER-GATE packet) + Scout-4 L1 finding, 2026-08-25.
+# Provenance: D34 teeth ① (TIER-GATE packet) + Scout-4 L1 finding, 2026-08-25;
+# LEDGER-GATE rider added 2026-09-03 (owner law: every pushed batch updates
+# the ledger with an item and closes one).
 
-bash scripts/run_local_ci.sh || exit 1
+set -eu
+
+# --- Gate 1: full-tier local CI -------------------------------------------
+bash scripts/run_local_ci.sh || {
+  echo "PRE-PUSH REFUSED: LOCAL-CI RED. No push was attempted." >&2
+  exit 1
+}
+
+# --- Gate 2: ledger batch law (exact unpushed batch) ----------------------
+# stdin carries the pre-push protocol lines: "<local ref> <local sha> <remote
+# ref> <remote sha>". Extract the exact unpushed range for each pushed ref and
+# demand ledger activity in it.
+while read -r local_ref local_sha remote_ref remote_sha; do
+  [ -n "$local_ref" ] || continue
+  case "$remote_ref" in
+    refs/heads/*) ;;      # branch push — gate it
+    *) continue ;;       # tag or other ref — not covered by this law
+  esac
+
+  # Null remote sha = branch creation: no baseline, ledger law starts with
+  # the branch's second push (the first push IS a ledger event itself only if
+  # it carries rows; we skip rather than guess).
+  [ "$remote_sha" = "0000000000000000000000000000000000000000" ] && continue
+
+  # shellcheck source=scripts/tier_gate.sh
+  . scripts/tier_gate.sh
+
+  if ! reason="$(tg_ledger_batch "$remote_sha" "$local_sha")"; then
+    echo "PRE-PUSH REFUSED: LEDGER-GATE rejected the batch for $remote_ref." >&2
+    echo "  $reason" >&2
+    exit 1
+  fi
+done
+exit 0
