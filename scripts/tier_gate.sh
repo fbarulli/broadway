@@ -15,6 +15,14 @@
 #   tg_events_has EVENTS_TEXT TOKEN                   -> rc0 iff row id found
 #   tg_check_message EVENTS_TEXT MESSAGE              -> rc0 pass / rc1 + reason
 #   tg_run                          (SHAs on stdin)   -> gates each via git
+#   tg_batch_adds_row BASE SHA                        -> rc0 iff the batch's
+#       ledger diff adds >=1 STATE row id (new CURRENT row; archive lines and
+#       in-place edits do not count)
+#   tg_batch_terminal BASE SHA                       -> rc0 iff the batch's
+#       ledger diff terminally dispositions >=1 STATE row (a new
+#       STATE-ARCHIVE marker, or a CURRENT row's status becoming closed/void)
+#   tg_ledger_batch BASE SHA                        -> batch-level ledger
+#       custody law: rc0 iff BOTH helpers pass (item added AND one closed)
 # shellcheck shell=bash
 
 _TG_TIERS='FULL|FAST|STATIC|DOCS'
@@ -100,6 +108,49 @@ tg_check_message() {
 _tg_events_at() {
   git show "$1:$_TG_EVENTS_FILE" \
     | sed -n "/^$_TG_EVENTS_HEADER/,/^## /p" | sed '1d;/^## /,$d'
+}
+
+# --- Batch-level ledger custody (2026-09-03 owner law: every pushed batch
+# must update the ledger with an item AND terminally disposition one) -------
+# Diff-based, never worktree-content-based: the batch is judged by what its
+# commits change BETWEEN the remote baseline and the pushed SHA. Pure diffs
+# over git plumbing; STATE ids are the STATE-YYYYMMDD-NNN grammar owned by
+# agents/tools/state_records.py.
+
+# rc0 iff the batch adds at least one STATE row id to CURRENT (STATE.md).
+tg_batch_adds_row() {
+  local base="$1" sha="$2"
+  git diff "$base" "$sha" -- agents/ledger/STATE.md     | grep -E '^\+\| STATE-[0-9]{8}-[0-9]{3} \|' | grep -qv '^+\+\+'
+  # '^+| STATE-... |' = a newly added CURRENT table row (an added +++ file
+  # header can never match, but grep -qv keeps the guard explicit).
+}
+
+# rc0 iff the batch terminally dispositions >=1 STATE row: either a new
+# STATE-ARCHIVE marker in the archive, or a CURRENT row's status column
+# flipping to closed/void.
+tg_batch_terminal() {
+  local base="$1" sha="$2"
+  # (a) new archive marker for any month file
+  if git diff "$base" "$sha" -- agents/ledger/archive/        | grep -Eq '^\+.*STATE-ARCHIVE:STATE-[0-9]{8}-[0-9]{3}'; then
+    return 0
+  fi
+  # (b) a CURRENT row's status cell edited to closed or void
+  git diff "$base" "$sha" -- agents/ledger/STATE.md     | grep -E '^\+\| STATE-[0-9]{8}-[0-9]{3} \| (closed|void) \|' | grep -q .
+}
+
+# Batch ledger-custody law: an added item AND a terminal disposition. Echoes
+# the missing piece on refusal so ship.sh reports it without duplicating law.
+tg_ledger_batch() {
+  local base="$1" sha="$2"
+  if ! tg_batch_adds_row "$base" "$sha"; then
+    echo "ledger: batch adds no STATE row (add one via: state_records.py record add)"
+    return 1
+  fi
+  if ! tg_batch_terminal "$base" "$sha"; then
+    echo "ledger: batch terminally dispositions no STATE row (close or void one via: state_records.py record close/void)"
+    return 1
+  fi
+  return 0
 }
 
 # Gate every SHA read on stdin against ITS OWN tree's EVENTS table; all-or-nothing.
