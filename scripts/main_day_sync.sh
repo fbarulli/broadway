@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
-# MAIN-DAY SYNC — resync main from dev (sklearn) via WHITELIST
+# MAIN-DAY SYNC — resync main from the dev line via WHITELIST
+# The dev line's name is SAID ONCE: parsed from scripts/check_branch_parity.sh's
+# inline era declaration (the same single PARITY_TRACK_BRANCH line that every
+# other consumer reads). Rename-day = edit the ONE declaration; nothing here.
 # Run from main worktree root. Requires: git, bash.
 # Design: copy only what main should contain, then re-apply main-only files.
 # Idempotent: safe to re-run.
 
 set -euo pipefail
 
-echo "==> MAIN-DAY SYNC: resyncing main from sklearn (whitelist)"
+echo "==> MAIN-DAY SYNC: resyncing main from $TRACK_BRANCH (whitelist)"
 
 # --- 0) Preconditions
 current_branch=$(git symbolic-ref --short HEAD)
@@ -29,13 +32,15 @@ cp README.md "$TMPDIR/README.md" 2>/dev/null || true
 cp GOVERNANCE-POINTER.md "$TMPDIR/GOVERNANCE-POINTER.md" 2>/dev/null || true
 
 # --- 2) Fetch dev
-echo "==> Fetching origin/sklearn"
-git fetch origin sklearn
+TRACK_BRANCH="$(sed -n 's/^PARITY_TRACK_BRANCH=\([A-Za-z0-9_.-]*\).*/\1/p' scripts/check_branch_parity.sh | head -1)"
+[ -n "$TRACK_BRANCH" ] || { echo "No PARITY_TRACK_BRANCH declaration in scripts/check_branch_parity.sh" >&2; exit 1; }
+echo "==> Fetching origin/$TRACK_BRANCH"
+git fetch origin "$TRACK_BRANCH"
 
 # --- 3) WHITELIST: only what main should contain
-echo "==> Checking out platform surface from sklearn (whitelist)"
+echo "==> Checking out platform surface from $TRACK_BRANCH (whitelist)"
 # Platform core + tests + demo + gates + shared infra
-git checkout origin/sklearn -- \
+git checkout "origin/$TRACK_BRANCH" -- \
   src/ \
   tests/ \
   demo/ \
@@ -50,7 +55,7 @@ git checkout origin/sklearn -- \
   2>&1 | tail -5
 
 # Configs (platform-owned, generic)
-git checkout origin/sklearn -- \
+git checkout "origin/$TRACK_BRANCH" -- \
   configs/dataset/ \
   configs/analysis/ \
   configs/environment/ \

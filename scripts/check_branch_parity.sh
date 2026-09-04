@@ -1,14 +1,13 @@
 #!/usr/bin/env bash
-# Branch parity gate — keep main and taxi's SHARED surface in lockstep.
+# Branch parity gate — keep main and the track line's SHARED surface in
+# lockstep. The repo has a deliberate split: the track branch is the only
+# active development line (agents/contracts/MAIN_AGENT_CONTRACT.md §2); main
+# is frozen until a human-declared main-day. The track branch's NAME is said
+# ONCE, in the PARITY_TRACK_BRANCH declaration below — no other file
+# hard-codes it (say-it-once law 2026-09-02).
 #
-# The repo has a deliberate split:
-#   * sklearn — the only active development line (agents/contracts/MAIN_AGENT_CONTRACT.md §2);
-#             taxi fast-forwards to it after each green push; main is frozen
-#             until declared main-day.
-#
-# src/, tests/, demo/, scripts/, experiments/more_modeling/, the synthetic-demo
-# configs, and the deployment files (k8s/, docker/, .github/workflows/) are
-# meant to be IDENTICAL on both
+# src/, tests/, demo/, scripts/, the synthetic-demo configs, and the
+# deployment files (.github/workflows/) are meant to be IDENTICAL on both
 # branches. This script fails loudly the moment they drift — including
 # deletions and content changes — so a change made on one branch cannot
 # silently diverge.
@@ -16,7 +15,7 @@
 # ERA-AWARE (D16): behaviour is gated by the era declaration, INLINED below
 # (D21 relocated it from .github/parity-era.env — see "Era declaration").
 # PARITY_ERA=dev means
-# sklearn is the active line and main is frozen (every event runs frozen-main
+# euromonitor is the active line and main is frozen (every event runs frozen-main
 # custody, then branch-aware pass-along guards); PARITY_ERA=main is lockstep
 # day (stock check / --sync). There is no environment-variable dialect.
 #
@@ -39,33 +38,27 @@ fi
 
 # The intended shared surface — paths that must be byte-identical on both
 # branches. Keep this list explicit: anything NOT listed is deliberately
-# taxi-only or main-only.
+# track-only or main-only. This list MUST stay in lockstep with the
+# main-day whitelist in scripts/main_day_sync.sh — the two are the same law
+# (say-it-once: extend both together or neither).
 SHARED=(
   src/
   tests/
   demo/
-  configs/dataset/test.yaml
-  configs/experiment/baseline.yaml
-  configs/experiment/engineered.yaml
-  configs/experiment/hyperopt.yaml
-  configs/analysis/test.yaml
-  configs/analysis/test_hypothesis.yaml
-  configs/analysis/test_causal.yaml
-  configs/step/causal.yaml
-  configs/step/etl.yaml
+  scripts/
+  .github/workflows/
   configs/environment/
   configs/flow/
-  k8s/
-  docker/
-  .github/workflows/
+  configs/dataset/
+  configs/analysis/
+  configs/experiment/
+  configs/step/
+  configs/sample/
   pyproject.toml
   Dockerfile
   docker-compose.yml
   .gitignore
   .dockerignore
-  README.md
-  scripts/
-  experiments/more_modeling/
 )
 
 check() {
@@ -74,8 +67,8 @@ check() {
   for path in "${SHARED[@]}"; do
     # Byte-identical between the two branch tips (deletions included: if one
     # side lacks the path, git diff reports it and we fail).
-    if ! git diff --exit-code --quiet "origin/main" "origin/taxi" -- "$path" 2>/dev/null; then
-      echo "DRIFT: $path differs between origin/main and origin/taxi" >&2
+    if ! git diff --exit-code --quiet "origin/main" "origin/$PARITY_TRACK_BRANCH" -- "$path" 2>/dev/null; then
+      echo "DRIFT: $path differs between origin/main and origin/$PARITY_TRACK_BRANCH" >&2
       drifted=1
     fi
   done
@@ -83,23 +76,23 @@ check() {
     echo "PARITY FAILED — shared surface drifted. Run: $0 --sync" >&2
     return 1
   fi
-  echo "PARITY OK — shared surface is identical on origin/main and origin/taxi"
+  echo "PARITY OK — shared surface is identical on origin/main and origin/$PARITY_TRACK_BRANCH"
 }
 
 sync_to_main() {
   local path
-  # Work from a clean main checkout against the latest taxi.
+  # Work from a clean main checkout against the latest track ref.
   git fetch origin
   git checkout main
-  git checkout taxi -- "${SHARED[@]}"
+  git checkout "$PARITY_TRACK_BRANCH" -- "${SHARED[@]}"
   # Deletions do not propagate with checkout — mirror them too.
   local f
   while IFS= read -r f; do
-    if ! git cat-file -e "origin/taxi:$f" 2>/dev/null; then
+    if ! git cat-file -e "origin/$PARITY_TRACK_BRANCH:$f" 2>/dev/null; then
       git rm -f --ignore-unmatch "$f" >/dev/null 2>&1 || true
     fi
-  done < <(git diff --name-only --diff-filter=AD "origin/main" "origin/taxi" -- "${SHARED[@]}" || true)
-  echo "SYNCED taxi -> main for shared surface. Review, run gates, commit, push."
+  done < <(git diff --name-only --diff-filter=AD "origin/main" "origin/$PARITY_TRACK_BRANCH" -- "${SHARED[@]}" || true)
+  echo "SYNCED $PARITY_TRACK_BRANCH -> main for shared surface. Review, run gates, commit, push."
 }
 
 # --- Era declaration INLINE (D21: no separate env file, zero SHARED lines) ---
@@ -108,8 +101,8 @@ sync_to_main() {
 # the main-day flip act (D16c). NOTE for scripts/run_local_ci.sh's F1b guard:
 # the `^PARITY_ERA=` line is the staleness marker — a track ref whose checker
 # lacks it predates D16/D21 and must not gate CI.
-PARITY_ERA=dev                 # dev: sklearn active, main frozen | main: lockstep day
-PARITY_TRACK_BRANCH=sklearn    # active development line during dev era
+PARITY_ERA=dev                 # dev: euromonitor active, main frozen | main: lockstep day
+PARITY_TRACK_BRANCH=euromonitor # active development line during dev era (owner ruling 2026-09-02: ex-sklearn line retired)
 PARITY_ALLOWLIST=()            # SHARED paths exempt from custody; extend only by cited ruling
 PARITY_MAIN_ANCHOR=6f102f29079d9911f79c0069f6ee2eea9ef62065  # re-anchored 2026-09-01 by owner ruling ("yes anchor, continue"): the Aug-31 reroot series IS the ratified frozen state; old anchor 70f4e5d superseded
 
@@ -149,7 +142,7 @@ custody() {
   fi
   #
   # (2) Blob provenance: every blob on main's tip under SHARED must already
-  #     exist somewhere in taxi's object universe (comm -23 = in main, not in
+  #     exist somewhere in the track ref's object universe (comm -23 = in main, not in
   #     universe). Allowlisted paths are skipped. Secondary layer — catches
   #     novel-content adds; the anchor diff above catches deletions/mods.
   # D21 rider: main and track lines are DISJOINT histories (no common
@@ -207,18 +200,10 @@ case "$PARITY_ERA" in
     # Branch-aware pass-along (F4: GITHUB_REF_NAME-first).
     if [[ -z "$branch" || "$branch" == "main" ]]; then
       :  # dead case, explicit: empty / main / PR-merge refs — custody-only
-    elif [[ "$branch" == "taxi" ]]; then
-      # Pushing TO taxi requires the fast-forward to already be complete.
-      if ! git diff --exit-code --quiet "origin/$PARITY_TRACK_BRANCH" origin/taxi -- "${SHARED[@]}"; then
-        echo "TAXI DRIFT: origin/taxi is not byte-identical to origin/$PARITY_TRACK_BRANCH on the shared surface — complete the fast-forward before pushing to taxi" >&2
-        exit 1
-      fi
     elif [[ "$branch" == "$PARITY_TRACK_BRANCH" ]]; then
-      # Pushing TO the track branch: taxi may lag, never fork.
-      if ! git merge-base --is-ancestor origin/taxi "origin/$branch"; then
-        echo "FORK: origin/taxi is not an ancestor of origin/$branch — taxi may lag, never fork" >&2
-        exit 1
-      fi
+      :  # the track branch itself — custody above is the whole law
+      # (2026-09-02 branch surgery: taxi/taxi_work/sklearn retired by owner
+      #  ruling; the former taxi-mirror drift/fork arms went with them)
     else
       :  # any other named ref — custody-only
     fi

@@ -30,8 +30,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import shlex
+import subprocess
 import sys
 import time
 from collections.abc import Callable
@@ -39,7 +41,10 @@ from datetime import UTC, datetime
 from typing import Any
 
 # --- Law-pinned constants (D23 + STATE.md ## TELEMETRY; not free choices) ---
-DEFAULT_BRANCH = "sklearn"  # D23: probe rides the sklearn branch tip
+# D23: the probe rides the CURRENT checkout's branch — never a hard-coded
+# name (say-it-once law 2026-09-02). CI supplies GITHUB_REF_NAME; a local
+# run falls back to the checked-out HEAD's symbolic ref.
+DEFAULT_BRANCH_ENV_VARS = ("GITHUB_REF_NAME", "GIT_BRANCH", "BRANCH_NAME")
 PAGE_LIMIT = "30"  # STATE.md hazard: LIST endpoints default to page size 30
 EXPECTED_CONCLUSION = "success"  # a green tip is the recording precondition
 POLL_INTERVAL_S = 15.0
@@ -328,6 +333,21 @@ def print_plan_lines(lines: list[str]) -> None:
 
 
 # --- CLI wiring ---
+def _current_branch() -> str:
+    """Current checkout's branch name; 'main' fallback for detached HEAD.
+
+    A hard failure here would make plan-only invocations impossible on a
+    detached HEAD, so the fallback keeps the probe usable while the
+    orchestrator supplies the explicit --branch it knows.
+    """
+    result = subprocess.run(
+        ["git", "symbolic-ref", "--short", "HEAD"],
+        capture_output=True, text=True, timeout=10, check=False,
+    )
+    branch = result.stdout.strip()
+    return branch or "main"
+
+
 def parse_args(argv: list[str] | None) -> argparse.Namespace:
     """Parse and sanity-check CLI arguments; usage errors exit 2."""
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
@@ -336,8 +356,12 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
                         help="0-based byte offset of the one-byte tweak")
     parser.add_argument("--note", required=True,
                         help="verbatim description of the inert byte change")
-    parser.add_argument("--branch", default=DEFAULT_BRANCH,
-                        help=f"target branch (default: {DEFAULT_BRANCH})")
+    branch_default = next(
+        (os.environ[var] for var in DEFAULT_BRANCH_ENV_VARS if os.environ.get(var)),
+        None,
+    ) or _current_branch()
+    parser.add_argument("--branch", default=branch_default,
+                        help=f"target branch (default: current checkout's branch: {branch_default})")
     parser.add_argument("--appear-timeout-s", type=float,
                         default=RUN_APPEAR_TIMEOUT_S)
     parser.add_argument("--conclude-timeout-s", type=float,

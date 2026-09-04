@@ -25,7 +25,7 @@
 - GATE-SURF-106
 --force flag:
 - GATE-TLINE-54
-? '24-entry SHARED surface: src/ tests/ demo/ configs/dataset/test.yaml configs/experiment/{baseline,engineered,hyperopt}.yaml configs/analysis/{test,test_hypothesis,test_causal}.yaml configs/step/{causal,etl}.yaml configs/environment/ configs/flow/ k8s/ docker/ .github/workflows/ pyproject.toml Dockerfile docker-compose.yml .gitignore .dockerignore README.md scripts/'
+? '17-entry SHARED surface: src/ tests/ demo/ scripts/ .github/workflows/ configs/environment/ configs/flow/ configs/dataset/ configs/analysis/ configs/experiment/ configs/step/ configs/sample/ pyproject.toml Dockerfile docker-compose.yml .gitignore .dockerignore'
 : - GATE-INFRA-93
 <dataset>_join_audit.json:
 - GATE-SURF-63
@@ -203,7 +203,7 @@ FileNotFoundError "sample dataset not found" (:127-129):
 - GATE-STATS-41
 FrozenTrial states/values/user attrs from the optimize callbacks hook:
 - GATE-HPO-83
-GITHUB_REF_NAME else `git rev-parse --abbrev-ref HEAD` (:187):
+GITHUB_REF_NAME else `git rev-parse --abbrev-ref HEAD` (:180):
 - GATE-INFRA-94
 GitHub Project:
 - GATE-INFRA-148
@@ -232,13 +232,13 @@ ModelHPOSpec.name registry key:
 - GATE-HPO-81
 Objective(params[, trial]) -> float closure; per-trial 'broadway_metrics' user attr:
 - GATE-HPO-81
-PARITY OK (era=… branch=…) | FATAL anchor shape/resolution errors | TAXI DRIFT | FORK | REFUSED (--sync off-era):
+PARITY OK (era=… branch=…) | FATAL anchor shape/resolution errors | REFUSED (--sync off-era):
 - GATE-INFRA-94
-'PARITY OK | DRIFT: <path> differs … PARITY FAILED — run $0 --sync':
+'PARITY OK | DRIFT: <path> differs between origin/main and origin/$PARITY_TRACK_BRANCH':
 - GATE-INFRA-93
 PARITY_ALLOWLIST=() prefix skips (:168-177):
 - GATE-INFRA-95
-PARITY_MAIN_ANCHOR=18607091ddbb2602ad4475341ad377bafee5ec4b (:114):
+PARITY_MAIN_ANCHOR=6f102f29079d9911f79c0069f6ee2eea9ef62065 (:107, re-anchored 2026-09-01 owner ruling):
 - GATE-INFRA-95
 PASS/FAIL graphify banner + KNOWN_UNMAPPED baseline report:
 - GATE-INFRA-149
@@ -739,12 +739,12 @@ ordered list[str] of concrete step names for the analysis mode:
 - GATE-CFG-78
 origin refs:
 - GATE-INFRA-94
+origin/$PARITY_TRACK_BRANCH (euromonitor) object universe (rev-list --objects :178):
+- GATE-INFRA-95
 origin/main SHARED subtree:
 - GATE-INFRA-95
-origin/main vs origin/taxi tips:
+origin/main vs origin/$PARITY_TRACK_BRANCH (euromonitor per 2026-09-02 owner ruling) tips:
 - GATE-INFRA-93
-origin/sklearn object universe (rev-list --objects :178):
-- GATE-INFRA-95
 pa.DataFrameSchema:
 - GATE-CFG-75
 pa.DataFrameSchema with op-derived pa.Checks (_CHECK_BUILDERS map loader.py:24-31); validated Sample(df, spec, provenance):
@@ -831,6 +831,7 @@ project/data/euromonitor/dataset.csv:
 - GATE-SURF-127
 - GATE-SURF-128
 - GATE-SURF-139
+- GATE-SURF-140
 project/data/euromonitor/dataset_deduped.csv:
 - GATE-SURF-104
 - GATE-SURF-106
@@ -844,6 +845,7 @@ project/data/euromonitor/dataset_deduped.csv:
 - GATE-SURF-134
 - GATE-SURF-135
 - GATE-SURF-137
+- GATE-SURF-140
 project/data/euromonitor/eda.parquet (evidence):
 - GATE-SURF-103
 project/data/euromonitor/embeddings_cache (bi-encoder .npz, all-MiniLM-L6-v2):
@@ -852,6 +854,7 @@ project/data/euromonitor/sku_to_rep.csv:
 - GATE-SURF-127
 - GATE-SURF-135
 - GATE-SURF-139
+- GATE-SURF-140
 project/experiments/euromonitor/07_nlp_hpo.py pair construction (same 10,891 pos / 10,000 neg population as step 04):
 - GATE-HPO-154
 project/experiments/euromonitor/entity_resolution.ipynb:
@@ -967,6 +970,7 @@ project/experiments/results/euromonitor/05b_exact_duplicates.png:
 - GATE-SURF-126
 project/experiments/results/euromonitor/06_ambiguous_offer_groups.csv:
 - GATE-SURF-127
+- GATE-SURF-140
 project/experiments/results/euromonitor/06_dedupe_summary.csv:
 - GATE-SURF-127
 project/experiments/results/euromonitor/06b_conflicting_barcode_groups.csv:
@@ -1015,9 +1019,24 @@ project/experiments/results/euromonitor/07e_cross_encoder_pairs.csv:
 - GATE-SURF-137
 project/experiments/results/euromonitor/07e_cross_encoder_rerank.csv:
 - GATE-SURF-137
+project/experiments/results/euromonitor/08_act1_dedup_pairs.csv:
+- GATE-SURF-140
+project/experiments/results/euromonitor/08_act1_funnel.csv:
+- GATE-SURF-140
+project/experiments/results/euromonitor/08_act1_regex_examples.csv:
+- GATE-SURF-140
+project/experiments/results/euromonitor/08_act2_fisher.csv:
+- GATE-SURF-140
+project/experiments/results/euromonitor/08_act2_four_pop.csv:
+- GATE-SURF-140
+project/experiments/results/euromonitor/08_act2_ground_truth.csv:
+- GATE-SURF-140
+project/experiments/results/euromonitor/08_act2_proxy.csv:
+- GATE-SURF-140
 project/experiments/results/euromonitor/sku_to_item.csv:
 - GATE-SURF-136
 - GATE-SURF-139
+- GATE-SURF-140
 project/experiments/results/univariate/fare_amount_trip_distance/ratecode1_sample.parquet|.json (pinned, tracked):
 - GATE-SURF-68
 'project/tests/** (project-tests: full tier only, -q --dist worksteal, NO coverage flags)':
@@ -1198,7 +1217,7 @@ suggest.suggest_next (suggest.py:312 decided_ids):
 - GATE-TLINE-51
 suggestion pass:
 - GATE-TLINE-53
-'sync mode: taxi→main checkout + deletion mirror (:89-103)':
+'sync mode: track-branch→main checkout + deletion mirror (:82-95)':
 - GATE-INFRA-93
 target:
 - GATE-FEAT-24

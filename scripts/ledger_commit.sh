@@ -97,8 +97,14 @@ if [[ -z "$state_ids" ]]; then
 fi
 while IFS= read -r sid; do
   [[ -n "$sid" ]] || continue
-  if ! grep -Eq "^\|[[:space:]]*${sid}[[:space:]]*\|" "$STATE_FILE"; then
-    die "cited $sid is not a row in $STATE_FILE CURRENT (create it first via: agents/tools/state_records.py record add)."
+  if grep -Eq "^\|[[:space:]]*${sid}[[:space:]]*\|" "$STATE_FILE"; then
+    continue   # a CURRENT row — the normal case
+  fi
+  # Terminal case: a close/void commit cites the row it dispositions; that
+  # row has LEFT CURRENT and lives in the archive under its marker. The id
+  # must resolve SOMEWHERE (current or archive), never free-float.
+  if ! grep -rq "STATE-ARCHIVE:${sid}" agents/ledger/archive/; then
+    die "cited $sid resolves in neither $STATE_FILE CURRENT nor the archive (create it first via: agents/tools/state_records.py record add)."
   fi
 done <<< "$state_ids"
 

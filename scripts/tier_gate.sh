@@ -135,9 +135,10 @@ tg_events_resolves() {
 
   # Authority registration must occur in a table row. Keep this deliberately
   # narrow: arbitrary prose or another event's description cannot register an
-  # id merely by mentioning it.
+  # id merely by mentioning it. (-q: this helper is rc-only; its caller
+  # captures stdout as a refusal reason, so a match must NOT print.)
   printf '%s\n' "$events" |
-    grep -Ei \
+    grep -Eiq \
       "^\|.*${escaped}.*valid[[:space:]]+Reviewer:-trailer[[:space:]]+resolution[[:space:]]+target.*\|"
 }
 

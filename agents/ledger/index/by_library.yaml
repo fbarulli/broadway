@@ -37,6 +37,8 @@ agents/contracts/MAIN_AGENT_CONTRACT.md §Ship-path law:
 - GATE-INFRA-90
 agents/contracts/MAIN_AGENT_CONTRACT.md §Ship-path law (:148-155):
 - GATE-INFRA-96
+agents/contracts/WORKER_CONTRACT.md §2 (points to this declaration):
+- GATE-INFRA-93
 agents/ledger/DECISIONS.md D16/D21 (design + relocation):
 - GATE-INFRA-94
 'agents/ledger/DECISIONS.md D16a/D26 (gate-list SSOT law: edit HERE, never YAML)':
@@ -213,6 +215,7 @@ broadway.training.nlp:
 - GATE-SURF-135
 - GATE-SURF-137
 - GATE-SURF-139
+- GATE-SURF-140
 broadway.viz.palette_colors (:112 — indirect viz.yaml disk read, see GATE-STATS-48 FINDING):
 - GATE-STATS-49
 broadway.viz.palette_colors — INDIRECT CONFIG READ (see FINDING):
@@ -354,6 +357,7 @@ numpy:
 - GATE-SURF-137
 - GATE-SURF-138
 - GATE-SURF-139
+- GATE-SURF-140
 - GATE-HPO-81
 - GATE-HPO-88
 numpy(np.isinf sibling require_finite):
@@ -435,6 +439,7 @@ pandas:
 - GATE-SURF-137
 - GATE-SURF-138
 - GATE-SURF-139
+- GATE-SURF-140
 - GATE-HPO-81
 - GATE-HPO-84
 pandas (df ops):
@@ -485,6 +490,8 @@ project.etl.process_config (indirectly via caller chain):
 - GATE-ETL-17
 project/data.py:
 - GATE-STATS-43
+project/experiments/euromonitor/make_notebook.py (reads these CSVs when baking the ipynb):
+- GATE-SURF-140
 psycopg2-binary:
 - GATE-HPO-86
 pydantic:
@@ -544,20 +551,24 @@ scipy:
 - GATE-SURF-138
 scipy.stats:
 - GATE-STATS-45
+- GATE-SURF-140
 scipy.stats (levene/skew/kurtosis/shapiro):
 - GATE-STATS-46
 scripts/check_branch_parity.sh:111 (the marker line itself):
 - GATE-INFRA-91
 scripts/check_e2e_determinism.sh:174-187:
 - GATE-CFG-70
+scripts/main_day_sync.sh (parses PARITY_TRACK_BRANCH from this file):
+- GATE-INFRA-93
+- GATE-INFRA-94
+scripts/run_local_ci.sh (consumes pinned copy of THIS file):
+- GATE-INFRA-93
+scripts/run_local_ci.sh (marker grep keys on ^PARITY_ERA=):
+- GATE-INFRA-94
+scripts/run_local_ci.sh (runs pinned custody on every CI event):
+- GATE-INFRA-95
 scripts/run_local_ci.sh header (CI-only roster naming):
 - GATE-INFRA-99
-scripts/run_local_ci.sh:30 (consumes pinned copy of THIS file):
-- GATE-INFRA-93
-scripts/run_local_ci.sh:30 (runs pinned custody on every CI event):
-- GATE-INFRA-95
-scripts/run_local_ci.sh:36 (marker grep keys on ^PARITY_ERA=):
-- GATE-INFRA-94
 scripts/run_local_ci.sh:47-51 (loads all configs/experiment/*.yaml through this gate):
 - GATE-CFG-73
 scripts/run_local_ci.sh:47-51 configs gate:
@@ -650,7 +661,7 @@ step-section attachment (loader.py:144):
 - GATE-CFG-71
 tests reading the files back:
 - GATE-TLINE-56
-tests/test_branch_parity_scripts.py:66 (parses SHARED array):
+tests/test_branch_parity_scripts.py (parses SHARED array):
 - GATE-INFRA-93
 tests/test_cli.py TestWalkthroughCLI:
 - GATE-TLINE-59

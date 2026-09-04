@@ -233,9 +233,9 @@ jobs:
 
       # Protected refs ONLY: package the exact sha-tagged images that just
       # passed boot tests, so cd publishes bit-for-bit what was verified —
-      # zero rebuilds downstream. sklearn/PR runs deploy nothing.
+      # zero rebuilds downstream. dev-line/PR runs deploy nothing.
       - name: Package verified deployment images
-        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/taxi')
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main')
         run: |
           docker save \
             broadway:${{ github.sha }} \
@@ -246,7 +246,7 @@ jobs:
       # compression-level: 0 — Docker layers arrive compressed; don't pay CPU
       # to recompress them.
       - name: Upload verified images
-        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/taxi')
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main')
         uses: actions/upload-artifact@v4
         with:
           name: verified-images-${{ github.sha }}
@@ -256,23 +256,23 @@ jobs:
           if-no-files-found: error
 
   # CD — publish to GHCR the EXACT images build-and-boot just tested, on push
-  # to main/taxi ONLY (never PRs; sklearn deploys nothing). No checkout, no
+  # to main ONLY (never PRs; dev lines deploy nothing). No checkout, no
   # rebuilds: the job downloads the artifact packaged above and re-tags it, so
   # what ships is bit-for-bit what passed every gate. lifecycle.sh consumes
   # the pushed tag via OPTUNA_WORKER_IMAGE.
   #
   # Tag law: push to main ⇒ worker/mlflow get their commit-sha tag AND
-  # :latest; push to taxi ⇒ the sha tag AND :taxi. broadway-base stays
+  # :latest. broadway-base stays
   # CI-private (internal FROM parent, not a deployable surface).
   cd:
     name: CD (push images to GHCR)
     needs: [platform, build-and-boot]
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/taxi')
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
     # Serialize deploys per ref: overlapping runs must never interleave
-    # :latest / :taxi layer pushes into a torn mutable tag.
+    # :latest layer pushes into a torn mutable tag.
     concurrency:
       group: cd-${{ github.ref }}
       cancel-in-progress: false
@@ -299,7 +299,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # sha tag always; :latest only from main; :taxi only from taxi.
+      # sha tag always; :latest only from main.
       - name: Push verified images to GHCR
         shell: bash
         run: |
@@ -317,8 +317,4 @@ jobs:
               docker push "$registry/$img:latest"
             fi
 
-            if [ "$ref" = "refs/heads/taxi" ]; then
-              docker tag "$img:${{ github.sha }}" "$registry/$img:taxi"
-              docker push "$registry/$img:taxi"
-            fi
           done

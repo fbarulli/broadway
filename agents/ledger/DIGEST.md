@@ -1,6 +1,6 @@
 # DIGEST.md — rendered from agents/ledger/gates.yaml · NEVER HAND-EDIT ·
 
-> 165 gates · rendered 2026-09-02 @ HEAD b9100f3 · load THIS into context;
+> 166 gates · rendered 2026-09-04 @ HEAD 854d124 · load THIS into context;
 > gates.yaml is the sole SSOT; the retired GATES.md/gates/*.md markdown world survives in agents/ledger/arbitration/2026-08-24/surface-and-analysis-preservation.md.
 
 | band | phase | gates | findings |
@@ -11,12 +11,12 @@
 | 04-training | training-eval | 12 | 11 |
 | 05-stats | stats | 11 | 7 |
 | 06-timeline | timeline-lineage | 11 | 7 |
-| 07-surfaces | surfaces | 50 | 1 |
+| 07-surfaces | surfaces | 51 | 1 |
 | 08-config | config-schema | 15 | 10 |
 | 80-hpo-optuna | hpo-optuna | 10 | 8 |
 | 09-infra | infra-meta | 26 | 14 |
 | 81-object-custody | object-custody | 3 | 0 |
-| **total** | | **165** | **75** |
+| **total** | | **166** | **75** |
 
 ### 01-ingest — ingest
 
@@ -244,7 +244,7 @@
   [project/data/euromonitor/dataset_deduped.csv, project/config/experiments/nlp.yaml] → [project/experiments/results/euromonitor/07_nlp_hpo_benchmark.csv, project/experiments/results/euromonitor/07_nlp_hpo_timing.csv, project/experiments/results/euromonitor/07_nlp_hpo_pareto.png] · pins: none direct
 - **GATE-SURF-131** `project/experiments/euromonitor/07b_finetune.py:95 main()`
   [project/data/euromonitor/dataset_deduped.csv] → [project/experiments/results/euromonitor/07b_four_pop_scores.csv] · pins: none direct
-- **GATE-SURF-132** `project/experiments/euromonitor/07c_field_ablation.py:30 main()`
+- **GATE-SURF-132** `project/experiments/euromonitor/07c_field_ablation.py:53 main() (build_cross_country_pairs :37)`
   [project/data/euromonitor/dataset_deduped.csv] → [project/experiments/results/euromonitor/07c_field_ablation.csv] · pins: none direct
 - **GATE-SURF-133** `project/experiments/euromonitor/07d_data_scaling.py:35 main()`
   [project/data/euromonitor/dataset_deduped.csv] → [project/experiments/results/euromonitor/07d_data_scaling.csv] · pins: none direct
@@ -260,6 +260,8 @@
   [] → [(shared) rep-level ITEM_ID + linking stats (n_items, edges, soft admitted/blocked, cand_pairs)] · pins: none direct
 - **GATE-SURF-139** `project/experiments/euromonitor/08_pipeline.py:33 main()`
   [project/data/euromonitor/dataset.csv, project/data/euromonitor/sku_to_rep.csv] → [project/experiments/results/euromonitor/sku_to_item.csv] · pins: none direct
+- **GATE-SURF-140** `project/experiments/euromonitor/08_data_prep.py:49 main() (helpers :51 _regex_examples, :58 _dedup_pairs, :66 _funnel, :74 _embed)`
+  [project/data/euromonitor/dataset.csv, project/data/euromonitor/dataset_deduped.csv, project/data/euromonitor/sku_to_rep.csv, project/experiments/results/euromonitor/06_ambiguous_offer_groups.csv, project/experiments/results/euromonitor/sku_to_item.csv] → [project/experiments/results/euromonitor/08_act1_regex_examples.csv, project/experiments/results/euromonitor/08_act1_dedup_pairs.csv, project/experiments/results/euromonitor/08_act1_funnel.csv, project/experiments/results/euromonitor/08_act2_ground_truth.csv, project/experiments/results/euromonitor/08_act2_proxy.csv, project/experiments/results/euromonitor/08_act2_four_pop.csv, project/experiments/results/euromonitor/08_act2_fisher.csv] · pins: none direct
 
 ### 08-config — config-schema
 
@@ -325,12 +327,12 @@
   [refs/remotes/origin/sklearn:scripts/check_branch_parity.sh via `git show` (:33)] → [parity sub-verdict to run() aggregator, FAIL parity (F1b): origin/sklearn unavailable | legacy pre-D16 checker on track ref] · pins: 3
 - **GATE-INFRA-92** `scripts/run_local_ci.sh:102 gate battery (ruff, mypy, Vulture, configs, shell-scripts, data-refs, graphify, pytest+cov floor=95, project-tests)` ⚠FINDING
   [src/** tests/test_project_paths.py project/experiments/** project/experiments.py project/dashboard.py project/paths.py project/working.py project/data.py scripts/check_project_paths.py scripts/ (ruff), project/config/ (project-owned layout, experiment, and config-overlay SSOT), src/broadway/** (mypy), configs/experiment/*.yaml via load_config(dataset='test') (configs), k8s/optuna/*.sh + scripts/*.sh via sh -n + shellcheck (shell-scripts), Dockerfile COPY/ADD sources + ci.yml -f dockerfile + k8s/*.yaml + config parquet/path/file refs via scripts/check_data_refs.py against project/config/layout.yaml build:* (data-refs), graphify-out/graph.json callables vs agents/ledger/gates.yaml owner fields via scripts/check_graphify_surfaces.py (graphify), src/broadway project scripts via Vulture --min-confidence 95 (vulture), tests/** (pytest -n 4 --dist worksteal, --cov-fail-under=95), project/tests/** (project-tests: full tier only, -q --dist worksteal, NO coverage flags)] → [PASS/FAIL ruff|mypy|configs|project-paths|shell-scripts|data-refs|graphify|vulture|pytest|project-tests banners + 40-line tails, cov floor breach ⇒ FAIL pytest] · pins: 4
-- **GATE-INFRA-93** `scripts/check_branch_parity.sh:71 check() (SHARED lockstep, list at :43-69) + sync_to_main() :89` ⚠FINDING
-  [24-entry SHARED surface: src/ tests/ demo/ configs/dataset/test.yaml configs/experiment/{baseline,engineered,hyperopt}.yaml configs/analysis/{test,test_hypothesis,test_causal}.yaml configs/step/{causal,etl}.yaml configs/environment/ configs/flow/ k8s/ docker/ .github/workflows/ pyproject.toml Dockerfile docker-compose.yml .gitignore .dockerignore README.md scripts/, origin/main vs origin/taxi tips] → [PARITY OK | DRIFT: <path> differs … PARITY FAILED — run $0 --sync, sync mode: taxi→main checkout + deletion mirror (:89-103)] · pins: 3
-- **GATE-INFRA-94** `scripts/check_branch_parity.sh:111 inline era declaration PARITY_ERA/PARITY_TRACK_BRANCH/PARITY_ALLOWLIST/PARITY_MAIN_ANCHOR (:111-114) + anchor guards :121-132 + dev-era dispatch :192-226` ⚠FINDING
-  [inline constants (no env dialect, D21), GITHUB_REF_NAME else `git rev-parse --abbrev-ref HEAD` (:187), origin refs] → [PARITY OK (era=… branch=…) | FATAL anchor shape/resolution errors | TAXI DRIFT | FORK | REFUSED (--sync off-era)] · pins: 2
-- **GATE-INFRA-95** `scripts/check_branch_parity.sh:134 custody() — layer 1 anchor-drift diff :146, freeze-intact shortcut :162, layer 2 blob-provenance comm -23 :166` ⚠FINDING
-  [PARITY_MAIN_ANCHOR=18607091ddbb2602ad4475341ad377bafee5ec4b (:114), origin/main SHARED subtree, origin/sklearn object universe (rev-list --objects :178), PARITY_ALLOWLIST=() prefix skips (:168-177)] → [ROGUE MAIN WRITE: frozen main changed since anchor … (adds/deletes/mods), ROGUE MAIN WRITE: novel blob(s) absent from track universe (head -10), silent return 0 via shortcut when main==anchor] · pins: none direct
+- **GATE-INFRA-93** `scripts/check_branch_parity.sh:64 check() (SHARED lockstep, list at :44-63) + sync_to_main() :82` ⚠FINDING
+  [17-entry SHARED surface: src/ tests/ demo/ scripts/ .github/workflows/ configs/environment/ configs/flow/ configs/dataset/ configs/analysis/ configs/experiment/ configs/step/ configs/sample/ pyproject.toml Dockerfile docker-compose.yml .gitignore .dockerignore, origin/main vs origin/$PARITY_TRACK_BRANCH (euromonitor per 2026-09-02 owner ruling) tips] → [PARITY OK | DRIFT: <path> differs between origin/main and origin/$PARITY_TRACK_BRANCH, sync mode: track-branch→main checkout + deletion mirror (:82-95)] · pins: 3
+- **GATE-INFRA-94** `scripts/check_branch_parity.sh:104 inline era declaration PARITY_ERA/PARITY_TRACK_BRANCH/PARITY_ALLOWLIST/PARITY_MAIN_ANCHOR (:104-107) + anchor guards + dev-era dispatch (:187-211)` ⚠FINDING
+  [inline constants (no env dialect, D21), GITHUB_REF_NAME else `git rev-parse --abbrev-ref HEAD` (:180), origin refs] → [PARITY OK (era=… branch=…) | FATAL anchor shape/resolution errors | REFUSED (--sync off-era)] · pins: 2
+- **GATE-INFRA-95** `scripts/check_branch_parity.sh:127 custody() — layer 1 anchor-drift diff :147, freeze-intact shortcut :162, layer 2 blob-provenance comm -23 :166` ⚠FINDING
+  [PARITY_MAIN_ANCHOR=6f102f29079d9911f79c0069f6ee2eea9ef62065 (:107, re-anchored 2026-09-01 owner ruling), origin/main SHARED subtree, origin/$PARITY_TRACK_BRANCH (euromonitor) object universe (rev-list --objects :178), PARITY_ALLOWLIST=() prefix skips (:168-177)] → [ROGUE MAIN WRITE: frozen main changed since anchor … (adds/deletes/mods), ROGUE MAIN WRITE: novel blob(s) absent from track universe (head -10), silent return 0 via shortcut when main==anchor] · pins: none direct
 - **GATE-INFRA-96** `scripts/ship.sh:24 ship gate (`if ! bash scripts/run_local_ci.sh` → refuse :24-27; single push later) + WAVE-A teeth insertions (:15-19 tier_gate sourcing, :31-40 L1 hook guard, :42-53 TIER-GATE batch) mirrored by .git/hooks/pre-push:5` ⚠FINDING
   [argv remote/refspec (default origin sklearn:sklearn :14), full-tier verdict of scripts/run_local_ci.sh] → [SHIP OK | SHIP REFUSED: LOCAL-CI RED … exit 1, single git push invocation → one hook gate (:25)] · pins: none direct
 - **GATE-INFRA-97** `scripts/check_e2e_determinism.sh:106 compare_trees() (json_diff whitelist :35-46, compare_file :89, --run chain run_e2e :163)` ⚠FINDING
@@ -357,7 +359,7 @@
   [uv editable-install discovery behavior] → [package-discovery guard contract (excludes the harness checkout, walks the repo root)] · pins: 2
 - **GATE-INFRA-141** `scripts/ship.sh push-path creator site for annotated tags (law: manual git tag -a mints ONLY via a named ledger-row procedure; NO scripted minter exists at HEAD)` ⚠FINDING
   [release/tag minting intent] → [published annotated tag with a ledger row naming its procedure] · pins: none direct
-- **GATE-INFRA-142** `scripts/check_branch_parity.sh:89 sync_to_main() ref-management site (stale-ref retirement law; objects: LOCAL refs refs/heads/pr-1 + pr-2, closed-unmerged snapshots)` ⚠FINDING
+- **GATE-INFRA-142** `scripts/check_branch_parity.sh:82 sync_to_main() ref-management site (stale-ref retirement law; objects: LOCAL refs refs/heads/pr-1 + pr-2, closed-unmerged snapshots)` ⚠FINDING
   [named local refs (pr-1/pr-2 and future strays)] → [retire-or-own verdict per named ref; detect-and-retire loop execution record] · pins: none direct
 - **GATE-INFRA-143** `.github/workflows/ci.yml:145 actions/cache@v4 cache retention/dedupe law`
   [CI cache key family (broadway-base hashFiles key)] → [one save-site per key family; size-budget watch; purge as invoked workflow step] · pins: none direct

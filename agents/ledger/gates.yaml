@@ -1,8 +1,8 @@
 # Gate registry SSOT — hand-maintained; the {01..09} gate fragments it consolidated predate git custody.
 meta:
-  head: 'b9100f3'
+  head: '854d124'
   counts:
-    total: 165
+    total: 166
     gates_with_findings: 75
     finding_strings: 99
     by_band:
@@ -2912,7 +2912,7 @@ gates:
 - id: GATE-SURF-132
   phase: surfaces
   order: 104
-  owner: project/experiments/euromonitor/07c_field_ablation.py:30 main()
+  owner: project/experiments/euromonitor/07c_field_ablation.py:53 main() (build_cross_country_pairs :37)
   inputs:
   - project/data/euromonitor/dataset_deduped.csv
   outputs:
@@ -3086,6 +3086,38 @@ gates:
   - project/experiments/euromonitor/_link.py
   - project/experiments/euromonitor/_blocking.py
   - project/experiments/euromonitor/_text.py
+  - src/broadway/training/nlp.py
+  findings: []
+- id: GATE-SURF-140
+  phase: surfaces
+  order: 112
+  owner: project/experiments/euromonitor/08_data_prep.py:49 main() (helpers :51 _regex_examples, :58 _dedup_pairs, :66 _funnel, :74 _embed)
+  inputs:
+  - project/data/euromonitor/dataset.csv
+  - project/data/euromonitor/dataset_deduped.csv
+  - project/data/euromonitor/sku_to_rep.csv
+  - project/experiments/results/euromonitor/06_ambiguous_offer_groups.csv
+  - project/experiments/results/euromonitor/sku_to_item.csv
+  outputs:
+  - project/experiments/results/euromonitor/08_act1_regex_examples.csv
+  - project/experiments/results/euromonitor/08_act1_dedup_pairs.csv
+  - project/experiments/results/euromonitor/08_act1_funnel.csv
+  - project/experiments/results/euromonitor/08_act2_ground_truth.csv
+  - project/experiments/results/euromonitor/08_act2_proxy.csv
+  - project/experiments/results/euromonitor/08_act2_four_pop.csv
+  - project/experiments/results/euromonitor/08_act2_fisher.csv
+  transforms:
+  - 'pre-computes the seven CSVs the deliverable notebook reads (nothing computed at runtime): Act 1 data mechanics (regex examples, dedupe pairs, funnel raw->deduped->ITEMs) + Act 2 matching evidence (ground-truth geography, silver cross-country proxy, four zero-shot score populations, Fisher exact on entity-level FN rates); deterministic (Act 1 seed 42, Act 2 series seed from the experiment config)'
+  touched_by:
+  - numpy
+  - pandas@2.3.3
+  - scipy.stats@fisher_exact
+  - broadway.training.nlp@load_cached_corpus
+  - project/experiments/euromonitor/make_notebook.py (reads these CSVs when baking the ipynb)
+  validated_by: []
+  if_changed:
+  - project/experiments/euromonitor/notebook.md
+  - project/experiments/euromonitor/_blocking.py
   - src/broadway/training/nlp.py
   findings: []
 - id: GATE-CFG-70
@@ -3940,84 +3972,88 @@ gates:
 - id: GATE-INFRA-93
   phase: infra-meta
   order: 140
-  owner: scripts/check_branch_parity.sh:71 check() (SHARED lockstep, list at :43-69) + sync_to_main() :89
+  owner: scripts/check_branch_parity.sh:64 check() (SHARED lockstep, list at :44-63) + sync_to_main() :82
   inputs:
-  - '24-entry SHARED surface: src/ tests/ demo/ configs/dataset/test.yaml configs/experiment/{baseline,engineered,hyperopt}.yaml configs/analysis/{test,test_hypothesis,test_causal}.yaml configs/step/{causal,etl}.yaml configs/environment/ configs/flow/ k8s/ docker/ .github/workflows/ pyproject.toml Dockerfile docker-compose.yml .gitignore .dockerignore README.md scripts/'
-  - origin/main vs origin/taxi tips
+  - '17-entry SHARED surface: src/ tests/ demo/ scripts/ .github/workflows/ configs/environment/ configs/flow/ configs/dataset/ configs/analysis/ configs/experiment/ configs/step/ configs/sample/ pyproject.toml Dockerfile docker-compose.yml .gitignore .dockerignore'
+  - origin/main vs origin/$PARITY_TRACK_BRANCH (euromonitor per 2026-09-02 owner ruling) tips
   outputs:
-  - 'PARITY OK | DRIFT: <path> differs … PARITY FAILED — run $0 --sync'
-  - 'sync mode: taxi→main checkout + deletion mirror (:89-103)'
+  - 'PARITY OK | DRIFT: <path> differs between origin/main and origin/$PARITY_TRACK_BRANCH'
+  - 'sync mode: track-branch→main checkout + deletion mirror (:82-95)'
   transforms:
-  - byte-identical git diff --exit-code per SHARED path, deletions included (:77)
-  - anything NOT listed is deliberately single-branch (:39-41)
-  - --sync refused outside main era (dev dispatch :202-205)
+  - byte-identical git diff --exit-code per SHARED path vs origin/main and origin/$PARITY_TRACK_BRANCH (:70)
+  - SHARED says-it-once: the PARITY_TRACK_BRANCH declaration at :105 is the single declaration; check() and sync_to_main() read it, no other file hardcodes a branch name
+  - anything NOT listed is deliberately single-branch (README.md k8s/ docker/ uv.lock are main-owned, not tracked for parity)
+  - --sync refused outside main era (dev dispatch :190-193)
   - project/ is deliberately excluded from branch parity because it is the project-specific development surface
   touched_by:
-  - scripts/run_local_ci.sh:30 (consumes pinned copy of THIS file)
-  - tests/test_branch_parity_scripts.py:66 (parses SHARED array)
+  - scripts/run_local_ci.sh (consumes pinned copy of THIS file)
+  - tests/test_branch_parity_scripts.py (parses SHARED array)
   - agents/contracts/MAIN_AGENT_CONTRACT.md §2 (branch model)
+  - scripts/main_day_sync.sh (parses PARITY_TRACK_BRANCH from this file)
+  - agents/contracts/WORKER_CONTRACT.md §2 (points to this declaration)
   validated_by:
   - tests/test_branch_parity_scripts.py::test_parity_surface_includes_scripts
   - tests/test_branch_parity_scripts.py::test_scripts_diff_empty_vs_main
   - tests/test_project_paths.py::test_main_day_sync_removes_project_surfaces_and_keeps_generic_sample
   if_changed:
   - any SHARED[] path
-  - refs origin/main, origin/taxi
+  - refs origin/main, refs/remotes/origin/euromonitor
   findings:
   - test_scripts_diff_empty_vs_main is era-gated and SKIPS during dev era — the stock check() comparison path never executes in dev-era CI; only the SHARED-array text shape is tested.
   - sync_to_main() is still not executed against a disposable main worktree; its project-removal and generic-sample projection are statically pinned by tests/test_project_paths.py.
 - id: GATE-INFRA-94
   phase: infra-meta
   order: 141
-  owner: scripts/check_branch_parity.sh:111 inline era declaration PARITY_ERA/PARITY_TRACK_BRANCH/PARITY_ALLOWLIST/PARITY_MAIN_ANCHOR (:111-114) + anchor guards :121-132 + dev-era dispatch :192-226
+  owner: scripts/check_branch_parity.sh:104 inline era declaration PARITY_ERA/PARITY_TRACK_BRANCH/PARITY_ALLOWLIST/PARITY_MAIN_ANCHOR (:104-107) + anchor guards + dev-era dispatch (:187-211)
   inputs:
   - inline constants (no env dialect, D21)
-  - GITHUB_REF_NAME else `git rev-parse --abbrev-ref HEAD` (:187)
+  - GITHUB_REF_NAME else `git rev-parse --abbrev-ref HEAD` (:180)
   - origin refs
   outputs:
-  - PARITY OK (era=… branch=…) | FATAL anchor shape/resolution errors | TAXI DRIFT | FORK | REFUSED (--sync off-era)
+  - PARITY OK (era=… branch=…) | FATAL anchor shape/resolution errors | REFUSED (--sync off-era)
   transforms:
-  - anchor must be full 40-hex AND resolve to a commit — garbled pin fails as CONFIG ERROR up front (:121-128)
-  - era vocabulary restricted to {dev,main} (:129-132); editing these lines IS the main-day flip act (D16c)
-  - 'dev era: custody FIRST on every event/branch (:206), then branch-aware pass-along — push-to-taxi requires byte-identical fast-forward (:212), push-to-track requires origin/taxi ancestor (never fork, :218), empty/main/other refs custody-only'
+  - anchor must be full 40-hex AND resolve to a commit — garbled pin fails as CONFIG ERROR up front
+  - era vocabulary restricted to {dev,main}; editing these lines IS the main-day flip act (D16c)
+  - 'dev era: custody FIRST on every event/branch (:199), then branch-aware pass-along — the track branch itself is custody-only (:204); taxi/taxi_work/sklearn arms retired by the 2026-09-02 owner ruling, empty/main/other refs custody-only (:202,:208)'
+  - PARITY_TRACK_BRANCH=euromonitor (:105) is the SINGLE branch declaration (say-it-once law) — main_day_sync.sh parses it, ci.yml guards nothing else, WORKER_CONTRACT.md §2 points here
   touched_by:
-  - scripts/run_local_ci.sh:36 (marker grep keys on ^PARITY_ERA=)
+  - scripts/run_local_ci.sh (marker grep keys on ^PARITY_ERA=)
+  - scripts/main_day_sync.sh (parses PARITY_TRACK_BRANCH from this file)
   - agents/ledger/DECISIONS.md D16/D21 (design + relocation)
   validated_by:
   - tests/test_branch_parity_scripts.py::test_parity_surface_includes_scripts (asserts parity-era.env NOT in SHARED)
   - tests/test_branch_parity_scripts.py::_declared_era via test_scripts_diff_empty_vs_main (parses ^PARITY_ERA= line)
   if_changed:
   - scripts/check_branch_parity.sh
-  - refs/remotes/origin/taxi
-  - refs/remotes/origin/sklearn
+  - refs/remotes/origin/euromonitor
   - GITHUB_REF_NAME
   findings:
-  - anchor shape/resolution guards (:121-128) and both dev-era pass-along guards (:212,:218) are asserted nowhere — no test feeds a non-ancestor taxi or a drifted taxi tip through the dispatch.
+  - the dev-era pass-along arms are custody-only no-ops since the 2026-09-02 branch surgery — no fork/drift arm remains to test; only the custody call order is load-bearing.
 - id: GATE-INFRA-95
   phase: infra-meta
   order: 142
-  owner: scripts/check_branch_parity.sh:134 custody() — layer 1 anchor-drift diff :146, freeze-intact shortcut :162, layer 2 blob-provenance comm -23 :166
+  owner: scripts/check_branch_parity.sh:127 custody() — layer 1 anchor-drift diff :147, freeze-intact shortcut :162, layer 2 blob-provenance comm -23 :166
   inputs:
-  - PARITY_MAIN_ANCHOR=18607091ddbb2602ad4475341ad377bafee5ec4b (:114)
+  - PARITY_MAIN_ANCHOR=6f102f29079d9911f79c0069f6ee2eea9ef62065 (:107, re-anchored 2026-09-01 owner ruling)
   - origin/main SHARED subtree
-  - origin/sklearn object universe (rev-list --objects :178)
+  - origin/$PARITY_TRACK_BRANCH (euromonitor) object universe (rev-list --objects :178)
   - PARITY_ALLOWLIST=() prefix skips (:168-177)
   outputs:
   - 'ROGUE MAIN WRITE: frozen main changed since anchor … (adds/deletes/mods)'
   - 'ROGUE MAIN WRITE: novel blob(s) absent from track universe (head -10)'
   - silent return 0 via shortcut when main==anchor
   transforms:
-  - 'layer 1: diff anchor..origin/main over SHARED catches adds/deletes/mods/smuggling (:146-149)'
-  - 'shortcut: main==anchor ⇒ return before layer 2 — disjoint histories make the universe test false-positive forever otherwise (:155-164)'
-  - 'layer 2: any blob on moved-off-anchor main that exists NOWHERE in sklearn''s universe IS rogue (novel-content adds)'
+  - 'layer 1: diff anchor..origin/main over SHARED catches adds/deletes/mods/smuggling (:147-150)'
+  - 'shortcut: main==anchor ⇒ return before layer 2 — disjoint histories make the universe test false-positive forever otherwise (:162-165)'
+  - 'layer 2: any blob on moved-off-anchor main that exists NOWHERE in the track branch universe IS rogue (novel-content adds); track ref resolved via PARITY_TRACK_BRANCH, never a hardcoded branch name'
   touched_by:
-  - scripts/run_local_ci.sh:30 (runs pinned custody on every CI event)
+  - scripts/run_local_ci.sh (runs pinned custody on every CI event)
   - agents/ledger/DECISIONS.md D16b/F2-revised
   validated_by: []
   if_changed:
   - origin/main (any move off the anchor re-arms layer 2)
   - PARITY_MAIN_ANCHOR constant
-  - origin/sklearn universe
+  - refs/remotes/origin/euromonitor universe
   findings:
   - custody() has ZERO test coverage — neither alarm is exercised by any node; verified live that origin/main == anchor today, so BOTH layers are shortcut-bypassed on every current run (correct-by-construction but unproven).
   - stale-pin failure direction is documented safe (false-red AFTER an unanchored ratified change), yet no test pins that behavior either.
@@ -4309,13 +4345,13 @@ gates:
 - id: GATE-INFRA-142
   phase: infra-meta
   order: 156
-  owner: 'scripts/check_branch_parity.sh:89 sync_to_main() ref-management site (stale-ref retirement law; objects: LOCAL refs refs/heads/pr-1 + pr-2, closed-unmerged snapshots)'
+  owner: 'scripts/check_branch_parity.sh:82 sync_to_main() ref-management site (stale-ref retirement law; objects: LOCAL refs refs/heads/pr-1 + pr-2, closed-unmerged snapshots)'
   inputs:
   - named local refs (pr-1/pr-2 and future strays)
   outputs:
   - retire-or-own verdict per named ref; detect-and-retire loop execution record
   transforms:
-  - 'refs verified local-only (remote-tracking remains main/sklearn/taxi/taxi_work); census danger #1 sp_probe found DELETED before ruling — proof the detect-and-retire loop works when someone executes it (packet H DRIFT #3)'
+  - 'refs verified local-only (remote-tracking now main/euromonitor after the 2026-09-02 branch surgery; taxi/taxi_work/sklearn deleted by owner ruling); census danger #1 sp_probe found DELETED before ruling — proof the detect-and-retire loop works when someone executes it (packet H DRIFT #3)'
   - 'grounds hygiene-only: closed-unmerged snapshots, ownerless named refs; HC-1 void bars credential framing; reflog-only mass decays by default policy — accepted-local, out of gate scope'
   - 'CREATION-TIME LAW YES on the fetch-of-refs/pull/N/head creator pattern; anchored to the repo''s only scripted ref manager as the persisting management site (objects themselves are untracked .git state)'
   touched_by: []

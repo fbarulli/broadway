@@ -77,6 +77,8 @@ project/experiments/euromonitor/07d_data_scaling.py:
 - GATE-SURF-133
 project/experiments/euromonitor/07e_cross_encoder_rerank.py:
 - GATE-SURF-137
+project/experiments/euromonitor/08_data_prep.py:
+- GATE-SURF-140
 project/experiments/euromonitor/08_pipeline.py:
 - GATE-SURF-139
 project/experiments/euromonitor/_blocking.py:
