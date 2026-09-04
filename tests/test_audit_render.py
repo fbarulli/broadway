@@ -218,3 +218,63 @@ def test_run_writes_five_markdown_files(
         assert (audit_dir / name).exists(), name
     index_md = (audit_dir / "index.md").read_text(encoding="utf-8")
     assert "Data Audit" in index_md
+
+
+# --- summary/state helper coverage (index-page assembly) ------------------- #
+
+
+def test_changed_items_labels_known_kinds_and_skips_zero_counts() -> None:
+    """_changed_items maps audit reasons to human labels; zero counts skip."""
+    result = _audit(
+        dropped=8,
+        reasons=["duplicates: -5 rows", "null target: -3 rows", "CI sampling: -0 rows"],
+    )
+    items = audit._changed_items(result)
+    assert items == [
+        "exact-duplicate rows dropped: 5",
+        "target-missing rows dropped: 3",
+    ]
+
+
+def test_changed_items_parse_failures_counted_by_dtype_kind() -> None:
+    from broadway.cleaning.models import ParseFailure
+
+    result = _audit(
+        parse_failures=[
+            ParseFailure(column="d", target_dtype="datetime64[ns]", count=2, examples=[]),
+            ParseFailure(column="n", target_dtype="float64", count=0, examples=[]),
+        ],
+    )
+    items = audit._changed_items(result)
+    assert items == ["datetime parse failures in d: 2"]
+
+
+def test_changed_items_none_result_is_empty() -> None:
+    assert audit._changed_items(None) == []
+
+
+def test_state_helpers_none_means_incomplete() -> None:
+    assert audit._transform_state(None) == audit.INCOMPLETE
+    assert audit._join_state(None) == audit.INCOMPLETE
+    assert audit._lookup_state(None) == audit.INCOMPLETE
+    assert audit._profile_state(None) == audit.INCOMPLETE
+
+
+def test_state_helpers_pass_and_warning_paths() -> None:
+    clean = _audit()  # no failures, no unexplained drops
+    assert audit._transform_state(clean) == audit.PASS
+    dirty = _audit(unexplained=1, dropped=1)
+    assert audit._transform_state(dirty) == audit.WARNING
+    assert audit._join_state(_join_report(unmatched=0)) == audit.PASS
+    assert audit._join_state(_join_report(unmatched=4)) == audit.WARNING
+    assert audit._lookup_state(_lookup_report(affected_rows=0)) == audit.PASS
+    assert audit._lookup_state(_lookup_report(affected_rows=2)) == audit.WARNING
+
+
+def test_summary_helpers_none_and_populated() -> None:
+    assert audit._join_summary(None) == "no join audit available"
+    assert audit._lookup_summary(None) == "no lookup value audit available"
+    assert "0 unmatched" in audit._join_summary(_join_report(unmatched=0))
+    assert "unmatched key event" in audit._join_summary(_join_report(unmatched=7))
+    assert "all matched" in audit._lookup_summary(_lookup_report(affected_rows=0))
+    assert "missing or sentinel" in audit._lookup_summary(_lookup_report(affected_rows=9))

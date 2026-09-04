@@ -657,3 +657,42 @@ def test_hybrid_score_clamps_float32_cosine_overflow() -> None:
     clamped = np.clip(cosine, 0.0, 1.0)
     e._assert_finite_in_unit("bi-encoder cosine", clamped)
     assert clamped[0] == pytest.approx(1.0)
+
+
+def test_load_cached_corpus_reads_npz_without_model(
+    tmp_path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """load_cached_corpus reads the cache with NO sentence_transformers import.
+
+    Companion to encode_corpus for weight-free consumers: same deterministic
+    cache path, np.load directly; FileNotFoundError when the entry is missing.
+    """
+    from broadway.training.nlp import encode_corpus, load_cached_corpus
+
+    st = types.ModuleType("sentence_transformers")
+
+    class _Model:
+        def __init__(self, model_id: str, device: str = "cpu", model_kwargs=None) -> None:
+            self.model_id = model_id
+            self.max_seq_length = None
+
+        def encode(self, payload, **kwargs):
+            del kwargs
+            emb = np.random.default_rng(0).normal(size=(len(payload), 3))
+            return emb / np.linalg.norm(emb, axis=1, keepdims=True)
+
+    st.SentenceTransformer = _Model
+    monkeypatch.setitem(sys.modules, "sentence_transformers", st)
+
+    payload = [f"s{i}" for i in range(8)]
+    emb1, s1 = encode_corpus("m", payload, cache_dir=str(tmp_path), batch_size=32)
+
+    # Weight-free path: purge the module so ANY model load would explode.
+    monkeypatch.setitem(sys.modules, "sentence_transformers", None)
+
+    emb2, s2 = load_cached_corpus("m", payload, cache_dir=str(tmp_path), batch_size=32)
+    assert np.allclose(emb1, emb2)
+    assert s2 == s1
+
+    with pytest.raises(FileNotFoundError, match="run the encode step"):
+        load_cached_corpus("m", ["unseen"], cache_dir=str(tmp_path), batch_size=32)
