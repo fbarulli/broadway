@@ -1273,6 +1273,10 @@ TOKEN_FLOOR = frozenset({
 # observable in today's run: blocks beyond TOKEN_FLOOR — control-flow words,
 # the gzip pipe, shell variable assignments, and the python -c string
 # fragments of the config-load boot step (verbatim, however inelegant).
+# Baselined @a41c5cf (2026-09-04, review 2026-12-01): the nullglob-safe
+# shell-scripts step (command-identical to the run_local_ci.sh gate per the
+# gate-divergence law; k8s/optuna glob dead since 0379df3) — "shopt",
+# "files=(scripts/*.sh)", the (( count guard head, "exit", and its "}" arm.
 TOKEN_BASELINE = frozenset({
     "set", "for", "do", "done", "if", "fi", "gzip", "import", "from", "cfg",
     "hpo", "assert", "print('config", 'ref="${{', 'registry="ghcr.io/${{',
@@ -1280,6 +1284,7 @@ TOKEN_BASELINE = frozenset({
         "Path('/app/project/"
         "config/experiments/mlflow.yaml').read_text())['hpo'])"
     ),
+    "shopt", "files=(scripts/*.sh)", "((", "exit", "}",
 })
 
 
