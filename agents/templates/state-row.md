@@ -5,20 +5,27 @@
 #
 #   uv run python agents/tools/state_records.py record add --id <id> \
 #     --kind <kind> --status open --owner "<who>" --custody "<who holds it>" \
-#     --updated <date> --source "<provenance>" --summary "<text>"
+#     --source "<provenance>" --summary "<text>"
+#
+# (No --updated flag: the tool stamps the date itself — passing --updated is
+# a usage error. Subcommand help is the interface truth: record add --help.)
 #
 # REQUIREMENTS (enforced by state_records.py record add):
-#   R1. id        STATE-YYYYMMDD-NNN, unique, never reused (check: `record list`)
+#   R1. id        STATE-YYYYMMDD-NNN, unique, never reused (rows live in
+#                 agents/ledger/STATE.md CURRENT; terminal rows archive with
+#                 STATE-ARCHIVE:<id> markers under agents/ledger/archive/)
 #   R2. kind      exactly one of: lane|custody|decision|hazard|checkpoint
 #   R3. status    "open" when creating (terminal statuses only via close/void)
 #   R4. owner     the deciding authority: "human owner" or "main agent"
 #                 (never a worker; workers execute, they do not own rows)
 #   R5. custody   who physically holds the work right now (main agent|worker id)
-#   R6. updated   YYYY-MM-DD
+#   R6. updated   stamped automatically by the tool — do not pass it
 #   R7. source    where this row came from: "owner chat ruling", "commit <sha8>",
 #                 "review <sha8>", "audit <date>" — always traceable
 #   R8. summary   the deliverable + the verification, stated so a reviewer can
 #                 re-run it. Cite commits shas8 and gate ids where they exist.
+#                 Bare 8-hex tokens outside a role-vocabulary context trip
+#                 the 8-hex governance probe — cite commits as "commit <sha8>".
 #
 # WORKED EXAMPLE (from STATE-20260901-011, a real closed row):
 #   id: STATE-<date>-<nnn>
@@ -40,14 +47,14 @@
 #   - "landed <sha>" claimed while the work sits uncommitted
 #   - closing a row whose hazard still exists (close=archive, not delete)
 
-# The template's JSON scaffold — paste into `record add` args:
+# The template's JSON scaffold — paste into `record add` args ("updated" is
+# tool-stamped; omit it):
 {
   "id": "STATE-YYYYMMDD-NNN",
   "kind": "lane|custody|decision|hazard|checkpoint",
   "status": "open",
   "owner": "human owner|main agent",
   "custody": "main agent|<worker id>",
-  "updated": "YYYY-MM-DD",
   "source": "<provenance: owner chat ruling / commit sha8 / review sha8>",
   "summary": "<deliverable + verification, re-runnable by a reviewer>"
 }
