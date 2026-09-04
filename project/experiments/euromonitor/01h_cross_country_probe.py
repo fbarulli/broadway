@@ -85,17 +85,24 @@ def main() -> None:
     for name, s in groups.items():
         print(f"  {name:<38} n={len(s):>6}  median={np.median(s):.3f}  p90={np.quantile(s, .9):.3f}  >=0.55: {(s >= 0.55).mean():.1%}")
 
-    # ---- plot: distributions ----
+    # ---- plot: ECDFs (reads threshold-clearance %/median/p90 directly off the curve,
+    # unlike overlapping histograms which are hard to compare across very different n's) ----
     fig, ax = plt.subplots(figsize=(9, 4.5), constrained_layout=True)
-    bins = np.linspace(0, 1, 51)
     colors = ["#4C72B0", "#55A868", "#C44E52", "#BBBBBB"]
     for (name, s), color in zip(groups.items(), colors):
-        ax.hist(s, bins=bins, alpha=0.55, color=color, label=f"{name} (n={len(s):,})")
+        xs = np.sort(s)
+        ys = np.arange(1, len(xs) + 1) / len(xs)
+        ax.plot(xs, ys, color=color, label=f"{name.replace(chr(10), ' ')} (n={len(s):,})", lw=1.8)
     ax.axvline(0.55, color="k", ls="--", lw=1, label="operating threshold 0.55")
-    ax.set_xlabel("cosine similarity"); ax.set_ylabel("pairs")
+    ax.set_xlabel("cosine similarity")
+    ax.set_ylabel("cumulative fraction of pairs")
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
     ax.set_title("Cross-country probe: does the model treat cross-border pairs as matches?")
-    ax.legend(fontsize=7)
-    fig.savefig(RESULTS / "01h_cross_country_probe.png", dpi=150); plt.close(fig)
+    ax.legend(fontsize=7, loc="upper left")
+    ax.grid(alpha=0.25)
+    fig.savefig(RESULTS / "01h_cross_country_probe.png", dpi=150)
+    plt.close(fig)
 
     # ---- spot-check CSV: highest-scoring cross-country pairs ----
     order = np.argsort(-cross_s)[:60]

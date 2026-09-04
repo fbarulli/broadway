@@ -192,11 +192,11 @@ def main() -> None:
                      ("greedy_step", "#C44E52"), ("greedy_final", "#2E7D32")]:
         sub = frame[frame["type"] == t]
         if len(sub):
-            ax.scatter(sub["candidates"], sub["recall"], s=55, color=color,
+            ax.scatter(sub["candidates"], sub["recall"], s=75, color=color,
                        label=t.replace("_", " "), zorder=3)
             for _, r in sub.iterrows():
                 ax.annotate(str(r["key"]).split("|")[0][:16], (r["candidates"], r["recall"]),
-                            fontsize=6, xytext=(4, 3), textcoords="offset points")
+                            fontsize=9, xytext=(4, 3), textcoords="offset points")
     ax.set_xscale("log")
     ax.set_xlim(1, total_pairs * 1.5)
     ax.set_ylim(0, 1.02)
@@ -204,7 +204,7 @@ def main() -> None:
     ax.set_xlabel("candidate pairs (log)")
     ax.set_ylabel("blocking recall")
     ax.set_title(f"Blocking feature audit — recall vs cost (budget {BUDGET:,})")
-    ax.legend(fontsize=8)
+    ax.legend(fontsize=10)
     fig.savefig(PNG_AUDIT, dpi=150)
     plt.close(fig)
     print(f"wrote {PNG_AUDIT}")

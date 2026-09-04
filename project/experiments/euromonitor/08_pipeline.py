@@ -55,14 +55,14 @@ def main() -> None:
     raw = load_dataset()
     rep_of = dict(zip(sku_to_rep["product_id"], sku_to_rep["rep_id"].astype(int)))
     raw["ITEM_ID"] = [rep_item[rep_of[pid]] for pid in raw["product_id"]]
-    out = raw[["product_id", "ITEM_ID"]].rename(columns={"product_id": "SKU_ID"})
+    out = raw[["product_id", "ITEM_ID"]].rename(columns={"product_id": "sku_id", "ITEM_ID": "item_id"})
     out.to_csv(OUT_PATH, index=False)
-    print(f"wrote {OUT_PATH}  ({len(out):,} SKUs -> {out['ITEM_ID'].nunique():,} ITEMs)", flush=True)
+    print(f"wrote {OUT_PATH}  ({len(out):,} SKUs -> {out["item_id"].nunique():,} ITEMs)", flush=True)
 
     # 5. headline
     n_sku = len(out)
-    n_item = int(out["ITEM_ID"].nunique())
-    item_ids = np.sort(out["ITEM_ID"].unique())
+    n_item = int(out["item_id"].nunique())
+    item_ids = np.sort(out["item_id"].unique())
     contiguous = bool((item_ids == np.arange(n_item)).all())
     max_cluster = int(np.bincount(rep_item).max())
     print(f"HEADLINE: {n_sku:,} SKUs -> {n_item:,} ITEMs  |  contiguous 0..{n_item - 1}: {contiguous}  |  max cluster: {max_cluster:,}", flush=True)
