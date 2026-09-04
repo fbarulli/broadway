@@ -1,6 +1,6 @@
 # Gate registry SSOT — hand-maintained; the {01..09} gate fragments it consolidated predate git custody.
 meta:
-  head: '854d124'
+  head: '3f98e93'
   counts:
     total: 166
     gates_with_findings: 75
@@ -31,7 +31,7 @@ meta:
         flagged: 7
         finding_strings: 12
       07-surfaces:
-        gates: 50
+        gates: 51
         flagged: 1
         finding_strings: 1
       08-config:
@@ -3122,7 +3122,7 @@ gates:
   findings: []
 - id: GATE-CFG-70
   phase: config-schema
-  order: 112
+  order: 113
   owner: src/broadway/config/loader.py:92 config_path() + :102 _load_yaml()
   inputs:
   - config-relative path via CONFIGS_DIR plus optional BROADWAY_CONFIG_OVERLAY_DIR
@@ -3158,7 +3158,7 @@ gates:
   - CONFIGS_DIR silently honors BROADWAY_CONFIGS_DIR (loader.py:34) — an inherited/stale value repoints EVERY load at a foreign tree with no warning; only tests/scripts set it deliberately.
 - id: GATE-CFG-71
   phase: config-schema
-  order: 113
+  order: 114
   owner: src/broadway/config/resolver.py:9 _resolve_string()
   inputs:
   - every string scalar in the merged config dict
@@ -3186,7 +3186,7 @@ gates:
   - resolver module has ZERO test coverage — grep census of tests/ for expandvars|expanduser|resolve_values|${ returns no hits; interpolation, passthrough behavior, and ordering vs merge are all unpinned.
 - id: GATE-CFG-72
   phase: config-schema
-  order: 114
+  order: 115
   owner: src/broadway/config/loader.py:104 _merge_section()
   inputs:
   - environment (required name, loader.py:193)
@@ -3212,7 +3212,7 @@ gates:
   - deep-merge precedence (override wins, loader.py:83-87) and list-replacement semantics are UNTESTED — grep census of tests/ shows no _deep_merge/_merge_section exercise; a future merge-semantics change lands silent. Merge happens BEFORE env-var resolution (merge at :110, resolve at :126), so a partial `${VAR}` inside an overridden subtree still resolves once, merged — correct today, unpinned tomorrow.
 - id: GATE-CFG-73
   phase: config-schema
-  order: 115
+  order: 116
   owner: src/broadway/config/schema.py:62 EnvironmentConfig
   inputs:
   - merged environment section (post GATE-CFG-71)
@@ -3243,7 +3243,7 @@ gates:
   findings: []
 - id: GATE-CFG-74
   phase: config-schema
-  order: 116
+  order: 117
   owner: src/broadway/config/schema.py:51 DatasetContract
   inputs:
   - 'project/config/dataset/*.yaml (column pins: dtype/null_count/role per column, e.g. project/config/dataset/euromonitor.yaml:1-29; lookup_tables with value_policies/sentinel_values euromonitor.yaml:31-59)'
@@ -3277,7 +3277,7 @@ gates:
   - dead EnvironmentConfig fields with zero consumers — grep census of src/ finds NO reader of sample_size_ci / sample_size_stats / api_replicas_min / api_replicas_max / api_hpa_cpu_threshold (schema.py:74-78; only the declaration matches). production.yaml:12-13 hardcodes both sample sizes to 0 and nothing rejects 0 (no ge constraint, contrast EtlStep.ci_sample_size Field(ge=0) schema.py:227). D11 (DECISIONS.md:60-62) already rules dead EnvironmentConfig fields = straight delete.
 - id: GATE-CFG-75
   phase: config-schema
-  order: 117
+  order: 118
   owner: src/broadway/contracts/pandera.py:46 build_raw_schema()
   inputs:
   - DatasetContract.columns (post GATE-CFG-74)
@@ -3310,7 +3310,7 @@ gates:
   - 'silent-degrade tail of the dtype map — pandera_dtype returns pa.Object for ANY unrecognized dtype string (pandera.py:43) and ColumnSchema.dtype is free-form str (only the datetime64 prefix is normalized, schema.py:24-25): a misspelled pin (`flaot64`, `int`) builds a schema whose column validates almost anything — the raw boundary gate quietly loses its teeth for that column instead of failing at derivation.'
 - id: GATE-CFG-76
   phase: config-schema
-  order: 118
+  order: 119
   owner: src/broadway/config/schema.py:187 ExperimentConfig
   inputs:
   - configs/experiment/*.yaml (data_source/features/model/split/hpo/preprocessing)
@@ -3347,7 +3347,7 @@ gates:
   - B1 include-validation NOT LANDED (slate v4 row QUEUED — agents/ledger/FIXES.md:38; DECISIONS.md:12-13, absorbed into Tier2 by D13 DECISIONS.md:67-68). Today build_generic_feature_specs SILENTLY SKIPS any FeatureConfig.include name absent from contract.columns (features/generic.py:16-19, `if col in contract.columns:` with no else) — a typo'd include shrinks the feature surface invisibly, violating the very "YAML declares everything" doctrine; no tripwire test pins the silence either (tests/test_generic_features.py::test_build_generic_feature_specs exercises only resolvable includes).
 - id: GATE-CFG-77
   phase: config-schema
-  order: 119
+  order: 120
   owner: src/broadway/features/recipe.py:102 validate_preprocessing_columns()
   inputs:
   - PipelineConfig with experiment.preprocessing + data_source.schema_contract + dataset
@@ -3387,7 +3387,7 @@ gates:
   findings: []
 - id: GATE-CFG-78
   phase: config-schema
-  order: 120
+  order: 121
   owner: src/broadway/config/loader.py:155 resolve_full_steps()
   inputs:
   - PipelineConfig(full+analysis)
@@ -3418,7 +3418,7 @@ gates:
   findings: []
 - id: GATE-CFG-79
   phase: config-schema
-  order: 121
+  order: 122
   owner: src/broadway/samples/loader.py:34 _build_schema()
   inputs:
   - SampleSpec.schema block from project/config/sample/*.yaml (e.g. project/config/sample/demo.yaml:29-36 dtype/nullable/checks)
@@ -3454,7 +3454,7 @@ gates:
   - C1 _SAMPLE_SCHEMA DERIVATION STILL QUEUED (agents/ledger/FIXES.md:40 "queued"; audit note agents/audits/B-TRUTH-ENFORCEMENT.md:32). Production derivation EXISTS (samples/loader.py:34 builds the schema FROM the sample config's schema block), but the boundary tripwire hand-maintains its own `_SAMPLE_SCHEMA` literal at tests/test_boundary_contracts.py:302-307 instead of deriving from project/config/sample/demo.yaml:29-36 — a second declaration surface that can drift from the shipped config with nothing red.
 - id: GATE-CFG-103
   phase: config-schema
-  order: 122
+  order: 123
   owner: 'src/broadway/config/loader.py:50 STEP_MODULES'
   inputs:
   - step name argv
@@ -3474,7 +3474,7 @@ gates:
   - 'lands WITH the same-commit flip of the former UNOWNED-surface tripwire (was test_has_step_modules_stays_a_drift_proof_miss @ tests/test_gate_registry.py:689-695 pinning arbitration PROPOSE-GH1-01) — rewritten into an ownership assertion so CI stays green (packet F #12 mandatory correction b: teeth live TRACKED in this batch, no self-attestation).'
 - id: GATE-CFG-105
   phase: config-schema
-  order: 123
+  order: 124
   owner: 'src/broadway/onboard/module.py:215 init() (_write_configs :178-198)'
   inputs:
   - stdin prompts + 13 argv flags
@@ -3489,7 +3489,7 @@ gates:
   findings: []
 - id: GATE-CFG-107
   phase: config-schema
-  order: 124
+  order: 125
   owner: 'src/broadway/data/loader.py:134 lookup pre-read existence admission (declared-lookup bootstrap check)'
   inputs:
   - 'DatasetContract.lookup_tables paths — project/config/dataset/euromonitor.yaml:31-34 declares out-of-repo symlink data/raw/(out-of-repo lookup symlink)'
@@ -3506,7 +3506,7 @@ gates:
   - 'FINDING root (packet H X2): dependency on a path OUTSIDE the repo, checked by nobody today; complements D#7''s README bootstrap edit (docs side).'
 - id: GATE-CFG-108
   phase: config-schema
-  order: 125
+  order: 126
   owner: 'src/broadway/onboard/infer.py:10 _IDENTIFIER_THRESHOLD'
   inputs:
   - BROADWAY_IDENTIFIER_THRESHOLD env var
@@ -3521,7 +3521,7 @@ gates:
   findings: []
 - id: GATE-CFG-112
   phase: config-schema
-  order: 126
+  order: 127
   owner: 'src/broadway/lineage/models.py:37 SampleSpec.column_mapping (+ consumers stats/module.py:42, stats/describe.py:132, timeline/runners.py:100)'
   inputs:
   - 'column_mapping block + analysis group_column (project/config/analysis/euromonitor.yaml group_column)'
@@ -3545,7 +3545,7 @@ gates:
   - 'FINDING-D1 correction carried per packets F/G: the three cited TRACKED tests pin the consumers'' correct direction (describe test builds source_{group} physical columns); the "fixture fix / inverted yaml" framing is struck — what legitimately remains is direction-law documentation plus the unpinned load-time existence check.'
 - id: GATE-HPO-80
   phase: hpo-optuna
-  order: 127
+  order: 128
   owner: src/broadway/training/hpo.py:120 run_model_study()
   inputs:
   - ModelHPOSpec search space via _trial_objective (hpo.py:99)
@@ -3576,7 +3576,7 @@ gates:
   - 'distributed phase-1 points N pods at ONE shared study with IDENTICALLY seeded samplers — every pod constructs TPESampler(seed) from the same config seed (project/experiments/mlflow/03_optuna_worker.py:190-194) and no TPESampler(constant_liar=True) exists anywhere in the repo, so concurrent pods reading the same trial history can propose identical params and burn duplicated budget; nothing detects or dedupes collisions. root: src/broadway/training/hpo.py:140 (+ project/experiments/mlflow/03_optuna_worker.py:194)'
 - id: GATE-HPO-81
   phase: hpo-optuna
-  order: 128
+  order: 129
   owner: src/broadway/training/hpo.py:30 make_objective()
   inputs:
   - PipelineConfig experiment block
@@ -3611,7 +3611,7 @@ gates:
   - 'metrics[target_metric] KeyError is UNPINNED — no test drives make_objective with a target_metric outside the 7-key vocabulary, so a YAML typo (e.g. ''MAE'') surfaces mid-study as a bare KeyError AFTER trials have burned, never as a config-validation error. root: src/broadway/training/hpo.py:61'
 - id: GATE-HPO-82
   phase: hpo-optuna
-  order: 129
+  order: 130
   owner: 'src/broadway/training/hpo.py:159+:177 study.optimize call sites (run_model_study leg + _optimize_study bandit continuation)'
   inputs:
   - _trial_objective wrapper (hpo.py:99)
@@ -3641,7 +3641,7 @@ gates:
   - 'bool params are UNTUNABLE END-TO-END (cross-ref E2E-D6, e2e-lane defect confirmed at clean HEAD 5016e93 and reproduced identically in this working tree) — three layers conspire: (a) the registry vocabulary is NAME-only (allowed_params frozenset, src/broadway/training/models/registry.py:28 advertises fit_intercept/positive/copy_X with no dtype dimension); (b) the suggest dispatch knows only int-vs-float from bound types (:107-111) — there is no suggest_categorical/bool branch; (c) ModelHPOSpec.search_space dict[str, list[float | int]] (src/broadway/config/schema.py:122) SILENTLY COERCES native bool bounds — verified live: [true, false] validates to [1.0, 0.0]. Int-encoded [0, 1] passes schema AND registry validation, then sklearn strict validation raises InvalidParameterError (''fit_intercept … must be an instance of bool … Got 0 instead.'') on EVERY trial sampling those params; a only-bool space aborts optimize() on trial 0 via the no-catch= mechanics above; a mixed space decimates the leaderboard probabilistically. root: src/broadway/training/hpo.py:107-111 (+ src/broadway/config/schema.py:122 silent bool→float coercion, src/broadway/training/models/registry.py:28 dtype-blind vocabulary)'
 - id: GATE-HPO-83
   phase: hpo-optuna
-  order: 130
+  order: 131
   owner: src/broadway/training/hpo.py:66 _mlflow_callback()
   inputs:
   - FrozenTrial states/values/user attrs from the optimize callbacks hook
@@ -3669,7 +3669,7 @@ gates:
   - 'pruned and failed trials are invisible in BOTH telemetry planes — the callback skips them (:78) and _leaderboard silently DROPS their studies via bare except ValueError (:260-268) — so an all-pruned study leaves no MLflow trace and vanishes from result[''models''] with no warning; the consumer-side silent-empty .get failure mode is ALREADY RULED (cross-ref arbitration board row B-HPO-METRICS-MAPPING, verdicts #23 — not re-ruled here). root: src/broadway/training/hpo.py:78'
 - id: GATE-HPO-84
   phase: hpo-optuna
-  order: 131
+  order: 132
   owner: src/broadway/training/hpo.py:350 best_model min()/max() selection in run_hpo_bandit()
   inputs:
   - leaderboard from _leaderboard (:285-293)
@@ -3698,7 +3698,7 @@ gates:
   - 'HPOConfig.direction remains an UNCONSTRAINED str (schema.py:127, no Literal): bandit_allocate and best_model now honor ''minimize'' vs ''maximize'' (2026-09 direction-inversion fix, GATE-HPO-85/-84), so the only residual is deferred validation — a typo is caught at optuna.create_study time (ValueError) rather than at config load, never a silent misranking. root: src/broadway/config/schema.py:127'
 - id: GATE-HPO-85
   phase: hpo-optuna
-  order: 132
+  order: 133
   owner: src/broadway/training/hpo.py:180 bandit_allocate()
   inputs:
   - 'leaderboard {model: best objective} (lower=better for minimize, higher=better for maximize)'
@@ -3731,7 +3731,7 @@ gates:
   findings: []
 - id: GATE-HPO-86
   phase: hpo-optuna
-  order: 133
+  order: 134
   owner: src/broadway/training/optuna.py:48 run_study_rdb()
   inputs:
   - storage_url string (sqlite:/// locally; postgresql://…:5432/optuna in k8s via compose_db_url)
@@ -3769,7 +3769,7 @@ gates:
   - 'DB credentials reach pod LOGS — compose_db_url bakes the raw password into the URL (optuna_worker.py:21) and the worker prints the composed db_url to stdout as a deliberate ''visibility requirement'' (project/experiments/mlflow/03_optuna_worker.py:87); the 2026-08-24 secret-audit factsheet covered manifests/templates only, not this runtime print. root: project/experiments/mlflow/03_optuna_worker.py:87'
 - id: GATE-HPO-88
   phase: hpo-optuna
-  order: 134
+  order: 135
   owner: src/broadway/training/hpo.py:204 _initial_round()
   inputs:
   - random_state base seed
@@ -3798,7 +3798,7 @@ gates:
   - 'the seed OFFSET couples determinism to MODEL LIST ORDER — inserting, removing, or reordering hpo.models shifts EVERY subsequent model''s sampler seed (:212-228), silently changing all trajectories while every determinism test stays green (they freeze the whole config, not the offset scheme); no test pins the offset convention itself. root: src/broadway/training/hpo.py:223'
 - id: GATE-HPO-89
   phase: hpo-optuna
-  order: 135
+  order: 136
   owner: src/broadway/config/schema.py:125 HPOConfig
   inputs:
   - 'configs/experiments/mlflow.yaml hpo: block (:14-44) = CFG-HPO-SPEC'
@@ -3827,7 +3827,7 @@ gates:
   - 'engine is DEAD CONFIG — declared REQUIRED (:126), set in both YAMLs (configs/experiments/mlflow.yaml:15, configs/experiment/hyperopt.yaml:24), echoed in fixtures (tests/test_config.py:138, :172), and READ BY NOTHING (repo-wide grep census finds no consumer of HPOConfig.engine); it implies a pluggable-engine surface that does not exist and would mask a future engine-vs-implementation mismatch. root: src/broadway/config/schema.py:126'
 - id: GATE-HPO-154
   phase: hpo-optuna
-  order: 136
+  order: 137
   owner: src/broadway/training/nlp.py:97 precision_at_recall_breakdown() + :122 calibrate_isotonic() + :147 calibrate_isotonic_heldout() + :200 precision_ci() + :227 split_pos_by_country() + :248 log_nlp_eval() + :411 make_objective() + :464 run_nlp_hpo() + :514 run_nlp()
   inputs:
   - 'src/broadway/config/schema.py:135 NLPConfig (typed data-agnostic config: model_zoo + hpo + knobs)'
@@ -3860,7 +3860,7 @@ gates:
   findings: []
 - id: GATE-INFRA-90
   phase: infra-meta
-  order: 137
+  order: 138
   owner: scripts/run_local_ci.sh:16 case-dispatch STATIC/TIER/CLEAN_LINT (+ run() aggregator :26-31, banner law :23/:100)
   inputs:
   - argv[1] ∈ {unset, --static, --tier=fast, --tier=full, --clean-lint} (else usage exit 2)
@@ -3889,7 +3889,7 @@ gates:
   - --static alone skips pytest+cov on a nominally full tier; scope discipline ("static is for iteration, not landing") is contract prose, not enforced by code.
 - id: GATE-INFRA-91
   phase: infra-meta
-  order: 138
+  order: 139
   owner: scripts/run_local_ci.sh:30 gate_parity() (F1b pin-guard, wired at :43)
   inputs:
   - refs/remotes/origin/sklearn:scripts/check_branch_parity.sh via `git show` (:33)
@@ -3914,7 +3914,7 @@ gates:
   - validation extracts-and-executes the real function body against a PATH-shimmed git — the true `git show refs/remotes/origin/sklearn:...` network path is never exercised in CI.
 - id: GATE-INFRA-92
   phase: infra-meta
-  order: 139
+  order: 140
   owner: scripts/run_local_ci.sh:102 gate battery (ruff, mypy, Vulture, configs, shell-scripts, data-refs, graphify, pytest+cov floor=95, project-tests)
   inputs:
   - src/** tests/test_project_paths.py project/experiments/** project/experiments.py project/dashboard.py project/paths.py project/working.py project/data.py scripts/check_project_paths.py scripts/ (ruff)
@@ -3971,7 +3971,7 @@ gates:
   - probes validate the floor NUMBER as text, not enforcement behavior — no test proves a sub-95 cov run actually fails.
 - id: GATE-INFRA-93
   phase: infra-meta
-  order: 140
+  order: 141
   owner: scripts/check_branch_parity.sh:64 check() (SHARED lockstep, list at :44-63) + sync_to_main() :82
   inputs:
   - '17-entry SHARED surface: src/ tests/ demo/ scripts/ .github/workflows/ configs/environment/ configs/flow/ configs/dataset/ configs/analysis/ configs/experiment/ configs/step/ configs/sample/ pyproject.toml Dockerfile docker-compose.yml .gitignore .dockerignore'
@@ -4003,7 +4003,7 @@ gates:
   - sync_to_main() is still not executed against a disposable main worktree; its project-removal and generic-sample projection are statically pinned by tests/test_project_paths.py.
 - id: GATE-INFRA-94
   phase: infra-meta
-  order: 141
+  order: 142
   owner: scripts/check_branch_parity.sh:104 inline era declaration PARITY_ERA/PARITY_TRACK_BRANCH/PARITY_ALLOWLIST/PARITY_MAIN_ANCHOR (:104-107) + anchor guards + dev-era dispatch (:187-211)
   inputs:
   - inline constants (no env dialect, D21)
@@ -4031,7 +4031,7 @@ gates:
   - the dev-era pass-along arms are custody-only no-ops since the 2026-09-02 branch surgery — no fork/drift arm remains to test; only the custody call order is load-bearing.
 - id: GATE-INFRA-95
   phase: infra-meta
-  order: 142
+  order: 143
   owner: scripts/check_branch_parity.sh:127 custody() — layer 1 anchor-drift diff :147, freeze-intact shortcut :162, layer 2 blob-provenance comm -23 :166
   inputs:
   - PARITY_MAIN_ANCHOR=6f102f29079d9911f79c0069f6ee2eea9ef62065 (:107, re-anchored 2026-09-01 owner ruling)
@@ -4059,7 +4059,7 @@ gates:
   - stale-pin failure direction is documented safe (false-red AFTER an unanchored ratified change), yet no test pins that behavior either.
 - id: GATE-INFRA-96
   phase: infra-meta
-  order: 143
+  order: 144
   owner: 'scripts/ship.sh:24 ship gate (`if ! bash scripts/run_local_ci.sh` → refuse :24-27; single push later) + WAVE-A teeth insertions (:15-19 tier_gate sourcing, :31-40 L1 hook guard, :42-53 TIER-GATE batch) mirrored by .git/hooks/pre-push:5'
   inputs:
   - argv remote/refspec (default origin sklearn:sklearn :14)
@@ -4090,7 +4090,7 @@ gates:
   - '.git/hooks/pre-push remains UNTRACKED machine-local (under .git/, invisible to git status; core.hooksPath unset) — every fresh clone ships with NO local gate; WAVE-A adds the tracked SSOT template (agents/contracts/hooks-pre-push.template) plus a ship-path REFUSAL when the live hook is missing/stale (:31-40), so the gap is now detected-and-named instead of procedural-only.'
 - id: GATE-INFRA-97
   phase: infra-meta
-  order: 144
+  order: 145
   owner: scripts/check_e2e_determinism.sh:106 compare_trees() (json_diff whitelist :35-46, compare_file :89, --run chain run_e2e :163)
   inputs:
   - two artifact trees (positional) or --run
@@ -4122,7 +4122,7 @@ gates:
   - the comparator core is well-tested but the --run runner (ephemeral MLflow boot, port pick, sed rewrite) has NO automated coverage; also this script is wired into NO tier of run_local_ci.sh nor ci.yml — determinism is checked only when someone remembers to run it.
 - id: GATE-INFRA-98
   phase: infra-meta
-  order: 145
+  order: 146
   owner: scripts/tier_classifier.py:104 classify() (triggers :51-64, parse_diff_payload :138, CLI main :162)
   inputs:
   - git-diff payload on stdin (files + added lines)
@@ -4152,7 +4152,7 @@ gates:
   - 'nothing enforces that committed commits actually CARRY a computed Tier: trailer — the classifier classifies when invoked, but no gate invokes it automatically on staging.'
 - id: GATE-INFRA-99
   phase: infra-meta
-  order: 146
+  order: 147
   owner: '.github/workflows/ci.yml:47 platform job step "Platform gates (SSOT)" (delegation law :42-46; docker-only checks :51-66; build-and-boot :151; CD job :310; concurrency :11-13)'
   inputs:
   - "push/PR to all branches (branches: ['**'], :3-7)"
@@ -4202,7 +4202,7 @@ gates:
 # when tracked_run exists with real owners + a named ledger consumer.
 - id: GATE-INFRA-123
   phase: infra-meta
-  order: 147
+  order: 148
   owner: 'project/dashboard.py:15 main() project composition entry'
   inputs:
   - host/port argv
@@ -4218,7 +4218,7 @@ gates:
   findings: []
 - id: GATE-INFRA-127
   phase: infra-meta
-  order: 148
+  order: 149
   owner: './Dockerfile:19 CMD bare deployable-image default entrypoint'
   inputs:
   - deployable image build
@@ -4233,7 +4233,7 @@ gates:
   findings: []
 - id: GATE-INFRA-128
   phase: infra-meta
-  order: 149
+  order: 150
   owner: 'docker-compose.yml:3 mlflow/postgres service command custody'
   inputs:
   - compose stack definition
@@ -4250,7 +4250,7 @@ gates:
   - 'D#17 broken-context fact rides as FINDING root (postgres context lacks Dockerfile).'
 - id: GATE-INFRA-131
   phase: infra-meta
-  order: 150
+  order: 151
   owner: 'k8s/api-deployment.yaml:40 HorizontalPodAutoscaler bounds'
   inputs:
   - api workload metrics
@@ -4265,7 +4265,7 @@ gates:
   findings: []
 - id: GATE-INFRA-133
   phase: infra-meta
-  order: 151
+  order: 152
   owner: 'k8s/postgres-deployment.yaml:2 StatefulSet durable-state workload'
   inputs:
   - postgres manifest apply
@@ -4280,7 +4280,7 @@ gates:
   findings: []
 - id: GATE-INFRA-137
   phase: infra-meta
-  order: 152
+  order: 153
   owner: 'docker-compose.yml:26 compose-stack build/volume FILE law'
   inputs:
   - compose stack definition
@@ -4296,7 +4296,7 @@ gates:
   findings: []
 - id: GATE-INFRA-138
   phase: infra-meta
-  order: 153
+  order: 154
   owner: 'tests/conftest.py:8 _SNAPSHOT_DIRS snapshot hygiene'
   inputs:
   - pytest session lifecycle
@@ -4311,7 +4311,7 @@ gates:
   findings: []
 - id: GATE-INFRA-139
   phase: infra-meta
-  order: 154
+  order: 155
   owner: 'tests/test_uv_probe_guard.py:27 package-discovery probe guard suite'
   inputs:
   - uv editable-install discovery behavior
@@ -4328,7 +4328,7 @@ gates:
   findings: []
 - id: GATE-INFRA-141
   phase: infra-meta
-  order: 155
+  order: 156
   owner: 'scripts/ship.sh push-path creator site for annotated tags (law: manual git tag -a mints ONLY via a named ledger-row procedure; NO scripted minter exists at HEAD)'
   inputs:
   - release/tag minting intent
@@ -4344,7 +4344,7 @@ gates:
   - 'Evidence CORRECTED (packet H DRIFT #4): the tag is ON ORIGIN, not local-only (ls-remote: tag object 015c5049, peeled 0d383125) — makes minting custody MORE urgent (published, unminted-law object). Credential rationale INADMISSIBLE: HC-1 VOIDED (00-resolutions.md §1); grounds survive on custody-hygiene law only.'
 - id: GATE-INFRA-142
   phase: infra-meta
-  order: 156
+  order: 157
   owner: 'scripts/check_branch_parity.sh:82 sync_to_main() ref-management site (stale-ref retirement law; objects: LOCAL refs refs/heads/pr-1 + pr-2, closed-unmerged snapshots)'
   inputs:
   - named local refs (pr-1/pr-2 and future strays)
@@ -4362,7 +4362,7 @@ gates:
   - 'owner-anchor judgment recorded: the gated objects are untracked .git-side refs with no in-repo declaring file; the law binds the scripted ref-management site plus the fetch/pull creator pattern rather than the ephemeral objects.'
 - id: GATE-INFRA-143
   phase: infra-meta
-  order: 157
+  order: 158
   owner: '.github/workflows/ci.yml:145 actions/cache@v4 cache retention/dedupe law'
   inputs:
   - CI cache key family (broadway-base hashFiles key)
@@ -4379,7 +4379,7 @@ gates:
   findings: []
 - id: GATE-INFRA-144
   phase: infra-meta
-  order: 158
+  order: 159
   owner: '.github/workflows/ci.yml:355 Push verified images to GHCR (CD single writer)'
   inputs:
   - verified image builds from the CD job
@@ -4396,7 +4396,7 @@ gates:
   - 'inventory honestly UNVERIFIABLE: package listing 403/404 (token lacks read:packages) — recorded, not invented. OPEN QUESTION carried: who executes the registry-side version cap?'
 - id: GATE-INFRA-146
   phase: infra-meta
-  order: 159
+  order: 160
   owner: 'scripts/uv.sh:1 host-local cache selector — the sole UV_CACHE_DIR runtime owner'
   inputs:
   - HOME/XDG_CACHE_HOME/TMPDIR/UV_CACHE_DIR environment
@@ -4417,7 +4417,7 @@ gates:
   findings: []
 - id: GATE-INFRA-147
   phase: infra-meta
-  order: 160
+  order: 161
   owner: 'scripts/deadcode_census.py:1 module — teeth ⑥ DEADCODE-CENSUS advisory engine'
   inputs:
   - tracked *.py corpus via git ls-files (src/project/tests/scripts)
@@ -4435,7 +4435,7 @@ gates:
   findings: []
 - id: GATE-INFRA-148
   phase: infra-meta
-  order: 161
+  order: 162
   owner: agents/tools/state_records.py sync()
   inputs:
   - STATE CURRENT record and immutable EVENTS section
@@ -4455,7 +4455,7 @@ gates:
   findings: []
 - id: GATE-INFRA-149
   phase: infra-meta
-  order: 162
+  order: 163
   owner: 'scripts/check_graphify_surfaces.py:1 main() graphify surface-reconciliation gate (callables vs gates.yaml owners)'
   inputs:
   - graphify-out/graph.json (deterministic --code-only AST graph over src/ + project/)
@@ -4484,7 +4484,7 @@ gates:
 # --- BAND 81-OBJECT-CUSTODY (minted per slate §0; header law above) ------
 - id: GATE-CUST-147
   phase: object-custody
-  order: 163
+  order: 164
   owner: 'src/broadway/training/mlflow_utils.py:162 promote_candidate()'
   inputs:
   - 'model_uri + alias="champion"'
@@ -4503,7 +4503,7 @@ gates:
   findings: []
 - id: GATE-CUST-148
   phase: object-custody
-  order: 164
+  order: 165
   owner: 'src/broadway/training/mlflow_utils.py:163 register_model call sites'
   inputs:
   - candidate model_uri + dataset name
@@ -4519,7 +4519,7 @@ gates:
   findings: []
 - id: GATE-CUST-150
   phase: object-custody
-  order: 165
+  order: 166
   owner: 'src/broadway/training/mlflow_utils.py:59 set_experiment auto-create chokepoint (inside setup_mlflow :54-63)'
   inputs:
   - experiment_name argument at setup time
