@@ -46,24 +46,30 @@ jobs:
       - name: Platform gates (SSOT)
         run: bash scripts/run_local_ci.sh
 
-      # Local parity exists since 2026-08-25 (shell-scripts gate inside
+      # Local parity exists since 2026-09-04 (shell-scripts gate inside
       # scripts/run_local_ci.sh); CI remains the enforcement tier.
-      # Shell scripts (k8s/optuna lifecycle + entrypoint AND repo scripts/)
-      # must at least be valid shell; the runner ships shellcheck (syntax-
-      # level CI — the deployment itself is a manual on-demand run via
-      # k8s/optuna/lifecycle.sh).
+      # Repo scripts/ must at least be valid shell; the runner ships
+      # shellcheck. The k8s/optuna lifecycle .sh files were removed with the
+      # obsolete optuna worker stack (0379df3) — the glob now matches the
+      # nullglob-safe local gate.
       # Gate-divergence law: this command shape MUST stay identical to the
       # 'shell-scripts' gate in scripts/run_local_ci.sh.
       - name: Shell scripts (sh -n + shellcheck)
         shell: bash
         run: |
           set -euo pipefail
-          for f in k8s/optuna/*.sh scripts/*.sh; do
+          shopt -s nullglob
+          files=(scripts/*.sh)
+          (( ${#files[@]} > 0 )) || {
+            echo "no scripts/*.sh files found" >&2
+            exit 1
+          }
+          for f in "${files[@]}"; do
             bash -n "$f"
           done
 
           # Don't silently weaken CI if shellcheck disappears from the runner.
-          shellcheck k8s/optuna/*.sh scripts/*.sh
+          shellcheck "${files[@]}"
 
       # CI-only — named in scripts/run_local_ci.sh header.
       # Pull once; reuse the exact kubeconform image in later checks.
