@@ -271,7 +271,7 @@ else
               if . == null then
                 \"\"
               else
-                .status + \" \" + (.conclusion // \"none\")
+                (.id | tostring) + \" \" + .status + \" \" + (.conclusion // \"none\")
               end" \
         2>"$api_err"
     )"; then
@@ -300,17 +300,21 @@ else
       appeared=1
     fi
 
+    # Heartbeat: one line per poll so a long-running CI never looks like a
+    # dead script to the caller (an outer tool timeout then lands on a
+    # visible "still running" line instead of silence).
+    echo "  [monitor poll $polls/20] run: ${seen:-not yet created}"
     case "$seen" in
       "")
         # Run has not been created yet.
         ;;
 
-      "completed success")
+      *"completed success")
         echo "SHIP MONITOR OK: $slug@$PUSH_SHA green on $branch"
         break
         ;;
 
-      completed\ *)
+      *completed\ *)
         echo "SHIP MONITOR RED: $slug@$PUSH_SHA reported '$seen'" >&2
         echo "Push landed red — fix forward before the next ship." >&2
         exit 1
@@ -331,14 +335,16 @@ else
       echo "WARNING: monitor exhausted 20 polls (~15 minutes)." >&2
       echo "No Actions run for exact SHA $PUSH_SHA appeared." >&2
       echo "Push STANDS; check $slug Actions manually." >&2
-    elif [[ "$seen" != "completed success" ]]; then
-      if [[ "$seen" == completed\ * ]]; then
+    elif [[ "$seen" != *"completed success" ]]; then
+      if [[ "$seen" == *"completed "* ]]; then
         echo "SHIP MONITOR RED: $slug@$PUSH_SHA reported '$seen'" >&2
         exit 1
       else
+        run_id="${seen%% *}"
         echo "WARNING: monitor exhausted 20 polls (~15 minutes)." >&2
-        echo "Actions run is still '$seen'." >&2
-        echo "Push STANDS; check $slug Actions manually." >&2
+        echo "Actions run is still '${seen#* }' (run id $run_id)." >&2
+        echo "Push STANDS; re-check with:" >&2
+        echo "  gh run view $run_id --repo $slug" >&2
       fi
     fi
   fi
