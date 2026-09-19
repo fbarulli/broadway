@@ -28,7 +28,7 @@ import os
 import re
 import subprocess
 import sys
-from collections.abc import Callable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from datetime import UTC, date, datetime
 from functools import cache, lru_cache
 from pathlib import Path
@@ -64,6 +64,55 @@ HISTORICAL_MARKERS = ("deleted", "historic", "b15f66e", "once")
 ROLE_VOCABULARY = re.compile(r"agent|adversar|reviewer|synthesis|senior", re.IGNORECASE)
 COV_FLAG = re.compile(r"--cov-fail-under\s*[=:]\s*(\d+)")
 PERCENT = re.compile(r"(\d+)\s*%")
+
+def run_probe_engine[C, T](
+    corpus: Iterable[C],
+    scan: Callable[[C], Iterable[T]],
+    resolve: Callable[[T], bool],
+    report: Callable[[list[T]], None],
+) -> None:
+    """ONE parametrized runner: scan(corpus) -> resolve(item) -> report(offenders).
+
+    ``scan`` maps each corpus unit to candidate items, ``resolve`` is the
+    probe's small injected predicate (True == covered/valid), and ``report``
+    owns the RED verdict over the collected offenders. Collect-then-report
+    preserves each probe's first-offender message while sharing the loop.
+    """
+    offenders: list[T] = []
+    for unit in corpus:
+        for item in scan(unit):
+            if not resolve(item):
+                offenders.append(item)
+    report(offenders)
+
+
+class _PathCandidate(NamedTuple):
+    lineno: int
+    token: str
+
+
+class _HexCandidate(NamedTuple):
+    token: str
+    is_event: bool
+    window_hit: bool
+
+
+def test_probe_engine_resolvers_decide_verdict() -> None:
+    """Falsifiability re-targeted at the engine: resolvers decide RED/GREEN."""
+    collected: list[str] = []
+
+    def report(items: list[str]) -> None:
+        collected.extend(items)
+
+    run_probe_engine(["ok", "bad"], lambda u: [u], lambda i: i == "ok", report)
+    assert collected == ["bad"]
+    collected.clear()
+    run_probe_engine([], lambda u: [u], lambda i: False, report)
+    assert collected == []
+    with pytest.raises(AssertionError, match="does not resolve"):
+        probe_backticked_paths("see `nope/missing_phantom.py` here", ROOT, source="engine")
+    with pytest.raises(AssertionError, match="declared agent-ID namespace"):
+        probe_hex_tokens("Mystery cafe1234 ends.", lambda t: False, source="engine")
 
 
 # --------------------------------------------------------------------------- #
@@ -142,14 +191,25 @@ def _basename(token: str) -> str:
 
 def probe_backticked_paths(text: str, root: Path, source: str = "<text>") -> None:
     """Every backticked path token resolves in-tree or sits on a historic line."""
-    for no, line in enumerate(text.splitlines(), 1):
-        lower = line.lower()
-        if any(marker in lower for marker in HISTORICAL_MARKERS):
-            continue
-        for name, ext in BACKTICKED_PATH.findall(line):
-            token = f"{name}.{ext}"
-            if not _resolves(token, root):
-                raise AssertionError(f"{source}:{no}: backticked path `{token}` does not resolve in-tree")
+    corpus = list(enumerate(text.splitlines(), 1))
+
+    def scan(unit: tuple[int, str]) -> Iterable[_PathCandidate]:
+        no, line = unit
+        if any(marker in line.lower() for marker in HISTORICAL_MARKERS):
+            return []
+        return [_PathCandidate(no, f"{name}.{ext}") for name, ext in BACKTICKED_PATH.findall(line)]
+
+    def resolve(item: _PathCandidate) -> bool:
+        return _resolves(item.token, root)
+
+    def report(offenders: list[_PathCandidate]) -> None:
+        if offenders:
+            first = offenders[0]
+            raise AssertionError(
+                f"{source}:{first.lineno}: backticked path `{first.token}` does not resolve in-tree"
+            )
+
+    run_probe_engine(corpus, scan, resolve, report)
 
 
 # --------------------------------------------------------------------------- #
@@ -263,27 +323,45 @@ def probe_hex_tokens(
     """
     registry = event_registry if event_registry is not None else frozenset()
     event_spans = {m.span("eid") for m in EVENT_LINE.finditer(text)}
-    for match in HEX8.finditer(text):
-        token = match.group(0)
-        if any(s <= match.start() and match.end() <= e for s, e in exempt_spans):
-            continue
-        if match.span() in event_spans:
-            if token not in registry:
-                raise AssertionError(
-                    f"{source}: unregistered event-id {token} — EVENT-line tokens need a "
-                    f"resolution row in the STATE.md ## EVENTS registry (role vocabulary "
-                    f"is no escape in this namespace)"
-                )
-            continue
-        if resolver(token):
-            continue
-        lo, hi = max(0, match.start() - window), min(len(text), match.end() + window)
-        if ROLE_VOCABULARY.search(text[lo:hi]):
-            continue
+
+    def scan(unit: str) -> Iterable[_HexCandidate]:
+        found: list[_HexCandidate] = []
+        for match in HEX8.finditer(unit):
+            token = match.group(0)
+            if any(s <= match.start() and match.end() <= e for s, e in exempt_spans):
+                continue
+            if match.span() in event_spans:
+                found.append(_HexCandidate(token, True, False))
+                continue
+            lo = max(0, match.start() - window)
+            hi = min(len(unit), match.end() + window)
+            hit = ROLE_VOCABULARY.search(unit[lo:hi]) is not None
+            found.append(_HexCandidate(token, False, hit))
+        return found
+
+    def resolve(item: _HexCandidate) -> bool:
+        if item.is_event:
+            return item.token in registry
+        if resolver(item.token):
+            return True
+        return item.window_hit
+
+    def report(offenders: list[_HexCandidate]) -> None:
+        if not offenders:
+            return
+        first = offenders[0]
+        if first.is_event:
+            raise AssertionError(
+                f"{source}: unregistered event-id {first.token} — EVENT-line tokens need a "
+                f"resolution row in the STATE.md ## EVENTS registry (role vocabulary "
+                f"is no escape in this namespace)"
+            )
         raise AssertionError(
-            f"{source}: 8-hex token {token} is neither a resolvable revision nor "
+            f"{source}: 8-hex token {first.token} is neither a resolvable revision nor "
             f"inside the declared agent-ID namespace (role vocabulary within {window} chars)"
         )
+
+    run_probe_engine([text], scan, resolve, report)
 
 
 # --------------------------------------------------------------------------- #
@@ -719,12 +797,21 @@ def find_unregistered(
                 return True
         return False
 
-    return sorted(
-        p for p in tracked
-        if p.split("/", 1)[0] in TRIPWIRE_SURFACES
-        and not registered(p)
-        and not exempted(p)
-    )
+    def scan(unit: str) -> Iterable[str]:
+        if unit.split("/", 1)[0] not in TRIPWIRE_SURFACES:
+            return []
+        return [unit]
+
+    def resolve(path: str) -> bool:
+        return registered(path) or exempted(path)
+
+    collected: list[str] = []
+
+    def report(offenders: list[str]) -> None:
+        collected.extend(offenders)
+
+    run_probe_engine(list(tracked), scan, resolve, report)
+    return sorted(collected)
 
 
 def expired_allowlist_entries(
@@ -946,6 +1033,17 @@ def assert_parent_stamp(actual: str, required: str, source: str = GATES_REGISTRY
 def required_meta_head(parent: str, head: str, dirty: bool) -> str:
     """Dirty registry content is stamped for its prospective parent."""
     return head if dirty else parent
+
+
+def compute_restamp_stamp(*, parent: str | None, head: str, dirty: bool) -> str | None:
+    """Pure restamp rule: the correct meta.head for a toucher parent/head/dirty trio.
+
+    Returns None when the toucher is the root commit (no parent exists).
+    Pure: no git, no file I/O — the CLI below supplies the git facts.
+    """
+    if parent is None:
+        return None
+    return required_meta_head(parent, head, dirty)
 
 
 def registry_is_dirty(path: str) -> bool:
@@ -1292,14 +1390,22 @@ def divergent_run_lines(
     lines: Sequence[str], allowed_tokens: frozenset[str], baseline_tokens: frozenset[str],
 ) -> list[str]:
     """Run-lines whose command head escapes floor ∪ baseline ∪ SSOT-invocation."""
-    offenders = []
-    for line in lines:
+    collected: list[str] = []
+
+    def scan(unit: str) -> Iterable[str]:
+        return [unit]
+
+    def resolve(line: str) -> bool:
         if line.startswith(RUN_LOCAL_CI_INVOCATION):
-            continue
+            return True
         head = line.split()[0]
-        if head not in allowed_tokens and head not in baseline_tokens:
-            offenders.append(line)
-    return offenders
+        return head in allowed_tokens or head in baseline_tokens
+
+    def report(offenders: list[str]) -> None:
+        collected.extend(offenders)
+
+    run_probe_engine(list(lines), scan, resolve, report)
+    return collected
 
 
 def assert_gate_divergence(offenders: Sequence[str]) -> None:
@@ -1333,3 +1439,25 @@ def test_probe_j_gate_divergence_watcher_live_and_falsifiable() -> None:
     ) == []
     # ...and a baselined exotic head stays green.
     assert divergent_run_lines(['ref="${{ github.ref }}"'], TOKEN_FLOOR, TOKEN_BASELINE) == []
+
+
+def _print_restamp() -> None:
+    """CLI: print the correct gates.yaml meta.head stamp (never edits files)."""
+    toucher = _last_commit_touching(GATES_REGISTRY)
+    if toucher is None:
+        print(f"{GATES_REGISTRY}: no committing history — no stamp derivable")
+        return
+    parent = _first_parent(toucher)
+    head = subprocess.run(
+        ["git", "rev-parse", "--short=7", "HEAD"],
+        capture_output=True, text=True, cwd=ROOT, check=True,
+    ).stdout.strip()
+    dirty = registry_is_dirty(GATES_REGISTRY)
+    actual = parse_meta_head((ROOT / GATES_REGISTRY).read_text(encoding="utf-8"))
+    required = compute_restamp_stamp(parent=parent, head=head, dirty=dirty)
+    print(f"toucher={toucher} parent={parent} head={head} dirty={dirty}")
+    print(f"actual={actual} required={required} match={actual == required}")
+
+
+if __name__ == "__main__":
+    _print_restamp()

@@ -18,6 +18,11 @@ The main agent is responsible for orchestration and verification. It does not si
 
 Only data-agnostic changes may be promoted to `main`.
 
+Main-day syncs are batched, never drive-by: accumulate taxi work and sync
+in one ratified act (each sync costs a full anchor + CI cycle). `taxi` is
+the deployment line (CD ships `:taxi` workload images); `main` ships no
+workload images and its CI skips workload steps by design.
+
 The legacy `project/etl` twin is retired (2026-09-19; see `agents/ledger/gates.yaml`
 `retired:`) — the `src/broadway` contract pipeline is the only ingest; do not
 resurrect the twin or its deleted `project/tests/*` suites.
