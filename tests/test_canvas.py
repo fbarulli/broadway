@@ -40,3 +40,19 @@ def test_emit_tldr_requires_node_and_skill(monkeypatch, tmp_path) -> None:
     monkeypatch.setattr(canvas.shutil, "which", lambda _: None)
     with pytest.raises(RuntimeError, match="node is required"):
         canvas.emit_tldr(tmp_path / "s.json", tmp_path / "o.tldr")
+
+
+def test_discover_series_lists_numbered_stems(tmp_path) -> None:
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "render_canvas_maps", "scripts/render_canvas_maps.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    (tmp_path / "alpha").mkdir()
+    (tmp_path / "alpha" / "01_a.py").write_text('"""a"""', encoding="utf-8")
+    (tmp_path / "alpha" / "notes.txt").write_text("x", encoding="utf-8")
+    (tmp_path / "empty").mkdir()
+    assert module._discover_series(tmp_path) == {"alpha": ["01_a"]}

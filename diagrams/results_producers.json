@@ -2,110 +2,665 @@
  "title": "Results producers",
  "nodes": [
   {
-   "id": "cfg",
-   "label": "configs/*.yaml (dataset+experiment)",
-   "group": "source"
-  },
-  {
-   "id": "etl",
-   "label": "etl.run -> canonical parquet",
-   "group": "core"
-  },
-  {
-   "id": "feat",
-   "label": "features -> train/val parquet",
-   "group": "core"
-  },
-  {
-   "id": "train",
-   "label": "train -> model + metrics",
-   "group": "core"
-  },
-  {
-   "id": "fare",
-   "label": "fare_prediction 01..08 -> results/fare_prediction/",
-   "group": "series"
-  },
-  {
-   "id": "mflow",
-   "label": "mlflow 01..02 -> mlruns + results",
-   "group": "series"
-  },
-  {
-   "id": "more",
-   "label": "more_modeling 01..08 -> results/more_modeling/",
-   "group": "series"
-  },
-  {
-   "id": "multi",
-   "label": "multivariate + univariate -> results/",
-   "group": "series"
-  },
-  {
-   "id": "dash",
+   "id": "dashboard",
    "label": "dashboard :8000 (results + maps)",
    "group": "serve"
+  },
+  {
+   "id": "track-fare_prediction",
+   "label": "fare_prediction (8 steps)",
+   "group": "series"
+  },
+  {
+   "id": "fare_prediction/01_fare_baseline",
+   "label": "01_fare_baseline",
+   "group": "series"
+  },
+  {
+   "id": "fare_prediction/02_filtered_profile",
+   "label": "02_filtered_profile",
+   "group": "series"
+  },
+  {
+   "id": "fare_prediction/03_short_trips",
+   "label": "03_short_trips",
+   "group": "series"
+  },
+  {
+   "id": "fare_prediction/04_percentile_extremes_audit",
+   "label": "04_percentile_extremes_audit",
+   "group": "series"
+  },
+  {
+   "id": "fare_prediction/05_temporal_features",
+   "label": "05_temporal_features",
+   "group": "series"
+  },
+  {
+   "id": "fare_prediction/06_prepare_model_data",
+   "label": "06_prepare_model_data",
+   "group": "series"
+  },
+  {
+   "id": "fare_prediction/07_specification_diagnostics",
+   "label": "07_specification_diagnostics",
+   "group": "series"
+  },
+  {
+   "id": "fare_prediction/08_lightgbm_baseline",
+   "label": "08_lightgbm_baseline",
+   "group": "series"
+  },
+  {
+   "id": "track-mlflow",
+   "label": "mlflow (3 steps)",
+   "group": "series"
+  },
+  {
+   "id": "mlflow/01_model_battle_mlflow",
+   "label": "01_model_battle_mlflow",
+   "group": "series"
+  },
+  {
+   "id": "mlflow/02_explainability",
+   "label": "02_explainability",
+   "group": "series"
+  },
+  {
+   "id": "mlflow/03_optuna_worker",
+   "label": "03_optuna_worker",
+   "group": "series"
+  },
+  {
+   "id": "track-more_modeling",
+   "label": "more_modeling (24 steps)",
+   "group": "series"
+  },
+  {
+   "id": "more_modeling/01_feature_mean_ci",
+   "label": "01_feature_mean_ci",
+   "group": "series"
+  },
+  {
+   "id": "more_modeling/02_feature_target_correlation_ci",
+   "label": "02_feature_target_correlation_ci",
+   "group": "series"
+  },
+  {
+   "id": "more_modeling/03_1_raw_ols_and_residuals",
+   "label": "03_1_raw_ols_and_residuals",
+   "group": "series"
+  },
+  {
+   "id": "more_modeling/03_2_heteroscedasticity_test",
+   "label": "03_2_heteroscedasticity_test",
+   "group": "series"
+  },
+  {
+   "id": "more_modeling/03_feature_effect_ci",
+   "label": "03_feature_effect_ci",
+   "group": "series"
+  },
+  {
+   "id": "more_modeling/04_categorical_anova_eta2",
+   "label": "04_categorical_anova_eta2",
+   "group": "series"
+  },
+  {
+   "id": "more_modeling/05_joint_model_top10_zones",
+   "label": "05_joint_model_top10_zones",
+   "group": "series"
+  },
+  {
+   "id": "more_modeling/06_joint_model_time_of_day",
+   "label": "06_joint_model_time_of_day",
+   "group": "series"
+  },
+  {
+   "id": "more_modeling/07_airport_flat_rate_audit",
+   "label": "07_airport_flat_rate_audit",
+   "group": "series"
+  },
+  {
+   "id": "more_modeling/08_model_validation",
+   "label": "08_model_validation",
+   "group": "series"
+  },
+  {
+   "id": "more_modeling/09_total_amount_fees",
+   "label": "09_total_amount_fees",
+   "group": "series"
+  },
+  {
+   "id": "more_modeling/10_subpopulation_audit",
+   "label": "10_subpopulation_audit",
+   "group": "series"
+  },
+  {
+   "id": "more_modeling/11_pure_meter_audit",
+   "label": "11_pure_meter_audit",
+   "group": "series"
+  },
+  {
+   "id": "more_modeling/12_executive_summary",
+   "label": "12_executive_summary",
+   "group": "series"
+  },
+  {
+   "id": "more_modeling/13_spatiotemporal_demand",
+   "label": "13_spatiotemporal_demand",
+   "group": "series"
+  },
+  {
+   "id": "more_modeling/14_demand_revenue_signatures",
+   "label": "14_demand_revenue_signatures",
+   "group": "series"
+  },
+  {
+   "id": "more_modeling/15_complexity_funnel",
+   "label": "15_complexity_funnel",
+   "group": "series"
+  },
+  {
+   "id": "more_modeling/16_production_pricing_engine",
+   "label": "16_production_pricing_engine",
+   "group": "series"
+  },
+  {
+   "id": "more_modeling/17_spatial_velocity_mapping",
+   "label": "17_spatial_velocity_mapping",
+   "group": "series"
+  },
+  {
+   "id": "more_modeling/18_fleet_revenue_simulator",
+   "label": "18_fleet_revenue_simulator",
+   "group": "series"
+  },
+  {
+   "id": "more_modeling/19_surge_sensitivity",
+   "label": "19_surge_sensitivity",
+   "group": "series"
+  },
+  {
+   "id": "more_modeling/20_heatmap_surge_matrix",
+   "label": "20_heatmap_surge_matrix",
+   "group": "series"
+  },
+  {
+   "id": "more_modeling/21_surge_waterfall",
+   "label": "21_surge_waterfall",
+   "group": "series"
+  },
+  {
+   "id": "more_modeling/22_demand_forecasting",
+   "label": "22_demand_forecasting",
+   "group": "series"
+  },
+  {
+   "id": "track-multivariate",
+   "label": "multivariate (6 steps)",
+   "group": "series"
+  },
+  {
+   "id": "multivariate/01_categorical_breakdown",
+   "label": "01_categorical_breakdown",
+   "group": "series"
+  },
+  {
+   "id": "multivariate/02_borough_dummies_kurtosis",
+   "label": "02_borough_dummies_kurtosis",
+   "group": "series"
+  },
+  {
+   "id": "multivariate/03_geography_premium",
+   "label": "03_geography_premium",
+   "group": "series"
+  },
+  {
+   "id": "multivariate/04_baseline_sample",
+   "label": "04_baseline_sample",
+   "group": "series"
+  },
+  {
+   "id": "multivariate/05_lightgbm_baselines",
+   "label": "05_lightgbm_baselines",
+   "group": "series"
+  },
+  {
+   "id": "multivariate/06_model_verdict",
+   "label": "06_model_verdict",
+   "group": "series"
+  },
+  {
+   "id": "track-polynomial_regression_et_all",
+   "label": "polynomial_regression_et_all (1 steps)",
+   "group": "series"
+  },
+  {
+   "id": "polynomial_regression_et_all/01_polynomial_regression",
+   "label": "01_polynomial_regression",
+   "group": "series"
   }
  ],
  "edges": [
   {
-   "from": "cfg",
-   "to": "etl",
-   "label": "contract"
-  },
-  {
-   "from": "etl",
-   "to": "feat",
-   "label": "canonical"
-  },
-  {
-   "from": "feat",
-   "to": "train",
-   "label": "features"
-  },
-  {
-   "from": "train",
-   "to": "dash",
-   "label": "metrics"
-  },
-  {
-   "from": "cfg",
-   "to": "fare",
-   "label": "config"
-  },
-  {
-   "from": "cfg",
-   "to": "mflow",
-   "label": "config"
-  },
-  {
-   "from": "cfg",
-   "to": "more",
-   "label": "config"
-  },
-  {
-   "from": "cfg",
-   "to": "multi",
-   "label": "config"
-  },
-  {
-   "from": "fare",
-   "to": "dash",
-   "label": "plots"
-  },
-  {
-   "from": "mflow",
-   "to": "dash",
+   "from": "track-fare_prediction",
+   "to": "fare_prediction/01_fare_baseline",
    "label": "runs"
   },
   {
-   "from": "more",
-   "to": "dash",
+   "from": "fare_prediction/01_fare_baseline",
+   "to": "dashboard",
    "label": "plots"
   },
   {
-   "from": "multi",
-   "to": "dash",
+   "from": "track-fare_prediction",
+   "to": "fare_prediction/02_filtered_profile",
+   "label": "runs"
+  },
+  {
+   "from": "fare_prediction/02_filtered_profile",
+   "to": "dashboard",
+   "label": "plots"
+  },
+  {
+   "from": "track-fare_prediction",
+   "to": "fare_prediction/03_short_trips",
+   "label": "runs"
+  },
+  {
+   "from": "fare_prediction/03_short_trips",
+   "to": "dashboard",
+   "label": "plots"
+  },
+  {
+   "from": "track-fare_prediction",
+   "to": "fare_prediction/04_percentile_extremes_audit",
+   "label": "runs"
+  },
+  {
+   "from": "fare_prediction/04_percentile_extremes_audit",
+   "to": "dashboard",
+   "label": "plots"
+  },
+  {
+   "from": "track-fare_prediction",
+   "to": "fare_prediction/05_temporal_features",
+   "label": "runs"
+  },
+  {
+   "from": "fare_prediction/05_temporal_features",
+   "to": "dashboard",
+   "label": "plots"
+  },
+  {
+   "from": "track-fare_prediction",
+   "to": "fare_prediction/06_prepare_model_data",
+   "label": "runs"
+  },
+  {
+   "from": "fare_prediction/06_prepare_model_data",
+   "to": "dashboard",
+   "label": "plots"
+  },
+  {
+   "from": "track-fare_prediction",
+   "to": "fare_prediction/07_specification_diagnostics",
+   "label": "runs"
+  },
+  {
+   "from": "fare_prediction/07_specification_diagnostics",
+   "to": "dashboard",
+   "label": "plots"
+  },
+  {
+   "from": "track-fare_prediction",
+   "to": "fare_prediction/08_lightgbm_baseline",
+   "label": "runs"
+  },
+  {
+   "from": "fare_prediction/08_lightgbm_baseline",
+   "to": "dashboard",
+   "label": "plots"
+  },
+  {
+   "from": "track-mlflow",
+   "to": "mlflow/01_model_battle_mlflow",
+   "label": "runs"
+  },
+  {
+   "from": "mlflow/01_model_battle_mlflow",
+   "to": "dashboard",
+   "label": "plots"
+  },
+  {
+   "from": "track-mlflow",
+   "to": "mlflow/02_explainability",
+   "label": "runs"
+  },
+  {
+   "from": "mlflow/02_explainability",
+   "to": "dashboard",
+   "label": "plots"
+  },
+  {
+   "from": "track-mlflow",
+   "to": "mlflow/03_optuna_worker",
+   "label": "runs"
+  },
+  {
+   "from": "mlflow/03_optuna_worker",
+   "to": "dashboard",
+   "label": "plots"
+  },
+  {
+   "from": "track-more_modeling",
+   "to": "more_modeling/01_feature_mean_ci",
+   "label": "runs"
+  },
+  {
+   "from": "more_modeling/01_feature_mean_ci",
+   "to": "dashboard",
+   "label": "plots"
+  },
+  {
+   "from": "track-more_modeling",
+   "to": "more_modeling/02_feature_target_correlation_ci",
+   "label": "runs"
+  },
+  {
+   "from": "more_modeling/02_feature_target_correlation_ci",
+   "to": "dashboard",
+   "label": "plots"
+  },
+  {
+   "from": "track-more_modeling",
+   "to": "more_modeling/03_1_raw_ols_and_residuals",
+   "label": "runs"
+  },
+  {
+   "from": "more_modeling/03_1_raw_ols_and_residuals",
+   "to": "dashboard",
+   "label": "plots"
+  },
+  {
+   "from": "track-more_modeling",
+   "to": "more_modeling/03_2_heteroscedasticity_test",
+   "label": "runs"
+  },
+  {
+   "from": "more_modeling/03_2_heteroscedasticity_test",
+   "to": "dashboard",
+   "label": "plots"
+  },
+  {
+   "from": "track-more_modeling",
+   "to": "more_modeling/03_feature_effect_ci",
+   "label": "runs"
+  },
+  {
+   "from": "more_modeling/03_feature_effect_ci",
+   "to": "dashboard",
+   "label": "plots"
+  },
+  {
+   "from": "track-more_modeling",
+   "to": "more_modeling/04_categorical_anova_eta2",
+   "label": "runs"
+  },
+  {
+   "from": "more_modeling/04_categorical_anova_eta2",
+   "to": "dashboard",
+   "label": "plots"
+  },
+  {
+   "from": "track-more_modeling",
+   "to": "more_modeling/05_joint_model_top10_zones",
+   "label": "runs"
+  },
+  {
+   "from": "more_modeling/05_joint_model_top10_zones",
+   "to": "dashboard",
+   "label": "plots"
+  },
+  {
+   "from": "track-more_modeling",
+   "to": "more_modeling/06_joint_model_time_of_day",
+   "label": "runs"
+  },
+  {
+   "from": "more_modeling/06_joint_model_time_of_day",
+   "to": "dashboard",
+   "label": "plots"
+  },
+  {
+   "from": "track-more_modeling",
+   "to": "more_modeling/07_airport_flat_rate_audit",
+   "label": "runs"
+  },
+  {
+   "from": "more_modeling/07_airport_flat_rate_audit",
+   "to": "dashboard",
+   "label": "plots"
+  },
+  {
+   "from": "track-more_modeling",
+   "to": "more_modeling/08_model_validation",
+   "label": "runs"
+  },
+  {
+   "from": "more_modeling/08_model_validation",
+   "to": "dashboard",
+   "label": "plots"
+  },
+  {
+   "from": "track-more_modeling",
+   "to": "more_modeling/09_total_amount_fees",
+   "label": "runs"
+  },
+  {
+   "from": "more_modeling/09_total_amount_fees",
+   "to": "dashboard",
+   "label": "plots"
+  },
+  {
+   "from": "track-more_modeling",
+   "to": "more_modeling/10_subpopulation_audit",
+   "label": "runs"
+  },
+  {
+   "from": "more_modeling/10_subpopulation_audit",
+   "to": "dashboard",
+   "label": "plots"
+  },
+  {
+   "from": "track-more_modeling",
+   "to": "more_modeling/11_pure_meter_audit",
+   "label": "runs"
+  },
+  {
+   "from": "more_modeling/11_pure_meter_audit",
+   "to": "dashboard",
+   "label": "plots"
+  },
+  {
+   "from": "track-more_modeling",
+   "to": "more_modeling/12_executive_summary",
+   "label": "runs"
+  },
+  {
+   "from": "more_modeling/12_executive_summary",
+   "to": "dashboard",
+   "label": "plots"
+  },
+  {
+   "from": "track-more_modeling",
+   "to": "more_modeling/13_spatiotemporal_demand",
+   "label": "runs"
+  },
+  {
+   "from": "more_modeling/13_spatiotemporal_demand",
+   "to": "dashboard",
+   "label": "plots"
+  },
+  {
+   "from": "track-more_modeling",
+   "to": "more_modeling/14_demand_revenue_signatures",
+   "label": "runs"
+  },
+  {
+   "from": "more_modeling/14_demand_revenue_signatures",
+   "to": "dashboard",
+   "label": "plots"
+  },
+  {
+   "from": "track-more_modeling",
+   "to": "more_modeling/15_complexity_funnel",
+   "label": "runs"
+  },
+  {
+   "from": "more_modeling/15_complexity_funnel",
+   "to": "dashboard",
+   "label": "plots"
+  },
+  {
+   "from": "track-more_modeling",
+   "to": "more_modeling/16_production_pricing_engine",
+   "label": "runs"
+  },
+  {
+   "from": "more_modeling/16_production_pricing_engine",
+   "to": "dashboard",
+   "label": "plots"
+  },
+  {
+   "from": "track-more_modeling",
+   "to": "more_modeling/17_spatial_velocity_mapping",
+   "label": "runs"
+  },
+  {
+   "from": "more_modeling/17_spatial_velocity_mapping",
+   "to": "dashboard",
+   "label": "plots"
+  },
+  {
+   "from": "track-more_modeling",
+   "to": "more_modeling/18_fleet_revenue_simulator",
+   "label": "runs"
+  },
+  {
+   "from": "more_modeling/18_fleet_revenue_simulator",
+   "to": "dashboard",
+   "label": "plots"
+  },
+  {
+   "from": "track-more_modeling",
+   "to": "more_modeling/19_surge_sensitivity",
+   "label": "runs"
+  },
+  {
+   "from": "more_modeling/19_surge_sensitivity",
+   "to": "dashboard",
+   "label": "plots"
+  },
+  {
+   "from": "track-more_modeling",
+   "to": "more_modeling/20_heatmap_surge_matrix",
+   "label": "runs"
+  },
+  {
+   "from": "more_modeling/20_heatmap_surge_matrix",
+   "to": "dashboard",
+   "label": "plots"
+  },
+  {
+   "from": "track-more_modeling",
+   "to": "more_modeling/21_surge_waterfall",
+   "label": "runs"
+  },
+  {
+   "from": "more_modeling/21_surge_waterfall",
+   "to": "dashboard",
+   "label": "plots"
+  },
+  {
+   "from": "track-more_modeling",
+   "to": "more_modeling/22_demand_forecasting",
+   "label": "runs"
+  },
+  {
+   "from": "more_modeling/22_demand_forecasting",
+   "to": "dashboard",
+   "label": "plots"
+  },
+  {
+   "from": "track-multivariate",
+   "to": "multivariate/01_categorical_breakdown",
+   "label": "runs"
+  },
+  {
+   "from": "multivariate/01_categorical_breakdown",
+   "to": "dashboard",
+   "label": "plots"
+  },
+  {
+   "from": "track-multivariate",
+   "to": "multivariate/02_borough_dummies_kurtosis",
+   "label": "runs"
+  },
+  {
+   "from": "multivariate/02_borough_dummies_kurtosis",
+   "to": "dashboard",
+   "label": "plots"
+  },
+  {
+   "from": "track-multivariate",
+   "to": "multivariate/03_geography_premium",
+   "label": "runs"
+  },
+  {
+   "from": "multivariate/03_geography_premium",
+   "to": "dashboard",
+   "label": "plots"
+  },
+  {
+   "from": "track-multivariate",
+   "to": "multivariate/04_baseline_sample",
+   "label": "runs"
+  },
+  {
+   "from": "multivariate/04_baseline_sample",
+   "to": "dashboard",
+   "label": "plots"
+  },
+  {
+   "from": "track-multivariate",
+   "to": "multivariate/05_lightgbm_baselines",
+   "label": "runs"
+  },
+  {
+   "from": "multivariate/05_lightgbm_baselines",
+   "to": "dashboard",
+   "label": "plots"
+  },
+  {
+   "from": "track-multivariate",
+   "to": "multivariate/06_model_verdict",
+   "label": "runs"
+  },
+  {
+   "from": "multivariate/06_model_verdict",
+   "to": "dashboard",
+   "label": "plots"
+  },
+  {
+   "from": "track-polynomial_regression_et_all",
+   "to": "polynomial_regression_et_all/01_polynomial_regression",
+   "label": "runs"
+  },
+  {
+   "from": "polynomial_regression_et_all/01_polynomial_regression",
+   "to": "dashboard",
    "label": "plots"
   }
  ]

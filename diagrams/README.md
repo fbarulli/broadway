@@ -15,20 +15,16 @@ All maps are produced by builders — never hand-written JSON:
 - `scripts/blast_radius.sh <path> [symbol]` — the evidence source: gate
   ownership plus `graphify affected` callers that feed the blast maps.
 
-## Regenerate a map
+## Regenerate maps + serve (one command)
 
 ```bash
-# 1. build the spec from live project surfaces (python, src builders)
-# 2. render it (needs node + the tldraw skill installed)
-python - <<'EOF'
-from pathlib import Path
-from broadway.reports import canvas
-spec = canvas.experiment_series_spec({"univariate": ["01_a"]})
-canvas.write_spec(spec, Path("diagrams/my_map.json"))
-canvas.emit_tldr(Path("diagrams/my_map.json"), Path("diagrams/my_map.tldr"))
-EOF
-# 3. view at /canvas/my_map on the dashboard; annotate; save persists
+bash scripts/uv.sh run --extra dev python scripts/render_canvas_maps.py [--no-serve] [--port 8000]
 ```
+
+Rebuilds every map from live project surfaces, prints the URLs, and starts
+the dashboard as its final act — a running web app is the expected output.
+`--no-serve` rebuilds only. Then open `/canvas/<name>`: annotate, save
+persists back into the versioned `.tldr`.
 
 ## Current maps
 
