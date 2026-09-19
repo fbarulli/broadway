@@ -4,7 +4,7 @@
 # unconditional newline-chained pushes. This wrapper makes both impossible:
 # the push lines execute ONLY if run_local_ci.sh exits 0.
 #
-# Usage: bash scripts/ship.sh [remote] [refspec...]   (default: origin +refs/heads/sklearn)
+# Usage: bash scripts/ship.sh [remote] [refspec...]   (default: origin +refs/heads/taxi)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 # Single sanctioned uv cache root: $HOME/.cache/uv — a repo-local UV_CACHE_DIR
@@ -18,7 +18,7 @@ export MPLCONFIGDIR="${MPLCONFIGDIR:-$PWD/.mplconfig}"
 
 REMOTE="${1:-origin}"; shift || true
 REFSPECS=("$@")
-[ ${#REFSPECS[@]} -eq 0 ] && REFSPECS=("sklearn:sklearn")
+[ ${#REFSPECS[@]} -eq 0 ] && REFSPECS=("taxi:taxi")
 
 echo "== ship.sh: full tier gates every push =="
 if ! bash scripts/run_local_ci.sh; then

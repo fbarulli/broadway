@@ -2,21 +2,21 @@
 # Branch parity gate — keep main and taxi's SHARED surface in lockstep.
 #
 # The repo has a deliberate split:
-#   * sklearn — the only active development line (agents/contracts/MAIN_AGENT_CONTRACT.md §2);
-#             taxi fast-forwards to it after each green push; main is frozen
+#   * taxi — the active development line and maintained reference use case
+#             (agents/contracts/MAIN_AGENT_CONTRACT.md §2); main is frozen
 #             until declared main-day.
 #
-# src/, tests/, demo/, scripts/, experiments/more_modeling/, the synthetic-demo
-# configs, and the deployment files (k8s/, docker/, .github/workflows/) are
-# meant to be IDENTICAL on both
-# branches. This script fails loudly the moment they drift — including
+# src/, tests/, demo/, scripts/, configs/, agents/contracts/,
+# agents/tools/, and the deployment files (k8s/, docker/,
+# .github/workflows/) are meant to be IDENTICAL on both branches.
+# This script fails loudly the moment they drift — including
 # deletions and content changes — so a change made on one branch cannot
 # silently diverge.
 #
 # ERA-AWARE (D16): behaviour is gated by the era declaration, INLINED below
 # (D21 relocated it from .github/parity-era.env — see "Era declaration").
 # PARITY_ERA=dev means
-# sklearn is the active line and main is frozen (every event runs frozen-main
+# taxi is the active line and main is frozen (every event runs frozen-main
 # custody, then branch-aware pass-along guards); PARITY_ERA=main is lockstep
 # day (stock check / --sync). There is no environment-variable dialect.
 #
@@ -39,33 +39,29 @@ fi
 
 # The intended shared surface — paths that must be byte-identical on both
 # branches. Keep this list explicit: anything NOT listed is deliberately
-# taxi-only or main-only.
+# taxi-only or main-only. Main-owned slate (README.md, GOVERNANCE-POINTER.md,
+# BROADWAY.md, root contracts) is NEVER shared — main's blank-slate README
+# differs from taxi's by design. Mirrors scripts/main_day_sync.sh WHITELIST.
 SHARED=(
   src/
   tests/
   demo/
-  configs/dataset/test.yaml
-  configs/experiment/baseline.yaml
-  configs/experiment/engineered.yaml
-  configs/experiment/hyperopt.yaml
-  configs/analysis/test.yaml
-  configs/analysis/test_hypothesis.yaml
-  configs/analysis/test_causal.yaml
-  configs/step/causal.yaml
-  configs/step/etl.yaml
-  configs/environment/
-  configs/flow/
+  configs/
+  agents/contracts/
+  agents/tools/
+  scripts/
   k8s/
   docker/
   .github/workflows/
   pyproject.toml
+  uv.lock
   Dockerfile
   docker-compose.yml
+  .python-version
+  .env.example
+  HPO_TRAINING.md
   .gitignore
   .dockerignore
-  README.md
-  scripts/
-  experiments/more_modeling/
 )
 
 check() {
@@ -88,10 +84,17 @@ check() {
 
 sync_to_main() {
   local path
-  # Work from a clean main checkout against the latest taxi.
-  git fetch origin
-  git checkout main
-  git checkout taxi -- "${SHARED[@]}"
+  # Main-day only: run from a clean checkout of main against latest origin/taxi.
+  if [[ "$(git symbolic-ref --short HEAD)" != "main" ]]; then
+    echo "REFUSED: --sync must run from a clean main checkout" >&2
+    exit 1
+  fi
+  git fetch origin taxi
+  git checkout origin/taxi -- "${SHARED[@]}"
+  # Main-owned slate is not shared — restore it in case the track line grew
+  # a same-named file.
+  git checkout origin/main -- README.md GOVERNANCE-POINTER.md BROADWAY.md \
+    AGENT_CONTRACT.md AGENT_WORKER_CONTRACT.md CONTRACT_TEMPLATE.md 2>/dev/null || true
   # Deletions do not propagate with checkout — mirror them too.
   local f
   while IFS= read -r f; do
@@ -108,10 +111,10 @@ sync_to_main() {
 # the main-day flip act (D16c). NOTE for scripts/run_local_ci.sh's F1b guard:
 # the `^PARITY_ERA=` line is the staleness marker — a track ref whose checker
 # lacks it predates D16/D21 and must not gate CI.
-PARITY_ERA=dev                 # dev: sklearn active, main frozen | main: lockstep day
-PARITY_TRACK_BRANCH=sklearn    # active development line during dev era
+PARITY_ERA=dev                 # dev: taxi active, main frozen | main: lockstep day
+PARITY_TRACK_BRANCH=taxi       # active development line during dev era
 PARITY_ALLOWLIST=()            # SHARED paths exempt from custody; extend only by cited ruling
-PARITY_MAIN_ANCHOR=6f102f29079d9911f79c0069f6ee2eea9ef62065  # re-anchored 2026-09-01 by owner ruling ("yes anchor, continue"): the Aug-31 reroot series IS the ratified frozen state; old anchor 70f4e5d superseded
+PARITY_MAIN_ANCHOR=ba12d6f1d0d5bbe40a73ec9623b5f8c5dc57cca8  # re-anchored 2026-09-19 by MAIN-RESET (whitelist rebuild from taxi@54e4483); old anchor 6f102f2 superseded with main history reset
 
 # Preserved validations (D16 rider). The old ENV_FILE readability test,
 # `source`, ${VAR:?} trio, and declare -p existence check are DEAD here —
@@ -141,8 +144,8 @@ custody() {
   #     adds/deletes/mods/smuggling; self-diff at seed is zero by
   #     construction, and a stale pin can only false-red loudly AFTER an
   #     unanchored ratified change — the safe failure direction.
-  #     (Merge-base anchoring rejected: 21/24 SHARED entries legitimately
-  #     diverge between merge-base 7758d1a and the sanctioned main tip.)
+  #     (Merge-base anchoring rejected: main and taxi are DISJOINT histories
+  #     since the 2026-09-19 MAIN-RESET orphan rebuild — no merge base exists.)
   if ! git diff --exit-code --quiet "$PARITY_MAIN_ANCHOR" origin/main -- "${SHARED[@]}"; then
     echo "ROGUE MAIN WRITE: frozen main changed since anchor $PARITY_MAIN_ANCHOR (adds/deletes/mods)" >&2
     exit 1

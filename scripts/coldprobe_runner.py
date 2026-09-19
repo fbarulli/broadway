@@ -39,7 +39,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 # --- Law-pinned constants (D23 + STATE.md ## TELEMETRY; not free choices) ---
-DEFAULT_BRANCH = "sklearn"  # D23: probe rides the sklearn branch tip
+DEFAULT_BRANCH = "taxi"  # D23: probe rides the taxi branch tip
 PAGE_LIMIT = "30"  # STATE.md hazard: LIST endpoints default to page size 30
 EXPECTED_CONCLUSION = "success"  # a green tip is the recording precondition
 POLL_INTERVAL_S = 15.0
