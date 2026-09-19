@@ -397,10 +397,24 @@ def test_probe_b_red_phantom_path_in_contract(tmp_path: Path) -> None:
         probe_backticked_paths(seeded, ROOT, source="seeded-MAC")
 
 
+# Hermetic seed for the event-id namespace tests: a minimal ledger excerpt
+# with the role-vocabulary window lit — NEVER the live file, so live drift
+# cannot break these tests before their own seed is reached (2026-09-19
+# cascade: a live unresolvable token failed both twins for the wrong reason).
+_SEEDED_EVENT_EXCERPT = (
+    "Ruled by the senior reviewer agent synthesis panel:\n"
+    "EVENT: issues/4#issuecomment-12345678 event-id deadbeef\n"
+)
+
+
+# Deterministic stub resolver: nothing resolves — the registry alone decides.
+def _resolves_nothing(token: str) -> bool:
+    return False
+
+
 def test_probe_c_red_unattributed_8hex_token(tmp_path: Path) -> None:
-    # Hermetic seed: a live-ledger append would sit near real role words
-    # (vocab window is ±80 chars), letting an unknown token pass via
-    # neighboring declarations. Minimal string keeps the negative case pure.
+    # Minimal string keeps the negative case pure: an unknown token far from
+    # any role word must fail through the namespace message.
     seeded_text = "Mystery reference cafe1234 ends here."
 
     def everything_except_seed(token: str) -> bool:
@@ -422,24 +436,26 @@ def _append_forged_event(lines: list[str]) -> list[str]:
     return lines
 
 
-def test_probe_c_red_unregistered_event_id_amid_role_vocab(tmp_path: Path) -> None:
+def test_probe_c_red_unregistered_event_id_amid_role_vocab() -> None:
     # F4′ bypass attempt: an EVENT-line token fabricated amid role vocabulary.
     # The ±80-char vocab window is NO escape in this namespace — only a
-    # ## EVENTS resolution row in STATE.md legitimizes the token.
-    seeded = _seeded_copy(tmp_path, "agents/ledger/DECISIONS.md", _append_forged_event)
+    # ## EVENTS resolution row legitimizes the token. Hermetic: the live
+    # file is never scanned, so live drift cannot fail this test early.
+    seeded = _SEEDED_EVENT_EXCERPT
     at = seeded.index("deadbeef")
     assert ROLE_VOCABULARY.search(seeded[max(0, at - 80):at])  # vocab window IS lit
     with pytest.raises(AssertionError, match="unregistered event-id"):
         probe_hex_tokens(
-            seeded, _git_resolves, source="seeded-DECISIONS",
-            event_registry=_registered_event_ids(),
+            seeded, _resolves_nothing, source="seeded-DECISIONS",
+            event_registry=frozenset(),
         )
 
 
-def test_probe_c_green_registered_event_id_via_events_registry(tmp_path: Path) -> None:
+def test_probe_c_green_registered_event_id_via_events_registry() -> None:
     # Same seed as the RED twin; registering the event-id flips it GREEN —
     # proving registry membership, not vocabulary proximity, is the gate.
-    seeded = _seeded_copy(tmp_path, "agents/ledger/DECISIONS.md", _append_forged_event)
+    # Hermetic like its twin: no live file, no git, no live registry.
+    seeded = _SEEDED_EVENT_EXCERPT
     synthetic_state = (
         "## EVENTS\n"
         "| event-id | issue | comment-id | created_at | type | supersedes |\n"
@@ -448,8 +464,7 @@ def test_probe_c_green_registered_event_id_via_events_registry(tmp_path: Path) -
         "| 2026-08-24T16:19:00Z | amendment | - |\n"
     )
     assert _parse_event_registry(synthetic_state) == {"deadbeef"}  # parser round-trip
-    registry = _registered_event_ids() | {"deadbeef"}  # live rows + the new one
-    probe_hex_tokens(seeded, _git_resolves, source="seeded-DECISIONS", event_registry=registry)
+    probe_hex_tokens(seeded, _resolves_nothing, source="seeded-DECISIONS", event_registry={"deadbeef"})
 
 
 def test_probe_c_red_duplicate_event_registry_row() -> None:
@@ -735,6 +750,17 @@ def expired_allowlist_entries(
     ]
 
 
+def active_allowlist_map(
+    allowlist: Sequence[tuple[str, str, str]], today: date,
+) -> dict[str, str]:
+    """The single date rule, shared: rows whose review date is today or later."""
+    return {
+        path: reason
+        for path, reason, review in allowlist
+        if date.fromisoformat(review) >= today
+    }
+
+
 def probe_new_surfaces_registered(
     tracked: Sequence[str],
     registry_rows: list[dict[str, object]],
@@ -797,8 +823,7 @@ def probe_new_surfaces_registered(
     effective = {
         **exemptions,
         **{path: f"allowlisted: {reason}"
-           for path, reason, review in allowlist
-           if date.fromisoformat(review) >= today},
+           for path, reason in active_allowlist_map(allowlist, today).items()},
     }
     unregistered = find_unregistered(
         list(tracked), parse_surface_coverage(registry_rows, root), effective,
@@ -1166,7 +1191,7 @@ def unexempted_uv_cache_hits(
     today: date,
 ) -> list[str]:
     """Hits whose path carries no ACTIVE dated exemption."""
-    active = {path for path, _reason, review in exemptions if date.fromisoformat(review) >= today}
+    active = set(active_allowlist_map(exemptions, today))
     allowed = active | {UV_CACHE_RUNTIME_OWNER}
     return [f"{path}:{no}" for path, no in hits if path not in allowed]
 
@@ -1233,12 +1258,14 @@ TOKEN_FLOOR = frozenset({
     "kubeconform", "docker", "python", "sh", "shellcheck", "uv", "tar", "ls",
     "echo", "git", "mkdir", "cp", "sed", "grep", "bash",
 })
-# Snapshot @eb9ea18 (2026-08-25, review 2026-10-01) + branch-aware docker
-# extension (2026-09-19, review 2026-10-19): every first token
-# observable in today's run: blocks beyond TOKEN_FLOOR — control-flow words,
-# the gzip pipe, shell variable assignments, manifest handling for the
-# branch-aware CD set, and the python -c string
+# Snapshot @eb9ea18 (2026-08-25) + branch-aware docker extension (2026-09-19):
+# every first token observable in the run: blocks beyond TOKEN_FLOOR —
+# control-flow words, the gzip pipe, shell variable assignments, manifest
+# handling for the branch-aware CD set, and the python -c string
 # fragments of the config-load boot step (verbatim, however inelegant).
+# NOTE: these dates are history, not policy — there is no expiry check on
+# this set. Enforcement is fail-loud: any NEW command head trips the probe
+# until deliberately baselined here.
 TOKEN_BASELINE = frozenset({
     "set", "for", "do", "done", "if", "fi", "else", "while", "[",
     "gzip", "import", "from", "cfg",
