@@ -1233,13 +1233,17 @@ TOKEN_FLOOR = frozenset({
     "kubeconform", "docker", "python", "sh", "shellcheck", "uv", "tar", "ls",
     "echo", "git", "mkdir", "cp", "sed", "grep", "bash",
 })
-# Snapshot @eb9ea18 (2026-08-25, review 2026-10-01): every first token
+# Snapshot @eb9ea18 (2026-08-25, review 2026-10-01) + branch-aware docker
+# extension (2026-09-19, review 2026-10-19): every first token
 # observable in today's run: blocks beyond TOKEN_FLOOR — control-flow words,
-# the gzip pipe, shell variable assignments, and the python -c string
+# the gzip pipe, shell variable assignments, manifest handling for the
+# branch-aware CD set, and the python -c string
 # fragments of the config-load boot step (verbatim, however inelegant).
 TOKEN_BASELINE = frozenset({
-    "set", "for", "do", "done", "if", "fi", "gzip", "import", "from", "cfg",
+    "set", "for", "do", "done", "if", "fi", "else", "while", "[",
+    "gzip", "import", "from", "cfg",
     "hpo", "assert", "print('config", 'ref="${{', 'registry="ghcr.io/${{',
+    "manifest=\"${{", "exit", "printf", ":",
     (
         "Path('/app/project/"
         "config/experiments/mlflow.yaml').read_text())['hpo'])"
