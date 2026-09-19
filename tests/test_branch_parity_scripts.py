@@ -345,3 +345,132 @@ def test_anchor_bump_fast_path_rejects_wrong_pin(tmp_path: Path) -> None:
         timeout=60,
     )
     assert result.returncode != 0, "fast path admitted a bump missing origin/main"
+
+
+def _custody_source() -> str:
+    """Extract the LIVE custody() body from scripts/check_branch_parity.sh.
+
+    Same extract-and-execute rationale as _gate_parity_source: the tests
+    execute the checker's real custody logic (including the MAIN-SYNC
+    transition rule) under bash in a tmp scratch repo, so they cannot
+    outlive the checker's actual semantics. Fails loudly if custody()
+    disappears or loses the transition marker.
+    """
+    text = CHECKER.read_text(encoding="utf-8")
+    assert "custody" in text, "checker no longer defines custody()"
+    start = text.index("custody() {")
+    end = text.index("\n}", start)
+    source = text[start : end + 2]
+    assert "MAIN-SYNC TRANSITION" in source, (
+        "live custody() carries no MAIN-SYNC transition rule — the checker "
+        "must pass a tip one ratified sync ahead (parent==anchor + MAIN-SYNC "
+        "subject) instead of ROGUE MAIN WRITE"
+    )
+    return source
+
+
+def _custody_scratch(tmp_path: Path, name: str) -> tuple[Path, str]:
+    """Scratch repo with one shared file; origin/main+taxi pinned at anchor.
+
+    Returns (repo, anchor) where anchor is the commit both remotes point
+    at. Callers advance origin/main to build transition / negative cases.
+    No network: all refs are local update-ref pins.
+    """
+    repo = tmp_path / name
+    repo.mkdir()
+    _git(repo, "init", "-q")
+    (repo / "scripts").mkdir()
+    (repo / "scripts" / "shared.txt").write_text("v1\n", encoding="utf-8")
+    _git(repo, "add", ".")
+    _git(repo, "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q",
+         "-m", "base")
+    anchor = _git(repo, "rev-parse", "HEAD")
+    _git(repo, "update-ref", "refs/remotes/origin/taxi", anchor)
+    _git(repo, "update-ref", "refs/remotes/origin/main", anchor)
+    return repo, anchor
+
+
+def _commit_shared(repo: Path, content: str, message: str) -> str:
+    """Rewrite scripts/shared.txt, commit, move origin/main to the new tip."""
+    (repo / "scripts" / "shared.txt").write_text(content, encoding="utf-8")
+    _git(repo, "add", ".")
+    _git(repo, "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q",
+         "-m", message)
+    tip = _git(repo, "rev-parse", "HEAD")
+    _git(repo, "update-ref", "refs/remotes/origin/main", tip)
+    return tip
+
+
+def _run_custody(repo: Path, anchor: str) -> subprocess.CompletedProcess[str]:
+    """Execute the extracted custody() with a pinned anchor in the scratch repo."""
+    script = (
+        "set -euo pipefail\n"
+        f"{_custody_source()}\n"
+        'SHARED=("scripts/shared.txt")\n'
+        f"PARITY_MAIN_ANCHOR={anchor}\n"
+        "PARITY_TRACK_BRANCH=taxi\n"
+        "PARITY_ALLOWLIST=()\n"
+        "custody\n"
+    )
+    return subprocess.run(
+        ["bash", "-c", script],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=60,
+    )
+
+
+def test_custody_main_sync_transition_passes(tmp_path: Path) -> None:
+    """TRANSITION: parent==anchor + MAIN-SYNC subject passes loudly."""
+    repo, anchor = _custody_scratch(tmp_path, "repo-transition")
+    tip = _commit_shared(repo, "v2\n", "MAIN-SYNC: ratified main-day sync")
+    parent = _git(repo, "rev-parse", f"{tip}^1")
+    assert parent == anchor
+    result = _run_custody(repo, anchor)
+    combined = result.stdout + result.stderr
+    assert result.returncode == 0, (
+        "custody rejected a provably one-ahead ratified sync "
+        f"(parent==anchor, MAIN-SYNC subject)\noutput:\n{combined}"
+    )
+    assert "MAIN-SYNC TRANSITION" in combined, (
+        f"transition pass lacks the loud notice line:\n{combined}"
+    )
+
+
+def test_custody_non_marker_still_fails(tmp_path: Path) -> None:
+    """NON-TRANSITION: same one-ahead tip without the marker still fails."""
+    repo, anchor = _custody_scratch(tmp_path, "repo-nonmarker")
+    tip = _commit_shared(repo, "v2\n", "HOTFIX: unratified main write")
+    parent = _git(repo, "rev-parse", f"{tip}^1")
+    assert parent == anchor
+    result = _run_custody(repo, anchor)
+    combined = result.stdout + result.stderr
+    assert result.returncode != 0, (
+        "custody admitted a one-ahead main write with a non-MAIN-SYNC "
+        f"subject\noutput:\n{combined}"
+    )
+    assert "ROGUE MAIN WRITE" in combined, (
+        f"wrong failure mode (expected ROGUE MAIN WRITE):\n{combined}"
+    )
+    assert "MAIN-SYNC TRANSITION" not in combined
+
+
+def test_custody_two_ahead_still_fails(tmp_path: Path) -> None:
+    """NON-TRANSITION: tip two commits ahead fails even with MAIN-SYNC marks."""
+    repo, anchor = _custody_scratch(tmp_path, "repo-twoahead")
+    _commit_shared(repo, "v2\n", "MAIN-SYNC: ratified main-day sync")
+    tip2 = _commit_shared(repo, "v3\n", "MAIN-SYNC: second sync")
+    parent2 = _git(repo, "rev-parse", f"{tip2}^1")
+    assert parent2 != anchor, "fixture error: tip is not two ahead of anchor"
+    result = _run_custody(repo, anchor)
+    combined = result.stdout + result.stderr
+    assert result.returncode != 0, (
+        "custody admitted a two-ahead tip (deeper history must fail exactly "
+        f"as before)\noutput:\n{combined}"
+    )
+    assert "ROGUE MAIN WRITE" in combined, (
+        f"wrong failure mode (expected ROGUE MAIN WRITE):\n{combined}"
+    )
+    assert "MAIN-SYNC TRANSITION" not in combined

@@ -128,17 +128,34 @@ esac
 
 custody() {
   # Frozen-main custody (D16b/F2-revised) — two independent alarms, tens of
-  # ms total.
+  # ms total, plus a MAIN-SYNC transition allowance.
   #
   # (1) Anchor drift guard: diff main against PARITY_MAIN_ANCHOR — the last
   #     ratified state of frozen main (seeded at the frozen tip; updated ONLY
   #     in the same commit as a ratified main-day sync/flip-back). Catches
   #     adds/deletes/mods/smuggling; self-diff at seed is zero by
-  #     construction, and a stale pin can only false-red loudly AFTER an
-  #     unanchored ratified change — the safe failure direction.
+  #     construction.
+  #     MAIN-SYNC TRANSITION: the ratified main-day sync commit itself must
+  #     move main exactly one step ahead of the anchor (the anchor pin lives
+  #     on taxi and can only follow the new tip afterwards), so a tip whose
+  #     first-parent is exactly PARITY_MAIN_ANCHOR AND whose commit subject
+  #     starts with `MAIN-SYNC` PASSES loudly (one ratified sync ahead) via
+  #     the transition check below instead of failing as ROGUE MAIN WRITE.
+  #     Anything else — deeper history (two+ commits ahead), wrong/missing
+  #     marker, unrelated write — fails exactly as before; the
+  #     non-transition path is unweakened.
   #     (Merge-base anchoring rejected: main and taxi are DISJOINT histories
   #     since the 2026-09-19 MAIN-RESET orphan rebuild — no merge base exists.)
   if ! git diff --exit-code --quiet "$PARITY_MAIN_ANCHOR" origin/main -- "${SHARED[@]}"; then
+    # MAIN-SYNC transition probe: provably one ratified sync ahead?
+    local _main_parent _main_subject _main_tip
+    _main_parent="$(git rev-parse --verify 'origin/main^1' 2>/dev/null || true)"
+    _main_subject="$(git log -1 --format=%s origin/main 2>/dev/null || true)"
+    if [[ "$_main_parent" == "$PARITY_MAIN_ANCHOR" && "$_main_subject" == MAIN-SYNC* ]]; then
+      _main_tip="$(git rev-parse --verify origin/main 2>/dev/null || true)"
+      echo "MAIN-SYNC TRANSITION: origin/main tip ${_main_tip} is one ratified sync ahead of anchor $PARITY_MAIN_ANCHOR (subject: ${_main_subject}) — custody passes"
+      return 0
+    fi
     echo "ROGUE MAIN WRITE: frozen main changed since anchor $PARITY_MAIN_ANCHOR (adds/deletes/mods)" >&2
     exit 1
   fi
@@ -151,9 +168,11 @@ custody() {
   # ancestor since the dev-era reset), so the universe below can never
   # contain main's blob versions — the check would false-positive on all
   # shared files forever. Its value is catching POST-FREEZE writes to
-  # main; when main sits exactly at the anchor, the freeze-intact
-  # shortcut above makes this layer unreachable-by-definition. Run it
-  # ONLY when main moved off the anchor (then any novel blob IS rogue).
+  #     main; when main sits exactly at the anchor, the freeze-intact
+  #     shortcut above makes this layer unreachable-by-definition. The
+  #     MAIN-SYNC transition above likewise returns before this layer. Run it
+  #     ONLY when main moved off the anchor via a non-transition write
+  #     (then any novel blob IS rogue).
   if [[ "$(git rev-parse --verify origin/main)" == "$PARITY_MAIN_ANCHOR" ]]; then
     return 0
   fi
