@@ -211,3 +211,57 @@ def test_dashboard_routes_validate_and_persist_real_files(monkeypatch, tmp_path)
     assert reordered == {"reordered": ["01_clean", "02_ingest"]}
     assert (series / "01_clean.py").is_file()
     assert (observations / "02_ingest.json").is_file()
+
+
+def _seed_diagrams(monkeypatch, tmp_path):
+    (tmp_path / "blast_radius.tldr").write_text(
+        '{"tldrawFileFormatVersion": 1, "schema": {"schemaVersion": 2}, "records": {"a:1": {"id": "a:1"}}}',
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(ui, "DIAGRAMS_DIR", tmp_path)
+    return tmp_path
+
+
+def test_canvas_index_lists_diagrams(monkeypatch, tmp_path) -> None:
+    _seed_diagrams(monkeypatch, tmp_path)
+    assert ui.list_diagrams() == ["blast_radius"]
+    response = ui.canvas_index()
+    assert response.status_code == 200
+    assert "/canvas/blast_radius" in response.body.decode()
+
+
+def test_canvas_page_and_save_validate(monkeypatch, tmp_path) -> None:
+    _seed_diagrams(monkeypatch, tmp_path)
+    assert ui._diagram_file("missing") is None
+    assert ui._diagram_file("../evil") is None
+    assert ui.canvas_page("missing").status_code == 404
+    page = ui.canvas_page("blast_radius")
+    assert page.status_code == 200
+    body = page.body.decode()
+    assert "tldraw@" in body and "'/diagrams/'" in body and ".tldr" in body
+
+    saved = asyncio.run(
+        ui.canvas_save("missing", _request(b"{}"))
+    )
+    assert saved.status_code == 404
+    invalid = asyncio.run(
+        ui.canvas_save("blast_radius", _request(b"not json"))
+    )
+    assert invalid.status_code == 422
+    empty = asyncio.run(
+        ui.canvas_save("blast_radius", _request(b'{"document": {}}'))
+    )
+    assert empty.status_code == 422
+    document = {"document": {"b:2": {"id": "b:2"}}}
+    import json as _json
+
+    ok = asyncio.run(
+        ui.canvas_save(
+            "blast_radius",
+            _request(_json.dumps(document).encode()),
+        )
+    )
+    assert ok.status_code == 200
+    stored = _json.loads((tmp_path / "blast_radius.tldr").read_text(encoding="utf-8"))
+    assert stored["records"] == {"b:2": {"id": "b:2"}}
+    assert stored["schema"] == {"schemaVersion": 2}
