@@ -97,6 +97,11 @@ that script; assembling gates ad hoc is how F401-class residue reached
 remote CI (incident GATE-SSOT, FIXES.md). A full-suite pytest run alone does
 not substitute.
 
+Every contract whose brief contains a Blast radius section MUST run
+`bash scripts/blast_radius.sh <path> [symbol]` for each touched surface and
+paste the output before implementing — graphify reverse traversal plus gate
+ownership, not guesswork.
+
 ## Live ops board (GitHub Projects)
 
 Project #4 is an availability mirror, not evidence. Workers and reviewers

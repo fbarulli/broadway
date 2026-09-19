@@ -27,6 +27,14 @@ For every file that changes:
 - If the worker would have to search to locate a target or a side-effect, the
   contract is incomplete.
 
+## Blast radius (mandatory, before any implementation reasoning)
+
+For every touched surface: `bash scripts/blast_radius.sh <path> [symbol]` —
+paste the governance (gates/owners/tests) AND structural (graphify reverse
+traversal: real callers with file:line) output here. A contract without this
+evidence is incomplete: the worker must not reason about changes it has not
+measured. Reviewers re-run the same command (REVIEWER_CONTRACT.md §4).
+
 ## Constraints
 
 - Immutable worker rules: `WORKER_CONTRACT.md` (type hints on public
