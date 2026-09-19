@@ -106,7 +106,7 @@ sync_to_main() {
 PARITY_ERA=dev                 # dev: taxi active, main frozen | main: lockstep day
 PARITY_TRACK_BRANCH=taxi       # active development line during dev era
 PARITY_ALLOWLIST=()            # SHARED paths exempt from custody; extend only by cited ruling
-PARITY_MAIN_ANCHOR=eae82c8556c467f1fbc7ee2b0cc0d9ebdb36df7b  # re-anchored 2026-09-19: track-side anchor follows the ratified sync tip; anchor bumps live on taxi only (syncing one to main would itself read as drift)
+PARITY_MAIN_ANCHOR=1b29a6daad3eeab5a329518f1f3e0a0fdbae6279  # re-anchored 2026-09-19: follows ratified main-day sync 1b29a6d; anchor bumps live on taxi only
 
 # Preserved validations (D16 rider). The old ENV_FILE readability test,
 # `source`, ${VAR:?} trio, and declare -p existence check are DEAD here —
