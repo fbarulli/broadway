@@ -13,6 +13,7 @@ from broadway.config import loader
 from broadway.config.loader import load_config
 from broadway.lineage import records
 from broadway.lineage.models import SampleSpec
+from broadway.paths import repo_root
 from broadway.reports import paths
 from broadway.stats.describe import (
     GroupSummary,
@@ -21,7 +22,7 @@ from broadway.stats.describe import (
     run,
 )
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = repo_root()
 
 
 def test_describe_groups_and_absent() -> None:

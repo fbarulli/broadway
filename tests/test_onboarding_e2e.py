@@ -19,9 +19,10 @@ from broadway.config.loader import load_config, resolve_full_steps
 from broadway.discover import module as discover_module
 from broadway.lineage import records
 from broadway.onboard import module as onboard_module
+from broadway.paths import repo_root
 from broadway.pipeline import run as run_pipeline
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = repo_root()
 
 
 def test_init_and_run_external_dataset(

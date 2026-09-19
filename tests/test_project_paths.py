@@ -8,7 +8,9 @@ from pathlib import Path
 
 import pytest
 
-REPO = Path(__file__).resolve().parents[1]
+from broadway.paths import repo_root
+
+REPO = repo_root()
 
 
 def _load_module(path: Path, name: str):

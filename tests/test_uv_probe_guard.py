@@ -14,9 +14,10 @@ would silently come back on the next pyproject.toml change.
 from __future__ import annotations
 
 import tomllib
-from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+from broadway.paths import repo_root
+
+REPO_ROOT = repo_root()
 
 # setuptools prunes a discovered dir when fnmatch(f"{package}*", pattern)
 # matches; "deepseek-harness*" covers the foreign tree itself and everything

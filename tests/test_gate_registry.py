@@ -35,7 +35,9 @@ from pathlib import Path
 import pytest
 import yaml
 
-REPO = Path(__file__).resolve().parents[1]
+from broadway.paths import repo_root
+
+REPO = repo_root()
 GATES_YAML = REPO / "agents" / "ledger" / "gates.yaml"
 DIGEST = REPO / "agents" / "ledger" / "DIGEST.md"
 INDEX_DIR = REPO / "agents" / "ledger" / "index"

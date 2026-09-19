@@ -37,10 +37,12 @@ from typing import NamedTuple
 import pytest
 import yaml
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+from broadway.paths import repo_root
+
+sys.path.insert(0, str(repo_root() / "scripts"))
 from tier_classifier import CHECKLIST, FULL, classify
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = repo_root()
 
 BACKTICKED_PATH = re.compile(r"`([^\s`]+)\.(py|sh|md|ya?ml|toml|txt|json|env|cfg|ini)`")
 HEX8 = re.compile(r"\b[0-9a-f]{8}\b")  # known lookalike, OUT OF SCOPE: reports/audit/* carries decimal join-counts with accidental hex shape (e.g. 17091666) — reports/ is outside probe-C scan scope by design

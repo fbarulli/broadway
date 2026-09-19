@@ -8,11 +8,12 @@ one list (scripts/main_whitelist.txt).
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 import yaml
 
-REPO = Path(__file__).resolve().parents[1]
+from broadway.paths import repo_root
+
+REPO = repo_root()
 
 DATA_SAFETY_RULES = [
     "reportOptionalMemberAccess",

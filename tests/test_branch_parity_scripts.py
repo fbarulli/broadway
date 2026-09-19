@@ -30,7 +30,9 @@ from pathlib import Path
 
 import pytest
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+from broadway.paths import repo_root
+
+REPO_ROOT = repo_root()
 CHECKER = REPO_ROOT / "scripts" / "check_branch_parity.sh"
 RUN_CI = REPO_ROOT / "scripts" / "run_local_ci.sh"
 

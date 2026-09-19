@@ -23,7 +23,9 @@ from pathlib import Path
 
 import pytest
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+from broadway.paths import repo_root
+
+REPO_ROOT = repo_root()
 TESTS_DIR = REPO_ROOT / "tests"
 
 # Project config references — always forbidden in platform tests.
