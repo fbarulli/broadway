@@ -114,7 +114,7 @@ sync_to_main() {
 PARITY_ERA=dev                 # dev: taxi active, main frozen | main: lockstep day
 PARITY_TRACK_BRANCH=taxi       # active development line during dev era
 PARITY_ALLOWLIST=()            # SHARED paths exempt from custody; extend only by cited ruling
-PARITY_MAIN_ANCHOR=ba12d6f1d0d5bbe40a73ec9623b5f8c5dc57cca8  # re-anchored 2026-09-19 by MAIN-RESET (whitelist rebuild from taxi@54e4483); old anchor 6f102f2 superseded with main history reset
+PARITY_MAIN_ANCHOR=0d792693f96465a1170e3c8dc02358b7b72c255f  # re-anchored 2026-09-19 by MAIN-SYNC (retargeted tooling now live on both tips); old anchor ba12d6f superseded in the same ratified sync
 
 # Preserved validations (D16 rider). The old ENV_FILE readability test,
 # `source`, ${VAR:?} trio, and declare -p existence check are DEAD here —
