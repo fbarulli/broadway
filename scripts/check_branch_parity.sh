@@ -48,18 +48,25 @@ fi
 # file, never a second inline list.
 SHARED=()
 _WHITELIST_FILE="$(python3 -c 'import yaml; print(yaml.safe_load(open("configs/tooling.yaml"))["shared_surface"]["file"])' 2>/dev/null || echo scripts/main_whitelist.txt)"
+_WHITELIST_CONTENT=""
 if [[ -f "$_WHITELIST_FILE" ]]; then
-  while IFS= read -r _line || [[ -n "$_line" ]]; do
+  _WHITELIST_CONTENT="$(<"$_WHITELIST_FILE")"
+elif git cat-file -e "origin/taxi:$_WHITELIST_FILE" 2>/dev/null; then
+  # Old checkout (e.g. pre-sync main) lacking the whitelist: read it from
+  # the track ref instead of failing — the surface definition always exists
+  # on taxi. Local file wins when present.
+  _WHITELIST_CONTENT="$(git show "origin/taxi:$_WHITELIST_FILE")"
+else
+  echo "FATAL: shared-surface whitelist not found: $_WHITELIST_FILE (see configs/tooling.yaml)" >&2
+  exit 1
+fi
+while IFS= read -r _line || [[ -n "$_line" ]]; do
     _line="${_line%%#*}"
     _line="${_line%"${_line##*[![:space:]]}"}"
     _line="${_line#"${_line%%[![:space:]]*}"}"
     [[ -z "$_line" ]] && continue
     SHARED+=("$_line")
-  done < "$_WHITELIST_FILE"
-else
-  echo "FATAL: shared-surface whitelist not found: $_WHITELIST_FILE (see configs/tooling.yaml)" >&2
-  exit 1
-fi
+done <<< "$_WHITELIST_CONTENT"
 # scripts/ — parity self-coverage marker (checker lives under scripts/, the
 # whitelist file lives under scripts/, so scripts/ must be on the surface).
 

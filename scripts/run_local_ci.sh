@@ -100,10 +100,25 @@ gate_parity() {
   return "$rc"
 }
 run parity gate_parity
-run ruff    dispatch bash scripts/uv.sh run --extra dev ruff check src tests project/experiments \
-            project/experiments.py \
-            project/working.py project/data.py \
-            scripts
+# shellcheck disable=SC2317  # reached via `run … gate_ruff` indirection
+gate_ruff() {
+  # Main-safe: project/* paths exist only on the development line — a clean
+  # main checkout is data-agnostic by design, so lint exactly the paths
+  # present (ruff E902s on missing paths). No hardcoded allowlist drift:
+  # the candidate list is the owned surface; existence decides.
+  local candidates=(src tests project/experiments project/experiments.py project/working.py project/data.py scripts)
+  local paths=()
+  local p
+  if [[ $CLEAN_LINT -eq 1 ]]; then
+    ensure_clean_snapshot
+    for p in "${candidates[@]}"; do [[ -e "$CLEAN_SNAP/head/$p" ]] && paths+=("$p"); done
+    ( cd "$CLEAN_SNAP/head" && exec env UV_PROJECT_ENVIRONMENT="$CLEAN_SNAP/venv" bash scripts/uv.sh run --extra dev ruff check "${paths[@]}" )
+    return $?
+  fi
+  for p in "${candidates[@]}"; do [[ -e "$p" ]] && paths+=("$p"); done
+  bash scripts/uv.sh run --extra dev ruff check "${paths[@]}"
+}
+run ruff    gate_ruff
 run mypy    dispatch bash scripts/uv.sh run --extra dev mypy src/broadway
 # Pyright CONSULTANT (strict, advisory-only): always green by design — reports
 # counts only, never fails. Highest strictness surfaces silent errors, data

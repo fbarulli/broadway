@@ -74,3 +74,19 @@ def test_promote_script_is_dry_run_default_and_never_commits() -> None:
     assert "--dry-run" in text and "DRY_RUN=1" in text
     assert "git commit" not in text and "git push" not in text, "custody: script never commits/pushes"
     assert "PARITY_MAIN_ANCHOR" in text, "must print the taxi-only anchor-bump instruction"
+
+
+def test_checker_and_sync_fall_back_to_track_ref_whitelist() -> None:
+    # Old checkouts (pre-sync main) lack the whitelist file: both scripts
+    # must read it from origin/taxi instead of failing (main-safe).
+    for script in ["check_branch_parity.sh", "main_day_sync.sh"]:
+        text = (REPO / "scripts" / script).read_text(encoding="utf-8")
+        assert "origin/taxi:" in text, script
+
+
+def test_ruff_gate_lints_only_paths_present() -> None:
+    # main is data-agnostic (no project/): the gate must skip missing paths
+    # instead of ruff-E902ing.
+    text = (REPO / "scripts" / "run_local_ci.sh").read_text(encoding="utf-8")
+    assert "gate_ruff" in text, "ruff must route through the main-safe gate"
+    assert "-e " in text or "[[ -e" in text, "gate must filter to existing paths"

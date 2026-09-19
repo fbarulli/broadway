@@ -40,8 +40,15 @@ git fetch origin taxi
 # --- 3) WHITELIST SSOT: only what main should contain
 echo "==> Checking out platform surface from taxi (whitelist SSOT)"
 WHITELIST_FILE="$(python3 -c 'import yaml; print(yaml.safe_load(open("configs/tooling.yaml"))["shared_surface"]["file"])' 2>/dev/null || echo scripts/main_whitelist.txt)"
-[[ -f "$WHITELIST_FILE" ]] || { echo "FATAL: whitelist not found: $WHITELIST_FILE" >&2; exit 1; }
-mapfile -t WHITELIST < <(grep -v '^\s*#' "$WHITELIST_FILE" | grep -v '^\s*$' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+WHITELIST_CONTENT=""
+if [[ -f "$WHITELIST_FILE" ]]; then
+  WHITELIST_CONTENT="$(<"$WHITELIST_FILE")"
+elif git cat-file -e "origin/taxi:$WHITELIST_FILE" 2>/dev/null; then
+  WHITELIST_CONTENT="$(git show "origin/taxi:$WHITELIST_FILE")"
+else
+  echo "FATAL: whitelist not found: $WHITELIST_FILE" >&2; exit 1
+fi
+mapfile -t WHITELIST < <(printf '%s\n' "$WHITELIST_CONTENT" | grep -v '^\s*#' | grep -v '^\s*$' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
 [[ ${#WHITELIST[@]} -gt 0 ]] || { echo "FATAL: whitelist empty: $WHITELIST_FILE" >&2; exit 1; }
 echo "==> Whitelist ($WHITELIST_FILE): ${#WHITELIST[@]} entries"
 git checkout origin/taxi -- "${WHITELIST[@]}" 2>&1 | tail -5
