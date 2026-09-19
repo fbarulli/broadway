@@ -18,6 +18,10 @@ The main agent is responsible for orchestration and verification. It does not si
 
 Only data-agnostic changes may be promoted to `main`.
 
+The legacy `project/etl` twin is retired (2026-09-19; see `agents/ledger/gates.yaml`
+`retired:`) — the `src/broadway` contract pipeline is the only ingest; do not
+resurrect the twin or its deleted `project/tests/*` suites.
+
 Development branches are not required to be byte-identical to `main`. The governing invariant is that `main` remains clean and data-agnostic.
 
 The definition and enforcement of main cleanliness live in the repository's main-cleanliness SSOT.

@@ -89,26 +89,12 @@ check() {
 }
 
 sync_to_main() {
-  local path
+  # CONSOLIDATED 2026-09-19: one sync implementation lives in
+  # scripts/main_day_sync.sh (whitelist SSOT, slate restore, taxi-only
+  # cleanup); this entry point delegates so the logic cannot drift apart.
+  # Prefer scripts/promote_to_main.sh --execute, which wraps sync + gates.
   # Main-day only: run from a clean checkout of main against latest origin/taxi.
-  if [[ "$(git symbolic-ref --short HEAD)" != "main" ]]; then
-    echo "REFUSED: --sync must run from a clean main checkout" >&2
-    exit 1
-  fi
-  git fetch origin taxi
-  git checkout origin/taxi -- "${SHARED[@]}"
-  # Main-owned slate is not shared — restore it in case the track line grew
-  # a same-named file.
-  git checkout origin/main -- README.md GOVERNANCE-POINTER.md BROADWAY.md \
-    AGENT_CONTRACT.md AGENT_WORKER_CONTRACT.md CONTRACT_TEMPLATE.md 2>/dev/null || true
-  # Deletions do not propagate with checkout — mirror them too.
-  local f
-  while IFS= read -r f; do
-    if ! git cat-file -e "origin/taxi:$f" 2>/dev/null; then
-      git rm -f --ignore-unmatch "$f" >/dev/null 2>&1 || true
-    fi
-  done < <(git diff --name-only --diff-filter=AD "origin/main" "origin/taxi" -- "${SHARED[@]}" || true)
-  echo "SYNCED taxi -> main for shared surface. Review, run gates, commit, push."
+  exec bash "$(dirname "$0")/main_day_sync.sh"
 }
 
 # --- Era declaration INLINE (D21: no separate env file, zero SHARED lines) ---

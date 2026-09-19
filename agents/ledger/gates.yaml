@@ -1,7 +1,18 @@
 # Gate registry SSOT — hand-maintained; the {01..09} gate fragments it consolidated predate git custody.
+# RETIRED 2026-09-19: the LEGACY project/etl twin (project/etl/process.py,
+# process_config.py + its 5 project/tests/* suites) was removed; the broadway
+# CONTRACT pipeline (src/broadway/...) is the only ingest. Rows below that
+# describe the legacy twin (GATE-INGEST-01/04, GATE-ETL-17/18/19, GATE-ETL-117
+# and LEGACY findings elsewhere) are preserved as history — see `retired:` —
+# and no longer bind any live surface.
+retired:
+- owners: ['project/etl/process.py', 'project/etl/process_config.py']
+  date: '2026-09-19'
+  successor: 'src/broadway/etl/module.py + src/broadway/data/loader.py (CONTRACT pipeline)'
+  history_rows_retained: ['GATE-INGEST-01', 'GATE-INGEST-04', 'GATE-ETL-17', 'GATE-ETL-18', 'GATE-ETL-19', 'GATE-ETL-116', 'GATE-ETL-117']
 meta:
-  head: 'd36f1d8'
-  assembled: '2026-08-24'
+  head: 'c7a85a6'
+  assembled: '2026-09-19'
   source_fragments:
   - agents/ledger/gates/01-ingest.md
   - agents/ledger/gates/02-etl-lookup.md
@@ -138,7 +149,6 @@ gates:
   touched_by: []
   validated_by:
   - tests/test_structural_cleaning.py::test_etl_ci_sampling_gated
-  - project/tests/test_ingest_audit.py::test_ci_sampling_reorder_becomes_visible_in_ledger
   if_changed:
   - row counts of every downstream artifact
   - TransformAudit.reasons grammar consumed by enforce_drop_fraction (src/broadway/lineage/records.py:43)
@@ -315,8 +325,6 @@ gates:
   - pandera@0.32.1
   - pyyaml@6.0.2
   validated_by:
-  - project/tests/test_ingest_contract.py::test_missing_dtype_raises
-  - project/tests/test_ingest_contract.py::test_dtype_mismatch_raises
   - tests/test_boundary_contracts.py::test_raw_canonical_boundary_rejects_dtype_mutation
   if_changed:
   - every consumer of the canonical parquet (features B2, stats B6, timeline B7 per tests/test_boundary_contracts.py header)
@@ -2078,8 +2086,6 @@ gates:
   - tests/test_lineage_models.py::test_transform_audit_and_lineage_record_round_trip
   - tests/test_lineage_graph.py::test_build_graph_links_nodes_and_records
   - tests/test_lineage_graph.py::test_dangling_parent_gets_placeholder_node
-  - tests/test_process.py::test_process_data_writes_ingest_lineage
-  - project/tests/test_ingest_audit.py::test_ingest_record_carries_balanced_audit
   - tests/test_lineage_state.py::test_non_lineage_kinds_never_listed
   if_changed:
   - rerun tests/test_lineage_*.py
@@ -2830,8 +2836,6 @@ gates:
   touched_by: []
   validated_by:
   - tests/test_loader.py::test_config_overlay_precedes_base_and_falls_back
-  - project/tests/test_process_config.py::test_project_config_matches_process_constants
-  - project/tests/test_process.py::test_process_data_writes_ingest_lineage
   - tests/test_experiments_dispatcher.py::test_project_cli_activates_the_project_config_overlay
   if_changed:
   - project/config/

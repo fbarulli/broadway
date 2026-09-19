@@ -82,6 +82,12 @@ REG = _load_registry()
 GATES = REG["gates"]
 VOCABULARY = set(REG.get("vocabulary") or [])
 GATE_IDS = {g["id"] for g in GATES}
+# Retired rows (gates.yaml `retired:`) are preserved history: exempt from
+# live-ownership and node-id existence probes, still counted in meta.
+RETIRED_IDS = {
+    gid for block in (REG.get("retired") or [])
+    for gid in (block.get("history_rows_retained") or [])
+}
 
 
 def _expand_gate_token(token: str) -> set[str]:
@@ -248,6 +254,8 @@ def _symbol_candidates(owner: str) -> tuple[list[str], list[str]]:
 
 @pytest.mark.parametrize("gate", GATES, ids=lambda g: g["id"])
 def test_owner_path_exists_and_symbol_matches(gate):
+    if gate["id"] in RETIRED_IDS:
+        pytest.skip(f"{gate['id']} retired — history row, no live owner")
     owner = gate["owner"]
     relpaths = [REPO / p for p in _owner_paths(owner)]
     assert relpaths, f"{gate['id']}: no repo path parsed from owner: {owner!r}"
@@ -306,6 +314,8 @@ def _node_id_exists(node_id: str, corpus: dict[str, str]) -> bool:
 def test_validated_by_node_ids_exist(test_corpus):
     missing = []
     for gate in GATES:
+        if gate["id"] in RETIRED_IDS:
+            continue
         for node_id in gate["validated_by"]:
             if not _node_id_exists(node_id, test_corpus):
                 missing.append(f"{gate['id']}: {node_id}")

@@ -1130,21 +1130,21 @@ UV_CACHE_NEEDLE = "UV_CACHE_DIR="
 UV_CACHE_RUNTIME_OWNER = "scripts/uv.sh"
 UV_CACHE_EXEMPTIONS: tuple[tuple[str, str, str], ...] = (
     ("agents/ledger/DECISIONS.md",
-     "historical D28/D32 measured-run records", "2026-09-08"),
+     "historical D28/D32 measured-run records; re-verified prose-only 2026-09-19", "2026-10-19"),
     ("agents/ledger/STATE.md",
-     "courtesy D28 suite-tail baseline command", "2026-09-08"),
+     "courtesy D28 suite-tail baseline command; re-verified prose-only 2026-09-19", "2026-10-19"),
     ("agents/ledger/archive/2026-08.md",
-     "historical D28 suite-tail baseline command", "2026-09-08"),
+     "historical D28 suite-tail baseline command; re-verified prose-only 2026-09-19", "2026-10-19"),
     ("agents/audits/B-TRUTH-ENFORCEMENT.md",
-     "audit prose quoting an in-venv run observation", "2026-09-08"),
+     "audit prose quoting an in-venv run observation; re-verified prose-only 2026-09-19", "2026-10-19"),
     ("agents/ledger/arbitration/2026-08-24/H-infra-custody-verdicts.md",
-     "row-146 cache-root fork-law verdict prose", "2026-09-08"),
+     "row-146 cache-root fork-law verdict prose; re-verified prose-only 2026-09-19", "2026-10-19"),
     ("agents/ledger/arbitration/2026-08-24/consolidation-slate.md",
-     "GATE-INFRA-146 slate entry (historical proposal record)", "2026-09-08"),
+     "GATE-INFRA-146 slate entry (historical proposal record); re-verified prose-only 2026-09-19", "2026-10-19"),
     ("agents/ledger/arbitration/2026-08-24/gap-object-creators.md",
-     "packet-H finding that created the fork-site law", "2026-09-08"),
+     "packet-H finding that created the fork-site law; re-verified prose-only 2026-09-19", "2026-10-19"),
     ("agents/ledger/gates.yaml",
-     "HISTORY finding string documenting the retired ship.sh fork site", "2026-09-08"),
+     "HISTORY finding string documenting the retired ship.sh fork site; re-verified prose-only 2026-09-19", "2026-10-19"),
 )
 
 

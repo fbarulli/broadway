@@ -111,7 +111,10 @@ run parity gate_parity
 PARALLEL_LOGDIR="$(mktemp -d "${TMPDIR:-/tmp}/broadway-gates.XXXXXX")"
 run_bg() {  # run_bg <name> <cmd...>: launch in background, log to file
   local name="$1"; shift
-  ( trap - EXIT; "$@" >"$PARALLEL_LOGDIR/$name.log" 2>&1; echo "$?" >"$PARALLEL_LOGDIR/$name.rc" ) &
+  # set +e: a failing gate must NOT kill the subshell before the rc write
+  # (set -e is inherited; without this the .rc never lands and collect
+  # dies on the missing file instead of printing FAIL).
+  ( trap - EXIT; set +e; "$@" >"$PARALLEL_LOGDIR/$name.log" 2>&1; echo "$?" >"$PARALLEL_LOGDIR/$name.rc" ) &
 }
 collect() {  # collect <name...>: wait all, emit banners in order, aggregate
   wait
