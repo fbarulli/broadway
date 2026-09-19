@@ -105,9 +105,13 @@ run ruff    dispatch bash scripts/uv.sh run --extra dev ruff check src tests pro
             project/working.py project/data.py \
             scripts
 run mypy    dispatch bash scripts/uv.sh run --extra dev mypy src/broadway
-# Pyright ADVISORY (compare-vs-mypy period): always green by design — reports
-# counts only, never fails. Promote to enforcing only by ruling; see
-# pyrightconfig.json + scripts/pyright_advisory.sh.
+# Pyright CONSULTANT (strict, advisory-only): always green by design — reports
+# counts only, never fails. Highest strictness surfaces silent errors, data
+# coercion, unexpected behavior, and data drops as advice; mypy enforces.
+# Version/scope resolve from configs/tooling.yaml (SSOT); options live in
+# pyrightconfig.json (strict JSON). Identical on taxi and main via parity.
+# Promote to enforcing only by ruling; see
+# configs/tooling.yaml + pyrightconfig.json + scripts/pyright_advisory.sh.
 run pyright-advisory bash scripts/pyright_advisory.sh
 run vulture dispatch bash scripts/uv.sh run --extra dev vulture src/broadway project scripts --min-confidence 95
 run configs bash scripts/uv.sh run --extra dev python -c "

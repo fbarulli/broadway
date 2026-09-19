@@ -88,9 +88,15 @@ def test_main_day_sync_removes_project_surfaces_and_keeps_generic_sample() -> No
     sync = (REPO / "scripts" / "main_day_sync.sh").read_text(encoding="utf-8")
     assert "git rm -r --ignore-unmatch project reports readmore experiments configs/project configs/experiments beads" in sync
     assert "configs/sample/fare_prediction_1m.yaml" not in sync
-    # Generic sample survives via the wholesale configs/ checkout (no
-    # dataset-specific allowlist survives a main-day sync).
-    assert "  configs/ \\" in sync
+    # Whitelist SSOT: the sync reads scripts/main_whitelist.txt via
+    # configs/tooling.yaml (no second inline list); the generic sample
+    # survives via the wholesale configs/ entry in that file.
+    assert "main_whitelist.txt" in sync
+    assert "configs/tooling.yaml" in sync
+    whitelist = (REPO / "scripts" / "main_whitelist.txt").read_text(encoding="utf-8")
+    assert "\nconfigs/\n" in "\n" + "\n".join(
+        line.split("#", 1)[0].strip() for line in whitelist.splitlines()
+    ) + "\n"
 
 
 def test_ci_smoke_uses_the_moved_project_dispatcher() -> None:

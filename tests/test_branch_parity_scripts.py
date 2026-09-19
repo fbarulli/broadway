@@ -35,11 +35,23 @@ CHECKER = REPO_ROOT / "scripts" / "check_branch_parity.sh"
 RUN_CI = REPO_ROOT / "scripts" / "run_local_ci.sh"
 
 
+def _whitelist_path() -> Path:
+    """Resolve the shared-surface whitelist SSOT (configs/tooling.yaml -> file)."""
+    import yaml
+
+    tooling = REPO_ROOT / "configs" / "tooling.yaml"
+    data = yaml.safe_load(tooling.read_text(encoding="utf-8"))
+    return REPO_ROOT / data["shared_surface"]["file"]
+
+
 def _shared_entries() -> list[str]:
-    """Parse the checker's SHARED array body into its entry strings."""
-    text = CHECKER.read_text(encoding="utf-8")
-    body = text.split("SHARED=(", 1)[1].split(")", 1)[0]
-    return [line.strip() for line in body.splitlines() if line.strip()]
+    """Read the shared surface from the whitelist SSOT (no inline list)."""
+    entries: list[str] = []
+    for raw_line in _whitelist_path().read_text(encoding="utf-8").splitlines():
+        line = raw_line.split("#", 1)[0].strip()
+        if line:
+            entries.append(line)
+    return entries
 
 
 def _declared_era() -> str:
@@ -64,17 +76,26 @@ def _declared_era() -> str:
 
 
 def test_parity_surface_includes_scripts() -> None:
-    """The checker's watched surface names scripts/ (directory + header)."""
+    """The shared surface (whitelist SSOT) names scripts/; checker reads it."""
     entries = _shared_entries()
     assert "scripts/" in entries, (
-        f"{CHECKER.relative_to(REPO_ROOT)} SHARED list lacks a 'scripts/' entry — "
-        "scripts/ must join the parity surface (CONTRACT FIX_3)"
+        f"shared-surface whitelist {_whitelist_path().relative_to(REPO_ROOT)} lacks a "
+        "'scripts/' entry — scripts/ must join the parity surface (CONTRACT FIX_3)"
     )
-    # The header comment must name scripts/ among the shared surfaces.
-    header = CHECKER.read_text(encoding="utf-8").split("SHARED=(", 1)[0]
-    assert "scripts/" in header, (
-        f"{CHECKER.relative_to(REPO_ROOT)} header comment does not name scripts/ "
-        "as part of the shared surface"
+    # The checker must read the whitelist SSOT, not maintain an inline list.
+    text = CHECKER.read_text(encoding="utf-8")
+    assert "main_whitelist.txt" in text, (
+        f"{CHECKER.relative_to(REPO_ROOT)} no longer reads the whitelist SSOT "
+        "(deterministic-ops law: one list, read from file)"
+    )
+    assert "configs/tooling.yaml" in text, (
+        f"{CHECKER.relative_to(REPO_ROOT)} must resolve the whitelist via "
+        "configs/tooling.yaml shared_surface.file (no hardcoded values)"
+    )
+    # No inline SHARED=( hard list may remain (empty init + file load only).
+    assert "SHARED=(\n" not in text and "SHARED=(" not in text.replace("SHARED=()", ""), (
+        f"{CHECKER.relative_to(REPO_ROOT)} carries an inline SHARED list — "
+        "the whitelist file is the single source"
     )
     # D21: the relocated env file must NOT linger as a maintained array line.
     assert ".github/parity-era.env" not in entries, (

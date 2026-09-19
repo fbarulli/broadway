@@ -38,32 +38,30 @@ elif [[ -n "${1:-}" ]]; then
 fi
 
 # The intended shared surface — paths that must be byte-identical on both
-# branches. Keep this list explicit: anything NOT listed is deliberately
-# taxi-only or main-only. Main-owned slate (README.md, GOVERNANCE-POINTER.md,
-# BROADWAY.md, root contracts) is NEVER shared — main's blank-slate README
-# differs from taxi's by design. Mirrors scripts/main_day_sync.sh WHITELIST.
-SHARED=(
-  src/
-  tests/
-  demo/
-  configs/
-  agents/contracts/
-  agents/tools/
-  scripts/
-  k8s/
-  docker/
-  .github/workflows/
-  pyproject.toml
-  uv.lock
-  pyrightconfig.json
-  Dockerfile
-  docker-compose.yml
-  .python-version
-  .env.example
-  HPO_TRAINING.md
-  .gitignore
-  .dockerignore
-)
+# branches. SINGLE SOURCE: scripts/main_whitelist.txt (via
+# configs/tooling.yaml shared_surface.file). Nothing is listed inline here —
+# anything NOT listed is deliberately taxi-only or main-only. Main-owned
+# slate (README.md, GOVERNANCE-POINTER.md, BROADWAY.md, root contracts) is
+# NEVER shared — main's blank-slate README differs from taxi's by design.
+# Deterministic law: this checker, main_day_sync.sh, and promote_to_main.sh
+# ALL read the same whitelist file; editing the surface means editing that
+# file, never a second inline list.
+SHARED=()
+_WHITELIST_FILE="$(python3 -c 'import yaml; print(yaml.safe_load(open("configs/tooling.yaml"))["shared_surface"]["file"])' 2>/dev/null || echo scripts/main_whitelist.txt)"
+if [[ -f "$_WHITELIST_FILE" ]]; then
+  while IFS= read -r _line || [[ -n "$_line" ]]; do
+    _line="${_line%%#*}"
+    _line="${_line%"${_line##*[![:space:]]}"}"
+    _line="${_line#"${_line%%[![:space:]]*}"}"
+    [[ -z "$_line" ]] && continue
+    SHARED+=("$_line")
+  done < "$_WHITELIST_FILE"
+else
+  echo "FATAL: shared-surface whitelist not found: $_WHITELIST_FILE (see configs/tooling.yaml)" >&2
+  exit 1
+fi
+# scripts/ — parity self-coverage marker (checker lives under scripts/, the
+# whitelist file lives under scripts/, so scripts/ must be on the surface).
 
 check() {
   local drifted=0
