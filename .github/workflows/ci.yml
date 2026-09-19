@@ -106,7 +106,10 @@ jobs:
       # CI-only — named in scripts/run_local_ci.sh header.
       # Orchestrator dry-run: render the worker Jobs for the HPO spec's models
       # and assert they are valid Kubernetes with the right image/env/args.
+      # Workload-gated: the default HPO spec is project-owned (this job has
+      # no detect step, so the project tree itself is the condition).
       - name: Orchestrator dry-run (render worker jobs)
+        if: hashFiles('project/config/experiments/mlflow.yaml') != ''
         run: |
           set -euo pipefail
 
@@ -164,10 +167,28 @@ jobs:
         with:
           fetch-depth: 1
 
+      # Branch-aware builds: the optuna workload images bake the taxi
+      # reference pipeline (COPY project/...) and cannot build on the
+      # data-agnostic main line. Detect once; workload steps below run
+      # only when the sources exist (loud SKIP otherwise), platform-image
+      # steps always run. Mirrors scripts/check_docker_paths.sh (local
+      # pre-flight, same rule).
+      - name: Detect workload sources
+        id: detect
+        run: |
+          if [ -d project ] && [ -f project/config/experiments/mlflow.yaml ]; then
+            echo "have-project=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "have-project=false" >> "$GITHUB_OUTPUT"
+            echo "NOTICE: no project/ workload sources — workload-image steps SKIP (platform images still build)"
+          fi
+
       # Restore previously saved base image so the chained FROM resolves
       # instantly and unchanged dep/code layers skip rebuilding.
+      # Workload-gated: the base bakes COPY project/ (see Detect step).
       - name: Restore base image
         id: base-cache
+        if: steps.detect.outputs.have-project == 'true'
         uses: actions/cache@v4
         with:
           path: ${{ runner.temp }}/broadway-base.tar.gz
@@ -182,7 +203,7 @@ jobs:
           docker image inspect broadway-base:latest >/dev/null
 
       - name: Build base image
-        if: steps.base-cache.outputs.cache-hit != 'true'
+        if: steps.detect.outputs.have-project == 'true' && steps.base-cache.outputs.cache-hit != 'true'
         # Tag :latest so worker/mlflow `FROM broadway-base:latest` resolves
         # locally on a cold cache (docker pulls from the registry otherwise).
         run: |
@@ -192,13 +213,16 @@ jobs:
             .
 
       - name: Save base image for future runs
-        if: steps.base-cache.outputs.cache-hit != 'true'
+        if: steps.detect.outputs.have-project == 'true' && steps.base-cache.outputs.cache-hit != 'true'
         run: |
           docker save broadway-base:latest | gzip -1 > "${RUNNER_TEMP}/broadway-base.tar.gz"
 
       # Thin COPY-only layers over the base — rebuilt unconditionally so they
       # always carry this exact commit's code under an immutable sha tag.
+      # Workload-gated: both images need the project/ tree (worker COPYs it,
+      # mlflow-server FROMs the base that does).
       - name: Build worker image
+        if: steps.detect.outputs.have-project == 'true'
         run: |
           docker build \
             -f k8s/optuna/Dockerfile.worker \
@@ -206,6 +230,7 @@ jobs:
             .
 
       - name: Build mlflow image
+        if: steps.detect.outputs.have-project == 'true'
         run: |
           docker build \
             -f k8s/optuna/Dockerfile.mlflow \
@@ -241,14 +266,18 @@ jobs:
       # Imports _common -> project.working (working.yaml), resolves
       # HPO_CONFIG_PATH via parents[] at the mirrored pod path, parses the HPO
       # spec and builds CLI choices. Catches the layout/import bug class.
+      # Workload-gated: exercises the worker image + the project HPO spec.
       - name: Boot — worker imports + CLI
+        if: steps.detect.outputs.have-project == 'true'
         run: docker run --rm broadway-optuna-worker:${{ github.sha }} python /app/project/experiments/mlflow/03_optuna_worker.py --help
 
       # Config-load simulation with the committed fixture: verifies the
       # configmap structure + the HPO spec both parse inside the pod layout.
+      # Workload-gated: asserts the project HPO spec parses inside the pod layout.
       # Literal block (run: |) — folded scalars collapse the newlines the
       # python -c string needs.
       - name: Boot — config-load simulation
+        if: steps.detect.outputs.have-project == 'true'
         run: |
           docker run --rm -v "$PWD/.github/ci-fixtures/k8s-config.yaml:/etc/broadway/config.yaml" broadway-optuna-worker:${{ github.sha }} python -c "
           import yaml
@@ -261,6 +290,7 @@ jobs:
           print('config load OK — models:', [m.name for m in hpo.models])"
 
       - name: Boot — mlflow image health
+        if: steps.detect.outputs.have-project == 'true'
         run: docker run --rm --entrypoint python mlflow-server:${{ github.sha }} -c "import mlflow; print('mlflow', mlflow.__version__)"
 
       # IMPORT-PATH WIRING ONLY — NOT A SERVING CHECK. The api target
@@ -291,14 +321,25 @@ jobs:
 
       # Protected refs ONLY: package the exact sha-tagged images that just
       # passed boot tests, so cd publishes bit-for-bit what was verified —
-      # zero rebuilds downstream. sklearn/PR runs deploy nothing.
+      # zero rebuilds downstream. PRs deploy nothing. On project-less lines
+      # (data-agnostic main) no workload image was built: the manifest then
+      # lists nothing and cd ships nothing (loud notice, still green) —
+      # platform images are verified by their own boot steps above.
       - name: Package verified deployment images
         if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/taxi')
         run: |
-          docker save \
-            broadway-optuna-worker:${{ github.sha }} \
-            mlflow-server:${{ github.sha }} \
-            -o "${{ runner.temp }}/verified-images.tar"
+          set -euo pipefail
+          mkdir -p "${{ runner.temp }}/ship"
+          : > "${{ runner.temp }}/ship/manifest.txt"
+          if [ "${{ steps.detect.outputs.have-project }}" = "true" ]; then
+            docker save \
+              broadway-optuna-worker:${{ github.sha }} \
+              mlflow-server:${{ github.sha }} \
+              -o "${{ runner.temp }}/ship/verified-images.tar"
+            printf '%s\n' broadway-optuna-worker mlflow-server > "${{ runner.temp }}/ship/manifest.txt"
+          else
+            echo "NOTICE: no workload images built on this line — manifest empty, cd ships nothing"
+          fi
 
       # compression-level: 0 — Docker layers arrive compressed; don't pay CPU
       # to recompress them.
@@ -307,16 +348,18 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: verified-images-${{ github.sha }}
-          path: ${{ runner.temp }}/verified-images.tar
+          path: ${{ runner.temp }}/ship
           compression-level: 0
           retention-days: 1
           if-no-files-found: error
 
   # CD — publish to GHCR the EXACT images build-and-boot just tested, on push
-  # to main/taxi ONLY (never PRs; sklearn deploys nothing). No checkout, no
+  # to main/taxi ONLY (never PRs). No checkout, no
   # rebuilds: the job downloads the artifact packaged above and re-tags it, so
   # what ships is bit-for-bit what passed every gate. lifecycle.sh consumes
-  # the pushed tag via OPTUNA_WORKER_IMAGE.
+  # the pushed tag via OPTUNA_WORKER_IMAGE. The manifest lists what was
+  # actually verified — empty on project-less lines (main), where the job
+  # succeeds shipping nothing rather than failing on unbuilt images.
   #
   # Tag law: push to main ⇒ worker/mlflow get their commit-sha tag AND
   # :latest; push to taxi ⇒ the sha tag AND :taxi. broadway-base stays
@@ -347,7 +390,11 @@ jobs:
 
       - name: Load verified images
         run: |
-          docker load -i "${{ runner.temp }}/verified-images.tar"
+          if [ -f "${{ runner.temp }}/verified-images.tar" ]; then
+            docker load -i "${{ runner.temp }}/verified-images.tar"
+          else
+            echo "NOTICE: no image tarball — nothing workload-verified on this line"
+          fi
 
       - name: Log in to GHCR
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
@@ -357,6 +404,8 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       # sha tag always; :latest only from main; :taxi only from taxi.
+      # Manifest-driven: ships exactly the verified set (empty manifest on
+      # project-less lines ships nothing, green with notice).
       - name: Push verified images to GHCR
         shell: bash
         run: |
@@ -364,8 +413,15 @@ jobs:
 
           ref="${{ github.ref }}"
           registry="ghcr.io/${{ github.repository }}"
+          manifest="${{ runner.temp }}/manifest.txt"
 
-          for img in broadway-optuna-worker mlflow-server; do
+          if [ ! -s "$manifest" ]; then
+            echo "NOTICE: manifest empty — no workload images verified on this line, shipping nothing"
+            exit 0
+          fi
+
+          while IFS= read -r img || [ -n "$img" ]; do
+            [ -n "$img" ] || continue
             docker tag "$img:${{ github.sha }}" "$registry/$img:${{ github.sha }}"
             docker push "$registry/$img:${{ github.sha }}"
 
@@ -378,4 +434,4 @@ jobs:
               docker tag "$img:${{ github.sha }}" "$registry/$img:taxi"
               docker push "$registry/$img:taxi"
             fi
-          done
+          done < "$manifest"

@@ -98,7 +98,8 @@ def test_static_gates_run_parallel_and_in_order() -> None:
     assert "run_bg ruff" in text and "run_bg mypy" in text
     assert "run_bg pyright-advisory" in text and "run_bg vulture" in text
     assert "run_bg configs" in text and "run_bg shell-scripts" in text
-    assert "collect ruff mypy pyright-advisory vulture configs shell-scripts" in text
+    assert "run_bg docker-paths" in text
+    assert "collect ruff mypy pyright-advisory vulture configs shell-scripts docker-paths" in text
     assert "trap - EXIT" in text, "background jobs must not trip the snapshot teardown"
 
 
@@ -109,6 +110,19 @@ def test_main_branch_runs_platform_subset_not_literal_gate() -> None:
     assert "--ignore=tests/test_project_paths.py" in text
     assert "--ignore=tests/test_gate_registry.py" in text
     assert "SKIP project-tests" in text
+
+
+def test_docker_table_matches_tree_and_ci() -> None:
+    import yaml
+
+    tooling = yaml.safe_load((REPO / "configs" / "tooling.yaml").read_text(encoding="utf-8"))
+    images = tooling["docker"]["images"]
+    assert len(images) >= 6
+    for img in images:
+        assert (REPO / img["dockerfile"]).exists(), img
+    ci = (REPO / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    assert "Detect workload sources" in ci
+    assert "manifest.txt" in ci
 
 
 def test_push_path_runs_fast_tier_not_full() -> None:
