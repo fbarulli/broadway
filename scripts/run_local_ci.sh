@@ -37,7 +37,7 @@ for arg in "$@"; do
       if [[ $SEEN_STATIC -eq 1 ]]; then
         echo "REFUSED: $arg conflicts with already-parsed --static" >&2; usage >&2; exit 2
       fi
-      TIER="${arg#--tier=}"; SEEN_TIER=1 ;;    # fast: parity+ruff+mypy+vulture+configs+shell (<30s) / full: +pytest+cov>=95 + project-tests
+      TIER="${arg#--tier=}"; SEEN_TIER=1 ;;    # fast: parity+ruff+mypy+pyright-advisory+vulture+configs+shell (<90s) / full: +pytest+cov>=95 + project-tests
     --clean-lint) CLEAN_LINT=1 ;;              # ruff+mypy vs pristine HEAD snapshot (teeth 5)
     *) echo "unknown argument: '$arg'" >&2; usage >&2; exit 2 ;;
   esac
@@ -105,6 +105,10 @@ run ruff    dispatch bash scripts/uv.sh run --extra dev ruff check src tests pro
             project/working.py project/data.py \
             scripts
 run mypy    dispatch bash scripts/uv.sh run --extra dev mypy src/broadway
+# Pyright ADVISORY (compare-vs-mypy period): always green by design — reports
+# counts only, never fails. Promote to enforcing only by ruling; see
+# pyrightconfig.json + scripts/pyright_advisory.sh.
+run pyright-advisory bash scripts/pyright_advisory.sh
 run vulture dispatch bash scripts/uv.sh run --extra dev vulture src/broadway project scripts --min-confidence 95
 run configs bash scripts/uv.sh run --extra dev python -c "
 from pathlib import Path
@@ -122,7 +126,7 @@ fi
 if [[ $fail -eq 0 ]]; then
   CL_NOTE=""
   [[ $CLEAN_LINT -eq 1 ]] && CL_NOTE=" + clean-lint(ruff+mypy@HEAD-snapshot)"
-  [[ $TIER == "fast" ]] && echo "$FAST_BANNERS (tiers: parity/ruff/mypy/vulture/configs/shell-scripts)$CL_NOTE" \
+  [[ $TIER == "fast" ]] && echo "$FAST_BANNERS (tiers: parity/ruff/mypy/pyright-advisory/vulture/configs/shell-scripts)$CL_NOTE" \
                         || echo "$FULL_BANNERS$CL_NOTE"
 else
   echo "LOCAL-CI RED — fix above before commit/push"

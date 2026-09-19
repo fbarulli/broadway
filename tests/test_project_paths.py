@@ -86,9 +86,11 @@ def test_moved_experiment_helpers_resolve_layout_through_project_paths() -> None
 
 def test_main_day_sync_removes_project_surfaces_and_keeps_generic_sample() -> None:
     sync = (REPO / "scripts" / "main_day_sync.sh").read_text(encoding="utf-8")
-    assert "git rm -r --ignore-unmatch project experiments configs/project configs/experiments" in sync
+    assert "git rm -r --ignore-unmatch project reports readmore experiments configs/project configs/experiments beads" in sync
     assert "configs/sample/fare_prediction_1m.yaml" not in sync
-    assert "configs/sample/demo.yaml" in sync
+    # Generic sample survives via the wholesale configs/ checkout (no
+    # dataset-specific allowlist survives a main-day sync).
+    assert "  configs/ \\" in sync
 
 
 def test_ci_smoke_uses_the_moved_project_dispatcher() -> None:
