@@ -289,6 +289,10 @@ def _scratch_repo_with_checker(tmp_path: Path, name: str) -> tuple[Path, str, st
         "PARITY_TRACK_BRANCH=taxi\n"
         "PARITY_ALLOWLIST=()\n"
         f"PARITY_MAIN_ANCHOR={c0}  # anchor\n"
+        "# stale custody below: the pinned run always fails, isolating the\n"
+        "# fast-path verdict (F1b covers live-checker semantics separately).\n"
+        "echo 'ROGUE MAIN WRITE (stale probe anchor)' >&2\n"
+        "exit 1\n"
     )
     (repo / "scripts").mkdir()
     (repo / "scripts" / "check_branch_parity.sh").write_text(checker, encoding="utf-8")
