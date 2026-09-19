@@ -52,6 +52,7 @@ git checkout origin/taxi -- \
   .github/workflows/ \
   pyproject.toml \
   uv.lock \
+  pyrightconfig.json \
   Dockerfile \
   docker-compose.yml \
   .python-version \

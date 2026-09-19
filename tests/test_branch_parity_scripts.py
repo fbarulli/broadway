@@ -14,7 +14,7 @@ close. Three guards here:
   patch cannot silently drop the entry.
 * ``test_scripts_diff_empty_vs_main`` (era-gated) — runs its body ONLY when
   the declared era is ``main``; otherwise it skips. On ``dev`` the
-  sklearn-vs-main shared surface diverges by design until the human-declared
+  taxi-vs-main shared surface diverges by design until the human-declared
   main-day flip (``PARITY_ERA=dev`` → ``main`` edited in ONE commit citing
   D16c/D21).
 * ``test_f1b_guard_rejects_legacy_checker_without_era_marker`` — proves the
@@ -84,10 +84,10 @@ def test_parity_surface_includes_scripts() -> None:
 
 
 def test_scripts_diff_empty_vs_main() -> None:
-    """The sklearn-vs-main scripts/ diff must be empty (era-gated, main day).
+    """The taxi-vs-main scripts/ diff must be empty (era-gated, main day).
 
     Mirrors the checker's own comparison (``git diff --exit-code --quiet
-    origin/main origin/taxi -- scripts/``); sklearn tracks taxi, so this
+    origin/main origin/taxi -- scripts/``); the track line is taxi, so this
     asserts the pair origin/main vs origin/taxi is in sync for ``scripts/``.
 
     Gating reads the INLINE ``^PARITY_ERA=`` declaration in the checker
@@ -113,7 +113,7 @@ def test_scripts_diff_empty_vs_main() -> None:
     assert result.returncode == 0, (
         "scripts/ differs between origin/main and origin/taxi — origin/main is "
         "missing scripts/check_e2e_determinism.sh and/or "
-        "scripts/check_champion_manifest.sh (sklearn tracks taxi); run the "
+        "scripts/check_champion_manifest.sh (track line is taxi); run the "
         "human-gated main-day sync so the shared surface is identical"
         + (f"\ngit stderr: {result.stderr.strip()}" if result.stderr.strip() else "")
     )
@@ -144,7 +144,7 @@ def _git_show_stub(bin_dir: Path, fixture: Path) -> None:
     shim = bin_dir / "git"
     shim.write_text(
         "#!/usr/bin/env bash\n"
-        'if [[ "$1 $2" == "show refs/remotes/origin/sklearn:'
+        'if [[ "$1 $2" == "show refs/remotes/origin/taxi:'
         'scripts/check_branch_parity.sh" ]]; then\n'
         f'  cat "{fixture}"\n'
         "  exit 0\n"
@@ -164,7 +164,7 @@ def test_f1b_guard_rejects_legacy_checker_without_era_marker(
 
     Mechanism: the real ``gate_parity`` body extracted from
     ``scripts/run_local_ci.sh`` is executed under bash with a stub ``git``
-    on PATH, so ``git show refs/remotes/origin/sklearn:…`` yields our
+    on PATH, so ``git show refs/remotes/origin/taxi:…`` yields our
     fixture instead of the network truth. Choice documented per contract:
     extract-and-execute over replicate, so the test cannot outlive the
     guard's actual semantics.
@@ -178,7 +178,7 @@ def test_f1b_guard_rejects_legacy_checker_without_era_marker(
     fixture = tmp_path / "checker_under_test.sh"
     marker_block = (
         "PARITY_ERA=dev\n"
-        "PARITY_TRACK_BRANCH=sklearn\n"
+        "PARITY_TRACK_BRANCH=taxi\n"
         "PARITY_ALLOWLIST=()\n"
         f"PARITY_MAIN_ANCHOR={'a' * 40}\n"
     ) if with_marker else ""
