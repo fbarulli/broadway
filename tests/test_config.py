@@ -224,11 +224,8 @@ def test_hpo_configs_parse() -> None:
 
     from broadway.config.schema import HPOConfig
 
-    try:
-        from project.paths import load_project_paths
-
-        taxi_hpo = load_project_paths().experiment_configs / "mlflow.yaml"
-    except ImportError:
+    taxi_hpo = repo_root() / "project" / "config" / "experiments" / "mlflow.yaml"
+    if not taxi_hpo.exists():
         pytest.skip("taxi-only: data-agnostic main carries no project/")
 
     for path in (

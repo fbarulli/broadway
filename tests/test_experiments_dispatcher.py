@@ -41,9 +41,7 @@ def test_help_lists_exact_dispatcher_commands() -> None:
 
 
 def test_dispatcher_uses_project_configured_data_and_results_paths() -> None:
-    from project.paths import load_project_paths
-
-    source = (load_project_paths().root / "experiments.py").read_text(encoding="utf-8")
+    source = (REPO / "project" / "experiments.py").read_text(encoding="utf-8")
     assert 'ROOT / "data"' not in source
     assert 'PATHS.results / "ols"' in source
     assert 'PATHS.results / "diagnostics"' in source

@@ -102,6 +102,14 @@ def test_static_gates_run_parallel_and_in_order() -> None:
     assert "trap - EXIT" in text, "background jobs must not trip the snapshot teardown"
 
 
+def test_main_branch_runs_platform_subset_not_literal_gate() -> None:
+    text = (REPO / "scripts" / "run_local_ci.sh").read_text(encoding="utf-8")
+    assert "--ignore=tests/test_governance_probes.py" in text
+    assert "--ignore=tests/test_state_records.py" in text
+    assert "--ignore=tests/test_project_paths.py" in text
+    assert "SKIP project-tests" in text
+
+
 def test_push_path_runs_fast_tier_not_full() -> None:
     hook = (REPO / "agents" / "contracts" / "hooks-pre-push.template").read_text(encoding="utf-8")
     assert "run_local_ci.sh --tier=fast" in hook

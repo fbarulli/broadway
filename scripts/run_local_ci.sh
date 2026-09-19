@@ -177,9 +177,29 @@ ps = sorted(Path('configs/experiment').glob('*.yaml')); assert ps, 'no configs'
 run_bg shell-scripts bash -c 'for f in k8s/optuna/*.sh scripts/*.sh; do bash -n "$f"; done; shellcheck k8s/optuna/*.sh scripts/*.sh'
 collect ruff mypy pyright-advisory vulture configs shell-scripts
 if [[ $STATIC -eq 0 && $TIER == "full" ]]; then
-  run pytest bash scripts/uv.sh run --extra dev pytest tests/ -n 4 --dist worksteal \
-             --cov=src/broadway --cov-report=term-missing --cov-fail-under=95
-  run project-tests bash scripts/uv.sh run --extra dev pytest project/tests -q --dist worksteal
+  # Main-branch platform subset: taxi-coupled suites (ledger probes,
+  # state_records, project loader paths) cannot pass where project/ and the
+  # ledger are absent BY DESIGN — the data-agnostic line runs the platform
+  # subset instead. Explicit --tier=full forces the literal gate; the
+  # default full tier on a main checkout subsets automatically. Taxi runs
+  # the literal gate either way.
+  _branch="${GITHUB_REF_NAME:-$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")}"
+  if [[ $SEEN_TIER -eq 0 && "$_branch" == "main" ]]; then
+    echo "== pytest (main-subset: ledger/project-coupled suites excluded by design)"
+    run pytest bash scripts/uv.sh run --extra dev pytest tests/ -n 4 --dist worksteal \
+               --cov=src/broadway --cov-report=term-missing --cov-fail-under=95 \
+               --ignore=tests/test_governance_probes.py \
+               --ignore=tests/test_state_records.py \
+               --ignore=tests/test_project_paths.py
+  else
+    run pytest bash scripts/uv.sh run --extra dev pytest tests/ -n 4 --dist worksteal \
+               --cov=src/broadway --cov-report=term-missing --cov-fail-under=95
+  fi
+  if [[ -d project/tests ]]; then
+    run project-tests bash scripts/uv.sh run --extra dev pytest project/tests -q --dist worksteal
+  else
+    echo "SKIP project-tests (no project/tests on data-agnostic main)"
+  fi
 fi
 if [[ $fail -eq 0 ]]; then
   CL_NOTE=""
