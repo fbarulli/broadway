@@ -97,8 +97,13 @@ tg_check_message() {
 }
 
 # EVENTS-table text of STATE.md AS OF a commit (its own tree, not the worktree).
+# Missing ledger (e.g. the data-agnostic main line carries none) yields empty
+# text, NOT an error: Tier: FAST/STATIC/DOCS batches still gate purely on
+# their trailer, while Tier: FULL still fails closed (no row can resolve).
+# The old bare `git show` printed `fatal: path ... does not exist` on
+# ledger-less lines — cosmetic noise around a PASS since 2026-09-19 syncs.
 _tg_events_at() {
-  git show "$1:$_TG_EVENTS_FILE" \
+  git show "$1:$_TG_EVENTS_FILE" 2>/dev/null \
     | sed -n "/^$_TG_EVENTS_HEADER/,/^## /p" | sed '1d;/^## /,$d'
 }
 

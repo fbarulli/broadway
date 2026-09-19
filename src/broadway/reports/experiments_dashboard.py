@@ -58,6 +58,12 @@ app = FastAPI()
 if (EXPERIMENTS_ROOT / "results").is_dir():
     app.mount("/results", StaticFiles(directory=EXPERIMENTS_ROOT / "results"), name="results")
 
+DIAGRAMS_DIR = Path(os.environ.get("BROADWAY_DIAGRAMS_DIR", "diagrams"))
+_TLDRAW_VERSION = "5.4.2"
+_DIAGRAM_RE = re.compile(r"[A-Za-z0-9_-]+")
+if DIAGRAMS_DIR.is_dir():
+    app.mount("/diagrams", StaticFiles(directory=DIAGRAMS_DIR), name="diagrams")
+
 
 @dataclass
 class ScriptProfile:
@@ -483,6 +489,7 @@ def _render_dashboard_page(
 </head>
 <body>
 <h1>Broadway experiments</h1>
+<p><a href="/canvas">maps</a> — annotated canvases (tldraw) over diagrams/ + results</p>
 {_series_selector(series, focus)}
 <table>
 <thead>
@@ -902,3 +909,170 @@ async def save_observations(
     if not (next_url.startswith("/") and not next_url.startswith("//")):
         next_url = ""
     return RedirectResponse(url=next_url or _h(f"/experiments/{name}", focus), status_code=303)
+
+
+# --------------------------------------------------------------------------- #
+# Canvas maps (tldraw over diagrams/ + results)
+# --------------------------------------------------------------------------- #
+# The one big canvas, hosted: diagrams/*.tldr render as an editable infinite
+# canvas; annotations save back to the same files (versioned). Plots stay on
+# the experiment pages (/results static); maps link to them. The ONLY page
+# allowed external assets (tldraw via esm.sh, pinned) — everything else in
+# this app remains dependency-free HTML.
+
+
+def list_diagrams() -> list[str]:
+    """Sorted .tldr stems under DIAGRAMS_DIR (empty when absent)."""
+    if not DIAGRAMS_DIR.is_dir():
+        return []
+    return sorted(p.stem for p in DIAGRAMS_DIR.glob("*.tldr") if p.is_file())
+
+
+def _diagram_file(name: str) -> Path | None:
+    """Resolve a diagram file, or None (unknown name, traversal, missing)."""
+    if not name or not _DIAGRAM_RE.fullmatch(name):
+        return None
+    candidate = (DIAGRAMS_DIR / f"{name}.tldr").resolve()
+    if DIAGRAMS_DIR.resolve() not in candidate.parents:
+        return None
+    return candidate if candidate.is_file() else None
+
+
+def _render_canvas_index(names: list[str]) -> str:
+    items = "".join(
+        f'<li><a href="/canvas/{html.escape(n)}">{html.escape(n)}</a></li>' for n in names
+    ) or "<li>No diagrams yet.</li>"
+    return f"""<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Maps</title>
+<style>
+  body {{ font-family: system-ui, sans-serif; margin: 2rem; color: #222; }}
+</style>
+</head>
+<body>
+<h1>Maps</h1>
+<p><a href="/">experiments</a> — annotated canvases over diagrams/ (tldraw, editable, saves back)</p>
+<ul>{items}</ul>
+</body>
+</html>
+"""
+
+
+def _render_canvas_page(name: str) -> str:
+    version = _TLDRAW_VERSION
+    return f"""<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Map — {html.escape(name)}</title>
+<link rel="stylesheet" href="https://esm.sh/tldraw@{version}/tldraw.css">
+<style>
+  html, body {{ margin: 0; height: 100%; font-family: system-ui, sans-serif; }}
+  #bar {{ padding: 0.4rem 0.8rem; background: #f0f0f0; font-size: 0.9rem; }}
+  #bar a {{ margin-right: 1rem; }}
+  #canvas {{ position: fixed; inset: 48px 0 0 0; }}
+</style>
+<script type="importmap">
+{{
+  "imports": {{
+    "react": "https://esm.sh/react@18.3.1",
+    "react/jsx-runtime": "https://esm.sh/react@18.3.1/jsx-runtime",
+    "react-dom": "https://esm.sh/react-dom@18.3.1",
+    "react-dom/client": "https://esm.sh/react-dom@18.3.1/client",
+    "tldraw": "https://esm.sh/tldraw@{version}?external=react,react-dom"
+  }}
+}}
+</script>
+</head>
+<body>
+<div id="bar"><a href="/canvas">maps</a><span id="status">loading…</span>
+<button id="save" type="button">save annotations</button></div>
+<div id="canvas"></div>
+<script type="module">
+import React from 'react';
+import {{ createRoot }} from 'react-dom/client';
+import {{ Tldraw, createTLStore, loadSnapshot, getSnapshot }} from 'tldraw';
+
+const NAME = {json.dumps(name)};
+const status = (msg) => {{ document.getElementById('status').textContent = msg; }};
+
+async function main() {{
+  const store = createTLStore();
+  try {{
+    const res = await fetch('/diagrams/' + encodeURIComponent(NAME) + '.tldr');
+    if (!res.ok) throw new Error('diagram not found');
+    const snap = await res.json();
+    loadSnapshot(store, {{ store: snap.records ?? snap.store, schema: snap.schema }});
+  }} catch (err) {{
+    status('failed to load: ' + err.message);
+    return;
+  }}
+  function App() {{
+    return React.createElement(Tldraw, {{
+      store,
+      onMount: (editor) => {{
+        window.__editor = editor;
+        status('ready — annotate freely, then save');
+        document.getElementById('save').onclick = async () => {{
+          status('saving…');
+          const snap = getSnapshot(editor.store);
+          const res = await fetch('/canvas/' + encodeURIComponent(NAME) + '/save', {{
+            method: 'POST',
+            headers: {{ 'Content-Type': 'application/json' }},
+            body: JSON.stringify({{ document: snap.document ?? snap.store }}),
+          }});
+          status(res.ok ? 'saved' : 'save failed: ' + res.status);
+        }};
+      }},
+    }});
+  }}
+  createRoot(document.getElementById('canvas')).render(React.createElement(App));
+  status('ready');
+}}
+main();
+</script>
+</body>
+</html>
+"""
+
+
+@app.get("/canvas", response_model=None)
+def canvas_index() -> HTMLResponse:
+    """List available canvases."""
+    return HTMLResponse(_render_canvas_index(list_diagrams()))
+
+
+@app.get("/canvas/{name}", response_model=None)
+def canvas_page(name: str) -> HTMLResponse | PlainTextResponse:
+    """Serve the editable tldraw canvas for a diagram."""
+    if _diagram_file(name) is None:
+        return PlainTextResponse("unknown diagram", status_code=404)
+    return HTMLResponse(_render_canvas_page(name))
+
+
+@app.post("/canvas/{name}/save", response_model=None)
+async def canvas_save(name: str, request: Request) -> HTMLResponse | PlainTextResponse:
+    """Persist canvas annotations back to the .tldr source file."""
+    target = _diagram_file(name)
+    if target is None:
+        return PlainTextResponse("unknown diagram", status_code=404)
+    try:
+        payload = await request.json()
+    except ValueError:
+        return PlainTextResponse("invalid snapshot json", status_code=422)
+    document = payload.get("document") if isinstance(payload, dict) else None
+    if not isinstance(document, dict) or not document:
+        return PlainTextResponse("snapshot carries no document records", status_code=422)
+    try:
+        current = json.loads(target.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return PlainTextResponse("stored diagram unreadable", status_code=422)
+    if not isinstance(current, dict):
+        return PlainTextResponse("stored diagram malformed", status_code=422)
+    current["records"] = document
+    target.write_text(json.dumps(current, indent=1), encoding="utf-8")
+    logger.info("saved canvas annotations for %s", name)
+    return HTMLResponse("<p>saved</p>")

@@ -243,3 +243,105 @@ def test_f1b_guard_rejects_legacy_checker_without_era_marker(
         assert "legacy pre-D16" in combined, (
             f"guard failed for the wrong reason:\n{combined}"
         )
+
+
+def _gate_functions_source() -> str:
+    """Extract gate_parity + gate_parity_anchor_bump from run_local_ci.sh.
+
+    Same extract-and-execute rationale as _gate_parity_source: the test
+    cannot outlive the guard's actual semantics.
+    """
+    text = RUN_CI.read_text(encoding="utf-8")
+    assert "run parity gate_parity" in text, "parity gate unwired"
+    chunks = []
+    for name in ("gate_parity() {", "gate_parity_anchor_bump() {"):
+        start = text.index(name)
+        end = text.index("\n}", start)
+        chunks.append(text[start : end + 2])
+    return "\n".join(chunks)
+
+
+def _git(repo: Path, *args: str) -> str:
+    result = subprocess.run(
+        ["git", *args], cwd=repo, capture_output=True, text=True, check=False,
+        timeout=60,
+    )
+    assert result.returncode == 0, f"git {' '.join(args)} failed: {result.stderr}"
+    return result.stdout.strip()
+
+
+def _scratch_repo_with_checker(tmp_path: Path, name: str) -> tuple[Path, str, str]:
+    """Scratch repo: origin/taxi pins an old checker, origin/main at new tip.
+
+    Returns (repo, c0, c1) where c0 is the stale pinned anchor and c1 the
+    origin/main tip. The pinned custody fails by construction (whitelist
+    absent + stale anchor), isolating the fast-path verdict.
+    """
+    repo = tmp_path / name
+    repo.mkdir()
+    _git(repo, "init", "-q")
+    _git(repo, "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q",
+         "--allow-empty", "-m", "base")
+    c0 = _git(repo, "rev-parse", "HEAD")
+    checker = (
+        "# probe checker\n"
+        "PARITY_ERA=dev\n"
+        "PARITY_TRACK_BRANCH=taxi\n"
+        "PARITY_ALLOWLIST=()\n"
+        f"PARITY_MAIN_ANCHOR={c0}  # anchor\n"
+        "# stale custody below: the pinned run always fails, isolating the\n"
+        "# fast-path verdict (F1b covers live-checker semantics separately).\n"
+        "echo 'ROGUE MAIN WRITE (stale probe anchor)' >&2\n"
+        "exit 1\n"
+    )
+    (repo / "scripts").mkdir()
+    (repo / "scripts" / "check_branch_parity.sh").write_text(checker, encoding="utf-8")
+    _git(repo, "add", ".")
+    _git(repo, "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q",
+         "-m", "checker")
+    c1 = _git(repo, "rev-parse", "HEAD")
+    _git(repo, "update-ref", "refs/remotes/origin/taxi", c1)
+    _git(repo, "update-ref", "refs/remotes/origin/main", c1)
+    _git(repo, "update-ref", "refs/heads/taxi", c1)
+    _git(repo, "checkout", "-q", "taxi")
+    return repo, c0, c1
+
+
+def test_anchor_bump_fast_path_admits_verifiable_reanchor(tmp_path: Path) -> None:
+    """Anchor bumps must not need --no-verify when verifiably correct.
+
+    Worktree checker differs from the pinned one ONLY on the anchor line
+    and the new pin is exactly origin/main's tip: gate_parity must admit
+    it — post-push custody holds by construction.
+    """
+    repo, c0, c1 = _scratch_repo_with_checker(tmp_path, "repo-ok")
+    (repo / "scripts" / "check_branch_parity.sh").write_text(
+        (repo / "scripts" / "check_branch_parity.sh").read_text(encoding="utf-8").replace(c0, c1),
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        ["bash", "-c", f"{_gate_functions_source()}\ngate_parity\n"],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=60,
+    )
+    combined = result.stdout + result.stderr
+    assert result.returncode == 0, f"fast path refused a verifiable bump\n{combined}"
+    assert "anchor-bump fast path" in combined
+
+
+def test_anchor_bump_fast_path_rejects_wrong_pin(tmp_path: Path) -> None:
+    """A bump pointing anywhere but origin/main's tip stays refused."""
+    repo, c0, c1 = _scratch_repo_with_checker(tmp_path, "repo-bad")
+    assert c0 != c1
+    result = subprocess.run(
+        ["bash", "-c", f"{_gate_functions_source()}\ngate_parity\n"],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=60,
+    )
+    assert result.returncode != 0, "fast path admitted a bump missing origin/main"
