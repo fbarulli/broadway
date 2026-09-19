@@ -7,7 +7,7 @@ the authority for landed history; GitHub Project #4 is a mirror, never evidence.
 
 | id | kind | status | owner | custody | updated | source | github_item | mirror_state | summary |
 |---|---|---|---|---|---|---|---|---|---|
-| STATE-20260830-001 | checkpoint | open | main agent | main agent | 2026-08-30 | state-foundation seed | pending | pending | Seed record for the private STATE-to-Project mirror; no worktree claim is implied. |
+| STATE-20260919-002 | checkpoint | open | main agent | main agent | 2026-09-19 | program 2026-09-19 | PVTI_lAHOAZFnCc4Bhhjqzg7vfyU | synced | Open program: graphify workflow integration with refresh cadence, beads stray removal, probes slice 2 engine |
 
 ## Access protocol
 
