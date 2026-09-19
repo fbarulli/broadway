@@ -14,9 +14,7 @@ The main agent is responsible for orchestration and verification. It does not si
 
 `main` is the clean, data-agnostic platform baseline.
 
-`sklearn` and all other non-main branches are development lines and may contain project-specific work.
-
-`taxi` is the maintained reference use case.
+`taxi` is the active development line and maintained reference use case. All other non-main branches are development lines and may contain project-specific work.
 
 Only data-agnostic changes may be promoted to `main`.
 

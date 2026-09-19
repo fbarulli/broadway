@@ -83,14 +83,14 @@ dispatch() {  # default: verbatim here; --clean-lint: same command in the snapsh
 [[ $CLEAN_LINT -eq 1 ]] && ensure_clean_snapshot
 # F1b guard (D21): the parity gate must NOT trust the tree-local checker —
 # a checkout of main (or any stale ref) carries the PRE-D16 legacy script.
-# Pin the checker to refs/remotes/origin/sklearn and reject it unless it
+# Pin the checker to refs/remotes/origin/taxi and reject it unless it
 # carries the post-D16/D21 inline era declaration (`^PARITY_ERA=` marker).
 # shellcheck disable=SC2317  # reached via `run parity gate_parity` indirection
 gate_parity() {
   local dest rc
   dest=$(mktemp "${TMPDIR:-/tmp}/f1b_parity.XXXXXX")
-  git show refs/remotes/origin/sklearn:scripts/check_branch_parity.sh >"$dest" 2>/dev/null || {
-    echo "FAIL parity (F1b): origin/sklearn unavailable — cannot pin checker"; return 1;
+  git show refs/remotes/origin/taxi:scripts/check_branch_parity.sh >"$dest" 2>/dev/null || {
+    echo "FAIL parity (F1b): origin/taxi unavailable — cannot pin checker"; return 1;
   }
   grep -q '^PARITY_ERA=' "$dest" || {
     echo "FAIL parity (F1b): legacy pre-D16 checker on track ref"; rm -f "$dest"; return 1;
