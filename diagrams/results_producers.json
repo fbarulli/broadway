@@ -1,0 +1,112 @@
+{
+ "title": "Results producers",
+ "nodes": [
+  {
+   "id": "cfg",
+   "label": "configs/*.yaml (dataset+experiment)",
+   "group": "source"
+  },
+  {
+   "id": "etl",
+   "label": "etl.run -> canonical parquet",
+   "group": "core"
+  },
+  {
+   "id": "feat",
+   "label": "features -> train/val parquet",
+   "group": "core"
+  },
+  {
+   "id": "train",
+   "label": "train -> model + metrics",
+   "group": "core"
+  },
+  {
+   "id": "fare",
+   "label": "fare_prediction 01..08 -> results/fare_prediction/",
+   "group": "series"
+  },
+  {
+   "id": "mflow",
+   "label": "mlflow 01..02 -> mlruns + results",
+   "group": "series"
+  },
+  {
+   "id": "more",
+   "label": "more_modeling 01..08 -> results/more_modeling/",
+   "group": "series"
+  },
+  {
+   "id": "multi",
+   "label": "multivariate + univariate -> results/",
+   "group": "series"
+  },
+  {
+   "id": "dash",
+   "label": "dashboard :8000 (results + maps)",
+   "group": "serve"
+  }
+ ],
+ "edges": [
+  {
+   "from": "cfg",
+   "to": "etl",
+   "label": "contract"
+  },
+  {
+   "from": "etl",
+   "to": "feat",
+   "label": "canonical"
+  },
+  {
+   "from": "feat",
+   "to": "train",
+   "label": "features"
+  },
+  {
+   "from": "train",
+   "to": "dash",
+   "label": "metrics"
+  },
+  {
+   "from": "cfg",
+   "to": "fare",
+   "label": "config"
+  },
+  {
+   "from": "cfg",
+   "to": "mflow",
+   "label": "config"
+  },
+  {
+   "from": "cfg",
+   "to": "more",
+   "label": "config"
+  },
+  {
+   "from": "cfg",
+   "to": "multi",
+   "label": "config"
+  },
+  {
+   "from": "fare",
+   "to": "dash",
+   "label": "plots"
+  },
+  {
+   "from": "mflow",
+   "to": "dash",
+   "label": "runs"
+  },
+  {
+   "from": "more",
+   "to": "dash",
+   "label": "plots"
+  },
+  {
+   "from": "multi",
+   "to": "dash",
+   "label": "plots"
+  }
+ ]
+}
