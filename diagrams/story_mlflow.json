@@ -1,0 +1,42 @@
+{
+ "title": "mlflow story",
+ "nodes": [
+  {
+   "id": "01_model_battle_mlflow",
+   "label": "01_model_battle_mlflow: MLflow model battle \u2014 OLS / LGBM / XGBoost (+ Ridge / RandomForest in parallel).",
+   "group": "step-01_model_battle_mlflow"
+  },
+  {
+   "id": "02_explainability",
+   "label": "02_explainability: explainability suite \u2014 SHAP, permutation, PDP/ICE, LIME, built-ins, residuals.",
+   "group": "step-02_explainability"
+  },
+  {
+   "id": "02_explainability/02_explainability_importance.csv",
+   "label": "02_explainability_importance.csv",
+   "group": "step-02_explainability"
+  },
+  {
+   "id": "03_optuna_worker",
+   "label": "03_optuna_worker: kubernetes optuna worker \u2014 per-model phase-1 study via the unified HPO API.",
+   "group": "step-03_optuna_worker"
+  }
+ ],
+ "edges": [
+  {
+   "from": "01_model_battle_mlflow",
+   "to": "02_explainability",
+   "label": "next"
+  },
+  {
+   "from": "02_explainability",
+   "to": "02_explainability/02_explainability_importance.csv",
+   "label": "produces"
+  },
+  {
+   "from": "02_explainability",
+   "to": "03_optuna_worker",
+   "label": "next"
+  }
+ ]
+}

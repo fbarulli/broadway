@@ -56,3 +56,15 @@ def test_discover_series_lists_numbered_stems(tmp_path) -> None:
     (tmp_path / "alpha" / "notes.txt").write_text("x", encoding="utf-8")
     (tmp_path / "empty").mkdir()
     assert module._discover_series(tmp_path) == {"alpha": ["01_a"]}
+
+
+def test_dashboard_story_spec_chains_steps_with_artifacts() -> None:
+    spec = canvas.dashboard_story_spec(
+        "alpha",
+        [("01_a", "Load it", ["01_a.csv", "01_a.png"]), ("02_b", "", [])],
+    )
+    assert spec["title"] == "alpha story"
+    assert "01_a" in [n["id"] for n in spec["nodes"]]
+    edges = [(e["from"], e["to"], e["label"]) for e in spec["edges"]]
+    assert ("01_a", "02_b", "next") in edges
+    assert ("01_a", "01_a/01_a.png", "produces") in edges

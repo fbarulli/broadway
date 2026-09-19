@@ -1,0 +1,172 @@
+{
+ "title": "multivariate story",
+ "nodes": [
+  {
+   "id": "01_categorical_breakdown",
+   "label": "01_categorical_breakdown: multivariate categorical breakdown \u2014 describe-style figures + evidence.",
+   "group": "step-01_categorical_breakdown"
+  },
+  {
+   "id": "01_categorical_breakdown/01_categorical_breakdown_VendorID.csv",
+   "label": "01_categorical_breakdown_VendorID.csv",
+   "group": "step-01_categorical_breakdown"
+  },
+  {
+   "id": "01_categorical_breakdown/01_categorical_breakdown_dropoff_borough.csv",
+   "label": "01_categorical_breakdown_dropoff_borough.csv",
+   "group": "step-01_categorical_breakdown"
+  },
+  {
+   "id": "01_categorical_breakdown/01_categorical_breakdown_pickup_hour.csv",
+   "label": "01_categorical_breakdown_pickup_hour.csv",
+   "group": "step-01_categorical_breakdown"
+  },
+  {
+   "id": "01_categorical_breakdown/01_categorical_breakdown_store_and_fwd_flag.csv",
+   "label": "01_categorical_breakdown_store_and_fwd_flag.csv",
+   "group": "step-01_categorical_breakdown"
+  },
+  {
+   "id": "01_categorical_breakdown/01_categorical_breakdown_time_bucket.csv",
+   "label": "01_categorical_breakdown_time_bucket.csv",
+   "group": "step-01_categorical_breakdown"
+  },
+  {
+   "id": "02_borough_dummies_kurtosis",
+   "label": "02_borough_dummies_kurtosis: does geography eat the heavy tails? \u2014 pickup_borough dummies vs kurtosis.",
+   "group": "step-02_borough_dummies_kurtosis"
+  },
+  {
+   "id": "02_borough_dummies_kurtosis/02_borough_dummies_kurtosis.csv",
+   "label": "02_borough_dummies_kurtosis.csv",
+   "group": "step-02_borough_dummies_kurtosis"
+  },
+  {
+   "id": "03_geography_premium",
+   "label": "03_geography_premium: the geography premium test \u2014 dropoff_borough HC3 premiums vs Manhattan.",
+   "group": "step-03_geography_premium"
+  },
+  {
+   "id": "03_geography_premium/03_geography_premium.csv",
+   "label": "03_geography_premium.csv",
+   "group": "step-03_geography_premium"
+  },
+  {
+   "id": "03_geography_premium/03_geography_premium_diagnostics.csv",
+   "label": "03_geography_premium_diagnostics.csv",
+   "group": "step-03_geography_premium"
+  },
+  {
+   "id": "04_baseline_sample",
+   "label": "04_baseline_sample: baseline sample setup \u2014 leak-free target/features + time-based holdout.",
+   "group": "step-04_baseline_sample"
+  },
+  {
+   "id": "04_baseline_sample/04_baseline_sample_split.csv",
+   "label": "04_baseline_sample_split.csv",
+   "group": "step-04_baseline_sample"
+  },
+  {
+   "id": "05_lightgbm_baselines",
+   "label": "05_lightgbm_baselines: LightGBM baseline on every population \u2014 A/B/C comparison.",
+   "group": "step-05_lightgbm_baselines"
+  },
+  {
+   "id": "05_lightgbm_baselines/05_lightgbm_baselines.csv",
+   "label": "05_lightgbm_baselines.csv",
+   "group": "step-05_lightgbm_baselines"
+  },
+  {
+   "id": "06_model_verdict",
+   "label": "06_model_verdict: model verdict scorecard \u2014 the three baselines and how to use them.",
+   "group": "step-06_model_verdict"
+  },
+  {
+   "id": "06_model_verdict/06_model_verdict.csv",
+   "label": "06_model_verdict.csv",
+   "group": "step-06_model_verdict"
+  }
+ ],
+ "edges": [
+  {
+   "from": "01_categorical_breakdown",
+   "to": "01_categorical_breakdown/01_categorical_breakdown_VendorID.csv",
+   "label": "produces"
+  },
+  {
+   "from": "01_categorical_breakdown",
+   "to": "01_categorical_breakdown/01_categorical_breakdown_dropoff_borough.csv",
+   "label": "produces"
+  },
+  {
+   "from": "01_categorical_breakdown",
+   "to": "01_categorical_breakdown/01_categorical_breakdown_pickup_hour.csv",
+   "label": "produces"
+  },
+  {
+   "from": "01_categorical_breakdown",
+   "to": "01_categorical_breakdown/01_categorical_breakdown_store_and_fwd_flag.csv",
+   "label": "produces"
+  },
+  {
+   "from": "01_categorical_breakdown",
+   "to": "01_categorical_breakdown/01_categorical_breakdown_time_bucket.csv",
+   "label": "produces"
+  },
+  {
+   "from": "01_categorical_breakdown",
+   "to": "02_borough_dummies_kurtosis",
+   "label": "next"
+  },
+  {
+   "from": "02_borough_dummies_kurtosis",
+   "to": "02_borough_dummies_kurtosis/02_borough_dummies_kurtosis.csv",
+   "label": "produces"
+  },
+  {
+   "from": "02_borough_dummies_kurtosis",
+   "to": "03_geography_premium",
+   "label": "next"
+  },
+  {
+   "from": "03_geography_premium",
+   "to": "03_geography_premium/03_geography_premium.csv",
+   "label": "produces"
+  },
+  {
+   "from": "03_geography_premium",
+   "to": "03_geography_premium/03_geography_premium_diagnostics.csv",
+   "label": "produces"
+  },
+  {
+   "from": "03_geography_premium",
+   "to": "04_baseline_sample",
+   "label": "next"
+  },
+  {
+   "from": "04_baseline_sample",
+   "to": "04_baseline_sample/04_baseline_sample_split.csv",
+   "label": "produces"
+  },
+  {
+   "from": "04_baseline_sample",
+   "to": "05_lightgbm_baselines",
+   "label": "next"
+  },
+  {
+   "from": "05_lightgbm_baselines",
+   "to": "05_lightgbm_baselines/05_lightgbm_baselines.csv",
+   "label": "produces"
+  },
+  {
+   "from": "05_lightgbm_baselines",
+   "to": "06_model_verdict",
+   "label": "next"
+  },
+  {
+   "from": "06_model_verdict",
+   "to": "06_model_verdict/06_model_verdict.csv",
+   "label": "produces"
+  }
+ ]
+}

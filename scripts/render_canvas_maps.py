@@ -46,9 +46,33 @@ def build_all_maps(diagrams_dir: Path, experiments_root: Path) -> list[str]:
         spec = canvas.experiment_series_spec(series)
         canvas.write_spec(spec, diagrams_dir / "results_producers.json")
         built.append("results_producers")
+    for track, stems in series.items():
+        steps = _dashboard_story_items(track, stems)
+        story = canvas.dashboard_story_spec(track, steps)
+        canvas.write_spec(story, diagrams_dir / f"story_{track}.json")
+        built.append(f"story_{track}")
     for name in built:
         canvas.emit_tldr(diagrams_dir / f"{name}.json", diagrams_dir / f"{name}.tldr")
     return built
+
+
+def _dashboard_story_items(track: str, stems: list[str]) -> list[tuple[str, str, list[str]]]:
+    """(stem, question, artifact names) per step, from live dashboard data."""
+    from broadway.reports import experiments_dashboard as ui
+
+    root = REPO_ROOT / "project" / "experiments"
+    if root.is_dir():
+        ui.EXPERIMENTS_ROOT = root
+    items: list[tuple[str, str, list[str]]] = []
+    for stem in stems:
+        try:
+            script = ui._script_for(stem, track)
+            question = ui._question_from_docstring(script) if script else ""
+            artifacts = [f.name for f in ui._result_files(stem, track)][:6]
+        except OSError:
+            question, artifacts = "", []
+        items.append((stem, question, artifacts))
+    return items
 
 
 def serve_dashboard(port: int) -> None:

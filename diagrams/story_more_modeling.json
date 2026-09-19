@@ -1,0 +1,372 @@
+{
+ "title": "more_modeling story",
+ "nodes": [
+  {
+   "id": "01_feature_mean_ci",
+   "label": "01_feature_mean_ci: confidence intervals for feature means.",
+   "group": "step-01_feature_mean_ci"
+  },
+  {
+   "id": "01_feature_mean_ci/01_feature_mean_ci.csv",
+   "label": "01_feature_mean_ci.csv",
+   "group": "step-01_feature_mean_ci"
+  },
+  {
+   "id": "02_feature_target_correlation_ci",
+   "label": "02_feature_target_correlation_ci: confidence intervals for feature-target correlation.",
+   "group": "step-02_feature_target_correlation_ci"
+  },
+  {
+   "id": "02_feature_target_correlation_ci/02_feature_target_correlation_ci.csv",
+   "label": "02_feature_target_correlation_ci.csv",
+   "group": "step-02_feature_target_correlation_ci"
+  },
+  {
+   "id": "03_1_raw_ols_and_residuals",
+   "label": "03_1_raw_ols_and_residuals: 03.1: Structural and Analytical Verification of the Linear Model.",
+   "group": "step-03_1_raw_ols_and_residuals"
+  },
+  {
+   "id": "03_2_heteroscedasticity_test",
+   "label": "03_2_heteroscedasticity_test",
+   "group": "step-03_2_heteroscedasticity_test"
+  },
+  {
+   "id": "03_2_heteroscedasticity_test/03_2_heteroscedasticity_test.csv",
+   "label": "03_2_heteroscedasticity_test.csv",
+   "group": "step-03_2_heteroscedasticity_test"
+  },
+  {
+   "id": "03_feature_effect_ci",
+   "label": "03_feature_effect_ci: confidence intervals for feature regression effects.",
+   "group": "step-03_feature_effect_ci"
+  },
+  {
+   "id": "03_feature_effect_ci/03_feature_effect_ci.csv",
+   "label": "03_feature_effect_ci.csv",
+   "group": "step-03_feature_effect_ci"
+  },
+  {
+   "id": "04_categorical_anova_eta2",
+   "label": "04_categorical_anova_eta2",
+   "group": "step-04_categorical_anova_eta2"
+  },
+  {
+   "id": "04_categorical_anova_eta2/04_categorical_anova_eta2.csv",
+   "label": "04_categorical_anova_eta2.csv",
+   "group": "step-04_categorical_anova_eta2"
+  },
+  {
+   "id": "05_joint_model_top10_zones",
+   "label": "05_joint_model_top10_zones: The Joint Model (Numeric + Top-10 Categorical Zones).",
+   "group": "step-05_joint_model_top10_zones"
+  },
+  {
+   "id": "06_joint_model_time_of_day",
+   "label": "06_joint_model_time_of_day: The Joint Model (Numeric + Time of Day).",
+   "group": "step-06_joint_model_time_of_day"
+  },
+  {
+   "id": "07_airport_flat_rate_audit",
+   "label": "07_airport_flat_rate_audit",
+   "group": "step-07_airport_flat_rate_audit"
+  },
+  {
+   "id": "07_airport_flat_rate_audit/07_airport_flat_rate_audit.csv",
+   "label": "07_airport_flat_rate_audit.csv",
+   "group": "step-07_airport_flat_rate_audit"
+  },
+  {
+   "id": "08_model_validation",
+   "label": "08_model_validation",
+   "group": "step-08_model_validation"
+  },
+  {
+   "id": "08_model_validation/08_model_validation_summary.csv",
+   "label": "08_model_validation_summary.csv",
+   "group": "step-08_model_validation"
+  },
+  {
+   "id": "09_total_amount_fees",
+   "label": "09_total_amount_fees",
+   "group": "step-09_total_amount_fees"
+  },
+  {
+   "id": "09_total_amount_fees/09_total_amount_fees.csv",
+   "label": "09_total_amount_fees.csv",
+   "group": "step-09_total_amount_fees"
+  },
+  {
+   "id": "10_subpopulation_audit",
+   "label": "10_subpopulation_audit",
+   "group": "step-10_subpopulation_audit"
+  },
+  {
+   "id": "10_subpopulation_audit/10_subpopulation_audit.csv",
+   "label": "10_subpopulation_audit.csv",
+   "group": "step-10_subpopulation_audit"
+  },
+  {
+   "id": "11_pure_meter_audit",
+   "label": "11_pure_meter_audit",
+   "group": "step-11_pure_meter_audit"
+  },
+  {
+   "id": "12_executive_summary",
+   "label": "12_executive_summary",
+   "group": "step-12_executive_summary"
+  },
+  {
+   "id": "13_spatiotemporal_demand",
+   "label": "13_spatiotemporal_demand",
+   "group": "step-13_spatiotemporal_demand"
+  },
+  {
+   "id": "14_demand_revenue_signatures",
+   "label": "14_demand_revenue_signatures",
+   "group": "step-14_demand_revenue_signatures"
+  },
+  {
+   "id": "15_complexity_funnel",
+   "label": "15_complexity_funnel",
+   "group": "step-15_complexity_funnel"
+  },
+  {
+   "id": "15_complexity_funnel/15_complexity_funnel.csv",
+   "label": "15_complexity_funnel.csv",
+   "group": "step-15_complexity_funnel"
+  },
+  {
+   "id": "16_production_pricing_engine",
+   "label": "16_production_pricing_engine",
+   "group": "step-16_production_pricing_engine"
+  },
+  {
+   "id": "17_spatial_velocity_mapping",
+   "label": "17_spatial_velocity_mapping",
+   "group": "step-17_spatial_velocity_mapping"
+  },
+  {
+   "id": "18_fleet_revenue_simulator",
+   "label": "18_fleet_revenue_simulator",
+   "group": "step-18_fleet_revenue_simulator"
+  },
+  {
+   "id": "18_fleet_revenue_simulator/18_fleet_revenue_simulator.csv",
+   "label": "18_fleet_revenue_simulator.csv",
+   "group": "step-18_fleet_revenue_simulator"
+  },
+  {
+   "id": "19_surge_sensitivity",
+   "label": "19_surge_sensitivity",
+   "group": "step-19_surge_sensitivity"
+  },
+  {
+   "id": "19_surge_sensitivity/19_surge_sensitivity.csv",
+   "label": "19_surge_sensitivity.csv",
+   "group": "step-19_surge_sensitivity"
+  },
+  {
+   "id": "20_heatmap_surge_matrix",
+   "label": "20_heatmap_surge_matrix",
+   "group": "step-20_heatmap_surge_matrix"
+  },
+  {
+   "id": "21_surge_waterfall",
+   "label": "21_surge_waterfall",
+   "group": "step-21_surge_waterfall"
+  },
+  {
+   "id": "21_surge_waterfall/21_surge_waterfall.csv",
+   "label": "21_surge_waterfall.csv",
+   "group": "step-21_surge_waterfall"
+  },
+  {
+   "id": "22_demand_forecasting",
+   "label": "22_demand_forecasting: Demand Forecasting: Predict ride volume by zone and hour.",
+   "group": "step-22_demand_forecasting"
+  }
+ ],
+ "edges": [
+  {
+   "from": "01_feature_mean_ci",
+   "to": "01_feature_mean_ci/01_feature_mean_ci.csv",
+   "label": "produces"
+  },
+  {
+   "from": "01_feature_mean_ci",
+   "to": "02_feature_target_correlation_ci",
+   "label": "next"
+  },
+  {
+   "from": "02_feature_target_correlation_ci",
+   "to": "02_feature_target_correlation_ci/02_feature_target_correlation_ci.csv",
+   "label": "produces"
+  },
+  {
+   "from": "02_feature_target_correlation_ci",
+   "to": "03_1_raw_ols_and_residuals",
+   "label": "next"
+  },
+  {
+   "from": "03_1_raw_ols_and_residuals",
+   "to": "03_2_heteroscedasticity_test",
+   "label": "next"
+  },
+  {
+   "from": "03_2_heteroscedasticity_test",
+   "to": "03_2_heteroscedasticity_test/03_2_heteroscedasticity_test.csv",
+   "label": "produces"
+  },
+  {
+   "from": "03_2_heteroscedasticity_test",
+   "to": "03_feature_effect_ci",
+   "label": "next"
+  },
+  {
+   "from": "03_feature_effect_ci",
+   "to": "03_feature_effect_ci/03_feature_effect_ci.csv",
+   "label": "produces"
+  },
+  {
+   "from": "03_feature_effect_ci",
+   "to": "04_categorical_anova_eta2",
+   "label": "next"
+  },
+  {
+   "from": "04_categorical_anova_eta2",
+   "to": "04_categorical_anova_eta2/04_categorical_anova_eta2.csv",
+   "label": "produces"
+  },
+  {
+   "from": "04_categorical_anova_eta2",
+   "to": "05_joint_model_top10_zones",
+   "label": "next"
+  },
+  {
+   "from": "05_joint_model_top10_zones",
+   "to": "06_joint_model_time_of_day",
+   "label": "next"
+  },
+  {
+   "from": "06_joint_model_time_of_day",
+   "to": "07_airport_flat_rate_audit",
+   "label": "next"
+  },
+  {
+   "from": "07_airport_flat_rate_audit",
+   "to": "07_airport_flat_rate_audit/07_airport_flat_rate_audit.csv",
+   "label": "produces"
+  },
+  {
+   "from": "07_airport_flat_rate_audit",
+   "to": "08_model_validation",
+   "label": "next"
+  },
+  {
+   "from": "08_model_validation",
+   "to": "08_model_validation/08_model_validation_summary.csv",
+   "label": "produces"
+  },
+  {
+   "from": "08_model_validation",
+   "to": "09_total_amount_fees",
+   "label": "next"
+  },
+  {
+   "from": "09_total_amount_fees",
+   "to": "09_total_amount_fees/09_total_amount_fees.csv",
+   "label": "produces"
+  },
+  {
+   "from": "09_total_amount_fees",
+   "to": "10_subpopulation_audit",
+   "label": "next"
+  },
+  {
+   "from": "10_subpopulation_audit",
+   "to": "10_subpopulation_audit/10_subpopulation_audit.csv",
+   "label": "produces"
+  },
+  {
+   "from": "10_subpopulation_audit",
+   "to": "11_pure_meter_audit",
+   "label": "next"
+  },
+  {
+   "from": "11_pure_meter_audit",
+   "to": "12_executive_summary",
+   "label": "next"
+  },
+  {
+   "from": "12_executive_summary",
+   "to": "13_spatiotemporal_demand",
+   "label": "next"
+  },
+  {
+   "from": "13_spatiotemporal_demand",
+   "to": "14_demand_revenue_signatures",
+   "label": "next"
+  },
+  {
+   "from": "14_demand_revenue_signatures",
+   "to": "15_complexity_funnel",
+   "label": "next"
+  },
+  {
+   "from": "15_complexity_funnel",
+   "to": "15_complexity_funnel/15_complexity_funnel.csv",
+   "label": "produces"
+  },
+  {
+   "from": "15_complexity_funnel",
+   "to": "16_production_pricing_engine",
+   "label": "next"
+  },
+  {
+   "from": "16_production_pricing_engine",
+   "to": "17_spatial_velocity_mapping",
+   "label": "next"
+  },
+  {
+   "from": "17_spatial_velocity_mapping",
+   "to": "18_fleet_revenue_simulator",
+   "label": "next"
+  },
+  {
+   "from": "18_fleet_revenue_simulator",
+   "to": "18_fleet_revenue_simulator/18_fleet_revenue_simulator.csv",
+   "label": "produces"
+  },
+  {
+   "from": "18_fleet_revenue_simulator",
+   "to": "19_surge_sensitivity",
+   "label": "next"
+  },
+  {
+   "from": "19_surge_sensitivity",
+   "to": "19_surge_sensitivity/19_surge_sensitivity.csv",
+   "label": "produces"
+  },
+  {
+   "from": "19_surge_sensitivity",
+   "to": "20_heatmap_surge_matrix",
+   "label": "next"
+  },
+  {
+   "from": "20_heatmap_surge_matrix",
+   "to": "21_surge_waterfall",
+   "label": "next"
+  },
+  {
+   "from": "21_surge_waterfall",
+   "to": "21_surge_waterfall/21_surge_waterfall.csv",
+   "label": "produces"
+  },
+  {
+   "from": "21_surge_waterfall",
+   "to": "22_demand_forecasting",
+   "label": "next"
+  }
+ ]
+}

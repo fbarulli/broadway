@@ -1,0 +1,152 @@
+{
+ "title": "fare_prediction story",
+ "nodes": [
+  {
+   "id": "01_fare_baseline",
+   "label": "01_fare_baseline: generate the named fare_prediction_1m sample (sampling + policy applied once).",
+   "group": "step-01_fare_baseline"
+  },
+  {
+   "id": "02_filtered_profile",
+   "label": "02_filtered_profile: profile the named fare_prediction_1m sample.",
+   "group": "step-02_filtered_profile"
+  },
+  {
+   "id": "02_filtered_profile/02_filtered_profile_describe.csv",
+   "label": "02_filtered_profile_describe.csv",
+   "group": "step-02_filtered_profile"
+  },
+  {
+   "id": "03_short_trips",
+   "label": "03_short_trips: profile the short trips (< 0.31 mi) subset of the named fare_prediction_1m sample.",
+   "group": "step-03_short_trips"
+  },
+  {
+   "id": "03_short_trips/03_short_trips_describe.csv",
+   "label": "03_short_trips_describe.csv",
+   "group": "step-03_short_trips"
+  },
+  {
+   "id": "04_percentile_extremes_audit",
+   "label": "04_percentile_extremes_audit: audit the bottom and top 1% of fares for plausibility.",
+   "group": "step-04_percentile_extremes_audit"
+  },
+  {
+   "id": "04_percentile_extremes_audit/04_percentile_extremes_audit_describe.csv",
+   "label": "04_percentile_extremes_audit_describe.csv",
+   "group": "step-04_percentile_extremes_audit"
+  },
+  {
+   "id": "05_temporal_features",
+   "label": "05_temporal_features: temporal features on the v3 sample \u2014 shared recipe from _common, evidence describe + summary.",
+   "group": "step-05_temporal_features"
+  },
+  {
+   "id": "05_temporal_features/05_temporal_features_describe.csv",
+   "label": "05_temporal_features_describe.csv",
+   "group": "step-05_temporal_features"
+  },
+  {
+   "id": "06_prepare_model_data",
+   "label": "06_prepare_model_data: chronological train/val/test split, temporal features, log-target smoothed encodings (route, pickup, dropoff) + pu\u00d7time interactions, raw location ids as categorical, log1p target.",
+   "group": "step-06_prepare_model_data"
+  },
+  {
+   "id": "06_prepare_model_data/06_prepare_model_data_split.csv",
+   "label": "06_prepare_model_data_split.csv",
+   "group": "step-06_prepare_model_data"
+  },
+  {
+   "id": "07_specification_diagnostics",
+   "label": "07_specification_diagnostics: specification diagnostics \u2014 Ramsey RESET, Pearson-vs-Spearman discrepancies, MI-vs-R\u00b2 audit; now audits the SAFE (pre-trip) feature set \u2014 post-trip columns (distance/duration/speed) are leakage and are excluded.",
+   "group": "step-07_specification_diagnostics"
+  },
+  {
+   "id": "07_specification_diagnostics/07_specification_diagnostics_describe.csv",
+   "label": "07_specification_diagnostics_describe.csv",
+   "group": "step-07_specification_diagnostics"
+  },
+  {
+   "id": "08_lightgbm_baseline",
+   "label": "08_lightgbm_baseline: LightGBM baseline on strictly pre-trip features, log-dollar target, dollar-space metrics.",
+   "group": "step-08_lightgbm_baseline"
+  },
+  {
+   "id": "08_lightgbm_baseline/08_lightgbm_baseline_describe.csv",
+   "label": "08_lightgbm_baseline_describe.csv",
+   "group": "step-08_lightgbm_baseline"
+  }
+ ],
+ "edges": [
+  {
+   "from": "01_fare_baseline",
+   "to": "02_filtered_profile",
+   "label": "next"
+  },
+  {
+   "from": "02_filtered_profile",
+   "to": "02_filtered_profile/02_filtered_profile_describe.csv",
+   "label": "produces"
+  },
+  {
+   "from": "02_filtered_profile",
+   "to": "03_short_trips",
+   "label": "next"
+  },
+  {
+   "from": "03_short_trips",
+   "to": "03_short_trips/03_short_trips_describe.csv",
+   "label": "produces"
+  },
+  {
+   "from": "03_short_trips",
+   "to": "04_percentile_extremes_audit",
+   "label": "next"
+  },
+  {
+   "from": "04_percentile_extremes_audit",
+   "to": "04_percentile_extremes_audit/04_percentile_extremes_audit_describe.csv",
+   "label": "produces"
+  },
+  {
+   "from": "04_percentile_extremes_audit",
+   "to": "05_temporal_features",
+   "label": "next"
+  },
+  {
+   "from": "05_temporal_features",
+   "to": "05_temporal_features/05_temporal_features_describe.csv",
+   "label": "produces"
+  },
+  {
+   "from": "05_temporal_features",
+   "to": "06_prepare_model_data",
+   "label": "next"
+  },
+  {
+   "from": "06_prepare_model_data",
+   "to": "06_prepare_model_data/06_prepare_model_data_split.csv",
+   "label": "produces"
+  },
+  {
+   "from": "06_prepare_model_data",
+   "to": "07_specification_diagnostics",
+   "label": "next"
+  },
+  {
+   "from": "07_specification_diagnostics",
+   "to": "07_specification_diagnostics/07_specification_diagnostics_describe.csv",
+   "label": "produces"
+  },
+  {
+   "from": "07_specification_diagnostics",
+   "to": "08_lightgbm_baseline",
+   "label": "next"
+  },
+  {
+   "from": "08_lightgbm_baseline",
+   "to": "08_lightgbm_baseline/08_lightgbm_baseline_describe.csv",
+   "label": "produces"
+  }
+ ]
+}

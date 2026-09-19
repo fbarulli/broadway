@@ -73,6 +73,30 @@ def blast_radius_spec(symbol: str, callers: list[tuple[str, str]]) -> dict[str, 
     return spec
 
 
+def dashboard_story_spec(
+    series: str, steps: list[tuple[str, str, list[str]]]
+) -> dict[str, object]:
+    """Left-to-right story of one dashboard series.
+
+    ``steps``: (stem, question, artifact names). Each step becomes its own
+    group/column in run order, chained with "next" edges; every artifact
+    hangs off its step. Mirrors what the dashboard shows, as a canvas.
+    """
+    spec = new_spec(f"{series} story")
+    previous: str | None = None
+    for stem, question, artifacts in steps:
+        group = f"step-{stem}"
+        add_node(spec, stem, f"{stem}: {question}" if question else stem, group)
+        if previous is not None:
+            add_edge(spec, previous, stem, "next")
+        previous = stem
+        for artifact in artifacts:
+            artifact_id = f"{stem}/{artifact}"
+            add_node(spec, artifact_id, artifact, group)
+            add_edge(spec, stem, artifact_id, "produces")
+    return spec
+
+
 def write_spec(spec: dict[str, object], path: Path) -> None:
     """Write a spec dict as JSON."""
     path.write_text(json.dumps(spec, indent=1), encoding="utf-8")
