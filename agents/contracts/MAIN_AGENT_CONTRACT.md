@@ -246,7 +246,12 @@ The main agent verifies before commit:
 
 No unrelated changes are silently included in a commit.
 
-Every landing commit uses the repository's current commit-trailer convention.
+Every landing commit uses the repository's current commit-trailer convention,
+including the `Tier:` trailer (`FULL|FAST|STATIC|DOCS`) enforced by
+`scripts/tier_gate.sh` on every push (pre-push hook and `scripts/ship.sh`
+gate the exact unpushed batch; `FULL` additionally needs a resolvable
+`Reviewer:` verdict id). Tooling batches land as `Tier: FAST`; local pushes
+run the fast tier, the full tier runs in CI.
 
 A push is performed only after the required local gates pass.
 

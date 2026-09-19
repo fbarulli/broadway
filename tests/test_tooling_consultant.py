@@ -89,4 +89,22 @@ def test_ruff_gate_lints_only_paths_present() -> None:
     # instead of ruff-E902ing.
     text = (REPO / "scripts" / "run_local_ci.sh").read_text(encoding="utf-8")
     assert "gate_ruff" in text, "ruff must route through the main-safe gate"
-    assert "-e " in text or "[[ -e" in text, "gate must filter to existing paths"
+    assert "[[ -e" in text, "gate must filter to existing paths"
+
+
+def test_static_gates_run_parallel_and_in_order() -> None:
+    text = (REPO / "scripts" / "run_local_ci.sh").read_text(encoding="utf-8")
+    assert "run_bg ruff" in text and "run_bg mypy" in text
+    assert "run_bg pyright-advisory" in text and "run_bg vulture" in text
+    assert "run_bg configs" in text and "run_bg shell-scripts" in text
+    assert "collect ruff mypy pyright-advisory vulture configs shell-scripts" in text
+    assert "trap - EXIT" in text, "background jobs must not trip the snapshot teardown"
+
+
+def test_push_path_runs_fast_tier_not_full() -> None:
+    hook = (REPO / "agents" / "contracts" / "hooks-pre-push.template").read_text(encoding="utf-8")
+    assert "run_local_ci.sh --tier=fast" in hook
+    assert "tg_ledger_batch" not in hook, "phantom symbol failed every push closed"
+    assert "tg_run" in hook, "batch law is the Tier: trailer gate"
+    ship = (REPO / "scripts" / "ship.sh").read_text(encoding="utf-8")
+    assert "run_local_ci.sh --tier=fast" in ship

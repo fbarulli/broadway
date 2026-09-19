@@ -3,8 +3,12 @@ name: CI
 on:
   push:
     branches: [main, taxi, sklearn]
+    # Docs-only pushes ship nothing (CD publishes tested images): skip the
+    # whole workflow when no shippable path changed. Code pushes run all jobs.
+    paths-ignore: ['**/*.md']
   pull_request:
     branches: [main, taxi, sklearn]
+    paths-ignore: ['**/*.md']
 
 # Rapid pushes to the same branch/PR cancel the in-flight run — no wasted
 # compute on superseded commits.
