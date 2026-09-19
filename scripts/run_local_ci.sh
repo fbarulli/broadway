@@ -97,7 +97,41 @@ gate_parity() {
   }
   bash "$dest"; rc=$?
   rm -f "$dest"
-  return "$rc"
+  [[ $rc -eq 0 ]] && return 0
+  gate_parity_anchor_bump || return 1
+  return 0
+}
+# shellcheck disable=SC2317  # reached via `gate_parity … gate_parity_anchor_bump` indirection
+gate_parity_anchor_bump() {
+  # Anchor-bump fast path: the pinned (old) checker cannot know a new tip,
+  # so every anchor bump fails its custody by construction (the safe failure
+  # direction). Admit the push IFF the tree's checker differs from the track
+  # ref ONLY on the PARITY_MAIN_ANCHOR value line AND the new pin is exactly
+  # origin/main's tip — post-push custody then holds by construction, so this
+  # is equivalent to the custody check passing, not a bypass of it. All
+  # other gates (CI tree tests, Tier: trailers) still apply normally.
+  local old_line new_line old_pin new_pin tip
+  old_line="$(git show refs/remotes/origin/taxi:scripts/check_branch_parity.sh 2>/dev/null \
+    | grep '^PARITY_MAIN_ANCHOR=')" || return 1
+  new_line="$(grep '^PARITY_MAIN_ANCHOR=' scripts/check_branch_parity.sh 2>/dev/null)" || return 1
+  [[ "$old_line" != "$new_line" ]] || return 1
+  old_pin="${old_line#PARITY_MAIN_ANCHOR=}"; old_pin="${old_pin%% *}"
+  new_pin="${new_line#PARITY_MAIN_ANCHOR=}"; new_pin="${new_pin%% *}"
+  [[ "$new_pin" =~ ^[0-9a-f]{40}$ ]] || return 1
+  [[ "$new_pin" != "$old_pin" ]] || return 1
+  local changed
+  changed="$(diff <(git show refs/remotes/origin/taxi:scripts/check_branch_parity.sh 2>/dev/null) \
+    scripts/check_branch_parity.sh 2>/dev/null | grep -c '^[<>]')" || return 1
+  [[ "$changed" -eq 2 ]] || {
+    echo "FAIL parity: not a pure anchor bump ($changed checker lines differ — push normally)"; return 1;
+  }
+  tip="$(git rev-parse --verify origin/main 2>/dev/null)" || return 1
+  git cat-file -e "$new_pin^{commit}" 2>/dev/null || return 1
+  [[ "$new_pin" == "$tip" ]] || {
+    echo "FAIL parity: new anchor $new_pin is not origin/main ($tip)"; return 1;
+  }
+  echo "parity: anchor-bump fast path (anchor -> $new_pin == origin/main)"
+  return 0
 }
 run parity gate_parity
 # Parallel static phase — ruff/mypy/pyright-advisory/vulture/configs/shell
