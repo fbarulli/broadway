@@ -27,6 +27,11 @@
    "group": "step-03_short_trips"
   },
   {
+   "id": "03_short_trips/verdict: supported",
+   "label": "verdict: supported",
+   "group": "step-03_short_trips"
+  },
+  {
    "id": "04_percentile_extremes_audit",
    "label": "04_percentile_extremes_audit: audit the bottom and top 1% of fares for plausibility.",
    "group": "step-04_percentile_extremes_audit"
@@ -34,6 +39,11 @@
   {
    "id": "04_percentile_extremes_audit/04_percentile_extremes_audit_describe.csv",
    "label": "04_percentile_extremes_audit_describe.csv",
+   "group": "step-04_percentile_extremes_audit"
+  },
+  {
+   "id": "04_percentile_extremes_audit/verdict: supported",
+   "label": "verdict: supported",
    "group": "step-04_percentile_extremes_audit"
   },
   {
@@ -100,12 +110,22 @@
   },
   {
    "from": "03_short_trips",
+   "to": "03_short_trips/verdict: supported",
+   "label": "produces"
+  },
+  {
+   "from": "03_short_trips",
    "to": "04_percentile_extremes_audit",
    "label": "next"
   },
   {
    "from": "04_percentile_extremes_audit",
    "to": "04_percentile_extremes_audit/04_percentile_extremes_audit_describe.csv",
+   "label": "produces"
+  },
+  {
+   "from": "04_percentile_extremes_audit",
+   "to": "04_percentile_extremes_audit/verdict: supported",
    "label": "produces"
   },
   {

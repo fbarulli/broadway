@@ -57,7 +57,12 @@ def build_all_maps(diagrams_dir: Path, experiments_root: Path) -> list[str]:
 
 
 def _dashboard_story_items(track: str, stems: list[str]) -> list[tuple[str, str, list[str]]]:
-    """(stem, question, artifact names) per step, from live dashboard data."""
+    """(stem, question, artifact labels) per step, from live dashboard data.
+
+    Uniform vocabulary every series: plots (.png) first, then result files,
+    then the recorded verdict — so all story maps share one style whatever
+    happens to be on disk.
+    """
     from broadway.reports import experiments_dashboard as ui
 
     root = REPO_ROOT / "project" / "experiments"
@@ -68,7 +73,13 @@ def _dashboard_story_items(track: str, stems: list[str]) -> list[tuple[str, str,
         try:
             script = ui._script_for(stem, track)
             question = ui._question_from_docstring(script) if script else ""
-            artifacts = [f.name for f in ui._result_files(stem, track)][:6]
+            files = ui._result_files(stem, track)
+            plots = sorted(f.name for f in files if f.suffix == ".png")
+            others = sorted(f.name for f in files if f.suffix != ".png")
+            artifacts = (plots + others)[:6]
+            verdict = ui.load_observations(stem).get("verdict", "")
+            if verdict:
+                artifacts = [*artifacts, f"verdict: {verdict}"]
         except OSError:
             question, artifacts = "", []
         items.append((stem, question, artifacts))
