@@ -36,3 +36,18 @@ methods:
   - "scripts/check_branch_parity.sh"
   - "scripts/pyright_advisory.sh"
   - "scripts/run_local_ci.sh"
+
+docker:
+  # Build table SSOT: every image CI builds, with its build CONTEXT (must
+  # match the `docker build` contexts in .github/workflows/ci.yml) and
+  # whether it is a WORKLOAD image (bakes the taxi reference pipeline via
+  # COPY project/... or FROMs an image that does). Workload images cannot
+  # build on the data-agnostic main line — the pre-flight gate and CI skip
+  # them there with notice instead of failing on missing paths.
+  images:
+    - {dockerfile: "Dockerfile", context: ".", workload: false}
+    - {dockerfile: "k8s/optuna/Dockerfile.base", context: ".", workload: true}
+    - {dockerfile: "k8s/optuna/Dockerfile.worker", context: ".", workload: true}
+    - {dockerfile: "k8s/optuna/Dockerfile.mlflow", context: ".", workload: true}
+    - {dockerfile: "docker/mlflow/Dockerfile", context: ".", workload: false}
+    - {dockerfile: "docker/postgres/Dockerfile", context: "docker/postgres", workload: false}

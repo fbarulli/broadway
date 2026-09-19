@@ -175,7 +175,11 @@ ps = sorted(Path('configs/experiment').glob('*.yaml')); assert ps, 'no configs'
 # Gate-divergence law: keep command-identical to ci.yml's 'Shell scripts' step.
 # shellcheck disable=SC2016  # single quotes intended: globs must expand under bash -c
 run_bg shell-scripts bash -c 'for f in k8s/optuna/*.sh scripts/*.sh; do bash -n "$f"; done; shellcheck k8s/optuna/*.sh scripts/*.sh'
-collect ruff mypy pyright-advisory vulture configs shell-scripts
+# Docker build-context pre-flight (blocking): missing COPY/ADD sources fail
+# here in seconds, not after a 10-minute image build. Workload images skip
+# with notice on project-less lines (see scripts/check_docker_paths.sh).
+run_bg docker-paths bash scripts/check_docker_paths.sh
+collect ruff mypy pyright-advisory vulture configs shell-scripts docker-paths
 if [[ $STATIC -eq 0 && $TIER == "full" ]]; then
   # Main-branch platform subset: taxi-coupled suites (ledger probes,
   # state_records, project loader paths) cannot pass where project/ and the
@@ -205,7 +209,7 @@ fi
 if [[ $fail -eq 0 ]]; then
   CL_NOTE=""
   [[ $CLEAN_LINT -eq 1 ]] && CL_NOTE=" + clean-lint(ruff+mypy@HEAD-snapshot)"
-  [[ $TIER == "fast" ]] && echo "$FAST_BANNERS (tiers: parity/ruff/mypy/pyright-advisory/vulture/configs/shell-scripts)$CL_NOTE" \
+  [[ $TIER == "fast" ]] && echo "$FAST_BANNERS (tiers: parity/ruff/mypy/pyright-advisory/vulture/configs/shell-scripts/docker-paths)$CL_NOTE" \
                         || echo "$FULL_BANNERS$CL_NOTE"
 else
   echo "LOCAL-CI RED — fix above before commit/push"
