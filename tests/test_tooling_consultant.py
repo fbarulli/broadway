@@ -107,6 +107,7 @@ def test_main_branch_runs_platform_subset_not_literal_gate() -> None:
     assert "--ignore=tests/test_governance_probes.py" in text
     assert "--ignore=tests/test_state_records.py" in text
     assert "--ignore=tests/test_project_paths.py" in text
+    assert "--ignore=tests/test_gate_registry.py" in text
     assert "SKIP project-tests" in text
 
 

@@ -190,7 +190,8 @@ if [[ $STATIC -eq 0 && $TIER == "full" ]]; then
                --cov=src/broadway --cov-report=term-missing --cov-fail-under=95 \
                --ignore=tests/test_governance_probes.py \
                --ignore=tests/test_state_records.py \
-               --ignore=tests/test_project_paths.py
+               --ignore=tests/test_project_paths.py \
+               --ignore=tests/test_gate_registry.py
   else
     run pytest bash scripts/uv.sh run --extra dev pytest tests/ -n 4 --dist worksteal \
                --cov=src/broadway --cov-report=term-missing --cov-fail-under=95
