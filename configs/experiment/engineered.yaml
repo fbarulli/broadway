@@ -1,0 +1,25 @@
+data_source:
+  loader: canonical
+  schema_contract: engineered
+features:
+  include:
+    - feature_1
+    - feature_2
+  exclude: []
+  derived:
+    - name: engineered_feature_1
+      func: source_copy
+      source: feature_2
+  encodings:
+    - type: target
+      columns:
+        - feature_3
+      smoothing: 20
+model:
+  type: linear
+  params: {}
+split:
+  type: random
+  validation_size: 0.2
+random_state: 42
+target_metric: rmse

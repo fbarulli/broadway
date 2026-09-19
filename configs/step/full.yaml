@@ -1,0 +1,4 @@
+flows:
+  prediction: prediction
+  hypothesis: hypothesis
+  causal: causal

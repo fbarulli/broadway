@@ -1,0 +1,15 @@
+log_level: INFO
+data_dir: data
+raw_subdir: raw
+processed_subdir: processed
+mlflow_tracking_uri: http://localhost:5000
+database_user: postgres
+database_password: postgres
+database_name: broadway
+database_host: localhost
+database_port: 5432
+sample_size_ci: 1000
+sample_size_stats: 10000
+api_replicas_min: 1
+api_replicas_max: 3
+api_hpa_cpu_threshold: 80

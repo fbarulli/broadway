@@ -1,0 +1,28 @@
+# optuna-init Job — creates the configured studies ONCE (schema-race fix).
+# Workers later only load_if_exists. Completion semantics: restartPolicy
+# Never + backoffLimit bounds retries (no infinite restarts);
+# ttlSecondsAfterFinished auto-deletes the Job 10 min after completion.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: optuna-init
+spec:
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 600
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: init
+          image: broadway-optuna-worker:latest
+          imagePullPolicy: IfNotPresent
+          command: ["python", "/app/worker.py"]
+          args: ["--init-only"]
+          volumeMounts:
+            - {name: config, mountPath: /etc/broadway/config.yaml, subPath: config.yaml, readOnly: true}
+            - {name: optuna-db, mountPath: /etc/broadway/secret, readOnly: true}
+      volumes:
+        - name: config
+          configMap: {name: optuna-config}
+        - name: optuna-db
+          secret: {secretName: optuna-db}

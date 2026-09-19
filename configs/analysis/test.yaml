@@ -1,0 +1,11 @@
+name: test
+mode: prediction
+goal: predict target
+row_definition: one listing
+decision_moment: at listing time
+available_info:
+  - feature_1
+  - feature_2
+  - feature_3
+leakage_notes: []
+success_criterion: beat mean baseline

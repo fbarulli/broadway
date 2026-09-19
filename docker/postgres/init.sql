@@ -1,0 +1,2 @@
+-- Intentionally empty bootstrap: etl_file_manifest schema deleted (orphan,
+-- no consumer); file kept because docker/postgres/Dockerfile COPYs init.sql.

@@ -1,0 +1,211 @@
+from __future__ import annotations
+
+import numpy as np
+import statsmodels.api as sm
+
+from broadway.stats.diagnostic_models import DiagnosticResult
+from broadway.stats.diagnostics import (
+    bp_test,
+    constant_variance_diagnostic,
+    durbin_watson,
+    influence_diagnostic,
+    jb_test,
+    mean_specification_diagnostic,
+    plot_residuals,
+    plot_residuals_histogram,
+    plot_residuals_qq,
+    plot_residuals_vs_fitted,
+    residual_distribution_diagnostic,
+)
+
+
+def test_bp_test_returns_two_floats_in_sane_range() -> None:
+    rng = np.random.default_rng(42)
+    n = 200
+    exog = sm.add_constant(rng.normal(size=(n, 2)))
+    resid = rng.normal(size=n)
+
+    statistic, p_value = bp_test(resid, exog)
+
+    assert isinstance(statistic, float)
+    assert isinstance(p_value, float)
+    assert statistic >= 0.0
+    assert 0.0 <= p_value <= 1.0
+
+
+def test_jb_test_returns_four_floats_for_normal_residuals() -> None:
+    rng = np.random.default_rng(42)
+    resid = rng.normal(size=1000)
+
+    statistic, p_value, skew, kurtosis = jb_test(resid)
+
+    assert isinstance(statistic, float)
+    assert isinstance(p_value, float)
+    assert isinstance(skew, float)
+    assert isinstance(kurtosis, float)
+    assert statistic >= 0.0
+    assert 0.0 <= p_value <= 1.0
+    assert abs(skew) < 1.0
+
+
+def test_jb_test_rejects_skewed_residuals() -> None:
+    rng = np.random.default_rng(42)
+    resid = rng.exponential(size=1000)
+
+    _, p_value_normal, _, _ = jb_test(rng.normal(size=1000))
+    _, p_value_skewed, _, _ = jb_test(resid)
+
+    assert p_value_skewed < p_value_normal
+
+
+def test_durbin_watson_near_two_for_iid_residuals() -> None:
+    rng = np.random.default_rng(42)
+    resid = rng.normal(size=500)
+
+    dw = durbin_watson(resid)
+
+    assert isinstance(dw, float)
+    assert 1.5 <= dw <= 2.5
+
+
+def test_plot_residuals_saves_png(tmp_path) -> None:
+    rng = np.random.default_rng(42)
+    n = 200
+    X = sm.add_constant(rng.normal(size=(n, 2)))
+    y = X @ np.array([1.0, 2.0, 3.0]) + rng.normal(scale=0.5, size=n)
+    model = sm.OLS(y, X).fit()
+
+    out_path = str(tmp_path / "residuals.png")
+    plot_residuals(model, out_path)
+
+    assert tmp_path.joinpath("residuals.png").exists()
+    assert tmp_path.joinpath("residuals.png").stat().st_size > 0
+
+
+def test_plot_residuals_vs_fitted_saves_png(tmp_path) -> None:
+    rng = np.random.default_rng(42)
+    n = 200
+    X = sm.add_constant(rng.normal(size=(n, 2)))
+    y = X @ np.array([1.0, 2.0, 3.0]) + rng.normal(scale=0.5, size=n)
+    model = sm.OLS(y, X).fit()
+
+    out_path = str(tmp_path / "rvf.png")
+    plot_residuals_vs_fitted(model, out_path)
+
+    assert tmp_path.joinpath("rvf.png").exists()
+    assert tmp_path.joinpath("rvf.png").stat().st_size > 0
+
+
+def test_mean_specification_diagnostic_returns_typed_result(tmp_path) -> None:
+    rng = np.random.default_rng(42)
+    n = 200
+    X = sm.add_constant(rng.normal(size=(n, 2)))
+    y = X @ np.array([1.0, 2.0, 3.0]) + rng.normal(scale=0.5, size=n)
+    model = sm.OLS(y, X).fit()
+
+    out_path = str(tmp_path / "diag.png")
+    result = mean_specification_diagnostic(model, out_path)
+
+    assert isinstance(result, DiagnosticResult)
+    assert result.question == "Is the mean relationship correctly specified?"
+    assert len(result.evidence) == 1
+    assert out_path in result.evidence[0]
+    assert isinstance(result.ramification, str)
+    assert result.ramification
+    assert result.warnings == []
+    assert tmp_path.joinpath("diag.png").exists()
+    assert tmp_path.joinpath("diag.png").stat().st_size > 0
+
+
+def test_constant_variance_diagnostic_returns_typed_result(tmp_path) -> None:
+    rng = np.random.default_rng(42)
+    n = 200
+    X = sm.add_constant(rng.normal(size=(n, 2)))
+    y = X @ np.array([1.0, 2.0, 3.0]) + rng.normal(scale=0.5, size=n)
+    model = sm.OLS(y, X).fit()
+
+    out_path = str(tmp_path / "diag.png")
+    result = constant_variance_diagnostic(model, out_path)
+
+    assert isinstance(result, DiagnosticResult)
+    assert result.question == "Is the error variance constant?"
+    assert len(result.evidence) == 2
+    assert out_path in result.evidence[0]
+    assert "Breusch-Pagan" in result.evidence[1]
+    assert isinstance(result.ramification, str)
+    assert result.ramification
+    assert result.warnings == []
+    assert tmp_path.joinpath("diag.png").exists()
+    assert tmp_path.joinpath("diag.png").stat().st_size > 0
+
+
+def test_influence_diagnostic_returns_typed_result(tmp_path) -> None:
+    rng = np.random.default_rng(42)
+    n = 200
+    X = sm.add_constant(rng.normal(size=(n, 2)))
+    y = X @ np.array([1.0, 2.0, 3.0]) + rng.normal(scale=0.5, size=n)
+    model = sm.OLS(y, X).fit()
+
+    out_path = str(tmp_path / "diag.png")
+    result = influence_diagnostic(model, out_path)
+
+    assert isinstance(result, DiagnosticResult)
+    assert result.question == "Is the result being driven by a few observations?"
+    assert len(result.evidence) == 2
+    assert out_path in result.evidence[0]
+    assert "Cook" in result.evidence[1]
+    assert isinstance(result.ramification, str)
+    assert result.ramification
+    assert result.warnings == []
+    assert tmp_path.joinpath("diag.png").exists()
+    assert tmp_path.joinpath("diag.png").stat().st_size > 0
+
+
+def test_plot_residuals_qq_saves_png(tmp_path) -> None:
+    rng = np.random.default_rng(42)
+    n = 200
+    X = sm.add_constant(rng.normal(size=(n, 2)))
+    y = X @ np.array([1.0, 2.0, 3.0]) + rng.normal(scale=0.5, size=n)
+    model = sm.OLS(y, X).fit()
+
+    out_path = str(tmp_path / "qq.png")
+    plot_residuals_qq(model, out_path)
+
+    assert tmp_path.joinpath("qq.png").exists()
+    assert tmp_path.joinpath("qq.png").stat().st_size > 0
+
+
+def test_plot_residuals_histogram_saves_png(tmp_path) -> None:
+    rng = np.random.default_rng(42)
+    n = 200
+    X = sm.add_constant(rng.normal(size=(n, 2)))
+    y = X @ np.array([1.0, 2.0, 3.0]) + rng.normal(scale=0.5, size=n)
+    model = sm.OLS(y, X).fit()
+
+    out_path = str(tmp_path / "hist.png")
+    plot_residuals_histogram(model, out_path)
+
+    assert tmp_path.joinpath("hist.png").exists()
+    assert tmp_path.joinpath("hist.png").stat().st_size > 0
+
+
+def test_residual_distribution_diagnostic_returns_typed_result(tmp_path) -> None:
+    rng = np.random.default_rng(42)
+    n = 200
+    X = sm.add_constant(rng.normal(size=(n, 2)))
+    y = X @ np.array([1.0, 2.0, 3.0]) + rng.normal(scale=0.5, size=n)
+    model = sm.OLS(y, X).fit()
+
+    out_path = str(tmp_path / "diag.png")
+    result = residual_distribution_diagnostic(model, out_path)
+
+    assert isinstance(result, DiagnosticResult)
+    assert result.question == "Is residual non-normality problematic for inference?"
+    assert len(result.evidence) == 2
+    assert out_path in result.evidence[0]
+    assert "Jarque-Bera" in result.evidence[1]
+    assert isinstance(result.ramification, str)
+    assert result.ramification
+    assert result.warnings == []
+    assert tmp_path.joinpath("diag.png").exists()
+    assert tmp_path.joinpath("diag.png").stat().st_size > 0

@@ -1,0 +1,96 @@
+[project]
+name = "broadway"
+version = "0.1.0"
+description = "Generalized ML experimentation platform"
+requires-python = ">=3.12"
+
+dependencies = [
+    "lightgbm>=4.7.0",
+    "optuna>=4.4.0",
+    "pandas>=2.3.0",
+    "pyarrow>=19",
+    "psycopg[binary]>=3.3.0",
+    "pydantic>=2.11.0",
+    "pyyaml>=6.0.0",
+    "scikit-learn>=1.7.0",
+    "scipy>=1.16.0",
+    "sqlalchemy>=2.0.0",
+    "tqdm>=4.66.0",
+    "xgboost>=3.4.0",
+    "joblib>=1.5.0",
+    "kubernetes>=32.0.0",
+    "python-dotenv>=1.1.0",
+    "pytest>=8.4.0",
+    # XDIST-1a: gate parallelization (D19-P3 ruling) — -n 4 --dist worksteal
+    "pytest-xdist>=3.6",
+    "pingouin>=0.6.0",
+    "statsmodels>=0.14.6",
+    "matplotlib>=3.10.0",
+    "requests>=2.32.0",
+    "pandera>=0.32.1",
+    "mlflow>=3.15.1",
+    "polars>=1.43.2",
+    "seaborn>=0.13.0",
+    "shap>=0.46",
+    "lime>=0.2",
+    "optuna-integration[mlflow]>=4.9.0",
+    "psycopg2-binary>=2.9",
+    "fastapi>=0.141.1",
+    "uvicorn>=0.52.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff==0.16.3",
+    "mypy>=1.14.0",
+    "pytest-cov>=6.0.0",
+    "vulture>=2.16",
+    "graphifyy",
+]
+spark = ["pyspark>=4.0.0"]
+db = ["psycopg[binary]>=3.3.0", "sqlalchemy>=2.0.0"]
+k8s = ["kubernetes>=32.0.0"]
+all = ["broadway[spark,db,k8s,dev]"]
+
+[project.scripts]
+ds-pipeline = "broadway.cli:main"
+
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src", "."]
+include = ["broadway*", "project*"]
+# deepseek-harness (gitignored DSH checkout) holds node_modules symlink loops:
+# discovery walks it with followlinks=True and spins forever in the
+# editable-build probe whenever uv re-syncs (incident 2026-08-23).
+exclude = ["deepseek-harness*"]
+
+[tool.mypy]
+python_version = "3.12"
+mypy_path = "src"
+explicit_package_bases = true
+namespace_packages = true
+ignore_missing_imports = true
+warn_unused_ignores = true
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+# Rules that are INTENTIONAL in this codebase:
+#   B017  — test_loud_failures deliberately asserts blind Exception (that's the test's job)
+#   BLE001 — fail-loud wrappers catch Exception to annotate and re-raise
+#   TRY004 — invalid-input contract is ValueError everywhere (project convention)
+ignore = ["B017", "BLE001", "TRY004"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["PLR0913", "PLR2004"]
+
+[tool.pytest.ini_options]
+addopts = "--ignore=deepseek-harness"
+
+[tool.uv.sources]
+graphifyy = { git = "https://github.com/Graphify-Labs/graphify.git" }

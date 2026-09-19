@@ -1,0 +1,15 @@
+log_level: WARNING
+data_dir: ${DATA_DIR}
+raw_subdir: raw
+processed_subdir: processed
+mlflow_tracking_uri: ${MLFLOW_TRACKING_URI}
+database_user: ${DATABASE_USER}
+database_password: ${DATABASE_PASSWORD}
+database_name: ${DATABASE_NAME}
+database_host: ${DATABASE_HOST}
+database_port: ${DATABASE_PORT}
+sample_size_ci: 0
+sample_size_stats: 0
+api_replicas_min: 2
+api_replicas_max: 10
+api_hpa_cpu_threshold: 80

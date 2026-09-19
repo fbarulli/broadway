@@ -1,0 +1,23 @@
+columns:
+  feature_1:
+    dtype: int64
+    null_count: 0
+    role: feature
+  feature_2:
+    dtype: int64
+    null_count: 0
+    role: feature
+  feature_3:
+    dtype: object
+    null_count: 0
+    role: feature
+  target:
+    dtype: int64
+    null_count: 0
+    role: target
+datetime_column: null
+lookup_tables: {}
+name: test
+path: demo/demo.csv
+target: target
+task: regression

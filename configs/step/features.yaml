@@ -1,0 +1,4 @@
+encoding_smoothing: 20
+frequency_fill: -1.0
+pipeline_file: feature_pipeline.pkl
+max_drop_fraction: 0.0

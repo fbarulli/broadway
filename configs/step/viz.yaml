@@ -1,0 +1,43 @@
+palette: BuPu_r
+max_features_per_figure: 12
+max_points_per_trace: 10000
+fig_size_per_subplot: 3.0
+dpi: 100
+min_unique_for_qq: 15
+qq_sample_size: 10000
+qq_random_state: 42
+qq_figure: numeric_qq_{fig_num}.png
+qq_log_figure: numeric_qq_log_{fig_num}.png
+dist_figure: numeric_dist_{fig_num}.png
+describe_figure: describe.png
+normality_figure: normality_qq.png
+qq_zones:
+  enabled: true
+  central_quantiles: [0.25, 0.75]
+  tail_threshold: 1.96
+  zero_mass_threshold: 0.05
+  central_alpha: 0.15
+  tail_alpha: 0.08
+  zone_color: "#999999"
+  shelf_color: "#d62728"
+qq_markers:
+  enabled: true
+  percentile_rings: true
+  percentiles: [0.5, 0.9, 0.99, 0.999]
+  ring_color: "#aaaaaa"
+  tail_highlight: true
+  tail_threshold: 3.09
+  tail_color: "#d62728"
+  tail_line_width: 1.0
+  robust_line: true
+  robust_line_color: "#1f77b4"
+  robust_line_width: 2.5
+diagnostics:
+  colormap: coolwarm
+  figure: numeric_diagnostics.png
+  annotate: true
+  thresholds:
+    zero_rate: 0.05
+    skew: 1.0
+    kurtosis: 3.0
+    max_p99_ratio: 10.0

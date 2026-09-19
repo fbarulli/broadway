@@ -1,0 +1,6 @@
+steps:
+  - discover
+  - etl
+  - contracts
+  - baseline
+  - causal
