@@ -13,8 +13,10 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 TOOLING="configs/tooling.yaml"
+# Workload presence = the project HPO spec (not merely a project/ dir, which
+# stray caches can resurrect). Same rule as ci.yml's Detect step.
 HAVE_PROJECT=0
-[[ -d project ]] && HAVE_PROJECT=1
+[[ -f project/config/experiments/mlflow.yaml ]] && HAVE_PROJECT=1
 
 python3 - "$TOOLING" "$HAVE_PROJECT" <<'EOF'
 import re
