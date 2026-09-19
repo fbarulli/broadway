@@ -1,12 +1,38 @@
 {
-  // Pyright ADVISORY config — compare-vs-mypy period (opened 2026-09-19).
-  // mypy remains the ENFORCING checker (run_local_ci.sh `mypy` gate).
-  // This config exists so the advisory gate and editors share one scope:
-  // src/broadway only, basic mode, zero suppressions — raw findings feed
-  // the keep-mypy-vs-switch comparison. Promote to enforcing only by ruling.
-  // Pinned runner: npx pyright@1.1.414 (see scripts/pyright_advisory.sh).
-  "venvPath": ".",
+  "include": [
+    "src/broadway"
+  ],
+  "reportArgumentType": true,
+  "reportAssignmentType": true,
+  "reportAttributeAccessIssue": true,
+  "reportCallIssue": true,
+  "reportFunctionMemberAccess": true,
+  "reportGeneralTypeIssues": true,
+  "reportImportCycles": true,
+  "reportIncompatibleMethodOverride": true,
+  "reportInconsistentOverload": true,
+  "reportInvalidTypeVarUse": true,
+  "reportMatchIssue": true,
+  "reportMissingImports": true,
+  "reportMissingParameterType": true,
+  "reportMissingTypeArgument": true,
+  "reportOptionalCall": true,
+  "reportOptionalContextManager": true,
+  "reportOptionalIterable": true,
+  "reportOptionalMemberAccess": true,
+  "reportOptionalOperand": true,
+  "reportOptionalSubscript": true,
+  "reportOverlappingOverload": true,
+  "reportPropertyTypeMismatch": true,
+  "reportReturnType": true,
+  "reportUnboundVariable": true,
+  "reportUndefinedVariable": true,
+  "reportUnknownArgumentType": true,
+  "reportUnknownMemberType": true,
+  "reportUnknownParameterType": true,
+  "reportUnknownVariableType": true,
+  "reportUnnecessaryTypeIgnoreComment": true,
+  "typeCheckingMode": "strict",
   "venv": ".venv",
-  "include": ["src/broadway"],
-  "typeCheckingMode": "basic"
+  "venvPath": "."
 }

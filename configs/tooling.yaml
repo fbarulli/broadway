@@ -1,0 +1,38 @@
+# configs/tooling.yaml — TOOLING SSOT (new-project rule: only configs/ changes).
+#
+# All hardcoded tooling values live HERE, never in scripts/. Scripts resolve
+# this file at runtime (python3+yaml, no defaults). Starting a new project
+# means editing configs/ (dataset/experiment/tooling) — never scripts/.
+#
+# Consumers:
+#   scripts/pyright_advisory.sh -> pyright.version, pyright.scope
+#   scripts/check_branch_parity.sh, scripts/main_day_sync.sh,
+#     scripts/promote_to_main.sh -> shared_surface.file
+#   pyrightconfig.json mirrors pyright.mode/scope (strict JSON, comments live here).
+pyright:
+  # Pinned runner. Bump ONLY here; the advisory script resolves it dynamically.
+  version: "1.1.414"
+  # Highest strictness, CONSULTANT role: findings are reported, never blocking.
+  # run_local_ci.sh routes pyright-advisory as always-green; mypy enforces.
+  mode: "strict"
+  # Advisory scope. Same on taxi and main (shared via parity surface).
+  scope:
+    - "src/broadway"
+  # Consultant law: true means the gate MUST always exit 0 (see advisory script).
+  advisory_only: true
+
+shared_surface:
+  # Single source of the taxi<->main shared surface. The parity checker,
+  # main-day sync, and promote script ALL read this file; none maintain a
+  # second inline list.
+  file: "scripts/main_whitelist.txt"
+
+# Deterministic repeatable methods (names only; implementations live in scripts/).
+# Every repeated manual change MUST route through one of these scripts —
+# never hand-run the underlying git/pyright sequence.
+methods:
+  - "scripts/promote_to_main.sh"
+  - "scripts/main_day_sync.sh"
+  - "scripts/check_branch_parity.sh"
+  - "scripts/pyright_advisory.sh"
+  - "scripts/run_local_ci.sh"

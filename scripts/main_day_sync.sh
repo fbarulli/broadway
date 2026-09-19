@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# MAIN-DAY SYNC — resync main from dev (taxi) via WHITELIST
-# Run from main worktree root. Requires: git, bash.
+# MAIN-DAY SYNC — resync main from dev (taxi) via WHITELIST SSOT
+# Run from main worktree root. Requires: git, bash, python3+yaml.
 # Design: copy only what main should contain, then re-apply main-only files.
 # Idempotent: safe to re-run.
-# WHITELIST mirrors the SHARED surface in scripts/check_branch_parity.sh —
-# keep the two lists in lockstep.
+# Deterministic law: WHITELIST is scripts/main_whitelist.txt (via
+# configs/tooling.yaml shared_surface.file) — the SAME file the parity
+# checker and promote_to_main.sh read. Never maintain a second inline list.
 
 set -euo pipefail
 
@@ -36,31 +37,21 @@ done
 echo "==> Fetching origin/taxi"
 git fetch origin taxi
 
-# --- 3) WHITELIST: only what main should contain
-echo "==> Checking out platform surface from taxi (whitelist)"
-# Platform core + tests + demo + generic governance + shared infra
-git checkout origin/taxi -- \
-  src/ \
-  tests/ \
-  demo/ \
-  scripts/ \
-  configs/ \
-  agents/contracts/ \
-  agents/tools/ \
-  k8s/ \
-  docker/ \
-  .github/workflows/ \
-  pyproject.toml \
-  uv.lock \
-  pyrightconfig.json \
-  Dockerfile \
-  docker-compose.yml \
-  .python-version \
-  .env.example \
-  HPO_TRAINING.md \
-  .gitignore \
-  .dockerignore \
-  2>&1 | tail -5
+# --- 3) WHITELIST SSOT: only what main should contain
+echo "==> Checking out platform surface from taxi (whitelist SSOT)"
+WHITELIST_FILE="$(python3 -c 'import yaml; print(yaml.safe_load(open("configs/tooling.yaml"))["shared_surface"]["file"])' 2>/dev/null || echo scripts/main_whitelist.txt)"
+WHITELIST_CONTENT=""
+if [[ -f "$WHITELIST_FILE" ]]; then
+  WHITELIST_CONTENT="$(<"$WHITELIST_FILE")"
+elif git cat-file -e "origin/taxi:$WHITELIST_FILE" 2>/dev/null; then
+  WHITELIST_CONTENT="$(git show "origin/taxi:$WHITELIST_FILE")"
+else
+  echo "FATAL: whitelist not found: $WHITELIST_FILE" >&2; exit 1
+fi
+mapfile -t WHITELIST < <(printf '%s\n' "$WHITELIST_CONTENT" | grep -v '^\s*#' | grep -v '^\s*$' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+[[ ${#WHITELIST[@]} -gt 0 ]] || { echo "FATAL: whitelist empty: $WHITELIST_FILE" >&2; exit 1; }
+echo "==> Whitelist ($WHITELIST_FILE): ${#WHITELIST[@]} entries"
+git checkout origin/taxi -- "${WHITELIST[@]}" 2>&1 | tail -5
 
 # --- 4) Restore main's slate (overwrite what dev brought)
 echo "==> Restoring main's slate"

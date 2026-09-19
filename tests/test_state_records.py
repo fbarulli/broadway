@@ -13,11 +13,12 @@ import importlib.util
 import json
 import re
 import sys
-from pathlib import Path
 
 import pytest
 
-REPO = Path(__file__).resolve().parents[1]
+from broadway.paths import repo_root
+
+REPO = repo_root()
 TOOL = REPO / "agents/tools/state_records.py"
 
 

@@ -13,7 +13,9 @@ import json
 import subprocess
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+from broadway.paths import repo_root
+
+REPO_ROOT = repo_root()
 SCRIPT = REPO_ROOT / "scripts" / "check_e2e_determinism.sh"
 
 # One canonical evaluation-style doc exercising every whitelisted field

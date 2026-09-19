@@ -100,28 +100,107 @@ gate_parity() {
   return "$rc"
 }
 run parity gate_parity
-run ruff    dispatch bash scripts/uv.sh run --extra dev ruff check src tests project/experiments \
-            project/experiments.py \
-            project/working.py project/data.py \
-            scripts
-run mypy    dispatch bash scripts/uv.sh run --extra dev mypy src/broadway
-# Pyright ADVISORY (compare-vs-mypy period): always green by design — reports
-# counts only, never fails. Promote to enforcing only by ruling; see
-# pyrightconfig.json + scripts/pyright_advisory.sh.
-run pyright-advisory bash scripts/pyright_advisory.sh
-run vulture dispatch bash scripts/uv.sh run --extra dev vulture src/broadway project scripts --min-confidence 95
-run configs bash scripts/uv.sh run --extra dev python -c "
+# Parallel static phase — ruff/mypy/pyright-advisory/vulture/configs/shell
+# are independent: launch together, collect in gate order. wall-clock becomes
+# max(gates) instead of sum(gates) (matters on cold caches: mypy cold
+# dominates). pytest stays sequential after: -n 4 already saturates all CPUs
+# and parallel lint would only contend with it.
+# NOTE: background jobs MUST clear the EXIT trap first — with --clean-lint
+# the trap tears down the shared HEAD snapshot, and an inherited trap firing
+# on a job's exit would delete the snapshot under the sibling jobs.
+PARALLEL_LOGDIR="$(mktemp -d "${TMPDIR:-/tmp}/broadway-gates.XXXXXX")"
+run_bg() {  # run_bg <name> <cmd...>: launch in background, log to file
+  local name="$1"; shift
+  # set +e: a failing gate must NOT kill the subshell before the rc write
+  # (set -e is inherited; without this the .rc never lands and collect
+  # dies on the missing file instead of printing FAIL).
+  ( trap - EXIT; set +e; "$@" >"$PARALLEL_LOGDIR/$name.log" 2>&1; echo "$?" >"$PARALLEL_LOGDIR/$name.rc" ) &
+}
+collect() {  # collect <name...>: wait all, emit banners in order, aggregate
+  wait
+  local name rc log
+  for name in "$@"; do
+    log="$PARALLEL_LOGDIR/$name.log"; rc="$(cat "$PARALLEL_LOGDIR/$name.rc")"
+    echo "== $name"
+    if [[ "$rc" -eq 0 ]]; then echo "PASS $name"
+    else echo "FAIL $name — tail:"; tail -40 "$log"; fail=1; fi
+    rm -f "$log" "$PARALLEL_LOGDIR/$name.rc"
+  done
+  rmdir "$PARALLEL_LOGDIR" 2>/dev/null || true
+}
+# shellcheck disable=SC2317  # reached via `run_bg … gate_vulture` indirection
+gate_vulture() {
+  # Main-safe like gate_ruff: vulture errors on missing paths and project/
+  # exists only on the development line.
+  local candidates=(src/broadway project scripts)
+  local paths=()
+  local p
+  for p in "${candidates[@]}"; do [[ -e "$p" ]] && paths+=("$p"); done
+  dispatch bash scripts/uv.sh run --extra dev vulture "${paths[@]}" --min-confidence 95
+}
+# shellcheck disable=SC2317  # reached via `run_bg … gate_ruff` indirection
+gate_ruff() {
+  # Main-safe: project/* paths exist only on the development line — a clean
+  # main checkout is data-agnostic by design, so lint exactly the paths
+  # present (ruff E902s on missing paths). No hardcoded allowlist drift:
+  # the candidate list is the owned surface; existence decides.
+  local candidates=(src tests project/experiments project/experiments.py project/working.py project/data.py scripts)
+  local paths=()
+  local p
+  if [[ $CLEAN_LINT -eq 1 ]]; then
+    ensure_clean_snapshot
+    for p in "${candidates[@]}"; do [[ -e "$CLEAN_SNAP/head/$p" ]] && paths+=("$p"); done
+    ( cd "$CLEAN_SNAP/head" && exec env UV_PROJECT_ENVIRONMENT="$CLEAN_SNAP/venv" bash scripts/uv.sh run --extra dev ruff check "${paths[@]}" )
+    return $?
+  fi
+  for p in "${candidates[@]}"; do [[ -e "$p" ]] && paths+=("$p"); done
+  bash scripts/uv.sh run --extra dev ruff check "${paths[@]}"
+}
+run_bg ruff    gate_ruff
+run_bg mypy    dispatch bash scripts/uv.sh run --extra dev mypy src/broadway
+# Pyright CONSULTANT (strict, advisory-only): always green by design — reports
+# counts only, never fails. Highest strictness surfaces silent errors, data
+# coercion, unexpected behavior, and data drops as advice; mypy enforces.
+# Version/scope resolve from configs/tooling.yaml (SSOT); options live in
+# pyrightconfig.json (strict JSON). Identical on taxi and main via parity.
+# Promote to enforcing only by ruling; see
+# configs/tooling.yaml + pyrightconfig.json + scripts/pyright_advisory.sh.
+run_bg pyright-advisory bash scripts/pyright_advisory.sh
+run_bg vulture gate_vulture
+run_bg configs bash scripts/uv.sh run --extra dev python -c "
 from pathlib import Path
 from broadway.config.loader import load_config
 ps = sorted(Path('configs/experiment').glob('*.yaml')); assert ps, 'no configs'
 [load_config('train', dataset='test', experiment=p.stem) or print(f'OK {p.stem}') for p in ps]"
 # Gate-divergence law: keep command-identical to ci.yml's 'Shell scripts' step.
 # shellcheck disable=SC2016  # single quotes intended: globs must expand under bash -c
-run shell-scripts bash -c 'for f in k8s/optuna/*.sh scripts/*.sh; do bash -n "$f"; done; shellcheck k8s/optuna/*.sh scripts/*.sh'
+run_bg shell-scripts bash -c 'for f in k8s/optuna/*.sh scripts/*.sh; do bash -n "$f"; done; shellcheck k8s/optuna/*.sh scripts/*.sh'
+collect ruff mypy pyright-advisory vulture configs shell-scripts
 if [[ $STATIC -eq 0 && $TIER == "full" ]]; then
-  run pytest bash scripts/uv.sh run --extra dev pytest tests/ -n 4 --dist worksteal \
-             --cov=src/broadway --cov-report=term-missing --cov-fail-under=95
-  run project-tests bash scripts/uv.sh run --extra dev pytest project/tests -q --dist worksteal
+  # Main-branch platform subset: taxi-coupled suites (ledger probes,
+  # state_records, project loader paths) cannot pass where project/ and the
+  # ledger are absent BY DESIGN — the data-agnostic line runs the platform
+  # subset instead. Explicit --tier=full forces the literal gate; the
+  # default full tier on a main checkout subsets automatically. Taxi runs
+  # the literal gate either way.
+  _branch="${GITHUB_REF_NAME:-$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")}"
+  if [[ $SEEN_TIER -eq 0 && "$_branch" == "main" ]]; then
+    echo "== pytest (main-subset: ledger/project-coupled suites excluded by design)"
+    run pytest bash scripts/uv.sh run --extra dev pytest tests/ -n 4 --dist worksteal \
+               --cov=src/broadway --cov-report=term-missing --cov-fail-under=95 \
+               --ignore=tests/test_governance_probes.py \
+               --ignore=tests/test_state_records.py \
+               --ignore=tests/test_project_paths.py \
+               --ignore=tests/test_gate_registry.py
+  else
+    run pytest bash scripts/uv.sh run --extra dev pytest tests/ -n 4 --dist worksteal \
+               --cov=src/broadway --cov-report=term-missing --cov-fail-under=95
+  fi
+  if [[ -d project/tests ]]; then
+    run project-tests bash scripts/uv.sh run --extra dev pytest project/tests -q --dist worksteal
+  else
+    echo "SKIP project-tests (no project/tests on data-agnostic main)"
+  fi
 fi
 if [[ $fail -eq 0 ]]; then
   CL_NOTE=""

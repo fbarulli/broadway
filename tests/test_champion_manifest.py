@@ -31,6 +31,7 @@ from sklearn.linear_model import LinearRegression
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder
 
+from broadway.paths import repo_root
 from broadway.training.mlflow_utils import (
     AMBIGUOUS,
     BARE_MODEL,
@@ -42,7 +43,7 @@ from broadway.training.mlflow_utils import (
 )
 from broadway.training.models.pyfunc_wrapper import ModelPyFunc
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = repo_root()
 SCRIPT = REPO_ROOT / "scripts" / "check_champion_manifest.sh"
 
 

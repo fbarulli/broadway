@@ -6,10 +6,18 @@ import os
 import re
 import subprocess
 import sys
-from pathlib import Path
 
-REPO = Path(__file__).resolve().parents[1]
+import pytest
+
+from broadway.paths import repo_root
+
+REPO = repo_root()
 EXPECTED_COMMANDS = {"ols", "diagnostics", "qq_legend", "verify"}
+
+pytestmark = pytest.mark.skipif(
+    not (REPO / "project" / "experiments.py").exists(),
+    reason="taxi-only: data-agnostic main carries no project/",
+)
 
 
 def _help_result() -> subprocess.CompletedProcess[str]:
@@ -33,7 +41,7 @@ def test_help_lists_exact_dispatcher_commands() -> None:
 
 
 def test_dispatcher_uses_project_configured_data_and_results_paths() -> None:
-    source = (REPO / "project/experiments.py").read_text(encoding="utf-8")
+    source = (REPO / "project" / "experiments.py").read_text(encoding="utf-8")
     assert 'ROOT / "data"' not in source
     assert 'PATHS.results / "ols"' in source
     assert 'PATHS.results / "diagnostics"' in source

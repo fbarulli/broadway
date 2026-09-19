@@ -22,6 +22,9 @@ agent deletes on sight and repeat offenses are a lane-failure class.
 - Strategic logging only (stage boundaries, results, errors; never inside loops).
 - Catch exceptions only when recoverable; let everything else bubble up.
 - YAML = single source of truth: no `get(key, default)`, no hardcoded values.
+- Tool values resolve from `configs/tooling.yaml`; the shared surface resolves from `scripts/main_whitelist.txt` — never inline a version, scope, or path list a script should read.
+- Deterministic methods only: repeated manual changes route through `scripts/promote_to_main.sh`, `scripts/main_day_sync.sh`, `scripts/check_branch_parity.sh`, `scripts/pyright_advisory.sh`, `scripts/run_local_ci.sh` — never hand-run the underlying git/checker sequence.
+- Pyright is consultant-only (strict, advisory, never blocking); `mypy` enforces. Do not gate acceptance on pyright counts; do fix pyright-surfaced silent-error/coercion/drop finds when cheap.
 - ~25-line functions; single responsibility; no dead/noise code.
 - Derive, don't maintain: never store state that can be computed from the
   tree/records at render time. The platform derives; it does not store
@@ -29,7 +32,7 @@ agent deletes on sight and repeat offenses are a lane-failure class.
 
 ## Branch-composition boundary
 
-`main` is the data-agnostic shared platform; `sklearn` is the active project
+`main` is the data-agnostic shared platform; `taxi` is the active project
 line. The migration target is that a development branch's only tracked-tree
 delta from `main` is `project/**`: project-specific configs, experiments,
 reports, docs, and binding tests live there. `src/`, generic tests, CI,

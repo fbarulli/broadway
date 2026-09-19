@@ -1,0 +1,29 @@
+# main_whitelist.txt — THE shared surface between taxi (track) and main.
+# Single source of truth: read by scripts/check_branch_parity.sh (SHARED),
+# scripts/main_day_sync.sh (checkout list) and scripts/promote_to_main.sh.
+# One path per line; '#' comments and blank lines ignored.
+# Anything NOT listed is deliberately taxi-only or main-only. Main-owned
+# slate (README.md, GOVERNANCE-POINTER.md, BROADWAY.md, root contracts) is
+# NEVER listed — main's blank-slate README differs from taxi's by design.
+# Taxi-only bindings (project/, reports/, readmore/, read.md, synth.md,
+# TODO.md, project.md, experiments/, agents/ledger) must NEVER be added.
+src/
+tests/
+demo/
+configs/
+agents/contracts/
+agents/tools/
+scripts/
+k8s/
+docker/
+.github/workflows/
+pyproject.toml
+uv.lock
+pyrightconfig.json
+Dockerfile
+docker-compose.yml
+.python-version
+.env.example
+HPO_TRAINING.md
+.gitignore
+.dockerignore

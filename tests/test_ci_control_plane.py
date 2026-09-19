@@ -7,7 +7,9 @@ import shutil
 import subprocess
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+from broadway.paths import repo_root
+
+REPO_ROOT = repo_root()
 
 
 def test_vulture_finding_makes_static_ci_red(tmp_path: Path) -> None:

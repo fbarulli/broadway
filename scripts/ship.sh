@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# ship.sh — THE push path. Full tier gates; exit codes decide; no prose parsing.
+# ship.sh — THE push path. Fast-tier gates every push (FULL runs in CI);
+# exit codes decide; no prose parsing.
 # Born from two push-on-red recurrences (2026-08-24): keyword-grep gating and
 # unconditional newline-chained pushes. This wrapper makes both impossible:
-# the push lines execute ONLY if run_local_ci.sh exits 0.
+# the push lines execute ONLY if run_local_ci.sh --tier=fast exits 0.
 #
 # Usage: bash scripts/ship.sh [remote] [refspec...]   (default: origin +refs/heads/taxi)
 set -euo pipefail
@@ -20,8 +21,8 @@ REMOTE="${1:-origin}"; shift || true
 REFSPECS=("$@")
 [ ${#REFSPECS[@]} -eq 0 ] && REFSPECS=("taxi:taxi")
 
-echo "== ship.sh: full tier gates every push =="
-if ! bash scripts/run_local_ci.sh; then
+echo "== ship.sh: fast-tier gates every push (FULL runs in CI) =="
+if ! bash scripts/run_local_ci.sh --tier=fast; then
   echo "" >&2
   echo "SHIP REFUSED: LOCAL-CI RED. Fix above. No flag exists to override this;" >&2
   echo "raw 'git push' is a policy violation (MAIN_AGENT_CONTRACT §push-custody)." >&2

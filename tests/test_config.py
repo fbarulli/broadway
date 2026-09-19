@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 import yaml
 from pydantic import ValidationError
@@ -19,6 +17,7 @@ from broadway.config.schema import (
     SplitConfig,
     TrainStep,
 )
+from broadway.paths import repo_root
 
 
 @pytest.fixture
@@ -225,9 +224,13 @@ def test_hpo_configs_parse() -> None:
 
     from broadway.config.schema import HPOConfig
 
+    taxi_hpo = repo_root() / "project" / "config" / "experiments" / "mlflow.yaml"
+    if not taxi_hpo.exists():
+        pytest.skip("taxi-only: data-agnostic main carries no project/")
+
     for path in (
-        Path(__file__).resolve().parents[1] / "configs" / "experiment" / "hyperopt.yaml",
-        Path(__file__).resolve().parents[1] / "project" / "config" / "experiments" / "mlflow.yaml",
+        repo_root() / "configs" / "experiment" / "hyperopt.yaml",
+        taxi_hpo,
     ):
         raw = yaml.safe_load(path.read_text())
         assert "hpo" in raw, f"{path.name} missing hpo block"

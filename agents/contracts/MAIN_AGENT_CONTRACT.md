@@ -18,6 +18,10 @@ The main agent is responsible for orchestration and verification. It does not si
 
 Only data-agnostic changes may be promoted to `main`.
 
+The legacy `project/etl` twin is retired (2026-09-19; see `agents/ledger/gates.yaml`
+`retired:`) — the `src/broadway` contract pipeline is the only ingest; do not
+resurrect the twin or its deleted `project/tests/*` suites.
+
 Development branches are not required to be byte-identical to `main`. The governing invariant is that `main` remains clean and data-agnostic.
 
 The definition and enforcement of main cleanliness live in the repository's main-cleanliness SSOT.
@@ -135,7 +139,8 @@ Use the repository's declared validation tools rather than substituting informal
 For Python/code changes, select the applicable checks from the gate registry and run the required tools, including as applicable:
 
 * `ruff` for lint/static correctness
-* `mypy` for type checking
+* `mypy` for type checking (ENFORCING)
+* `pyright` as CONSULTANT (highest strictness, advisory-only, never blocking): `pyrightconfig.json` sets `typeCheckingMode: strict` plus explicit data-safety diagnostics (Optional-access, coercion, return/assignment rules) to surface silent errors, data coercion, unexpected behavior, and data drops as advice; `scripts/pyright_advisory.sh` resolves version/scope from `configs/tooling.yaml` and always exits 0; identical config on `taxi` and `main` via the parity surface
 * `vulture` for unused/dead-code detection
 * `pytest` with the required coverage threshold
 * project-specific tests and probes
@@ -144,7 +149,7 @@ For Python/code changes, select the applicable checks from the gate registry and
 * Kubernetes/infrastructure validation where applicable
 * graph/import checks where structural relationships change
 
-Do not omit a registered gate because a change appears small if that gate owns the affected surface.
+No hardcoded tool values: every version, scope, and surface list resolves from `configs/tooling.yaml` (SSOT) and `scripts/main_whitelist.txt` (shared-surface SSOT). Starting a new project means editing `configs/` — never `scripts/`. Do not omit a registered gate because a change appears small if that gate owns the affected surface.
 
 ## 10. Gates
 
@@ -155,6 +160,8 @@ Required landing gates are determined by the current gate registry and contract.
 The normal platform gate includes the repository's registered lint, type, dead-code, configuration, shell, test, and coverage checks. `vulture` is part of the required validation where owned by the gate set.
 
 A failing gate blocks the commit or push.
+
+Deterministic-ops law: every repeated manual change routes through its script — never hand-run the underlying sequence. `scripts/promote_to_main.sh` (dry-run default; `--execute --main-worktree <path>` for the sync), `scripts/main_day_sync.sh` (whitelist resync inside a clean `main` checkout), `scripts/check_branch_parity.sh` (custody + drift), `scripts/pyright_advisory.sh` (consultant report), `scripts/run_local_ci.sh` (landing gate). All three branch scripts read the same `scripts/main_whitelist.txt` via `configs/tooling.yaml`; anchor bumps land on `taxi` only.
 
 Never bypass a failing gate merely to land work.
 
@@ -243,7 +250,12 @@ The main agent verifies before commit:
 
 No unrelated changes are silently included in a commit.
 
-Every landing commit uses the repository's current commit-trailer convention.
+Every landing commit uses the repository's current commit-trailer convention,
+including the `Tier:` trailer (`FULL|FAST|STATIC|DOCS`) enforced by
+`scripts/tier_gate.sh` on every push (pre-push hook and `scripts/ship.sh`
+gate the exact unpushed batch; `FULL` additionally needs a resolvable
+`Reviewer:` verdict id). Tooling batches land as `Tier: FAST`; local pushes
+run the fast tier, the full tier runs in CI.
 
 A push is performed only after the required local gates pass.
 

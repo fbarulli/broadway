@@ -14,9 +14,10 @@ from broadway.config.loader import load_config
 from broadway.lineage import records
 from broadway.lineage.models import SampleSpec
 from broadway.lineage.sample import load_sample
+from broadway.paths import repo_root
 from broadway.stats import describe as describe_module
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = repo_root()
 
 
 def test_sample_spec_validation() -> None:

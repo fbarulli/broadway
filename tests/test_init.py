@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import shutil
-from pathlib import Path
 
 import pandas as pd
 import pytest
@@ -9,8 +8,9 @@ import yaml
 
 from broadway.lineage import records
 from broadway.onboard import module
+from broadway.paths import repo_root
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = repo_root()
 
 
 def _write_csv(path) -> str:

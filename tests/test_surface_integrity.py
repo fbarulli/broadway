@@ -14,7 +14,9 @@ import re
 import subprocess
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+from broadway.paths import repo_root
+
+REPO_ROOT = repo_root()
 REPORTS_DIR = REPO_ROOT / "reports"
 
 HTML_CAP_BYTES = 5 * 1024 * 1024

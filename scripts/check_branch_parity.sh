@@ -38,32 +38,37 @@ elif [[ -n "${1:-}" ]]; then
 fi
 
 # The intended shared surface — paths that must be byte-identical on both
-# branches. Keep this list explicit: anything NOT listed is deliberately
-# taxi-only or main-only. Main-owned slate (README.md, GOVERNANCE-POINTER.md,
-# BROADWAY.md, root contracts) is NEVER shared — main's blank-slate README
-# differs from taxi's by design. Mirrors scripts/main_day_sync.sh WHITELIST.
-SHARED=(
-  src/
-  tests/
-  demo/
-  configs/
-  agents/contracts/
-  agents/tools/
-  scripts/
-  k8s/
-  docker/
-  .github/workflows/
-  pyproject.toml
-  uv.lock
-  pyrightconfig.json
-  Dockerfile
-  docker-compose.yml
-  .python-version
-  .env.example
-  HPO_TRAINING.md
-  .gitignore
-  .dockerignore
-)
+# branches. SINGLE SOURCE: scripts/main_whitelist.txt (via
+# configs/tooling.yaml shared_surface.file). Nothing is listed inline here —
+# anything NOT listed is deliberately taxi-only or main-only. Main-owned
+# slate (README.md, GOVERNANCE-POINTER.md, BROADWAY.md, root contracts) is
+# NEVER shared — main's blank-slate README differs from taxi's by design.
+# Deterministic law: this checker, main_day_sync.sh, and promote_to_main.sh
+# ALL read the same whitelist file; editing the surface means editing that
+# file, never a second inline list.
+SHARED=()
+_WHITELIST_FILE="$(python3 -c 'import yaml; print(yaml.safe_load(open("configs/tooling.yaml"))["shared_surface"]["file"])' 2>/dev/null || echo scripts/main_whitelist.txt)"
+_WHITELIST_CONTENT=""
+if [[ -f "$_WHITELIST_FILE" ]]; then
+  _WHITELIST_CONTENT="$(<"$_WHITELIST_FILE")"
+elif git cat-file -e "origin/taxi:$_WHITELIST_FILE" 2>/dev/null; then
+  # Old checkout (e.g. pre-sync main) lacking the whitelist: read it from
+  # the track ref instead of failing — the surface definition always exists
+  # on taxi. Local file wins when present.
+  _WHITELIST_CONTENT="$(git show "origin/taxi:$_WHITELIST_FILE")"
+else
+  echo "FATAL: shared-surface whitelist not found: $_WHITELIST_FILE (see configs/tooling.yaml)" >&2
+  exit 1
+fi
+while IFS= read -r _line || [[ -n "$_line" ]]; do
+    _line="${_line%%#*}"
+    _line="${_line%"${_line##*[![:space:]]}"}"
+    _line="${_line#"${_line%%[![:space:]]*}"}"
+    [[ -z "$_line" ]] && continue
+    SHARED+=("$_line")
+done <<< "$_WHITELIST_CONTENT"
+# scripts/ — parity self-coverage marker (checker lives under scripts/, the
+# whitelist file lives under scripts/, so scripts/ must be on the surface).
 
 check() {
   local drifted=0
@@ -84,26 +89,12 @@ check() {
 }
 
 sync_to_main() {
-  local path
+  # CONSOLIDATED 2026-09-19: one sync implementation lives in
+  # scripts/main_day_sync.sh (whitelist SSOT, slate restore, taxi-only
+  # cleanup); this entry point delegates so the logic cannot drift apart.
+  # Prefer scripts/promote_to_main.sh --execute, which wraps sync + gates.
   # Main-day only: run from a clean checkout of main against latest origin/taxi.
-  if [[ "$(git symbolic-ref --short HEAD)" != "main" ]]; then
-    echo "REFUSED: --sync must run from a clean main checkout" >&2
-    exit 1
-  fi
-  git fetch origin taxi
-  git checkout origin/taxi -- "${SHARED[@]}"
-  # Main-owned slate is not shared — restore it in case the track line grew
-  # a same-named file.
-  git checkout origin/main -- README.md GOVERNANCE-POINTER.md BROADWAY.md \
-    AGENT_CONTRACT.md AGENT_WORKER_CONTRACT.md CONTRACT_TEMPLATE.md 2>/dev/null || true
-  # Deletions do not propagate with checkout — mirror them too.
-  local f
-  while IFS= read -r f; do
-    if ! git cat-file -e "origin/taxi:$f" 2>/dev/null; then
-      git rm -f --ignore-unmatch "$f" >/dev/null 2>&1 || true
-    fi
-  done < <(git diff --name-only --diff-filter=AD "origin/main" "origin/taxi" -- "${SHARED[@]}" || true)
-  echo "SYNCED taxi -> main for shared surface. Review, run gates, commit, push."
+  exec bash "$(dirname "$0")/main_day_sync.sh"
 }
 
 # --- Era declaration INLINE (D21: no separate env file, zero SHARED lines) ---
@@ -115,7 +106,7 @@ sync_to_main() {
 PARITY_ERA=dev                 # dev: taxi active, main frozen | main: lockstep day
 PARITY_TRACK_BRANCH=taxi       # active development line during dev era
 PARITY_ALLOWLIST=()            # SHARED paths exempt from custody; extend only by cited ruling
-PARITY_MAIN_ANCHOR=e813605867a380ca06950a9b4e256ec9bc5dfd1a  # re-anchored 2026-09-19: track-side anchor follows the ratified sync tip; anchor bumps live on taxi only (syncing one to main would itself read as drift)
+PARITY_MAIN_ANCHOR=eae82c8556c467f1fbc7ee2b0cc0d9ebdb36df7b  # re-anchored 2026-09-19: track-side anchor follows the ratified sync tip; anchor bumps live on taxi only (syncing one to main would itself read as drift)
 
 # Preserved validations (D16 rider). The old ENV_FILE readability test,
 # `source`, ${VAR:?} trio, and declare -p existence check are DEAD here —
