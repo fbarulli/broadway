@@ -88,6 +88,15 @@ jobs:
           sed 's/{{[^}]*}}/ci-placeholder/g' k8s/train-job.yaml \
             > "${RUNNER_TEMP}/manifests/train-job.yaml"
 
+          manifests=(k8s/optuna/ k8s/api-deployment.yaml k8s/mlflow-deployment.yaml k8s/postgres-deployment.yaml /rendered/train-job.yaml)
+          # The optuna project stack is project-owned: include it only on
+          # lines carrying project/, otherwise validate platform manifests.
+          if [ -f project/k8s/optuna/configmap.yaml ]; then
+            manifests+=(project/k8s/optuna/configmap.yaml)
+          else
+            echo "NOTICE: project stack absent on this line — kubeconform covers platform manifests only"
+          fi
+
           docker run --rm \
             -v "$PWD:/work" \
             -v "${RUNNER_TEMP}/manifests:/rendered" \
@@ -96,12 +105,7 @@ jobs:
             -strict \
             -summary \
             -ignore-filename-pattern "kind-config\\.yaml" \
-            k8s/optuna/ \
-            project/k8s/optuna/configmap.yaml \
-            k8s/api-deployment.yaml \
-            k8s/mlflow-deployment.yaml \
-            k8s/postgres-deployment.yaml \
-            /rendered/train-job.yaml
+            "${manifests[@]}"
 
       # CI-only — named in scripts/run_local_ci.sh header.
       # Orchestrator dry-run: render the worker Jobs for the HPO spec's models

@@ -1258,7 +1258,7 @@ TOKEN_BASELINE = frozenset({
     "set", "for", "do", "done", "if", "fi", "else", "while", "[",
     "gzip", "import", "from", "cfg",
     "hpo", "assert", "print('config", 'ref="${{', 'registry="ghcr.io/${{',
-    "manifest=\"${{", "exit", "printf", ":",
+    "manifest=\"${{", "manifests=(", "manifests=(k8s/optuna/",     "manifests+=(project/k8s/optuna/configmap.yaml)", "exit", "printf", ":",
     (
         "Path('/app/project/"
         "config/experiments/mlflow.yaml').read_text())['hpo'])"
