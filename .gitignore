@@ -13,6 +13,12 @@ build/
 data/raw/
 data/processed/
 data/samples/
+# STATE-20260921-004 custody: artifacts/tracking/ is the ignored machine truth
+# (data_manifest.json + baseline_stats.json written by 001/002 writers, owned
+# by the etl/train steps). The published surface is tracked
+# reports/tracking/ (data_card.md + rendered summaries via the report/audit
+# renderer pattern) plus MLflow run artifacts on the train run (mlruns/ stays
+# local-only). Do NOT add negations for artifacts/tracking/ here.
 artifacts/
 /results/
 project/experiments/results/**

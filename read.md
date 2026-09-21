@@ -27,7 +27,14 @@ You cannot monitor production drift if you don't save the "truth" of what the mo
 | **Lineage Graph** | `graph.json` + `graph.md` | Mermaid diagram and JSON mapping of: Raw Data → Cleaned Data → Features → Model. |
 | **Data Card / Fact Sheet** | `data_card.md` | High-level summary: Date range, known biases, exclusions, and missingness rates. |
 
-**Where it lives:** `artifacts/tracking/`
+**Where it lives (STATE-20260921-004 custody):** machine truth
+`artifacts/tracking/{data_manifest.json,baseline_stats.json}` (git-ignored,
+written by the etl/train-side writers); published surface
+`reports/tracking/data_card.md` (git-tracked, pure-render from the ignored
+JSONs via the report/audit renderer pattern — never recomputed there) plus
+the same files as MLflow run artifacts on the train run (`mlruns/` stays
+local-only). No new `ds-pipeline` step; sibling writers (001/002) own the
+JSONs, the train hook (003, `log_datasets`) owns the MLflow copy.
 
 ---
 

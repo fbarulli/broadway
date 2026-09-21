@@ -1,3 +1,6 @@
+# STATE-20260921-004 custody: train logs the artifacts/tracking/ bundle copy
+# as MLflow run artifacts (see log_datasets hook, 003); artifacts/tracking/
+# stays git-ignored, reports/tracking/ stays the tracked published surface.
 random_state: 42
 n_jobs: -1
 cv_folds: 5
