@@ -1,0 +1,36 @@
+%% SNAPSHOT (point-in-time, manual) — NOT generated. STATE-20260921-005.
+%% Scope: ETL internals for taxi (loader -> join audit -> lookup-value audit
+%%   -> canonicalize -> parquet -> lineage record), with file:line citations.
+%% The generated lineage graph is the SSOT for analysis-level provenance:
+%%   reports/lineage/graph.{json,md} via `ds-pipeline lineage`
+%%   (see src/broadway/lineage/module.py, mermaid.py).
+%% Do not update this file to track pipeline changes; regenerate from lineage
+%% or delete it if it drifts.
+flowchart LR
+    %% sources loader.py load_with_audit plus join_audit.py plus cleaner.py plus etl module.py plus lineage ids.py records.py models.py plus gates.yaml GATE-ETL-13 plus GATE-ETL-14 plus etl_taxi.json plus join_taxi.json plus lookup_value_taxi.json plus ingest_taxi.json
+    %% raw node cites src/broadway/data/loader.py lines 18-23 READERS plus line 129 single read
+    raw["raw file dataset.path csv parquet xlsx xls"]
+    %% load node cites src/broadway/data/loader.py line 124 load_with_audit plus line 25 MERGE HOW left plus line 29 LOOKUP SUFFIX lookup
+    load["load with audit left merge suffix lookup"]
+    %% joinaudit node cites src/broadway/data/join_audit.py lines 9-19 JoinAudit plus gates.yaml GATE-ETL-13 plus artifact data/processed/taxi_join_audit.json from join_taxi.json
+    joinaudit["JoinAudit rows attempted matched unmatched null keys unmatched rate"]
+    %% valueaudit node cites src/broadway/data/lookup_value_audit.py lines 9-25 LookupValueAudit plus gates.yaml GATE-ETL-14 plus artifact data/processed/taxi_lookup_value_audit.json from lookup_value_taxi.json
+    valueaudit["LookupValueAudit null count sentinel counts affected rows affected rate"]
+    %% canon node cites src/broadway/data/cleaner.py lines 47-75 canonicalize plus src/broadway/etl/module.py lines 82-90 canonicalize call
+    canon["canonicalize duplicates first then target null drop"]
+    %% parquet node cites src/broadway/data/loader.py lines 112-117 canonical path plus src/broadway/etl/module.py line 98 to parquet plus artifact data/processed/taxi_canonical.parquet from etl_taxi.json
+    parquet["taxi canonical parquet 8545665 rows out"]
+    %% lineage node cites src/broadway/lineage/records.py lines 19-40 write record plus src/broadway/lineage/ids.py lines 1-2 node id plus src/broadway/lineage/models.py lines 73-83 TransformAudit plus record etl_taxi.json rows in 8545833 rows out 8545665
+    lineage["etl taxi record 8545833 in 8545665 out 168 dropped 0 unexplained"]
+    %% edge raw to load cites src/broadway/data/loader.py line 129 READERS ext path
+    raw -->|single read of dataset.path by suffix| load
+    %% edge load to joinaudit cites src/broadway/data/loader.py line 135 audit join before merge plus src/broadway/data/join_audit.py lines 27-44 isin matched plus artifact data/processed/taxi_join_audit.json
+    load -->|pre merge isin count to taxi join audit json| joinaudit
+    %% edge joinaudit to valueaudit cites src/broadway/data/lookup_value_audit.py line 41 matched mask notna plus src/broadway/etl/module.py lines 163-167 lookup value parent join plus artifact data/processed/taxi_lookup_value_audit.json
+    joinaudit -->|matched mask notna to taxi lookup value audit json| valueaudit
+    %% edge valueaudit to canon cites src/broadway/etl/module.py lines 68-70 rows in len df plus etl_taxi.json columns before 15 cols Borough Zone service zone plus merged names lookup suffix rule loader.py line 137
+    valueaudit -->|merged frame 15 cols Borough Zone service zone onward| canon
+    %% edge canon to parquet cites src/broadway/data/cleaner.py line 51 duplicates minus N rows plus line 75 null target minus N rows plus etl_taxi.json reasons duplicates minus 168 rows
+    canon -->|duplicates minus 168 rows grammar dash N rows| parquet
+    %% edge parquet to lineage cites src/broadway/etl/module.py lines 114-127 TransformAudit plus lines 171-177 write record etl taxi parent join taxi plus src/broadway/lineage/records.py lines 43-51 enforce drop fraction
+    parquet -->|TransformAudit write etl taxi parent join taxi| lineage
