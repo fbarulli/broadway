@@ -78,7 +78,7 @@ data_card.md
 
 High-level summary: Date range, known biases, exclusions, and missingness rates.
 
-Where it lives: artifacts/tracking/
+Where it lives (STATE-20260921-004 custody): machine truth `artifacts/tracking/{data_manifest.json,baseline_stats.json}` (git-ignored, written by the etl/train-side writers); published surface `reports/tracking/data_card.md` (git-tracked, pure-render from the ignored JSONs via the report/audit renderer pattern) plus the same files as MLflow run artifacts on the train run (`mlruns/` stays local-only).
 
 3. The DS Bundle (The Story & Logic)
 
@@ -551,11 +551,11 @@ Suggestions are de-prescribed: `suggest.py` emits
 
 pre-filled method), and the post-hoc gate adds `--kind posthoc`.
 
-### Git-track policy
+### Git-track policy (STATE-20260921-004 custody)
 
-- Tracked: `reports/**` (index.md, results/*.md, figures/*.png, lineage/graph.md + graph.json).
+- Tracked: `reports/**` (index.md, results/*.md, figures/*.png, lineage/graph.md + graph.json, tracking/data_card.md + rendered tracking summaries).
 
-- Ignored: `artifacts/`, `data/raw/`, `data/processed/` (machine evidence + caches).
+- Ignored: `artifacts/` (machine evidence + caches — including `artifacts/tracking/{data_manifest.json,baseline_stats.json}`, the ignored machine truth the tracked `reports/tracking/` surface renders from), `data/raw/`, `data/processed/`, `mlruns/` (local-only MLflow run artifacts, including the train-run copy of the tracking bundle).
 
 ---
 
@@ -735,7 +735,10 @@ change required.
 
 Typed step outputs follow `artifacts/<step>/` and reports follow
 
-`reports/`.
+`reports/`. Tracking-bundle custody (STATE-20260921-004): writers emit the
+ignored machine truth to `artifacts/tracking/`; a pure-render report step
+publishes the tracked `reports/tracking/` surface; the train run additionally
+logs the bundle as MLflow run artifacts.
 
 ---
 

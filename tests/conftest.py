@@ -9,6 +9,22 @@ _SNAPSHOT_DIRS = ["artifacts", "reports"]
 _snapshot: dict[str, dict[str, str]] = {}
 
 
+@pytest.fixture(autouse=True)
+def _isolate_tracking_dir(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Redirect the tracking bundle out of the shared tree.
+
+    The etl manifest writer resolves its output from BROADWAY_TRACKING_DIR
+    at call time (default: artifacts/tracking). Any test running etl for
+    real — e.g. the onboarding e2e full-pipeline run — would otherwise write
+    artifacts/tracking/data_manifest.json into the repo tree and trip the
+    sessionfinish custody guard below. Tests that need an explicit location
+    keep overriding the env var themselves.
+    """
+    monkeypatch.setenv("BROADWAY_TRACKING_DIR", str(tmp_path / "tracking"))
+
+
 def _tree_hashes(root: Path) -> dict[str, str]:
     out: dict[str, str] = {}
     if not root.is_dir():
@@ -19,8 +35,7 @@ def _tree_hashes(root: Path) -> dict[str, str]:
     return out
 
 
-def pytest_sessionstart(session: pytest.Session) -> None:
-    # XDIST-1b amendment (a): custody snapshot is controller-only. Under xdist,
+def pytest_sessionstart(session: pytest.Session) -> None:    # XDIST-1b amendment (a): custody snapshot is controller-only. Under xdist,
     # workers execute session hooks too; a worker-side RuntimeError here would
     # surface as noisy internal_error (xdist remote.py hookwrapper path).
     if hasattr(session.config, "workerinput"):  # xdist worker -> skip

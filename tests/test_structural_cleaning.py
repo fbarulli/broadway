@@ -199,6 +199,7 @@ def test_etl_module_writes_canonical_and_result(
         }
     )
     monkeypatch.setattr(records, "LINEAGE_DIR", tmp_path / "lineage")
+    monkeypatch.setenv("BROADWAY_TRACKING_DIR", str(tmp_path / "tracking"))
 
     columns = dict(cfg.dataset.columns)
     columns["listed_at"] = ColumnSchema(
@@ -269,6 +270,7 @@ def test_etl_parent_defaults_to_dataset(tmp_path: Path, monkeypatch) -> None:
         }
     )
     monkeypatch.setattr(records, "LINEAGE_DIR", tmp_path / "lineage")
+    monkeypatch.setenv("BROADWAY_TRACKING_DIR", str(tmp_path / "tracking"))
     monkeypatch.setattr(etl_module, "load_with_audit", lambda dataset: (_simple_df(cfg).copy(), [], []))
 
     etl_module.run(cfg)
@@ -287,6 +289,7 @@ def test_etl_parent_ingest_when_present(tmp_path: Path, monkeypatch) -> None:
         }
     )
     monkeypatch.setattr(records, "LINEAGE_DIR", tmp_path / "lineage")
+    monkeypatch.setenv("BROADWAY_TRACKING_DIR", str(tmp_path / "tracking"))
     records.write_record(
         node_id("ingest", "test"),
         "ingest",
@@ -312,6 +315,7 @@ def test_etl_ci_sampling_gated(tmp_path: Path, monkeypatch) -> None:
         }
     )
     monkeypatch.setattr(records, "LINEAGE_DIR", tmp_path / "lineage")
+    monkeypatch.setenv("BROADWAY_TRACKING_DIR", str(tmp_path / "tracking"))
 
     feats, target = frame_slots(cfg.dataset)
     df = pd.DataFrame(
@@ -347,6 +351,7 @@ def test_etl_with_lookups_writes_join_audit(tmp_path: Path, monkeypatch) -> None
         }
     )
     monkeypatch.setattr(records, "LINEAGE_DIR", tmp_path / "lineage")
+    monkeypatch.setenv("BROADWAY_TRACKING_DIR", str(tmp_path / "tracking"))
 
     feats, target = frame_slots(cfg.dataset)
     raw_path = tmp_path / "raw.csv"

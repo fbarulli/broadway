@@ -1,3 +1,8 @@
+# STATE-20260921-004 custody: the etl/train-side tracking writers (001/002)
+# emit ignored machine truth to artifacts/tracking/{data_manifest.json,
+# baseline_stats.json}; the tracked reports/tracking/ surface + MLflow
+# run-artifact copy are published downstream (report renderer / train hook),
+# never here.
 ci_sample_size: 50000
 max_drop_fraction: 0.1
 random_state: 42

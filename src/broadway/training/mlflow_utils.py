@@ -89,27 +89,14 @@ def log_metadata(metadata: dict[str, float]) -> None:
     mlflow.log_metrics(metadata)
 
 
-def log_dataset(dataset_id: str, source_path: str, context: str = "train") -> None:
-    """Log a dataset id and, when the parquet source exists, its lineage.
+def _local_source(path: str) -> Any:
+    """Build an already-resolved local DatasetSource for *path*.
 
-    MLflow 3.x removed ``mlflow.data.from_parquet``; the parquet lineage is
-    recorded via ``from_pandas`` with the file path as the dataset source.
-    A missing source is recoverable: a warning is logged and logging continues.
+    MLflow 3.15.1 registers LocalArtifactDatasetSource twice under the same
+    name, so resolving any local path string warns "interpreted in multiple
+    ways". We bypass resolve() by handing from_pandas an already-built
+    DatasetSource; this is the registry class name it must be looked up by.
     """
-    mlflow.log_params({"dataset_id": dataset_id})
-    path = Path(source_path)
-    if not path.exists():
-        logger.warning("dataset source not found, skipping lineage: %s", source_path)
-        return
-    df = pd.read_parquet(path)
-    # The duplicate-registration warning is bypassed by handing from_pandas an
-    # already-built DatasetSource. Integer columns in the recorded dataset
-    # schema warn as well and are re-declared float64 — not because they may
-    # carry missing values (the dtype trace proves the opposite: every int
-    # column is null-free by construction), but because this record is lineage
-    # metadata with no enforcement semantics: float64 is lossless there and
-    # avoids the hint at its second emission site without any suppression.
-    # This affects only the dataset lineage record — not the model artifact.
     # mlflow's stub types registry items as the base DatasetSource while the
     # registry returns concrete classes; Any bridges the stub.
     sources: Any = get_registered_sources()
@@ -127,9 +114,66 @@ def log_dataset(dataset_id: str, source_path: str, context: str = "train") -> No
     # disambiguation hint for an already-built source and any same-named local
     # source resolves identically; revisit if mlflow's registry grows distinct
     # classes sharing a name.
+    return local_source(path)
+
+
+def _log_frame_lineage(df: pd.DataFrame, path: Path, context: str) -> None:
+    # Integer columns in the recorded dataset schema warn as well and are
+    # re-declared float64 — not because they may carry missing values (the
+    # dtype trace proves the opposite: every int column is null-free by
+    # construction), but because this record is lineage metadata with no
+    # enforcement semantics: float64 is lossless there and avoids the hint at
+    # its second emission site without any suppression. This affects only the
+    # dataset lineage record — not the model artifact.
     df = df.astype({col: "float64" for col in df.select_dtypes("integer").columns})
-    dataset = mlflow.data.from_pandas(df, source=local_source(str(path)))  # type: ignore[attr-defined]
+    dataset = mlflow.data.from_pandas(df, source=_local_source(str(path)))  # type: ignore[attr-defined]
     mlflow.log_input(dataset, context=context)
+
+
+def log_dataset(dataset_id: str, source_path: str, context: str = "train") -> None:
+    """Log a dataset id and, when the parquet source exists, its lineage.
+
+    MLflow 3.x removed ``mlflow.data.from_parquet``; the parquet lineage is
+    recorded via ``from_pandas`` with the file path as the dataset source.
+    A missing source is recoverable: a warning is logged and logging continues.
+    """
+    mlflow.log_params({"dataset_id": dataset_id})
+    path = Path(source_path)
+    if not path.exists():
+        logger.warning("dataset source not found, skipping lineage: %s", source_path)
+        return
+    df = pd.read_parquet(path)
+    _log_frame_lineage(df, path, context)
+
+
+def log_datasets(
+    dataset_id: str,
+    train_df: pd.DataFrame,
+    train_source: str | None,
+    val_df: pd.DataFrame | None = None,
+    val_source: str | None = None,
+) -> None:
+    """Log dataset lineage from already-loaded in-memory frames (D9).
+
+    Same lineage record as :func:`log_dataset` but without the second parquet
+    read + float64 recast cost: the caller hands over the frames training
+    already uses. ``train_source``/``val_source`` are the persisted paths the
+    frames were loaded from, kept as the lineage source string only — the
+    files are never re-read. A missing/``None`` source is recoverable per
+    frame: a warning is logged and logging continues (existing pattern).
+    """
+    mlflow.log_params({"dataset_id": dataset_id})
+    frames: tuple[tuple[pd.DataFrame | None, str | None, str], ...] = (
+        (train_df, train_source, "train"),
+        (val_df, val_source, "eval"),
+    )
+    for df, source, context in frames:
+        if df is None:
+            continue
+        if source is None or not Path(source).exists():
+            logger.warning("dataset source not found, skipping lineage: %s", source)
+            continue
+        _log_frame_lineage(df, Path(source), context)
 
 
 def log_model(model: Any, artifact_path: str, signature: ModelSignature | None = None) -> str:
