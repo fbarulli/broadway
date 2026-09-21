@@ -21,6 +21,7 @@ from broadway.lineage.ids import node_id
 from broadway.lineage.records import write_record
 from broadway.training.hpo import run_hpo
 from broadway.training.mlflow_utils import (
+    log_datasets,
     log_metrics,
     log_model,
     log_params,
@@ -113,6 +114,18 @@ def run(cfg: PipelineConfig) -> None:
                 for key, value in cfg.experiment.data_source.model_dump().items()
                 if value is not None
             }
+        )
+        # Dataset lineage from the already-loaded in-memory frames (D9): no
+        # parquet re-read, source paths are lineage strings only. A missing
+        # source (e.g. val built by in-memory split) warns and continues.
+        processed_dir = _processed_dir(cfg)
+        assert cfg.dataset is not None and cfg.etl is not None
+        log_datasets(
+            cfg.dataset.name,
+            train_df,
+            str(processed_dir / cfg.etl.train_features_file),
+            val_df,
+            str(processed_dir / cfg.etl.val_features_file),
         )
         # Val metrics are used for model selection — reported numbers carry
         # selection bias (optimistic); no held-out third split exists.
