@@ -46,6 +46,7 @@ dev = [
     "pytest-cov>=6.0.0",
     "vulture>=2.16",
     "graphifyy",
+    "httpx2",  # starlette>=1.6 TestClient requires httpx2 (httpx path deprecated; bare httpx absent from frozen CI sync)
 ]
 spark = ["pyspark>=4.0.0"]
 db = ["psycopg[binary]>=3.3.0", "sqlalchemy>=2.0.0"]
