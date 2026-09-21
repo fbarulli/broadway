@@ -20,6 +20,7 @@ from broadway.data.splitter import split
 from broadway.lineage.ids import node_id
 from broadway.lineage.models import TransformAudit
 from broadway.lineage.records import enforce_drop_fraction, records_dir, write_record
+from broadway.tracking.manifest import write_etl_manifest
 
 logger = logging.getLogger(__name__)
 
@@ -135,6 +136,17 @@ def run(cfg: PipelineConfig) -> None:
     result_path = out_dir / f"{dataset.name}_clean.json"
     result_path.write_text(result.model_dump_json(indent=2), encoding="utf-8")
     logger.info(f"saved structural clean result to {result_path}")
+
+    experiment = cfg.experiment
+    if experiment is None:
+        raise ValueError("etl manifest requires an experiment binding")
+    write_etl_manifest(
+        dataset=dataset,
+        audit=audit,
+        canonical_path=canonical_path_,
+        schema_contract=experiment.data_source.schema_contract,
+        df=df,
+    )
 
     ingest_id = node_id("ingest", dataset.name)
     upstream = (
