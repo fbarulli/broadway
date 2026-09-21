@@ -8,6 +8,11 @@ the authority for landed history; GitHub Project #4 is a mirror, never evidence.
 | id | kind | status | owner | custody | updated | source | github_item | mirror_state | summary |
 |---|---|---|---|---|---|---|---|---|---|
 | STATE-20260919-002 | checkpoint | open | main agent | main agent | 2026-09-19 | program 2026-09-19 | PVTI_lAHOAZFnCc4Bhhjqzg7vfyU | synced | Open program: graphify workflow integration with refresh cadence, beads stray removal, probes slice 2 engine |
+| STATE-20260921-001 | lane | open | main agent | main agent | 2026-09-21 | time branch data-tracking review 2026-09-21 | PVTI_lAHOAZFnCc4Bhhjqzg77Vms | synced | Data manifest writer: sha256 parquet plus row counts plus timestamps plus schema version from DatasetProfile and TransformAudit |
+| STATE-20260921-002 | lane | open | main agent | main agent | 2026-09-21 | time branch data-tracking review 2026-09-21 | PVTI_lAHOAZFnCc4Bhhjqzg77Vn8 | synced | Drift baseline stats writer: per-feature moments plus PSI-CSI bins plus data_card.md for training truth snapshot |
+| STATE-20260921-003 | lane | open | main agent | main agent | 2026-09-21 | time branch data-tracking review 2026-09-21 | PVTI_lAHOAZFnCc4Bhhjqzg77VpY | synced | Wire log_dataset into train: pass in-memory train and val frames instead of parquet re-read per D9 backlog |
+| STATE-20260921-004 | lane | open | main agent | main agent | 2026-09-21 | time branch data-tracking review 2026-09-21 | PVTI_lAHOAZFnCc4Bhhjqzg77VrA | synced | Tracking bundle custody: decide artifacts-tracking ignored vs reports-or-MLflow published location and update gitignore plus README |
+| STATE-20260921-005 | lane | open | main agent | main agent | 2026-09-21 | time branch data-tracking review 2026-09-21 | PVTI_lAHOAZFnCc4Bhhjqzg77VsA | synced | Reconcile diagrams-data_tracking.mmd manual snapshot vs generated reports-lineage-graph and implement trust drift check PSI-KS-KL |
 
 ## Access protocol
 
