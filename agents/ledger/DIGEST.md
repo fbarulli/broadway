@@ -1,6 +1,6 @@
 # DIGEST.md — rendered from agents/ledger/gates.yaml · NEVER HAND-EDIT ·
 
-> 143 gates · rendered 2026-09-01 @ HEAD d36f1d8 · load THIS into context;
+> 143 gates · rendered 2026-09-21 @ HEAD 5b17a92 · load THIS into context;
 > gates.yaml is the sole SSOT; the retired GATES.md/gates/*.md markdown world survives in agents/ledger/arbitration/2026-08-24/surface-and-analysis-preservation.md.
 
 | band | phase | gates | findings |
@@ -25,7 +25,7 @@
 - **GATE-INGEST-02** `src/broadway/data/loader.py:124 load_with_audit()` ⚠FINDING
   [CFG-DATASET-CONTRACT, ARTIFACT-RAW-PARQUET] → [ARTIFACT-RAW-FRAME] · pins: 4
 - **GATE-INGEST-03** `src/broadway/etl/module.py:74 run() CI-sample guard` ⚠FINDING
-  [ARTIFACT-RAW-FRAME, CFG-ETL-STEP, CFG-TAXI-PROJECT] → [ARTIFACT-RAW-FRAME] · pins: 2
+  [ARTIFACT-RAW-FRAME, CFG-ETL-STEP, CFG-TAXI-PROJECT] → [ARTIFACT-RAW-FRAME] · pins: 1
 - **GATE-INGEST-04** `project/etl/process.py: select_and_clean_columns() projection/missing/extra/dropna aspects (numeric anchors stripped pending DP-A07/R2 StageLedger merge)` ⚠FINDING
   [CFG-DATASET-CONTRACT, CFG-TAXI-PROJECT, ARTIFACT-RAW-FRAME] → [ARTIFACT-SELECTED-FRAME] · pins: 5
 - **GATE-INGEST-05** `src/broadway/cleaning/structural.py:49 parse_datetime()` ⚠FINDING
@@ -37,7 +37,7 @@
 - **GATE-INGEST-08** `src/broadway/data/cleaner.py:34 canonicalize()` ⚠FINDING
   [CFG-DATASET-CONTRACT, CFG-ETL-STEP, ARTIFACT-RAW-FRAME] → [ARTIFACT-CANONICAL-FRAME, ARTIFACT-CLEAN-EVIDENCE] · pins: 5
 - **GATE-INGEST-09** `src/broadway/contracts/pandera.py:46 build_raw_schema()` ⚠FINDING
-  [CFG-DATASET-CONTRACT, ARTIFACT-CANONICAL-FRAME] → [ARTIFACT-CANONICAL-FRAME] · pins: 3
+  [CFG-DATASET-CONTRACT, ARTIFACT-CANONICAL-FRAME] → [ARTIFACT-CANONICAL-FRAME] · pins: 1
 
 ### 02-etl-lookup — etl-lookup
 
@@ -162,7 +162,7 @@
 - **GATE-TLINE-57** `src/broadway/timeline/sequence.py:47 load_walkthrough_sequence()`
   [configs/flow/hypothesis_walkthrough.yaml (step ids/orders/questions/kind/action), configs/step/walkthrough.yaml (skew/kurtosis/shapiro/imbalance/significance thresholds, max_qq_groups, decisions.{omnibus,posthoc}.{methods,parents})] → [WalkthroughSequence (sequence.py:22) and WalkthroughConfig (sequence.py:35) pydantic models; the single source of gate order, gate questions, threshold flags, and the decision allowlists/parent sets used by GATE-TLINE-52/-54/-55] · pins: 3
 - **GATE-TLINE-58** `src/broadway/lineage/records.py:19 write_record()` ⚠FINDING
-  [node_id strings from lineage/ids.py:1 node_id() (f"{kind}:{name}", no character validation), TransformAudit (lineage/models.py:73) from etl/canonicalize accounting, sample_name/sample_role, parents list, BROADWAY_LINEAGE_DIR env (records.py:8, default artifacts/lineage)] → [artifacts/lineage/records/<sanitized_node_id>.json LineageRecords; consumed only by graph.build_graph (graph.py:105-123) -> LineageGraph -> reports/lineage/graph.json + graph.md (lineage/module.py:27/:38) and mermaid rendering (mermaid.py:6); enforce_drop_fraction (records.py:43) raises before any record is written when unexplained row loss exceeds max_drop_fraction] · pins: 6
+  [node_id strings from lineage/ids.py:1 node_id() (f"{kind}:{name}", no character validation), TransformAudit (lineage/models.py:73) from etl/canonicalize accounting, sample_name/sample_role, parents list, BROADWAY_LINEAGE_DIR env (records.py:8, default artifacts/lineage)] → [artifacts/lineage/records/<sanitized_node_id>.json LineageRecords; consumed only by graph.build_graph (graph.py:105-123) -> LineageGraph -> reports/lineage/graph.json + graph.md (lineage/module.py:27/:38) and mermaid rendering (mermaid.py:6); enforce_drop_fraction (records.py:43) raises before any record is written when unexplained row loss exceeds max_drop_fraction] · pins: 4
 - **GATE-TLINE-59** `src/broadway/cli.py:105 main()` ⚠FINDING
   [argv parsed by _build_parser (cli.py:26-102): walkthrough --analysis/--dataset/--sample/--force (cli.py:87-92), decide --analysis/--method/--reason/--kind choices={omnibus,posthoc} (cli.py:94-100), lineage --analysis/--dataset (cli.py:40-42), report (cli.py:44-46), stats run|describe --sample (cli.py:80-84); console-script entry ds-pipeline = broadway.cli:main (pyproject.toml:53-54)] → [dispatch into timeline.walkthrough.run (cli.py:166-173), decide_module.record + timeline_module.save_decision (cli.py:174-189), lineage.module.run (cli.py:118-121), report path re-rendering results from persisted steps/decisions with 'run the walkthrough first' short-circuit (cli.py:122-134)] · pins: 5
 - **GATE-TLINE-114** `src/broadway/lineage/state.py:5 LINEAGE_STEPS + src/broadway/baseline/module.py:87-91 parents` ⚠FINDING
@@ -195,7 +195,7 @@
 - **GATE-SURF-101** `src/broadway/discover/columns.py:10 run()`
   [raw CSV path (ds-pipeline columns subparser argv)] → [stdout per-column dtype report (read-only probe, zero artifact writes)] · pins: none direct
 - **GATE-SURF-102** `src/broadway/reports/experiments_dashboard.py:56 FastAPI app custody (generic dashboard series endpoints)`
-  [project-provided experiment results CSVs via BROADWAY_EXPERIMENTS_ROOT] → [dashboard series endpoints served by the FastAPI app object] · pins: 3
+  [project-provided experiment scripts and result artifacts via BROADWAY_EXPERIMENTS_ROOT, selected series id via focus query parameter and selected artifact filename via artifact query parameter] → [dashboard series endpoints with one selected experiment series and one inline artifact preview, bounded CSV tables, text previews, image/plot previews, and artifact downloads] · pins: 6
 
 ### 08-config — config-schema
 
@@ -222,7 +222,7 @@
 - **GATE-CFG-103** `src/broadway/config/loader.py:50 STEP_MODULES` ⚠FINDING
   [step name argv] → [module binding or loud unknown-step error] · pins: 1
 - **GATE-CFG-104** `project/data.py:32-48 composed project-config resolution block`
-  [project/config/{dataset,analysis,project}/ taxi overlay plus generic base configs] → [seven module-level config singletons resolved at import (_contract/_project/_etl/_features and siblings)] · pins: 4
+  [project/config/{dataset,analysis,project}/ taxi overlay plus generic base configs] → [seven module-level config singletons resolved at import (_contract/_project/_etl/_features and siblings)] · pins: 2
 - **GATE-CFG-105** `src/broadway/onboard/module.py:215 init() (_write_configs :178-198)`
   [stdin prompts + 13 argv flags] → [configs dataset/analysis/experiment YAMLs + profile JSON + 1 lineage record (write call :302)] · pins: none direct
 - **GATE-CFG-107** `src/broadway/data/loader.py:134 lookup pre-read existence admission (declared-lookup bootstrap check)` ⚠FINDING
@@ -319,8 +319,8 @@
   [HOME/XDG_CACHE_HOME/TMPDIR/UV_CACHE_DIR environment] → [writable host-local uv cache or loud nonzero failure] · pins: 3
 - **GATE-INFRA-147** `scripts/deadcode_census.py:1 module — teeth ⑥ DEADCODE-CENSUS advisory engine`
   [tracked *.py corpus via git ls-files (src/project/tests/scripts), pyproject [project.scripts] entrypoint table] → [data/processed/deadcode_census.md suspicion report (gitignored sink); stdout default] · pins: none direct
-- **GATE-INFRA-148** `agents/tools/state_records.py sync()`
-  [STATE CURRENT record and immutable EVENTS section, GitHub Project] → [pending CURRENT intent followed by one synced mirror item] · pins: 1
+- **GATE-INFRA-148** `agents/tools/state_records.py apply_record_operation()`
+  [STATE CURRENT record and immutable EVENTS section] → [atomic branch-tracked CURRENT update or terminal archive entry] · pins: 3
 
 ### 81-object-custody — object-custody
 

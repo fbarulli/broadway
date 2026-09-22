@@ -1187,6 +1187,7 @@ def test_probe_g_events_tamper_lock_live_and_falsifiable() -> None:
 # --- Probe (h): repo-root dot-dir / tracked-cache ban (L5) ---------------- #
 SANCTIONED_ROOT_DOT_DIRS = frozenset({
     ".git", ".github", ".mplconfig",  # floor: git itself, workflows, sanctioned MPL root
+    ".agents", ".codex",  # read-only managed-agent workspace metadata
     ".venv", ".uv-cache", ".pytest_cache", ".mypy_cache", ".ruff_cache",
 })
 BANNED_TRACKED_PREFIXES = (".uv-cache/", ".pytest_cache/", ".mypy_cache/", ".ruff_cache/")

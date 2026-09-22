@@ -2,10 +2,9 @@
 
 Covers the transactional lifecycle: add/update/close/void, invalid
 transitions, revision conflict, immutable ## EVENTS, journal recovery,
-archive collision/idempotency, deterministic rendering, JSON output,
-mirror identity, and terminal archive behavior. The tool under test is
-agents/tools/state_records.py (the landed rewrite) with
-agents/tools/project_board.py for the mirror transport.
+archive collision/idempotency, deterministic rendering, JSON output, and
+terminal archive behavior. The tool under test is
+agents/tools/state_records.py.
 """
 from __future__ import annotations
 
@@ -31,23 +30,12 @@ def _load_tool() -> object:
     return module
 
 
-def _load_project_board() -> object:
-    spec = importlib.util.spec_from_file_location(
-        "project_board_under_test", REPO / "agents/tools/project_board.py")
-    module = importlib.util.module_from_spec(spec)
-    assert spec.loader
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
-
-
 def _make_state(rows: str = "") -> str:
-    """A minimal STATE.md CURRENT section (10-column schema, post-migration)."""
-    header = ("| id | kind | status | owner | custody | updated | source | "
-              "github_item | mirror_state | summary |")
-    divider = "|---|---|---|---|---|---|---|---|---|---|"
+    """A minimal STATE.md CURRENT section (branch-tracked schema)."""
+    header = "| id | kind | status | owner | custody | updated | source | summary |"
+    divider = "|---|---|---|---|---|---|---|---|"
     row = ("| STATE-1 | checkpoint | open | main agent | main agent | 2026-08-30 | "
-           "test | pending | pending | mirror me |")
+           "test | coordinate me |")
     return (
         "# STATE.md — current operational control record\n\n"
         "## CURRENT\n\n" + header + "\n" + divider + "\n" + row + rows + "\n"
@@ -56,85 +44,37 @@ def _make_state(rows: str = "") -> str:
     )
 
 
-class _BoardFixture:
-    """A tiny in-memory board double implementing the transport API."""
-
-    def __init__(self) -> None:
-        self.items: dict[str, dict] = {}
-        self.next_id = 0
-
-    def create_draft(self, title: str, body: str, status_name: str | None = None) -> str:
-        item_id = f"item-{self.next_id}"
-        self.next_id += 1
-        self.items[item_id] = {"title": title, "body": body, "status": status_name or "Todo"}
-        return item_id
-
-    def update_draft(self, item_id: str, *, title: str | None = None, body: str | None = None) -> None:
-        self.items[item_id]["title"] = title if title is not None else self.items[item_id]["title"]
-        self.items[item_id]["body"] = body if body is not None else self.items[item_id]["body"]
-
-    def update_status(self, item_id: str, status_name: str) -> None:
-        self.items[item_id]["status"] = status_name
-
-    def get(self, item_id: str):
-        class _Item:
-            body = self.items[item_id]["body"]
-        return _Item()
-
-    def find_state_mirror(self, record_id: str) -> str | None:
-        for item_id, item in self.items.items():
-            body = item["body"]
-            try:
-                payload = json.loads(body)
-            except json.JSONDecodeError:
-                continue
-            if isinstance(payload, dict) and payload.get("id") == record_id:
-                return item_id
-        return None
-
-    def iter_items(self):
-        class _I:
-            def __init__(self, item_id, body):
-                self.item_id = item_id
-                self.body = body
-        for item_id, item in self.items.items():
-            yield _I(item_id, item["body"])
-
-
 @pytest.fixture()
 def env(tmp_path, monkeypatch):
-    """Wire the tool to a temp STATE.md + in-memory board."""
+    """Wire the tool to a temporary branch-like STATE.md."""
     tool = _load_tool()
-    board = _BoardFixture()
     state = tmp_path / "STATE.md"
     state.write_text(_make_state(), encoding="utf-8")
     monkeypatch.setattr(tool, "STATE_PATH", state)
     monkeypatch.setattr(tool, "ARCHIVE_DIR", tmp_path / "archive")
-    monkeypatch.setattr(tool, "project_board", board)
-    return tool, board, state
+    return tool, None, state
 
 
 # --------------------------------------------------------------------------- #
 # Lifecycle
 # --------------------------------------------------------------------------- #
 
-def test_add_creates_pending_row_then_syncs(env) -> None:
-    tool, board, state = env
+def test_add_persists_branch_tracked_row(env) -> None:
+    tool, _, state = env
     tool.apply_record_operation(_args(env, "add", id="STATE-20260901-001", kind="decision",
                                        status="open", owner="main agent", custody="main agent",
                                        source="test", summary="a decision"), "add")
     text = state.read_text(encoding="utf-8")
     assert "| STATE-20260901-001 | decision | open | main agent | main agent |" in text
-    assert "| synced |" in text  # add writes local, mirrors, marks synced
-    assert len(board.items) == 1
+    assert "github_item" not in text
+    assert "mirror_state" not in text
 
 
-def test_update_replaces_summary_and_marks_pending_then_synced(env) -> None:
+def test_update_replaces_summary(env) -> None:
     tool, _, state = env
     tool.apply_record_operation(_args(env, "update", id="STATE-1", summary="new summary"), "update")
     text = state.read_text(encoding="utf-8")
     assert "new summary" in text
-    assert "| synced |" in text
 
 
 def test_close_marks_terminal_and_archives(env) -> None:
@@ -312,48 +252,7 @@ def test_json_output(env) -> None:
 
 
 # --------------------------------------------------------------------------- #
-# Mirror identity
-# --------------------------------------------------------------------------- #
-
-def test_sync_binds_correct_board_item(env) -> None:
-    tool, board, _ = env
-    tool.apply_record_operation(_args(env, "sync", id="STATE-1"), "sync")
-    # The mirrored body is JSON with id STATE-1.
-    found = board.find_state_mirror("STATE-1")
-    assert found is not None
-    item = board.items[found]
-    payload = json.loads(item["body"])
-    assert payload["id"] == "STATE-1"
-
-
-def test_sync_paginates_skips_non_draft_and_preserves_events(env) -> None:
-    """find_state_mirror walks all items, skips non-JSON-state bodies, and the
-    sync never touches ## EVENTS bytes."""
-    tool, board, state = env
-    board.items["foreign"] = {"title": "t", "body": "not-json", "status": "Todo"}
-    tool.apply_record_operation(_args(env, "sync", id="STATE-1"), "sync")
-    found = board.find_state_mirror("STATE-1")
-    assert found is not None
-    assert found != "foreign"
-    before_events = state.read_text(encoding="utf-8").split("## EVENTS\n", 1)[1]
-    tool.apply_record_operation(_args(env, "sync", id="STATE-1"), "sync")
-    assert state.read_text(encoding="utf-8").split("## EVENTS\n", 1)[1] == before_events
-
-
-def test_sync_of_unknown_record_not_found(env) -> None:
-    tool, _, _ = env
-    with pytest.raises(ValueError, match="unknown STATE record"):
-        tool.apply_record_operation(_args(env, "sync", id="STATE-999"), "sync")
-
-
-def test_terminal_archive_writes_board_done(env) -> None:
-    tool, board, _ = env
-    tool.apply_record_operation(_args(env, "close", id="STATE-1", reason="done"), "close")
-    assert all(item["status"] == "Done" for item in board.items.values())
-
-
-# --------------------------------------------------------------------------- #
-# Deterministic archive naming + reconcile
+# Deterministic archive naming
 # --------------------------------------------------------------------------- #
 
 def test_archive_path_derives_month_from_record_updated(env) -> None:
@@ -370,54 +269,27 @@ def test_archive_path_is_deterministic_across_calls(env) -> None:
     assert tool._archive_path(record) == tool._archive_path(record)
 
 
-def test_reconcile_reports_local_only_drift(env, capsys) -> None:
-    tool, board, _ = env
-    board.create_draft("x", json.dumps({"id": "STATE-OTHER"}))
-    tool.command_reconcile(_args(env, "reconcile"))
-    out = capsys.readouterr().out
-    assert "STATE-1" in out
-
-
-def test_reconcile_reports_board_extra(env, capsys) -> None:
-    tool, board, _ = env
-    board.create_draft("x", json.dumps({"id": "STATE-ORPHAN"}))
-    tool.command_reconcile(_args(env, "reconcile"))
-    out = capsys.readouterr().out
-    assert "board-extra STATE-ORPHAN" in out
-
-
-def test_reconcile_ok_when_consistent(env, capsys) -> None:
-    tool, _, _ = env
-    # Sync first so the board holds STATE-1's mirror.
-    tool.apply_record_operation(_args(env, "sync", id="STATE-1"), "sync")
-    tool.command_reconcile(_args(env, "reconcile"))
-    out = capsys.readouterr().out
-    assert "RECONCILE OK" in out
-
-
 # --------------------------------------------------------------------------- #
-# Dry-run (no file or board change)
+# Dry-run
 # --------------------------------------------------------------------------- #
 
 def test_dry_run_add_changes_nothing(env, capsys) -> None:
-    tool, board, state = env
+    tool, _, state = env
     before = state.read_text(encoding="utf-8")
     tool.apply_record_operation(_args(env, "add", id="STATE-20260901-001", kind="decision",
                                       status="open", owner="main agent", custody="main agent",
                                       source="test", summary="planned", dry_run=True), "add")
     assert state.read_text(encoding="utf-8") == before  # file untouched
-    assert len(board.items) == 0  # board untouched
     out = capsys.readouterr().out
     assert "STATE DRY-RUN" in out
     assert '"id": "STATE-20260901-001"' in out
 
 
 def test_dry_run_close_changes_nothing(env, capsys) -> None:
-    tool, board, state = env
+    tool, _, state = env
     before = state.read_text(encoding="utf-8")
     tool.apply_record_operation(_args(env, "close", id="STATE-1", reason="planned-close", dry_run=True), "close")
     assert state.read_text(encoding="utf-8") == before
-    assert len(board.items) == 0
     out = capsys.readouterr().out
     assert "terminal disposition CLOSED" in out
 
@@ -441,10 +313,16 @@ def test_layout_guard_rejects_missing_state(env, monkeypatch) -> None:
 
 def test_mutation_output_exposes_state_path(env, capsys) -> None:
     tool, _, _ = env
-    tool.apply_record_operation(_args(env, "sync", id="STATE-1"), "sync")
+    tool.apply_record_operation(_args(env, "update", id="STATE-1", summary="updated"), "update")
     out = capsys.readouterr().out
     assert "state_path:" in out
     assert "STATE.md" in out
+
+
+def test_cli_has_no_network_mirror_commands() -> None:
+    help_text = _load_tool().parser().format_help()
+    assert "sync" not in help_text
+    assert "reconcile" not in help_text
 
 
 # --------------------------------------------------------------------------- #
@@ -461,7 +339,14 @@ def test_active_state_has_no_legacy_tail_before_events() -> None:
         "## Access protocol",
         "## Retention",
     ]
-    assert sum(line.startswith("|") for line in active.splitlines()) == 3
+    table_lines = [line for line in active.splitlines() if line.startswith("|")]
+    assert table_lines[0] == "| id | kind | status | owner | custody | updated | source | summary |"
+    assert all(len(line.strip("|").split("|")) == 8 for line in table_lines)
+    # Frozen 2026-09-22: CURRENT carries no open rows (closed lanes live in
+    # agents/ledger/archive/). Only the header plus divider remain.
+    assert len(table_lines) == 2
+    assert "github_item" not in active
+    assert "mirror_state" not in active
 
 
 # --------------------------------------------------------------------------- #

@@ -102,11 +102,12 @@ Every contract whose brief contains a Blast radius section MUST run
 paste the output before implementing — graphify reverse traversal plus gate
 ownership, not guesswork.
 
-## Live ops board (GitHub Projects)
+## Branch-tracked operational state
 
-Project #4 is an availability mirror, not evidence. Workers and reviewers
-never mutate it. The main agent alone uses the private `state_records.py`
-CURRENT lifecycle; it writes local pending intent before mirror I/O.
+Workers and reviewers never mutate operational state. The main agent alone
+uses the private, offline `state_records.py` CURRENT lifecycle. `STATE.md` is
+tracked per branch so the data-agnostic platform line and project-specific
+lines can coordinate without an external project-board dependency.
 
 ## Report format (every dispatch)
 

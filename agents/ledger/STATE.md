@@ -1,20 +1,21 @@
 # STATE.md — current operational control record
 
-`STATE.md` holds only active custody and retryable operational intent. Git is
-the authority for landed history; GitHub Project #4 is a mirror, never evidence.
+`STATE.md` holds active custody and operational intent for this branch. It is
+tracked with the repository so coordination composes with the data-agnostic
+`main` line and project-specific development lines. Git is the authority for
+landed history.
 
 ## CURRENT
 
-| id | kind | status | owner | custody | updated | source | github_item | mirror_state | summary |
-|---|---|---|---|---|---|---|---|---|---|
-| STATE-20260919-002 | checkpoint | open | main agent | main agent | 2026-09-19 | program 2026-09-19 | PVTI_lAHOAZFnCc4Bhhjqzg7vfyU | synced | Open program: graphify workflow integration with refresh cadence, beads stray removal, probes slice 2 engine |
+| id | kind | status | owner | custody | updated | source | summary |
+|---|---|---|---|---|---|---|---|
 
 ## Access protocol
 
-- Main alone uses `state_records.py record add|update|sync`; workers and
+- Main alone uses `state_records.py record add|update|close|void`; workers and
   reviewers only read and report.
-- Local CURRENT intent is written before its mirror. A failed mirror leaves
-  `mirror_state=pending`, and `record sync <id>` retries the same record.
+- CURRENT changes are atomic, offline repository writes. Each branch carries
+  its own operational state and resolves it through normal git integration.
 - The helper changes only CURRENT; `## EVENTS` and the historical archive are
   immutable through this interface.
 
@@ -22,7 +23,7 @@ the authority for landed history; GitHub Project #4 is a mirror, never evidence.
 
 The pre-foundation record is preserved verbatim in
 `agents/ledger/archive/2026-08.md` from source commit `7dcb34f`. Current
-operational history stays in git and Project #4 mirrors.
+operational history stays in git.
 
 ## EVENTS
 

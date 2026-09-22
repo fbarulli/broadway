@@ -206,8 +206,6 @@ FrozenTrial states/values/user attrs from the optimize callbacks hook:
 - GATE-HPO-83
 GITHUB_REF_NAME else `git rev-parse --abbrev-ref HEAD` (:187):
 - GATE-INFRA-94
-GitHub Project:
-- GATE-INFRA-148
 GroupSummary from stats.describe:
 - GATE-TLINE-56
 - GATE-SURF-65
@@ -387,6 +385,8 @@ artifacts/lineage records + decisions (lineage/records.py LINEAGE_DIR):
 : - GATE-TLINE-58
 ? artifacts/timeline/<analysis>/steps/<step_id>.json and .../decisions/<decision.id>.json (model_dump_json indent=2); read back by load_step/load_steps/load_decision/load_decisions which feed every gate check
 : - GATE-TLINE-53
+atomic branch-tracked CURRENT update or terminal archive entry:
+- GATE-INFRA-148
 audit JSONs (GATE-ETL-13/14/15):
 - GATE-ETL-10
 'autoscaling bounds minReplicas: 2 / maxReplicas: 10 / averageUtilization: 70 (:48-56)':
@@ -399,6 +399,8 @@ bash scripts/run_local_ci.sh (no args ⇒ full tier):
 : - GATE-INFRA-98
 between:
 - GATE-STATS-47
+bounded CSV tables, text previews, image/plot previews, and artifact downloads:
+- GATE-SURF-102
 bp_test/jb_test/durbin_watson wrappers (diagnostics.py:20-31):
 - GATE-STATS-48
 builder_dtype→_BUILDER_DTYPES (builders.py:94-95):
@@ -485,7 +487,7 @@ cov floor breach ⇒ FAIL pytest:
 - GATE-INFRA-92
 dangling-symlink-aware loud pre-merge error NAMING the bootstrap step:
 - GATE-CFG-107
-dashboard series endpoints served by the FastAPI app object:
+dashboard series endpoints with one selected experiment series and one inline artifact preview:
 - GATE-SURF-102
 dashboard server (uvicorn.run(app, host="127.0.0.1", port=8000) :19):
 - GATE-INFRA-123
@@ -782,8 +784,6 @@ parquet artifact:
 - GATE-CFG-79
 pd.Series:
 - GATE-ETL-15
-pending CURRENT intent followed by one synced mirror item:
-- GATE-INFRA-148
 ? per-group {skew, kurtosis, shapiro_p} (:31-35); levene {statistic, p_value} (:15-16); ValueError "normality checks require non-constant groups" (:23-24); ValueError "Levene's test requires non-zero variance in every group" (:13-14)
 : - GATE-STATS-46
 ? per-order executor dispatch through _STEP_RUNNERS (walkthrough.py:281-288); step JSONs saved (walkthrough.py:384); DECISION REQUIRED console panels (walkthrough.py:138-189); reports regenerated via _write_timeline (walkthrough.py:71-91 -> reports/timeline.md, reports/index.md, reports/results/*); stale-decision warnings (walkthrough.py:192-201)
@@ -819,7 +819,7 @@ pre-merge df.columns:
 - GATE-ETL-12
 project-owned plots/results CSVs/verification JSON (self-auditing verify subcommand):
 - GATE-INFRA-122
-project-provided experiment results CSVs via BROADWAY_EXPERIMENTS_ROOT:
+project-provided experiment scripts and result artifacts via BROADWAY_EXPERIMENTS_ROOT:
 - GATE-SURF-102
 project/config/ (project-owned layout, experiment, and taxi config-overlay SSOT):
 - GATE-INFRA-92
@@ -977,6 +977,8 @@ sample.column_mapping logical→source resolution (:132):
 - GATE-STATS-49
 sample_name/sample_role:
 - GATE-TLINE-58
+selected series id via focus query parameter and selected artifact filename via artifact query parameter:
+- GATE-SURF-102
 seven module-level config singletons resolved at import (_contract/_project/_etl/_features and siblings):
 - GATE-CFG-104
 sha-tagged images built/boot-tested; CD publishes bit-for-bit verified tarball to GHCR on main/taxi pushes only (:290-376):

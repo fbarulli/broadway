@@ -11,7 +11,7 @@ retired:
   successor: 'src/broadway/etl/module.py + src/broadway/data/loader.py (CONTRACT pipeline)'
   history_rows_retained: ['GATE-INGEST-01', 'GATE-INGEST-04', 'GATE-ETL-17', 'GATE-ETL-18', 'GATE-ETL-19', 'GATE-ETL-116', 'GATE-ETL-117']
 meta:
-  head: 'c7a85a6'
+  head: '7addcbe'
   assembled: '2026-09-19'
   source_fragments:
   - agents/ledger/gates/01-ingest.md
@@ -2455,19 +2455,27 @@ gates:
   order: 79
   owner: 'src/broadway/reports/experiments_dashboard.py:56 FastAPI app custody (generic dashboard series endpoints)'
   inputs:
-  - project-provided experiment results CSVs via BROADWAY_EXPERIMENTS_ROOT
+  - project-provided experiment scripts and result artifacts via BROADWAY_EXPERIMENTS_ROOT
+  - selected series id via focus query parameter and selected artifact filename via artifact query parameter
   outputs:
-  - dashboard series endpoints served by the FastAPI app object
+  - dashboard series endpoints with one selected experiment series and one inline artifact preview
+  - bounded CSV tables, text previews, image/plot previews, and artifact downloads
   transforms:
   - 'app = FastAPI() module-level custody (:56); app-body aspect of the dashboard surface'
   - 'co-tenancy with GATE-INFRA-123 declared LEGAL (packet H #123): entry (__main__ uvicorn.run) vs app-body aspects of one file'
+  - 'scripts/render_canvas_maps.py is the project launcher and enables Uvicorn reload for src/ and project/experiments/'
   touched_by: []
   validated_by:
   - tests/test_experiments_ui.py::test_default_focus_uses_first_discovered_series
   - tests/test_experiments_ui.py::test_dashboard_helpers_cover_discovery_rendering_and_renumbering
   - tests/test_experiments_ui.py::test_dashboard_routes_validate_and_persist_real_files
+  - tests/test_experiments_ui.py::test_artifact_picker_selects_one_inline_preview
+  - tests/test_experiments_ui.py::test_project_experiment_selector_is_single_select
+  - tests/test_canvas.py::test_dashboard_launcher_enables_reload
   if_changed:
   - dashboard endpoint contract consumed by GATE-INFRA-123 server entry
+  - scripts/render_canvas_maps.py launcher contract
+  - project/experiments result naming convention (step-stem prefix)
   findings: []
 - id: GATE-CFG-70
   phase: config-schema
@@ -3916,22 +3924,24 @@ gates:
 - id: GATE-INFRA-148
   phase: infra-meta
   order: 137
-  owner: agents/tools/state_records.py sync()
+  owner: agents/tools/state_records.py apply_record_operation()
   inputs:
   - STATE CURRENT record and immutable EVENTS section
-  - GitHub Project #4 DraftIssue mirror
   outputs:
-  - pending CURRENT intent followed by one synced mirror item
+  - atomic branch-tracked CURRENT update or terminal archive entry
   transforms:
-  - Project item pagination keeps pageInfo outside nodes; null and non-DraftIssue content are skipped
-  - local pending state is persisted before mirror I/O and retry uses the same id
+  - STATE lifecycle is offline and performs no GitHub or other network I/O
+  - CURRENT carries branch-specific operational coordination while landed history remains in git
+  - terminal close and void operations journal before archiving and preserve immutable EVENTS bytes
   touched_by: []
   validated_by:
-  - tests/test_state_records.py::test_sync_paginates_skips_non_draft_and_preserves_events
+  - tests/test_state_records.py::test_add_persists_branch_tracked_row
+  - tests/test_state_records.py::test_events_mutation_refused
+  - tests/test_state_records.py::test_journal_recovered_on_next_lock
   if_changed:
   - agents/tools/state_records.py
   - tests/test_state_records.py
-  - GitHub Project #4 draft-issue lifecycle
+  - agents/ledger/STATE.md CURRENT schema
   findings: []
 # --- BAND 81-OBJECT-CUSTODY (minted per slate §0; header law above) ------
 - id: GATE-CUST-147
