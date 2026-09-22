@@ -95,6 +95,35 @@ def test_evidence_table_escapes_html_in_cells(monkeypatch, tmp_path) -> None:
     assert "&lt;script&gt;" in html
 
 
+def test_artifact_picker_selects_one_inline_preview(monkeypatch, tmp_path) -> None:
+    """One selected output is shown at a time, with CSV and plot previews available."""
+    results = tmp_path / "results"
+    results.mkdir()
+    csv = results / "01_step_counts.csv"
+    csv.write_text("bucket,trips\n&lt;unsafe&gt;,42\n", encoding="utf-8")
+    (results / "01_step_plot.png").write_bytes(b"png")
+    monkeypatch.setattr(ui, "_results_dir", lambda focus: results)
+
+    default_html = ui._render_artifacts("01_step", "alpha")
+    assert '01_step_plot.png" selected' in default_html
+    assert '<img src="/results/alpha/01_step_plot.png"' in default_html
+
+    csv_html = ui._render_artifacts("01_step", "alpha", csv.name)
+    assert '01_step_counts.csv" selected' in csv_html
+    assert '<table class="evidence">' in csv_html
+    assert "&amp;lt;unsafe&amp;gt;" in csv_html
+    assert "01_step_plot.png" in csv_html
+    assert csv_html.count("<img") == 0
+
+
+def test_project_experiment_selector_is_single_select() -> None:
+    rendered = ui._series_selector(["alpha", "beta"], "beta")
+
+    assert '<select id="project-experiment"' in rendered
+    assert 'value="beta" selected' in rendered
+    assert rendered.count("<select") == 1
+
+
 def test_default_focus_uses_first_discovered_series(monkeypatch, tmp_path) -> None:
     for series in ("beta", "alpha"):
         directory = tmp_path / series

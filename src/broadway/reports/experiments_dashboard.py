@@ -23,6 +23,7 @@ import ast
 import html
 import json
 import logging
+import mimetypes
 import os
 import re
 from collections.abc import Callable
@@ -53,6 +54,34 @@ _VERDICTS = ("supported", "refuted", "inconclusive", "partial")
 _UPSTREAM_LABEL = "upstream (project data / working dataset)"
 
 app = FastAPI()
+
+
+def configure_from_env() -> None:
+    """Re-read dashboard env and mount static surfaces (idempotent).
+
+    Import-time globals freeze the first-import env, but the project launcher
+    sets ``BROADWAY_*`` after importing this module to build canvas specs.
+    Call this after the env is final so ``/results`` + ``/diagrams`` serve
+    the configured directories even when the module was imported early.
+    """
+    global EXPERIMENTS_ROOT, DEFAULT_SERIES, OBSERVATIONS_DIR, DIAGRAMS_DIR
+    EXPERIMENTS_ROOT = Path(os.environ.get("BROADWAY_EXPERIMENTS_ROOT", "experiments"))
+    DEFAULT_SERIES = os.environ.get("BROADWAY_DEFAULT_EXPERIMENT_SERIES", "")
+    OBSERVATIONS_DIR = Path(
+        os.environ.get("BROADWAY_OBSERVATIONS_DIR", "artifacts/experiments/observations")
+    )
+    DIAGRAMS_DIR = Path(os.environ.get("BROADWAY_DIAGRAMS_DIR", "diagrams"))
+    mounted = {getattr(route, "path", "") for route in app.routes}
+    # Results are experiment-scratch and may be absent (e.g. a platform-only
+    # checkout) — only mount the static surface when the directory exists.
+    if (EXPERIMENTS_ROOT / "results").is_dir() and "/results" not in mounted:
+        app.mount(
+            "/results", StaticFiles(directory=EXPERIMENTS_ROOT / "results"), name="results"
+        )
+    if DIAGRAMS_DIR.is_dir() and "/diagrams" not in mounted:
+        app.mount("/diagrams", StaticFiles(directory=DIAGRAMS_DIR), name="diagrams")
+
+
 # Results are experiment-scratch and may be absent (e.g. a platform-only
 # checkout) — only mount the static surface when the directory exists.
 if (EXPERIMENTS_ROOT / "results").is_dir():
@@ -247,22 +276,88 @@ def _render_table(rows: list[dict[str, str | int]], focus: str) -> str:
     return "\n".join(cells)
 
 
-def _render_artifacts(stem: str, focus: str) -> str:
-    """Render result files as links plus the embedded PNG, if present."""
+_IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"}
+_TEXT_SUFFIXES = {".md", ".txt", ".json", ".yaml", ".yml", ".log"}
+_MAX_PREVIEW_ROWS = 200
+_MAX_TEXT_PREVIEW = 100_000
+
+
+def _artifact_url(path: Path, focus: str) -> str:
+    """Return the static URL for one result artifact."""
+    return f"/results/{quote(focus, safe='/')}/{quote(path.name)}"
+
+
+def _render_csv_preview(path: Path) -> str:
+    """Render a bounded, escaped CSV preview suitable for large result files."""
+    try:
+        frame = pd.read_csv(path, nrows=_MAX_PREVIEW_ROWS)
+    except (ValueError, OSError, UnicodeDecodeError):
+        return "<p>Could not preview this CSV.</p>"
+    header = "".join(f"<th>{html.escape(str(column))}</th>" for column in frame.columns)
+    rows = []
+    for values in frame.itertuples(index=False, name=None):
+        cells = "".join(
+            f"<td>{'' if pd.isna(value) else html.escape(str(value))}</td>" for value in values
+        )
+        rows.append(f"<tr>{cells}</tr>")
+    truncated = (
+        f'<p class="preview-note">Showing the first {_MAX_PREVIEW_ROWS} rows.</p>'
+        if len(frame) == _MAX_PREVIEW_ROWS
+        else ""
+    )
+    return (
+        '<div class="table-scroll"><table class="evidence">'
+        f"<thead><tr>{header}</tr></thead><tbody>{''.join(rows)}</tbody>"
+        f"</table></div>{truncated}"
+    )
+
+
+def _render_artifact_preview(path: Path, focus: str) -> str:
+    """Render an inline preview for supported result artifacts."""
+    suffix = path.suffix.lower()
+    url = html.escape(_artifact_url(path, focus))
+    name = html.escape(path.name)
+    if suffix in _IMAGE_SUFFIXES:
+        return f'<figure><img src="{url}" alt="{name}"><figcaption>{name}</figcaption></figure>'
+    if suffix == ".csv":
+        return _render_csv_preview(path)
+    if suffix in _TEXT_SUFFIXES:
+        try:
+            content = path.read_text(encoding="utf-8")[:_MAX_TEXT_PREVIEW]
+        except (OSError, UnicodeDecodeError):
+            return "<p>Could not preview this text artifact.</p>"
+        return f'<pre class="text-preview">{html.escape(content)}</pre>'
+    mime, _ = mimetypes.guess_type(path.name)
+    return f'<p>No inline preview for {html.escape(mime or suffix or "this file type")}.</p>'
+
+
+def _render_artifacts(stem: str, focus: str, selected: str = "") -> str:
+    """Render a selectable, notebook-like result artifact viewer."""
     files = _result_files(stem, focus)
     if not files:
         return "<p>No artifacts yet.</p>"
-    links = "".join(
-        f'<li><a href="/results/{html.escape(focus)}/{html.escape(f.name)}">{html.escape(f.name)}</a></li>'
-        for f in files
+    selected_path = next((path for path in files if path.name == selected), None)
+    if selected_path is None:
+        selected_path = next(
+            (path for path in files if path.suffix.lower() in _IMAGE_SUFFIXES), files[0]
+        )
+    options = "".join(
+        f'<option value="{html.escape(path.name)}"'
+        f'{" selected" if path == selected_path else ""}>{html.escape(path.name)}</option>'
+        for path in files
     )
-    png = next((f for f in files if f.suffix == ".png"), None)
-    image = (
-        f'<p><img src="/results/{html.escape(focus)}/{html.escape(png.name)}" alt="{html.escape(png.name)}"></p>'
-        if png
-        else ""
+    download = html.escape(_artifact_url(selected_path, focus))
+    picker = (
+        '<form class="artifact-picker" method="get">'
+        f'<input type="hidden" name="focus" value="{html.escape(focus)}">'
+        '<label for="artifact">output</label> '
+        f'<select id="artifact" name="artifact" onchange="this.form.submit()">{options}</select> '
+        '<noscript><button type="submit">show</button></noscript>'
+        f'<a href="{download}" download>download</a>'
+        "</form>"
     )
-    return f"<ul>{links}</ul>{image}"
+    preview = _render_artifact_preview(selected_path, focus)
+    return f'{picker}<div class="artifact-preview">{preview}</div>'
 
 
 def _render_evidence(stem: str, focus: str) -> str:
@@ -456,15 +551,21 @@ def _renumber_stems(order: list[str], focus: str) -> list[str]:
 
 
 def _series_selector(series: list[str], focus: str) -> str:
-    """Render the top-row series selector: one dashboard link per series, current bold."""
-    links = []
+    """Render a compact dropdown that navigates to one experiment series."""
+    options = []
     for sid in series:
-        label = html.escape(sid)
-        if sid == focus:
-            links.append(f"<strong>{label}</strong>")
-        else:
-            links.append(f'<a href="{html.escape(_h("/", sid))}">{label}</a>')
-    return '<nav class="selector">' + " | ".join(links) + "</nav>"
+        options.append(
+            f'<option value="{html.escape(sid)}"'
+            f'{" selected" if sid == focus else ""}>{html.escape(sid)}</option>'
+        )
+    return (
+        '<form class="selector" method="get" action="/">'
+        '<label for="project-experiment">project experiment</label> '
+        f'<select id="project-experiment" name="focus" onchange="this.form.submit()">'
+        f'{"".join(options)}</select>'
+        '<noscript><button type="submit">open</button></noscript>'
+        "</form>"
+    )
 
 
 def _render_dashboard_page(
@@ -511,6 +612,7 @@ def _render_experiment_page(
     profiles: dict[str, ScriptProfile],
     focus: str,
     series: list[str],
+    artifact: str = "",
 ) -> str:
     """Render the full per-experiment HTML page (strip, graph, artifacts, observation form)."""
     prev_href, next_href = _prev_next_hrefs(stems, stem, "/experiments/")
@@ -525,8 +627,6 @@ def _render_experiment_page(
         f' | <a href="{html.escape(_h(f"/experiments/{stem}/new", focus))}">＋ new step after this</a>'
         "</p>"
     )
-    evidence = _render_evidence(stem, focus)
-    evidence_section = f"<h2>evidence</h2>{evidence}" if evidence else ""
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -548,6 +648,12 @@ def _render_experiment_page(
   .box.strong {{ font-weight: bold; border-width: 2px; }}
   .arrow {{ color: #666; }}
   img {{ max-width: 100%; }}
+  .artifact-picker {{ display: flex; gap: 0.6rem; align-items: center; margin: 0.75rem 0; }}
+  .artifact-preview {{ border: 1px solid #ddd; border-radius: 6px; padding: 1rem; background: #fafafa; }}
+  .artifact-preview figure {{ margin: 0; }}
+  .artifact-preview figcaption, .preview-note {{ color: #666; font-size: 0.85rem; margin-top: 0.5rem; }}
+  .table-scroll {{ max-height: 38rem; overflow: auto; }}
+  .text-preview {{ max-height: 38rem; overflow: auto; white-space: pre-wrap; }}
   .evidence {{ border-collapse: collapse; width: 100%; font-size: 0.9rem; }}
   .evidence th, .evidence td {{ border: 1px solid #ccc; padding: 0.4rem 0.6rem; text-align: left; vertical-align: top; }}
   .evidence th {{ background: #f0f0f0; }}
@@ -561,8 +667,7 @@ def _render_experiment_page(
 {nav}
 {_graph_html(stem, profiles, focus)}
 <h2>artifacts</h2>
-{_render_artifacts(stem, focus)}
-{evidence_section}
+{_render_artifacts(stem, focus, artifact)}
 <h2>observations</h2>
 {_render_observations_form(stem, load_observations(stem), focus)}
 </body>
@@ -772,7 +877,9 @@ def index(focus: str = Query(default=DEFAULT_SERIES)) -> HTMLResponse | PlainTex
 
 @app.get("/experiments/{name}", response_model=None)
 def experiment_page(
-    name: str, focus: str = Query(default=DEFAULT_SERIES)
+    name: str,
+    focus: str = Query(default=DEFAULT_SERIES),
+    artifact: str = Query(default=""),
 ) -> HTMLResponse | PlainTextResponse:
     """Serve the per-experiment page with strip, graph, artifacts, and observation form."""
     focus = _resolve_focus(focus)
@@ -784,7 +891,13 @@ def experiment_page(
     stems = [s.stem for s in series_scripts(focus)]
     return HTMLResponse(
         _render_experiment_page(
-            name, _question_from_docstring(script), stems, series_profiles(focus), focus, list_series()
+            name,
+            _question_from_docstring(script),
+            stems,
+            series_profiles(focus),
+            focus,
+            list_series(),
+            artifact,
         )
     )
 

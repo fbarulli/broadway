@@ -86,28 +86,47 @@ def _dashboard_story_items(track: str, stems: list[str]) -> list[tuple[str, str,
     return items
 
 
-def serve_dashboard(port: int) -> None:
-    """Start the hosted dashboard (blocking): maps + results + canvas."""
+def _ensure_dashboard_env() -> None:
+    """Set BROADWAY_* before the dashboard module is first imported.
+
+    The dashboard reads its env at import time; map building imports it as a
+    side effect, so the env must be final before either step runs.
+    """
     from project.paths import load_project_paths
 
     paths = load_project_paths()
     os.environ.setdefault("BROADWAY_EXPERIMENTS_ROOT", str(paths.experiments))
     os.environ.setdefault("BROADWAY_OBSERVATIONS_DIR", str(paths.observations))
     os.environ.setdefault("BROADWAY_DIAGRAMS_DIR", str(REPO_ROOT / "diagrams"))
+
+
+def serve_dashboard(port: int, *, reload: bool = True) -> None:
+    """Start the hosted dashboard (blocking): maps + results + canvas."""
+    _ensure_dashboard_env()
     import uvicorn
 
-    from broadway.reports.experiments_dashboard import app
+    from broadway.reports import experiments_dashboard as ui
+
+    ui.configure_from_env()
 
     print(f"dashboard serving at http://127.0.0.1:{port}  (canvas: /canvas)")
-    uvicorn.run(app, host="127.0.0.1", port=port)
+    uvicorn.run(
+        "broadway.reports.experiments_dashboard:app",
+        host="127.0.0.1",
+        port=port,
+        reload=reload,
+        reload_dirs=[str(REPO_ROOT / "src"), str(REPO_ROOT / "project" / "experiments")],
+    )
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="render_canvas_maps")
     parser.add_argument("--no-serve", action="store_true", help="rebuild maps only")
+    parser.add_argument("--no-reload", action="store_true", help="disable Uvicorn auto-reload")
     parser.add_argument("--port", type=int, default=8000)
     args = parser.parse_args(argv)
 
+    _ensure_dashboard_env()
     diagrams_dir = REPO_ROOT / "diagrams"
     diagrams_dir.mkdir(parents=True, exist_ok=True)
     experiments_root = REPO_ROOT / "project" / "experiments"
@@ -119,7 +138,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"maps ready: {', '.join(built) if built else 'specs only (no renderer)'}")
     if args.no_serve:
         return 0
-    serve_dashboard(args.port)
+    serve_dashboard(args.port, reload=not args.no_reload)
     return 0
 
 
