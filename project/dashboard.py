@@ -11,7 +11,10 @@ def main() -> None:
     """Serve the generic dashboard with this project's resolved paths."""
     paths = load_project_paths()
     os.environ.setdefault("BROADWAY_EXPERIMENTS_ROOT", str(paths.experiments))
-    os.environ.setdefault("BROADWAY_OBSERVATIONS_DIR", str(paths.observations))
+    # Project-relative observations may not exist (live verdicts live under the
+    # repo-root default). Only override when the resolved dir is real.
+    if paths.observations.is_dir():
+        os.environ.setdefault("BROADWAY_OBSERVATIONS_DIR", str(paths.observations))
     from broadway.reports.experiments_dashboard import app
 
     uvicorn.run(app, host="127.0.0.1", port=8000)

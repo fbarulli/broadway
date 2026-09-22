@@ -11,6 +11,7 @@ def test_main_wires_project_paths_into_generic_dashboard(monkeypatch, tmp_path) 
         experiments=tmp_path / "experiments",
         observations=tmp_path / "observations",
     )
+    (tmp_path / "observations").mkdir()
     run_calls: list[tuple[object, str, int]] = []
     monkeypatch.delenv("BROADWAY_EXPERIMENTS_ROOT", raising=False)
     monkeypatch.delenv("BROADWAY_OBSERVATIONS_DIR", raising=False)

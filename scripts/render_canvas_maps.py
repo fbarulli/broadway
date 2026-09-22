@@ -96,7 +96,10 @@ def _ensure_dashboard_env() -> None:
 
     paths = load_project_paths()
     os.environ.setdefault("BROADWAY_EXPERIMENTS_ROOT", str(paths.experiments))
-    os.environ.setdefault("BROADWAY_OBSERVATIONS_DIR", str(paths.observations))
+    # Project-relative observations may not exist (live verdicts live under the
+    # repo-root default). Only override when the resolved dir is real.
+    if paths.observations.is_dir():
+        os.environ.setdefault("BROADWAY_OBSERVATIONS_DIR", str(paths.observations))
     os.environ.setdefault("BROADWAY_DIAGRAMS_DIR", str(REPO_ROOT / "diagrams"))
 
 
