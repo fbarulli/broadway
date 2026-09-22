@@ -240,6 +240,16 @@
    "id": "polynomial_regression_et_all/01_polynomial_regression",
    "label": "01_polynomial_regression",
    "group": "series"
+  },
+  {
+   "id": "track-timeseries",
+   "label": "timeseries (1 steps)",
+   "group": "series"
+  },
+  {
+   "id": "timeseries/01_series_profile",
+   "label": "01_series_profile",
+   "group": "series"
   }
  ],
  "edges": [
@@ -660,6 +670,16 @@
   },
   {
    "from": "polynomial_regression_et_all/01_polynomial_regression",
+   "to": "dashboard",
+   "label": "plots"
+  },
+  {
+   "from": "track-timeseries",
+   "to": "timeseries/01_series_profile",
+   "label": "runs"
+  },
+  {
+   "from": "timeseries/01_series_profile",
    "to": "dashboard",
    "label": "plots"
   }

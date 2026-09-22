@@ -1,0 +1,52 @@
+{
+ "title": "timeseries story",
+ "nodes": [
+  {
+   "id": "01_series_profile",
+   "label": "01_series_profile: temporal profile of the canonical frame (read-only).",
+   "group": "step-01_series_profile"
+  },
+  {
+   "id": "01_series_profile/01_series_profile.png",
+   "label": "01_series_profile.png",
+   "group": "step-01_series_profile"
+  },
+  {
+   "id": "01_series_profile/01_series_profile.md",
+   "label": "01_series_profile.md",
+   "group": "step-01_series_profile"
+  },
+  {
+   "id": "01_series_profile/01_series_profile_daily_counts.csv",
+   "label": "01_series_profile_daily_counts.csv",
+   "group": "step-01_series_profile"
+  },
+  {
+   "id": "01_series_profile/01_series_profile_hourly_counts.csv",
+   "label": "01_series_profile_hourly_counts.csv",
+   "group": "step-01_series_profile"
+  }
+ ],
+ "edges": [
+  {
+   "from": "01_series_profile",
+   "to": "01_series_profile/01_series_profile.png",
+   "label": "produces"
+  },
+  {
+   "from": "01_series_profile",
+   "to": "01_series_profile/01_series_profile.md",
+   "label": "produces"
+  },
+  {
+   "from": "01_series_profile",
+   "to": "01_series_profile/01_series_profile_daily_counts.csv",
+   "label": "produces"
+  },
+  {
+   "from": "01_series_profile",
+   "to": "01_series_profile/01_series_profile_hourly_counts.csv",
+   "label": "produces"
+  }
+ ]
+}
