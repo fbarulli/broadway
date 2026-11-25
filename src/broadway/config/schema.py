@@ -6,6 +6,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from broadway.analysis.contracts import AnalysisContract, AnalysisMode
+from broadway.calibration.contracts import CalibrationConfig
 from broadway.training.models.registry import allowed_params
 
 
@@ -194,6 +195,7 @@ class ExperimentConfig(BaseModel):
     target_metric: str
     hpo: HPOConfig | None = None
     preprocessing: list[PreprocessingStepConfig] = []
+    calibration: CalibrationConfig | None = None
 
     @model_validator(mode="after")
     def _validate_hpo_search_space(self) -> ExperimentConfig:
@@ -296,6 +298,8 @@ class EvaluateStep(BaseModel):
     promotion_threshold: float
     output_dir: str
     output_file: str
+    coverage_tolerance: float | None = None
+    min_period_rows: int | None = None
 
 
 class BaselineStep(BaseModel):

@@ -1,4 +1,8 @@
 target_metric: rmse
 promotion_threshold: 0.05
+coverage_tolerance: 0.05
+# Weekly coverage periods with fewer rows are excluded: a partial terminal
+# week must never be read as a coverage collapse (complete-bucket rule).
+min_period_rows: 100
 output_dir: artifacts/evaluation
 output_file: metrics.json

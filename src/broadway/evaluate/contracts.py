@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict
 
+from broadway.calibration.contracts import CalibrationEvaluation
+
 
 class MetricComparison(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -40,4 +42,5 @@ class EvaluationResult(BaseModel):
     residuals: dict[str, float] | None = None
     comparison: ModelComparison | None = None
     baseline: BaselineComparison | None = None
+    calibration: CalibrationEvaluation | None = None
     warnings: list[str] = []

@@ -12,11 +12,20 @@ from pathlib import Path
 from typing import Any
 
 import mlflow
+import numpy as np
 import pandas as pd
 
 from broadway.analysis.contracts import AnalysisMode, require_mode
 from broadway.baseline.improvement import improvement_vs_baseline
 from broadway.baseline.module import load_persisted
+from broadway.calibration import CALIBRATION_FILE
+from broadway.calibration.conformal import SplitConformal
+from broadway.calibration.contracts import (
+    CalibrationEvaluation,
+    CalibrationSummary,
+    PeriodCoverage,
+)
+from broadway.calibration.metrics import coverage, coverage_by_period, mean_width
 from broadway.config.schema import PipelineConfig
 from broadway.evaluate.comparison import compare_models
 from broadway.evaluate.contracts import BaselineComparison, EvaluationResult
@@ -27,7 +36,12 @@ from broadway.features.generic import validate_engineered_frame
 from broadway.lineage.ids import node_id
 from broadway.lineage.records import write_record
 from broadway.training.contracts import TrainingResult
-from broadway.training.mlflow_utils import get_champion, promote_candidate, setup_mlflow
+from broadway.training.mlflow_utils import (
+    get_champion,
+    log_metrics,
+    promote_candidate,
+    setup_mlflow,
+)
 from broadway.training.trainer import build_model_pipeline
 from broadway.utils import eligible_feature_columns
 
@@ -38,7 +52,9 @@ def _processed_dir(cfg: PipelineConfig) -> Path:
     return Path(cfg.environment.data_dir) / cfg.environment.processed_subdir
 
 
-def _load_val_features(cfg: PipelineConfig) -> tuple[pd.DataFrame, pd.Series]:
+def _load_val_features(
+    cfg: PipelineConfig,
+) -> tuple[pd.DataFrame, pd.Series, pd.DataFrame]:
     assert cfg.etl is not None and cfg.dataset is not None
     out_dir = _processed_dir(cfg)
     val_path = out_dir / cfg.etl.val_features_file
@@ -49,7 +65,7 @@ def _load_val_features(cfg: PipelineConfig) -> tuple[pd.DataFrame, pd.Series]:
     val_df = pd.read_parquet(val_path)
     validate_engineered_frame(cfg, val_df)
     assert cfg.dataset is not None
-    return eligible_feature_columns(val_df, cfg), val_df[cfg.dataset.target]
+    return eligible_feature_columns(val_df, cfg), val_df[cfg.dataset.target], val_df
 
 
 def _load_train_features(cfg: PipelineConfig) -> tuple[pd.DataFrame, pd.Series]:
@@ -79,6 +95,82 @@ def _load_champion(model_uri: str) -> Any:
     return mlflow.pyfunc.load_model(model_uri)
 
 
+def _period_coverage(
+    cfg: PipelineConfig,
+    val_df: pd.DataFrame,
+    y_true: np.ndarray,
+    lower: np.ndarray,
+    upper: np.ndarray,
+) -> list[PeriodCoverage]:
+    """Per-ISO-week holdout coverage; empty when the dataset declares no datetime."""
+    assert cfg.dataset is not None and cfg.evaluate is not None
+    column = cfg.dataset.datetime_column
+    if column is None or column not in val_df.columns:
+        return []
+    min_rows = cfg.evaluate.min_period_rows if cfg.evaluate.min_period_rows is not None else 1
+    return coverage_by_period(
+        pd.DatetimeIndex(val_df[column]), y_true, lower, upper, min_rows=min_rows
+    )
+
+
+def _calibration_evaluation(
+    cfg: PipelineConfig,
+    summary: CalibrationSummary,
+    val_df: pd.DataFrame,
+    y_true: np.ndarray,
+    y_pred: np.ndarray,
+) -> CalibrationEvaluation:
+    """Evaluate the calibrated interval on the untouched holdout."""
+    assert cfg.evaluate is not None
+    lower, upper = SplitConformal().interval(y_pred, summary.q)
+    observed = coverage(y_true, lower, upper)
+    nominal = 1.0 - summary.alpha
+    tolerance = cfg.evaluate.coverage_tolerance
+    calibrated = None if tolerance is None else abs(observed - nominal) <= tolerance
+    return CalibrationEvaluation(
+        method=summary.method,
+        alpha=summary.alpha,
+        q=summary.q,
+        nominal_coverage=nominal,
+        coverage=observed,
+        mean_width=mean_width(lower, upper),
+        periods=_period_coverage(cfg, val_df, y_true, lower, upper),
+        coverage_tolerance=tolerance,
+        calibrated=calibrated,
+    )
+
+
+def _calibration_warning(evaluation: CalibrationEvaluation) -> str:
+    """Name the observed-vs-nominal gap when the interval misses tolerance."""
+    assert evaluation.coverage_tolerance is not None
+    gap = evaluation.coverage - evaluation.nominal_coverage
+    return (
+        f"calibration coverage {evaluation.coverage:.3f} deviates from nominal "
+        f"{evaluation.nominal_coverage:.3f} by {gap:+.3f} "
+        f"(tolerance {evaluation.coverage_tolerance:.3f})"
+    )
+
+
+def _persist_calibration(
+    eval_dir: Path, evaluation: CalibrationEvaluation
+) -> None:
+    """Write the calibration artifact and log coverage/width to MLflow."""
+    (eval_dir / CALIBRATION_FILE).write_text(
+        evaluation.model_dump_json(indent=2), encoding="utf-8"
+    )
+    with mlflow.start_run():
+        log_metrics(
+            {
+                "calibration.coverage": evaluation.coverage,
+                "calibration.mean_width": evaluation.mean_width,
+            }
+        )
+    logger.info(
+        f"evaluate: calibration coverage={evaluation.coverage:.4f}, "
+        f"mean_width={evaluation.mean_width:.4f}, calibrated={evaluation.calibrated}"
+    )
+
+
 def run(cfg: PipelineConfig) -> None:
     if not cfg.dataset or not cfg.experiment or not cfg.evaluate or not cfg.etl or not cfg.train:
         raise ValueError("evaluate step requires dataset, experiment, evaluate, etl, and train config")
@@ -87,13 +179,21 @@ def run(cfg: PipelineConfig) -> None:
 
     setup_mlflow(cfg.environment.mlflow_tracking_uri, cfg.dataset.name)
 
-    X_val, y_val = _load_val_features(cfg)
+    X_val, y_val, val_df = _load_val_features(cfg)
     result = _load_training_result(cfg)
     candidate = _load_candidate(result)
 
     y_true = y_val.to_numpy()
     y_pred = candidate.predict(X_val)
     candidate_metrics = compute_metrics(y_true, y_pred)
+
+    calibration_evaluation: CalibrationEvaluation | None = None
+    if result.calibration is not None:
+        calibration_evaluation = _calibration_evaluation(
+            cfg, result.calibration, val_df, y_true, y_pred
+        )
+        if calibration_evaluation.calibrated is False:
+            warnings.append(_calibration_warning(calibration_evaluation))
 
     baseline_result = load_persisted(cfg)
     baseline_comparison: BaselineComparison | None = None
@@ -157,12 +257,15 @@ def run(cfg: PipelineConfig) -> None:
         # so downstream consumers can trace champion-None (delta=None) values explicitly.
         comparison=comparison,
         baseline=baseline_comparison,
+        calibration=calibration_evaluation,
         warnings=warnings,
     )
 
     eval_dir = Path(cfg.evaluate.output_dir)
     eval_dir.mkdir(parents=True, exist_ok=True)
     (eval_dir / cfg.evaluate.output_file).write_text(evaluation.model_dump_json(indent=2), encoding="utf-8")
+    if calibration_evaluation is not None:
+        _persist_calibration(eval_dir, calibration_evaluation)
     write_record(
         node_id("evaluation", cfg.dataset.name),
         "evaluation",

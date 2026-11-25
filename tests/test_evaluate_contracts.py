@@ -74,6 +74,7 @@ def test_evaluation_result_json_round_trip() -> None:
             }
         },
         "baseline": None,
+        "calibration": None,
         "warnings": [],
     }
     assert EvaluationResult.model_validate_json(data) == result

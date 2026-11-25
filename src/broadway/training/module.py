@@ -7,14 +7,19 @@ import warnings
 from pathlib import Path
 
 import mlflow
+import numpy as np
 import pandas as pd
 from mlflow.models import infer_signature
+from sklearn.pipeline import Pipeline
 
 from broadway.analysis.contracts import AnalysisMode, require_mode
 from broadway.baseline.improvement import improvement_vs_baseline
 from broadway.baseline.module import load_persisted
+from broadway.calibration import CALIBRATION_FILE
+from broadway.calibration.conformal import SplitConformal
+from broadway.calibration.contracts import CalibrationConfig, CalibrationSummary
 from broadway.config.schema import PipelineConfig
-from broadway.data.splitter import split
+from broadway.data.splitter import calibration_split, split
 from broadway.evaluate.metrics import compute_metrics
 from broadway.features.generic import validate_engineered_frame
 from broadway.lineage.ids import node_id
@@ -87,27 +92,93 @@ def _resolve_params(
     return dict(best["best_params"])
 
 
+def _calibration_config(cfg: PipelineConfig) -> CalibrationConfig | None:
+    """Return the experiment's calibration request, refusing unsupported combos.
+
+    HPO selects params on a validation slice while split-conformal calibration
+    needs its own exchangeable calibration slice; combining them in one step
+    would leak the calibration slice into model selection, so it fails loud.
+    """
+    assert cfg.experiment is not None
+    calibration = cfg.experiment.calibration
+    if calibration is not None and cfg.experiment.hpo is not None:
+        raise ValueError(
+            "calibration with hpo is unsupported in this slice: calibration "
+            "fits q on a held-out calibration slice while HPO selects params on "
+            "its validation slice; configure hpo or calibration, not both"
+        )
+    return calibration
+
+
+def _fit_calibration(
+    cfg: PipelineConfig,
+    calibration_df: pd.DataFrame,
+    model: Pipeline,
+    calibration: CalibrationConfig,
+) -> CalibrationSummary:
+    """Fit the residual quantile on the calibration slice (never on the holdout)."""
+    assert cfg.dataset is not None
+    X_cal, y_cal = _xy(cfg, calibration_df)
+    residuals = np.abs(y_cal.to_numpy() - model.predict(X_cal))
+    q = SplitConformal().quantile(residuals, calibration.alpha)
+    return CalibrationSummary(
+        method=calibration.method,
+        alpha=calibration.alpha,
+        q=q,
+        n_calibration=len(calibration_df),
+        calibration_size=calibration.calibration_size,
+    )
+
+
+def _log_calibration(summary: CalibrationSummary) -> None:
+    log_params(
+        {"calibration.method": summary.method, "calibration.alpha": summary.alpha}
+    )
+    log_metrics({"calibration.q": summary.q})
+
+
 def run(cfg: PipelineConfig) -> None:
     if not cfg.dataset or not cfg.experiment or not cfg.train or not cfg.etl:
         raise ValueError("training step requires dataset, experiment, train, and etl config")
     require_mode(cfg.analysis, AnalysisMode.PREDICTION)
     assert cfg.analysis is not None and cfg.analysis.name is not None
 
+    calibration = _calibration_config(cfg)
     train_df, val_df = _load_features(cfg)
 
     if val_df is None:
         train_df, val_df = split(train_df, cfg.dataset, cfg.experiment.split, cfg.experiment.random_state)
 
-    X_train, y_train = _xy(cfg, train_df)
+    fit_df = train_df
+    calibration_df: pd.DataFrame | None = None
+    if calibration is not None:
+        # The fit/calibration split is the only slice q is measured on; val_df
+        # stays the untouched holdout and never feeds the calibration quantile.
+        fit_df, calibration_df = calibration_split(
+            train_df,
+            cfg.dataset,
+            cfg.experiment.split,
+            calibration.calibration_size,
+            cfg.experiment.random_state,
+        )
+
+    X_train, y_train = _xy(cfg, fit_df)
     X_val, y_val = _xy(cfg, val_df)
 
     params = _resolve_params(cfg, X_train, y_train, X_val, y_val)
 
     model, result = train(cfg, X_train, y_train, **params)
+    summary: CalibrationSummary | None = None
+    if calibration is not None:
+        assert calibration_df is not None
+        summary = _fit_calibration(cfg, calibration_df, model, calibration)
+        result = result.model_copy(update={"calibration": summary})
 
     setup_mlflow(cfg.environment.mlflow_tracking_uri, cfg.dataset.name)
     with mlflow.start_run():
         log_params(params)
+        if summary is not None:
+            _log_calibration(summary)
         log_params(
             {
                 f"data_source.{key}": value
@@ -163,6 +234,10 @@ def run(cfg: PipelineConfig) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / cfg.train.output_file).write_text(result.model_dump_json(indent=2), encoding="utf-8")
     logger.info(f"training result written to {out_dir / cfg.train.output_file}")
+    if summary is not None:
+        calibration_path = out_dir / CALIBRATION_FILE
+        calibration_path.write_text(summary.model_dump_json(indent=2), encoding="utf-8")
+        logger.info(f"calibration written to {calibration_path}")
     write_record(
         node_id("training", cfg.dataset.name),
         "training",
