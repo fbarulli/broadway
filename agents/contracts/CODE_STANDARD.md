@@ -87,15 +87,17 @@ platform through an owned seam.
 | `scope` | `platform` \| `project` \| `dev` \| `optional` |
 | `purpose` | the capability it provides |
 | `adapter` | module that wraps it (empty only for dev tooling) |
-| `license` | SPDX id, checked against the allowlist |
+| `license` | SPDX id, recorded for provenance only |
 | `added` | date, so age is visible |
 
 **Rules.**
 
 - Hash-pinned through `uv.lock`; CI syncs with `--frozen`. No floating ranges at
   runtime.
-- License allowlist lives in the same registry file. An unlisted or unknown
-  license fails the gate.
+- Licenses are **recorded, not gated**: this platform is internal and undistributed,
+  so no allowlist blocks a dependency and no human reviews one. The SPDX id is
+  captured automatically for provenance. Revisit only if the project is ever
+  published, sold, or distributed as a product.
 - A vulnerability scan runs at the fast tier; the severity threshold is config, and
   an advisory is never silently ignored.
 - **One library per capability.** A second library that overlaps an existing one is
@@ -123,8 +125,11 @@ platform through an owned seam.
 ## 6. Enforcement
 
 - `ruff`, `mypy`, `vulture`, config-schema load — the existing fast tier.
-- Dependency gate: every direct dependency resolves to a registry row; license and
-  scope checks; vulnerability threshold from config.
+- Dependency gate: every direct dependency resolves to a registry row; scope check;
+  license recorded (not gated).
+- Vulnerability scan at the fast tier once the scanner lands; severity threshold is
+  config and an advisory is never silently ignored. Security is separate from
+  licensing and is not relaxed by the internal-use policy.
 - Import-boundary check: `src/` importing a `project`-scoped dep fails.
 - Review: the pass-2 questions (§2) and one-library-per-capability (§4) are
   reviewer duties until the gates exist.
