@@ -19,16 +19,17 @@ import json
 import math
 import resource
 import sys
-import time
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field
 
 StepFn = Callable[[int, int, str, str], int | None]
+Device = Literal["cuda", "cpu"]
+Dtype = Literal["fp32", "fp16", "bf16"]
 _MIB = 1_000_000.0
 
 
@@ -38,8 +39,8 @@ class ProbeConfig(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     step: str
-    device: str
-    dtype: str
+    device: Device
+    dtype: Dtype
     seq_len: int = Field(gt=0)
     batches: list[int] = Field(min_length=1)
     headroom: float = Field(gt=0.0, le=1.0)
@@ -74,13 +75,13 @@ class Baseline(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    device: str
+    device: Device
     device_name: str
     total_mb: float | None
     free_mb: float | None
     params: int | None
     seq_len: int
-    dtype: str
+    dtype: Dtype
     headroom: float
     batches: list[BatchMeasurement]
     max_batch: int | None
@@ -205,10 +206,7 @@ class MemoryProbe:
 
             torch.cuda.empty_cache()
             torch.cuda.reset_peak_memory_stats()
-        started = time.perf_counter()
-        params = self._step(batch, self._config.seq_len, self._config.device, self._config.dtype)
-        _ = time.perf_counter() - started
-        return params
+        return self._step(batch, self._config.seq_len, self._config.device, self._config.dtype)
 
     def _max_batch(self, measurements: list[BatchMeasurement], total: float) -> int | None:
         ok = [m for m in measurements if m.ok]
@@ -220,7 +218,9 @@ class MemoryProbe:
             for m in ok
             if (m.peak_reserved_mb or m.peak_rss_mb or 0.0) <= limit
         ]
-        return max((m.batch_size for m in fitting), default=ok[0].batch_size)
+        if not fitting:
+            return None
+        return max(m.batch_size for m in fitting)
 
     def _per_trial(self, measurements: list[BatchMeasurement], max_batch: int | None) -> float | None:
         if max_batch is None:
@@ -276,7 +276,8 @@ def main(argv: list[str] | None = None) -> int:
             updates["batches"] = [int(v) for v in arguments.batches.split(",")]
         if arguments.output:
             updates["output"] = arguments.output
-        config = config.model_copy(update=updates)
+        # model_copy(update=...) does not validate; re-validate at the CLI boundary
+        config = ProbeConfig.model_validate({**config.model_dump(), **updates})
 
     baseline = MemoryProbe.from_config(config).run()
     path = _write(baseline, config.output)

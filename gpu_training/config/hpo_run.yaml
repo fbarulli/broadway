@@ -1,8 +1,11 @@
 # HPO fan-out config (SSOT). No study name, budget, or storage URL in code.
 #
 # `command` is the per-worker command template. Placeholders:
-#   {study} {storage} {n_trials} {micro_batch} {worker} {gpu}
-# Replace it with the ER HPO kernel invocation on the GPU host.
+#   {study} {storage} {storage_env} {n_trials} {micro_batch} {worker} {gpu}
+# {storage} is resolved from `storage_env` ONLY in the child argv; every printed
+# command shows <redacted> instead. Prefer {storage_env} (the env name) when the
+# child can read it itself — then the secret never enters argv at all. Replace
+# the template with the ER HPO kernel invocation on the GPU host.
 command: "python -m hpo.kernel --study {study} --storage {storage} --n-trials {n_trials} --micro-batch {micro_batch} --worker {worker}"
 
 n_trials: 10

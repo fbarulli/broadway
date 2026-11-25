@@ -5,11 +5,15 @@
 This directory has two parts:
 
 1. **`er_reference/`** — a faithful copy of ER's Kaggle/Colab training lane
-   (`/home/opc/ONE/ER`, 66 files: `src/cli/{kaggle,colab,laya_hpo,laya_kernel_text,laya_*}.py`,
+   (`/home/opc/ONE/ER` at commit **`d5eab456`**, 66 files:
+   `src/cli/{kaggle,colab,laya_hpo,laya_kernel_text,laya_*}.py`,
    the `scripts/` launchers, `config/laya_hpo_space.yaml`, `config/training.yaml`).
    These files are a **reference**, not a runnable package: they import ER's
    `core`, `model_tracks`, and `laya` modules, which were not copied. Keep them
-   as the source of truth for how the lane is wired.
+   as the source of truth for how the lane is wired. The copy is excluded from
+   the ruff gate (`ruff check … --exclude gpu_training/er_reference`): a verbatim
+   copy must stay verbatim, so its diagnostics (147 today) are not this repo's
+   to fix.
 2. **The runnable part here** — a memory probe and an HPO fan-out that do not
    depend on ER:
    - `memory_probe.py` — measures the real training step's footprint per
@@ -46,6 +50,13 @@ The probe replaces the hand-pinned number with a measurement on the actual host.
 It reports the largest batch that fits under `headroom` of total, the per-trial
 footprint, and an upper bound on concurrent trials
 (`floor(free * headroom / footprint)`). That is the baseline the HPO run needs.
+When no successful batch fits, `max_batch` is `null` — the launcher then refuses
+to start rather than running a batch the probe already rejected.
+
+On CPU, `peak_rss_mb` is **process-cumulative** (`ru_maxrss` high-water mark for
+the whole probe process), not the footprint of that one batch. It still answers
+"does the machine survive this batch", and it is monotonic, so the largest
+observed value is the honest one.
 
 ## Step adapter contract
 
@@ -100,7 +111,7 @@ Output (`baseline/memory_baseline.json` by default):
 python gpu_training/run_hpo.py \
   --baseline baseline/memory_baseline.json \
   --config gpu_training/config/hpo_run.yaml \
-  --dry-run          # prints the resolved worker commands
+  --dry-run          # prints the resolved worker commands (storage URL redacted)
 ```
 
 `--execute` starts the workers (one per assigned GPU/MPS slot), splits the
@@ -108,6 +119,22 @@ trial budget, and injects `micro_batch` from the baseline. The command template
 is config; no study name, storage URL, or budget is code. The shared Optuna URL
 comes from the env var named in `config/hpo_run.yaml` (`OPTUNA_STORAGE_URL`),
 never a file or a literal.
+
+Budget split: the trial count is divided exactly — floor per worker, remainder
+to the first workers — so 5 trials over 2 workers is 3 + 2, never 3 + 3. Workers
+never outnumber trials.
+
+Fan-out is concurrent: `--execute` starts every worker with `Popen` and only
+then waits on each exit code, so two workers cost the slower one, not the sum.
+Any non-zero code fails the launch (exit 1) with the failing codes.
+
+Secret handling: the storage URL is redacted in **everything printed** — the
+dry-run plan and the `--execute` banner show `--storage <redacted>`; only the
+child argv carries the real value. Residual exposure: the value is still in the
+child's `/proc/<pid>/cmdline` while a worker runs, so anything able to read
+process arguments on the host can see it. A template that passes the env-var
+name (e.g. `--storage-env {storage_env}`) instead of the value would remove
+that too; that is a change on the ER HPO kernel side.
 
 ## What stays in ER
 

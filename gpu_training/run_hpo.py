@@ -3,14 +3,15 @@
 The baseline says which micro-batch fits and how many trials the host can run.
 This launcher splits the trial budget across that many workers, assigns each a
 GPU/MPS slot, and renders the command from config. Dry-run is the default
-posture; ``--execute`` starts the workers.
+posture; ``--execute`` starts every worker at once, then collects exit codes.
+The storage URL is a secret: it is redacted in everything printed, and only the
+child argv carries the real value.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
-import math
 import os
 import shlex
 import subprocess
@@ -20,6 +21,8 @@ from pathlib import Path
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field
+
+REDACTED = "<redacted>"  # what every printed command shows in place of the storage URL
 
 
 class HpoRunConfig(BaseModel):
@@ -46,12 +49,18 @@ class HpoRunConfig(BaseModel):
 
 @dataclass(frozen=True)
 class WorkerPlan:
-    """One worker's assigned slot and trial budget."""
+    """One worker's assigned slot and trial budget.
+
+    ``command`` is the exact argv handed to the child (it carries the storage
+    URL); ``display`` is the same command with that URL redacted and is the
+    only render that may be printed.
+    """
 
     worker: int
     gpu: int
     n_trials: int
     command: str
+    display: str
 
 
 def _workers(config: HpoRunConfig, baseline: dict[str, object]) -> int:
@@ -61,40 +70,66 @@ def _workers(config: HpoRunConfig, baseline: dict[str, object]) -> int:
     return max(1, min(chosen, ceiling))
 
 
+def _distribute(n_trials: int, workers: int) -> list[int]:
+    """Split the budget exactly: floor each worker, hand the remainder to the first ones."""
+    base, remainder = divmod(n_trials, workers)
+    return [base + (1 if worker < remainder else 0) for worker in range(workers)]
+
+
 def _plan(config: HpoRunConfig, baseline: dict[str, object]) -> list[WorkerPlan]:
-    workers = _workers(config, baseline)
-    per_worker = math.ceil(config.n_trials / workers)
+    workers = min(_workers(config, baseline), config.n_trials)
     micro_batch = baseline.get("max_batch")
     if micro_batch is None:
         raise ValueError("baseline has no fitting batch: every configured micro-batch failed")
     storage = os.environ.get(config.storage_env, "<unset>")
     plans: list[WorkerPlan] = []
-    for worker in range(workers):
+    for worker, n_trials in enumerate(_distribute(config.n_trials, workers)):
         gpu = config.gpus[worker % len(config.gpus)]
-        command = config.command.format(
-            study=config.study,
-            storage=storage,
-            n_trials=per_worker,
-            micro_batch=micro_batch,
-            worker=worker,
-            gpu=gpu,
+        values = {
+            "study": config.study,
+            "n_trials": n_trials,
+            "micro_batch": micro_batch,
+            "worker": worker,
+            "gpu": gpu,
+            "storage_env": config.storage_env,
+        }
+        plans.append(
+            WorkerPlan(
+                worker=worker,
+                gpu=gpu,
+                n_trials=n_trials,
+                command=config.command.format(storage=storage, **values),
+                display=config.command.format(storage=REDACTED, **values),
+            )
         )
-        plans.append(WorkerPlan(worker=worker, gpu=gpu, n_trials=per_worker, command=command))
     return plans
 
 
-def _execute(plan: WorkerPlan, storage_env: str) -> int:
+def _start(plan: WorkerPlan) -> subprocess.Popen[bytes]:
     environment = {
         **os.environ,
         "CUDA_VISIBLE_DEVICES": str(plan.gpu),
         "OMP_NUM_THREADS": "1",
     }
+    print(f"[worker {plan.worker}] gpu={plan.gpu} trials={plan.n_trials}: {plan.display}", flush=True)
+    return subprocess.Popen(shlex.split(plan.command), env=environment)
+
+
+def _execute(plans: list[WorkerPlan], storage_env: str) -> list[int]:
+    """Start every worker before waiting on any so the fan-out is concurrent."""
     if storage_env not in os.environ:
         raise ValueError(
             f"{storage_env} is unset: the shared study URL must come from the secret store"
         )
-    print(f"[worker {plan.worker}] gpu={plan.gpu} trials={plan.n_trials}: {plan.command}", flush=True)
-    return subprocess.run(shlex.split(plan.command), env=environment, check=False).returncode
+    processes: list[subprocess.Popen[bytes]] = []
+    try:
+        for plan in plans:
+            processes.append(_start(plan))
+    except Exception:  # never leave earlier workers orphaned on a failed start
+        for process in processes:
+            process.terminate()
+        raise
+    return [process.wait() for process in processes]
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -118,10 +153,10 @@ def main(argv: list[str] | None = None) -> int:
     )
     if not arguments.execute:
         for plan in plans:
-            print(plan.command)
+            print(plan.display)
         return 0
 
-    codes = [_execute(plan, config.storage_env) for plan in plans]
+    codes = _execute(plans, config.storage_env)
     failed = [code for code in codes if code != 0]
     if failed:
         print(f"FAILED workers: {len(failed)}/{len(codes)} (codes {failed})", file=sys.stderr)

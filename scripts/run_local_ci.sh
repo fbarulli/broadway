@@ -178,17 +178,19 @@ gate_ruff() {
   # main checkout is data-agnostic by design, so lint exactly the paths
   # present (ruff E902s on missing paths). No hardcoded allowlist drift:
   # the candidate list is the owned surface; existence decides.
-  local candidates=(src tests project/experiments project/experiments.py project/working.py project/data.py scripts)
+  # gpu_training/er_reference is a verbatim ER reference copy (not runnable
+  # here), so it is the one explicit exclusion — see its README.
+  local candidates=(src tests project/experiments project/experiments.py project/working.py project/data.py scripts gpu_training)
   local paths=()
   local p
   if [[ $CLEAN_LINT -eq 1 ]]; then
     ensure_clean_snapshot
     for p in "${candidates[@]}"; do [[ -e "$CLEAN_SNAP/head/$p" ]] && paths+=("$p"); done
-    ( cd "$CLEAN_SNAP/head" && exec env UV_PROJECT_ENVIRONMENT="$CLEAN_SNAP/venv" bash scripts/uv.sh run --extra dev ruff check "${paths[@]}" )
+    ( cd "$CLEAN_SNAP/head" && exec env UV_PROJECT_ENVIRONMENT="$CLEAN_SNAP/venv" bash scripts/uv.sh run --extra dev ruff check "${paths[@]}" --exclude gpu_training/er_reference )
     return $?
   fi
   for p in "${candidates[@]}"; do [[ -e "$p" ]] && paths+=("$p"); done
-  bash scripts/uv.sh run --extra dev ruff check "${paths[@]}"
+  bash scripts/uv.sh run --extra dev ruff check "${paths[@]}" --exclude gpu_training/er_reference
 }
 # shellcheck disable=SC2317  # reached via `run_bg … gate_logging` indirection
 gate_logging() {
