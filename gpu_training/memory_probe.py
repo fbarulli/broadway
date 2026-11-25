@@ -88,6 +88,8 @@ class Baseline(BaseModel):
     per_trial_mb: float | None
     concurrent_trials: int | None
     created_at: str
+    concurrent_trials_per_gpu: int | None = None
+    device_count: int | None = None
 
 
 def _meminfo() -> dict[str, float]:
@@ -148,7 +150,9 @@ class MemoryProbe:
                 params = self._last_params
         max_batch = self._max_batch(measurements, total)
         per_trial = self._per_trial(measurements, max_batch)
-        concurrent = self._concurrency(free, per_trial)
+        per_gpu = self._concurrency(free, per_trial)
+        device_count = self._device_count()
+        concurrent = per_gpu * device_count if per_gpu is not None else None
         return Baseline(
             device=self._config.device,
             device_name=name,
@@ -162,6 +166,8 @@ class MemoryProbe:
             max_batch=max_batch,
             per_trial_mb=per_trial,
             concurrent_trials=concurrent,
+            concurrent_trials_per_gpu=per_gpu,
+            device_count=device_count,
             created_at=datetime.now(UTC).isoformat(),
         )
 
@@ -234,6 +240,14 @@ class MemoryProbe:
         if self._config.device != "cuda" or not per_trial:
             return None
         return max(1, math.floor((free * self._config.headroom) / per_trial))
+
+    def _device_count(self) -> int:
+        """Physical GPU count (1 on CPU); the baseline's total multiplies by it."""
+        if self._config.device != "cuda":
+            return 1
+        import torch
+
+        return max(1, torch.cuda.device_count())
 
 
 def _resolve_step(spec: str) -> StepFn:

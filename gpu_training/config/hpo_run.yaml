@@ -1,20 +1,17 @@
 # HPO fan-out config (SSOT). No study name, budget, or storage URL in code.
 #
-# `command` is the per-worker command template. Placeholders:
-#   {study} {storage} {storage_env} {n_trials} {micro_batch} {worker} {gpu}
-# {storage} is resolved from `storage_env` ONLY in the child argv; every printed
-# command shows <redacted> instead. Prefer {storage_env} (the env name) when the
-# child can read it itself — then the secret never enters argv at all. Replace
-# the template with the ER HPO kernel invocation on the GPU host.
-command: "python -m hpo.kernel --study {study} --storage {storage} --n-trials {n_trials} --micro-batch {micro_batch} --worker {worker}"
+# Replace with the model HPO kernel once the per-model measurements land.
+command: "python gpu_training/hpo_kernel.py --study {study} --storage {storage} --n-trials {n_trials} --micro-batch {micro_batch} --worker {worker}"
 
 n_trials: 10
-study: laya
-# Env var that holds the shared Optuna URL. ER resolves it from the secret
-# store; never put the value here.
+study: taxi_demand
+# Env var that holds the shared Optuna URL; never a file or a literal.
 storage_env: OPTUNA_STORAGE_URL
 
 # GPU ids visible to the launcher (one worker per MPS slot).
+# Kaggle 2xT4 (measured 1 trial/GPU): gpus: [0, 1], mps_slots_per_gpu: 1.
+# One T4 with MPS slots: gpus: [0], mps_slots_per_gpu: 2 — only if the measured
+# per-trial footprint fits twice (10.7 GB x 2 does NOT fit 15.6 GB).
 gpus: [0]
 mps_slots_per_gpu: 2
 

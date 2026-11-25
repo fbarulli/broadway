@@ -11,7 +11,7 @@ retired:
   successor: 'src/broadway/etl/module.py + src/broadway/data/loader.py (CONTRACT pipeline)'
   history_rows_retained: ['GATE-INGEST-01', 'GATE-INGEST-04', 'GATE-ETL-17', 'GATE-ETL-18', 'GATE-ETL-19', 'GATE-ETL-116', 'GATE-ETL-117']
 meta:
-  head: '2a070a7'
+  head: '72212b5'
   assembled: '2026-11-25'
   source_fragments:
   - agents/ledger/gates/01-ingest.md
@@ -25,7 +25,7 @@ meta:
   - agents/ledger/gates/09-infra.md
   - agents/ledger/gates/80-hpo-optuna.md
   counts:
-    total: 170
+    total: 169
     gates_with_findings: 84
     finding_strings: 109
     by_band:
@@ -66,7 +66,7 @@ meta:
         flagged: 9
         finding_strings: 13
       09-infra:
-        gates: 58
+        gates: 57
         flagged: 17
         finding_strings: 25
       81-object-custody:
@@ -3483,7 +3483,7 @@ gates:
   - hook re-runs the SAME full tier fail-closed server-side-of-your-fingers; sole bypass is visible `git push --no-verify`
   - 'WAVE-A teeth ① insertions: sources scripts/tier_gate.sh (:17); L1 pre-push hook guard VERIFIES (never auto-installs) that .git/hooks/pre-push execs run_local_ci.sh, refusing with manual-install remediation naming agents/contracts/hooks-pre-push.template (:31-40); TIER-GATE runs tg_run over the origin/$branch..HEAD unpushed batch — atomic all-or-nothing, skipped with a SHIP NOTICE when no remote baseline exists (:42-53)'
   - 'TIER-GATE grammar custody lands HERE as FILE-law co-aspect (distinct symbols, one ship-path artifact): scripts/tier_gate.sh tg_* library (_TG_TIERS :20, tg_check_message :64, tg_run :96) implements the D35(2) two-key rule — Tier ∈ {FULL,FAST,STATIC,DOCS} case-sensitive; FULL resolves Reviewer: against the EVENTS section AT THAT SHA plus the event-id echoed in the message. RESOLUTION SEMANTICS (fix-forward commit after the gate refused its own maiden batch): tg_events_resolves accepts the token as a row id OR as an exact word occurrence inside the EVENTS body — i.e. via an authority-class registration row whose stated scope is "valid Reviewer:-trailer resolution target" (row 39de4245 registers 2d9ab1a1 exactly so); unregistered ids still fail closed'
-  - 'POSTURE RIDER (mint deferred): tier_gate.sh has zero automated validation (no test executes any tg_*) and scripts/deadcode_census.py (teeth ⑥, advisory-never-gate by ratified law) is wired to NO tier — a dedicated registry row is OWED; ids now run 154..180 under the extended BAND_RANGES law, so mint at >=181 (153 stays burned)'
+  - 'POSTURE RIDER (mint deferred): tier_gate.sh has zero automated validation (no test executes any tg_*) and scripts/deadcode_census.py (teeth ⑥, advisory-never-gate by ratified law) is wired to NO tier — a dedicated registry row is OWED; ids now run 154..180 under the extended BAND_RANGES law, so mint at >=181 (153/176 stay burned)'
   touched_by:
   - agents/contracts/MAIN_AGENT_CONTRACT.md §Ship-path law (:148-155)
   - agents/ledger/DECISIONS.md D24/D25 (ship semantics + PUSH-STANDING-GO compensating control i)
@@ -3599,8 +3599,8 @@ gates:
 # --- SENIOR ARBITRATION CYCLE #2 LANDING (2026-08-24) --------------------
 # Appended region: ids continue the global dense order at 100..180 (slate §0).
 # Numeric ids are unique across prefixes: INFRA 154..180 sit ABOVE the BAND 81
-# CUST 147..153 block (153 stays burned). Future mints append >=181.
-# Burned ids NEVER reused: 121, 130, 132, 134, 135, 136, 140, 153. Not landed
+# CUST 147..153 block (153/176 stay burned). Future mints append >=181.
+# Burned ids NEVER reused: 121, 130, 132, 134, 135, 136, 140, 153, 176. Not landed
 # as standalone gates either: 106 MERGE-WITH-CFG-75 · 109 demoted to rider on
 # GATE-INGEST-03 (packet F #18) · 110 OVERRULE→NOT-GATE (packet F #19) ·
 # 115 OVERRULE→dead-code-DELETE-referral, executed this commit (packet G D5).
@@ -4401,7 +4401,7 @@ gates:
   inputs: []
   outputs: []
   transforms:
-  - 'declares the per-worker command template with placeholders {study}/{storage}/{n_trials}/{micro_batch}/{worker}/{gpu}, n_trials 10, study laya, gpus [0], mps_slots_per_gpu 2, and workers null (= use the baseline concurrency)'
+  - 'declares the per-worker command template with placeholders {study}/{storage}/{n_trials}/{micro_batch}/{worker}/{gpu}, n_trials 10, study taxi_demand, gpus [0], mps_slots_per_gpu 2, and workers null (= use the baseline concurrency)'
   - 'the shared Optuna URL is named only as storage_env OPTUNA_STORAGE_URL; the value comes from the secret store and never from this file'
   touched_by:
   - pyyaml@6.0.2
@@ -4427,25 +4427,9 @@ gates:
   - GATE-INFRA-171
   - GATE-INFRA-173
   findings: []
-- id: GATE-INFRA-176
-  phase: infra-meta
-  order: 160
-  owner: 'gpu_training/er_reference/config/laya_hpo_space.yaml:1 laya HPO reference space (copied from ER; tree is not executable here)'
-  inputs: []
-  outputs: []
-  transforms:
-  - 'REFERENCE-ONLY surface: 66 files copied from /home/opc/ONE/ER (src/cli kaggle/colab/laya_*, scripts/, config/training.yaml, config/laya_hpo_space.yaml); they import ER core/model_tracks/laya modules that were not copied, so nothing in this tree runs in this repo (gpu_training/README.md :5-12)'
-  - 'records ER HPO baseline facts: 421M-param laya, T4 15GB, micro_batch 16 with grad_accum 4, Optuna/TPE 10 trials, n_jobs 2 per session, objective dev_accuracy (never test) (gpu_training/README.md :23-35)'
-  - 'the runnable replacement is GATE-INFRA-171/172; the copied files are deliberately not gated individually, because a reference copy must not carry execution ownership it cannot honor'
-  touched_by: []
-  validated_by: []
-  if_changed:
-  - GATE-INFRA-171
-  - GATE-INFRA-172
-  findings: []
 - id: GATE-INFRA-177
   phase: infra-meta
-  order: 161
+  order: 160
   owner: 'src/broadway/pipeline.py:16 run()'
   inputs: []
   outputs: []
@@ -4464,7 +4448,7 @@ gates:
   findings: []
 - id: GATE-INFRA-178
   phase: infra-meta
-  order: 162
+  order: 161
   owner: 'configs/step/train.yaml:1 training step config'
   inputs: []
   outputs: []
@@ -4480,7 +4464,7 @@ gates:
   findings: []
 - id: GATE-INFRA-179
   phase: infra-meta
-  order: 163
+  order: 162
   owner: 'configs/step/evaluate.yaml:1 evaluation policy config'
   inputs: []
   outputs: []
@@ -4496,7 +4480,7 @@ gates:
   findings: []
 - id: GATE-INFRA-180
   phase: infra-meta
-  order: 164
+  order: 163
   owner: 'project/config/experiment/taxi.yaml:1 calibration opt-in overlay (split_conformal)'
   inputs: []
   outputs: []
@@ -4514,7 +4498,7 @@ gates:
 # --- BAND 81-OBJECT-CUSTODY (minted per slate §0; header law above) ------
 - id: GATE-CUST-147
   phase: object-custody
-  order: 165
+  order: 164
   owner: 'src/broadway/training/mlflow_utils.py:162 promote_candidate()'
   inputs:
   - 'model_uri + alias="champion"'
@@ -4533,7 +4517,7 @@ gates:
   findings: []
 - id: GATE-CUST-148
   phase: object-custody
-  order: 166
+  order: 165
   owner: 'src/broadway/training/mlflow_utils.py:163 register_model call sites'
   inputs:
   - candidate model_uri + dataset name
@@ -4549,7 +4533,7 @@ gates:
   findings: []
 - id: GATE-CUST-149
   phase: object-custody
-  order: 167
+  order: 166
   owner: 'project/experiments/mlflow/03_optuna_worker.py:111 set_tag trio (model/study/seed) + hpo callback tags + battle writers'
   inputs:
   - every mlflow.set_tag call across the independent writer sites
@@ -4566,7 +4550,7 @@ gates:
   findings: []
 - id: GATE-CUST-150
   phase: object-custody
-  order: 168
+  order: 167
   owner: 'src/broadway/training/mlflow_utils.py:59 set_experiment auto-create chokepoint (inside setup_mlflow :54-63)'
   inputs:
   - experiment_name argument at setup time
@@ -4581,7 +4565,7 @@ gates:
   findings: []
 - id: GATE-CUST-151
   phase: object-custody
-  order: 169
+  order: 168
   owner: 'k8s/optuna/lifecycle.sh:149 dump_state() snapshot generations (keep-N cap) + training-plane registry-prune policy (non-champion versions)'
   inputs:
   - registry versions + $BACKUP_DIR snapshot generations
@@ -4598,7 +4582,7 @@ gates:
   findings: []
 - id: GATE-CUST-152
   phase: object-custody
-  order: 170
+  order: 169
   owner: 'project/experiments/mlflow/03_optuna_worker.py:106 optuna_{model} run-name convention (+ {study} trial {n}, battle names)'
   inputs:
   - every run-name emission across optuna/battle/callback writers

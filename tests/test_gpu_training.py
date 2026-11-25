@@ -82,7 +82,7 @@ def _run_config(**overrides: object) -> run_hpo.HpoRunConfig:
     values: dict[str, object] = {
         "command": "run --n-trials {n_trials} --micro-batch {micro_batch} --worker {worker} --gpu {gpu}",
         "n_trials": 5,
-        "study": "laya",
+        "study": "taxi_demand",
         "storage_env": "OPTUNA_STORAGE_URL",
         "gpus": [0],
         "mps_slots_per_gpu": 2,
@@ -102,6 +102,18 @@ def test_plan_splits_the_trial_budget_over_measured_concurrency() -> None:
     assert [plan.gpu for plan in plans] == [0, 0]
 
 
+def test_plan_multiplies_per_gpu_concurrency_by_device_count() -> None:
+    baseline = {
+        "max_batch": 8,
+        "concurrent_trials": 1,
+        "concurrent_trials_per_gpu": 1,
+        "device_count": 2,
+    }
+    plans = run_hpo._plan(_run_config(gpus=[0, 1], mps_slots_per_gpu=1), baseline)
+    assert len(plans) == 2
+    assert [plan.gpu for plan in plans] == [0, 1]
+
+
 def test_plan_requires_a_fitting_batch() -> None:
     with pytest.raises(ValueError, match="no fitting batch"):
         run_hpo._plan(_run_config(), {"max_batch": None, "concurrent_trials": 1})
@@ -116,7 +128,7 @@ def _write_run_inputs(tmp_path: Path, command: str) -> tuple[Path, Path]:
             {
                 "command": command,
                 "n_trials": 4,
-                "study": "laya",
+                "study": "taxi_demand",
                 "storage_env": "OPTUNA_STORAGE_URL",
                 "gpus": [0],
                 "mps_slots_per_gpu": 2,

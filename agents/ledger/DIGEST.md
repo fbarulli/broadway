@@ -1,6 +1,6 @@
 # DIGEST.md — rendered from agents/ledger/gates.yaml · NEVER HAND-EDIT ·
 
-> 170 gates · rendered 2026-11-25 @ HEAD 2a070a7 · load THIS into context;
+> 169 gates · rendered 2026-11-25 @ HEAD 72212b5 · load THIS into context;
 > gates.yaml is the sole SSOT; the retired GATES.md/gates/*.md markdown world survives in agents/ledger/arbitration/2026-08-24/surface-and-analysis-preservation.md.
 
 | band | phase | gates | findings |
@@ -14,9 +14,9 @@
 | 07-surfaces | surfaces | 13 | 1 |
 | 08-config | config-schema | 17 | 11 |
 | 80-hpo-optuna | hpo-optuna | 10 | 9 |
-| 09-infra | infra-meta | 58 | 17 |
+| 09-infra | infra-meta | 57 | 17 |
 | 81-object-custody | object-custody | 6 | 0 |
-| **total** | | **170** | **84** |
+| **total** | | **169** | **84** |
 
 ### 01-ingest — ingest
 
@@ -365,8 +365,6 @@
   [] → [] · pins: 1
 - **GATE-INFRA-175** `gpu_training/adapters/cpu_smoke.py:22 step()`
   [] → [] · pins: 1
-- **GATE-INFRA-176** `gpu_training/er_reference/config/laya_hpo_space.yaml:1 laya HPO reference space (copied from ER; tree is not executable here)`
-  [] → [] · pins: none direct
 - **GATE-INFRA-177** `src/broadway/pipeline.py:16 run()`
   [] → [] · pins: 1
 - **GATE-INFRA-178** `configs/step/train.yaml:1 training step config`

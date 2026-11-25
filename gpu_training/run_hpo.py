@@ -64,9 +64,15 @@ class WorkerPlan:
 
 
 def _workers(config: HpoRunConfig, baseline: dict[str, object]) -> int:
-    measured = baseline.get("concurrent_trials")
+    per_gpu = baseline.get("concurrent_trials_per_gpu")
+    device_count = baseline.get("device_count")
+    measured: object
+    if isinstance(per_gpu, (int, float)) and isinstance(device_count, (int, float)):
+        measured = int(per_gpu) * int(device_count)
+    else:
+        measured = baseline.get("concurrent_trials")
     ceiling = len(config.gpus) * config.mps_slots_per_gpu
-    chosen = config.workers or (int(measured) if measured else 1)
+    chosen = config.workers or (int(measured) if isinstance(measured, (int, float)) else 1)
     return max(1, min(chosen, ceiling))
 
 
