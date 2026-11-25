@@ -13,13 +13,20 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 from broadway.paths import repo_root
 
 REPO_ROOT = repo_root()
 SCRIPT = REPO_ROOT / "scripts" / "verify_live.py"
 
 
-def _run(tmp_path: Path, command: str) -> subprocess.CompletedProcess[str]:
+def _run(
+    tmp_path: Path,
+    command: str,
+    dataset: Path | None = None,
+    *extra: str,
+) -> subprocess.CompletedProcess[str]:
     """Invoke the recorder against tmp_path evidence output."""
     return subprocess.run(
         [
@@ -30,9 +37,10 @@ def _run(tmp_path: Path, command: str) -> subprocess.CompletedProcess[str]:
             "--command",
             command,
             "--dataset",
-            str(tmp_path / "sample.csv"),
+            str(dataset if dataset is not None else tmp_path / "sample.csv"),
             "--output-dir",
             str(tmp_path / "evidence"),
+            *extra,
         ],
         cwd=REPO_ROOT,
         capture_output=True,
@@ -61,3 +69,26 @@ def test_verify_live_records_evidence_and_preserves_exit_code(tmp_path: Path) ->
     failed = _run(tmp_path, f'{sys.executable} -c "import sys; sys.exit(3)"')
     assert failed.returncode == 3
     assert sorted(record["exit_code"] for record in _records(tmp_path)) == [0, 3]
+
+
+def test_verify_live_honors_and_propagates_run_id(tmp_path: Path) -> None:
+    child = f'{sys.executable} -c "import os; print(os.environ[\'BROADWAY_RUN_ID\'])"'
+    result = _run(tmp_path, child, None, "--run-id", "abc123")
+    assert result.returncode == 0
+    record = _records(tmp_path)[0]
+    assert record["run_id"] == "abc123"
+    assert "abc123" in record["stdout_tail"]
+
+
+@pytest.mark.parametrize("corrupt", [False, True], ids=["missing", "corrupt"])
+def test_verify_live_records_unreadable_parquet_rows_with_reason(
+    tmp_path: Path, corrupt: bool
+) -> None:
+    dataset = tmp_path / "unreadable.parquet"
+    if corrupt:
+        dataset.write_bytes(b"not a parquet file")
+    result = _run(tmp_path, f'{sys.executable} -c "import sys; sys.exit(7)"', dataset)
+    assert result.returncode == 7
+    record = _records(tmp_path)[0]
+    assert record["rows"] is None
+    assert record["rows_error"]

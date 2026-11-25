@@ -10,11 +10,20 @@ import logging
 from pathlib import Path
 
 from broadway.config.schema import EnvironmentConfig
+from broadway.observability.context import current_run_id
 from broadway.paths import repo_root
 
-FORMAT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+FORMAT = "%(asctime)s [%(levelname)s] run=%(run_id)s %(name)s: %(message)s"
 
 _configured = False
+
+
+class RunIdFilter(logging.Filter):
+    """Stamp every record with the current run id (LOGGING.md §5)."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        record.run_id = current_run_id()
+        return True
 
 
 def _log_path(environment: EnvironmentConfig) -> Path:
@@ -35,10 +44,12 @@ def setup_logging(environment: EnvironmentConfig) -> None:
     log_path = _log_path(environment)
     log_path.parent.mkdir(parents=True, exist_ok=True)
     formatter = logging.Formatter(FORMAT)
+    run_id_filter = RunIdFilter()
     console = logging.StreamHandler()
     file_handler = logging.FileHandler(log_path)
     for handler in (console, file_handler):
         handler.setFormatter(formatter)
+        handler.addFilter(run_id_filter)
     root = logging.getLogger()
     root.setLevel(environment.log_level)
     root.addHandler(console)

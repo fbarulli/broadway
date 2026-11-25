@@ -17,12 +17,16 @@ empty store simply yields an empty list.
 from __future__ import annotations
 
 import os
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from importlib import metadata
 from pathlib import Path
 
 from fastapi import FastAPI
 from pydantic import BaseModel
 
+from broadway.config.loader import DEFAULT_ENVIRONMENT, load_environment
+from broadway.observability.logging import setup_logging
 from broadway.paths import repo_root
 
 
@@ -88,7 +92,14 @@ def list_models(store: Path | None = None) -> list[ModelEntry]:
     return found
 
 
-app = FastAPI(title="broadway-inference")
+@asynccontextmanager
+async def _lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    """Configure process logging once, when the server starts (LOGGING.md §1)."""
+    setup_logging(load_environment(os.getenv("BROADWAY_ENVIRONMENT", DEFAULT_ENVIRONMENT)))
+    yield
+
+
+app = FastAPI(title="broadway-inference", lifespan=_lifespan)
 
 
 @app.get("/health", response_model=HealthResponse)

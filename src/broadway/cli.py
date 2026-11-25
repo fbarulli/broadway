@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 
 from broadway.config.loader import (
     DEFAULT_ENVIRONMENT,
@@ -12,6 +13,7 @@ from broadway.config.loader import (
     resolve_full_steps,
 )
 from broadway.lineage.sample import load_sample
+from broadway.observability.context import RUN_ID_ENV, new_run_id, set_run_id
 from broadway.observability.logging import setup_logging
 
 STEPS = list(STEP_MODELS.keys())
@@ -105,6 +107,9 @@ def _build_parser() -> argparse.ArgumentParser:
 
 def main() -> None:
     args = _build_parser().parse_args()
+    # The recorder exports BROADWAY_RUN_ID for its child; a CLI child reuses it
+    # so one invocation's log, profile, and evidence share the same id (§5).
+    set_run_id(os.getenv(RUN_ID_ENV) or new_run_id())
     setup_logging(load_environment(getattr(args, "environment", DEFAULT_ENVIRONMENT)))
 
     if args.step == "discover":

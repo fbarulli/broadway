@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import sys
 from pathlib import Path
 
 import pytest
@@ -43,3 +44,29 @@ def test_missing_log_path_field_raises_naming_it(tmp_path: Path, field: str) -> 
     environment = _environment(tmp_path, level="INFO").model_copy(update={field: None})
     with pytest.raises(ValueError, match=field):
         setup_logging(environment)
+
+
+def test_cli_main_writes_run_id_in_the_configured_log_line(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from broadway import cli
+    from broadway.discover import module as discover_module
+
+    def _log_probe(*_args: object) -> None:
+        logging.getLogger("broadway.cli_probe").info("cli-run-probe")
+
+    monkeypatch.setattr(discover_module, "run", _log_probe)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "ds-pipeline", "discover", "--csv", "a.csv",
+            "--target", "price", "--task", "regression",
+        ],
+    )
+    monkeypatch.setenv("BROADWAY_RUN_ID", "cli-run-id")
+    cli.main()
+
+    log_text = (tmp_path / "artifacts" / "logs" / "broadway.log").read_text(encoding="utf-8")
+    assert "run=cli-run-id" in log_text
+    assert "cli-run-probe" in log_text

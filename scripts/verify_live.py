@@ -22,23 +22,26 @@ command's exit code (1 when the command produced no exit code, e.g. timeout).
 from __future__ import annotations
 
 import argparse
+import os
 import shlex
 import subprocess
 import sys
 import time
 import traceback
-import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
 import pyarrow.parquet as pq
 import yaml
+from pyarrow import ArrowInvalid
 from pydantic import BaseModel, ConfigDict, Field
 
+from broadway.config.loader import config_path
+from broadway.observability.context import RUN_ID_ENV, new_run_id
 from broadway.paths import repo_root
 
-CONFIG_PATH = repo_root() / "configs" / "verification.yaml"
+VERIFICATION_CONFIG = "verification.yaml"
 PARQUET_SUFFIX = ".parquet"
 
 
@@ -48,7 +51,6 @@ class VerificationConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     output_dir: Path
-    tolerance: float = Field(ge=0.0)
     default_timeout_seconds: int = Field(gt=0)
     output_tail_lines: int = Field(gt=0)
 
@@ -69,6 +71,7 @@ class VerificationRequest(BaseModel):
     dataset: str = Field(min_length=1)
     log_path: str | None = None
     output_dir: Path | None = None
+    run_id: str = Field(min_length=1)
 
 
 class Evidence(BaseModel):
@@ -82,12 +85,21 @@ class Evidence(BaseModel):
     command: str
     dataset: str
     rows: int | None
+    rows_error: str | None = None
     duration_seconds: float
     exit_code: int | None
     stdout_tail: str
     stderr_tail: str
     log_path: str | None
     created_at: datetime
+
+
+@dataclass(frozen=True)
+class RowProvenance:
+    """Parquet row count plus the recorded reason when it could not be read."""
+
+    rows: int | None
+    error: str | None
 
 
 @dataclass(frozen=True)
@@ -119,12 +131,13 @@ class CommandRunner:
     def __init__(self, timeout_seconds: int) -> None:
         self._timeout_seconds = timeout_seconds
 
-    def run(self, command: str) -> CommandOutcome:
+    def run(self, command: str, run_id: str) -> CommandOutcome:
         """Execute ``command``; a timeout is recorded as a missing exit code."""
         started = time.perf_counter()
         exit_code: int | None
         stdout: str | bytes | None
         stderr: str | bytes | None
+        environment = {**os.environ, RUN_ID_ENV: run_id}
         try:
             completed = subprocess.run(
                 shlex.split(command),
@@ -132,6 +145,7 @@ class CommandRunner:
                 text=True,
                 timeout=self._timeout_seconds,
                 check=False,
+                env=environment,
             )
             exit_code, stdout, stderr = completed.returncode, completed.stdout, completed.stderr
         except subprocess.TimeoutExpired as expired:
@@ -156,12 +170,16 @@ class CommitResolver:
 class ParquetRowCounter:
     """Row-count provenance from parquet footer metadata only (no data load)."""
 
-    def count(self, dataset: str) -> int | None:
-        """Return the parquet row count, or None for a non-parquet dataset."""
+    def count(self, dataset: str) -> RowProvenance:
+        """Return the parquet row count, or the reason it could not be read."""
         if not dataset.lower().endswith(PARQUET_SUFFIX):
-            return None
-        metadata = pq.ParquetFile(dataset).metadata
-        return None if metadata is None else int(metadata.num_rows)
+            return RowProvenance(None, None)
+        try:
+            metadata = pq.ParquetFile(dataset).metadata
+        except (OSError, ArrowInvalid) as error:
+            traceback.print_exc()
+            return RowProvenance(None, f"{type(error).__name__}: {error}")
+        return RowProvenance(None if metadata is None else int(metadata.num_rows), None)
 
 
 class EvidenceRecorder:
@@ -191,27 +209,27 @@ class EvidenceRecorder:
 
     def record(self, request: VerificationRequest) -> RecordingResult:
         """Run the command, write its evidence record, return the result."""
-        run_id = uuid.uuid4().hex
         commit = self._commits.short_head()
-        outcome = self._runner.run(request.command)
-        evidence = self._build(run_id, commit, request, outcome)
+        outcome = self._runner.run(request.command, request.run_id)
+        evidence = self._build(commit, request, outcome)
         return RecordingResult(self._write(evidence, request), evidence.exit_code)
 
     def _build(
         self,
-        run_id: str,
         commit: str,
         request: VerificationRequest,
         outcome: CommandOutcome,
     ) -> Evidence:
         lines = self._config.output_tail_lines
+        provenance = self._rows.count(request.dataset)
         return Evidence(
-            run_id=run_id,
+            run_id=request.run_id,
             commit=commit,
             step=request.step,
             command=request.command,
             dataset=request.dataset,
-            rows=self._rows.count(request.dataset),
+            rows=provenance.rows,
+            rows_error=provenance.error,
             duration_seconds=outcome.duration_seconds,
             exit_code=outcome.exit_code,
             stdout_tail=self._tail(outcome.stdout, lines),
@@ -252,6 +270,11 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--dataset", required=True, help="dataset the run used (provenance)")
     parser.add_argument("--log-path", default=None, help="log file of the run (LOGGING.md)")
     parser.add_argument("--output-dir", default=None, help="override the configured output dir")
+    parser.add_argument(
+        "--run-id",
+        default=new_run_id(),
+        help="run id shared with the command's logs (default: a fresh uuid4 hex)",
+    )
     return parser
 
 
@@ -259,7 +282,7 @@ def main(argv: list[str] | None = None) -> int:
     """Record one live run and exit with its exit code."""
     try:
         request = VerificationRequest.model_validate(vars(_build_parser().parse_args(argv)))
-        config = VerificationConfig.from_config(CONFIG_PATH)
+        config = VerificationConfig.from_config(config_path(VERIFICATION_CONFIG))
         result = EvidenceRecorder.from_config(config).record(request)
     except Exception:
         traceback.print_exc()

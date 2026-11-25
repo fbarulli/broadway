@@ -2,12 +2,10 @@
 #
 # Consumers:
 #   scripts/verify_live.py -> output_dir, default_timeout_seconds, output_tail_lines
-#   the acceptance gate (main wires it) -> tolerance
 #
 # Provenance only: rows/hashes/timestamps in the evidence record are recorded so a
 # result can be traced, never used to accept or reject data (LIVE_VERIFICATION.md §4).
 output_dir: artifacts/verification
-tolerance: 0.0
 default_timeout_seconds: 1800
 # Output lines kept in stdout_tail/stderr_tail of one evidence record.
 output_tail_lines: 20
