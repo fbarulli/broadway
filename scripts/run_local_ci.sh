@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2329  # gate_* are dispatched indirectly via run_bg/run/dispatch
 # run_local_ci.sh — SINGLE SOURCE of the platform gate list (D16a pattern).
 # ci.yml invokes THIS script; edit the gate list HERE, never in ci.yml —
 # editing YAML alone reopens two-source drift (D16d rejected C7).
