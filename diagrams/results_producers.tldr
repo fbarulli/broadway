@@ -2263,7 +2263,7 @@
               "content": [
                 {
                   "type": "text",
-                  "text": "timeseries (1 steps)"
+                  "text": "timeseries (3 steps)"
                 }
               ]
             }
@@ -2316,6 +2316,92 @@
     },
     {
       "typeName": "shape",
+      "id": "shape:gen_n_a2h",
+      "type": "geo",
+      "x": 600,
+      "y": 10980,
+      "rotation": 0,
+      "isLocked": false,
+      "opacity": 1,
+      "parentId": "page:page",
+      "index": "a2i",
+      "meta": {},
+      "props": {
+        "geo": "rectangle",
+        "dash": "draw",
+        "url": "",
+        "w": 200,
+        "h": 80,
+        "growY": 0,
+        "scale": 1,
+        "labelColor": "black",
+        "color": "black",
+        "fill": "semi",
+        "size": "m",
+        "font": "sans",
+        "align": "middle",
+        "verticalAlign": "middle",
+        "richText": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "02_seasonality"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "typeName": "shape",
+      "id": "shape:gen_n_a2j",
+      "type": "geo",
+      "x": 600,
+      "y": 11200,
+      "rotation": 0,
+      "isLocked": false,
+      "opacity": 1,
+      "parentId": "page:page",
+      "index": "a2k",
+      "meta": {},
+      "props": {
+        "geo": "rectangle",
+        "dash": "draw",
+        "url": "",
+        "w": 200,
+        "h": 80,
+        "growY": 0,
+        "scale": 1,
+        "labelColor": "black",
+        "color": "black",
+        "fill": "semi",
+        "size": "m",
+        "font": "sans",
+        "align": "middle",
+        "verticalAlign": "middle",
+        "richText": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "03_stationarity_acf"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "typeName": "shape",
       "id": "shape:gen_e_0",
       "type": "arrow",
       "x": 700,
@@ -2324,7 +2410,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a2h",
+      "index": "a2l",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -2374,7 +2460,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a2i",
+      "index": "a2m",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -2424,7 +2510,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a2j",
+      "index": "a2n",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -2474,7 +2560,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a2k",
+      "index": "a2o",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -2524,7 +2610,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a2l",
+      "index": "a2p",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -2574,7 +2660,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a2m",
+      "index": "a2q",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -2624,7 +2710,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a2n",
+      "index": "a2r",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -2674,7 +2760,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a2o",
+      "index": "a2s",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -2724,7 +2810,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a2p",
+      "index": "a2t",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -2774,7 +2860,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a2q",
+      "index": "a2u",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -2824,7 +2910,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a2r",
+      "index": "a2v",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -2874,7 +2960,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a2s",
+      "index": "a2w",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -2924,7 +3010,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a2t",
+      "index": "a2x",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -2974,7 +3060,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a2u",
+      "index": "a2y",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -3024,7 +3110,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a2v",
+      "index": "a2z",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -3074,7 +3160,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a2w",
+      "index": "a31",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -3124,7 +3210,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a2x",
+      "index": "a32",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -3174,7 +3260,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a2y",
+      "index": "a33",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -3224,7 +3310,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a2z",
+      "index": "a34",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -3274,7 +3360,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a31",
+      "index": "a35",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -3324,7 +3410,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a32",
+      "index": "a36",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -3374,7 +3460,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a33",
+      "index": "a37",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -3424,7 +3510,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a34",
+      "index": "a38",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -3474,7 +3560,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a35",
+      "index": "a39",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -3524,7 +3610,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a36",
+      "index": "a3A",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -3574,7 +3660,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a37",
+      "index": "a3B",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -3624,7 +3710,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a38",
+      "index": "a3C",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -3674,7 +3760,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a39",
+      "index": "a3D",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -3724,7 +3810,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a3A",
+      "index": "a3E",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -3774,7 +3860,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a3B",
+      "index": "a3F",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -3824,7 +3910,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a3C",
+      "index": "a3G",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -3874,7 +3960,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a3D",
+      "index": "a3H",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -3924,7 +4010,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a3E",
+      "index": "a3I",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -3974,7 +4060,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a3F",
+      "index": "a3J",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -4024,7 +4110,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a3G",
+      "index": "a3K",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -4074,7 +4160,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a3H",
+      "index": "a3L",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -4124,7 +4210,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a3I",
+      "index": "a3M",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -4174,7 +4260,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a3J",
+      "index": "a3N",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -4224,7 +4310,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a3K",
+      "index": "a3O",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -4274,7 +4360,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a3L",
+      "index": "a3P",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -4324,7 +4410,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a3M",
+      "index": "a3Q",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -4374,7 +4460,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a3N",
+      "index": "a3R",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -4424,7 +4510,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a3O",
+      "index": "a3S",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -4474,7 +4560,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a3P",
+      "index": "a3T",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -4524,7 +4610,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a3Q",
+      "index": "a3U",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -4574,7 +4660,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a3R",
+      "index": "a3V",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -4624,7 +4710,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a3S",
+      "index": "a3W",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -4674,7 +4760,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a3T",
+      "index": "a3X",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -4724,7 +4810,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a3U",
+      "index": "a3Y",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -4774,7 +4860,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a3V",
+      "index": "a3Z",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -4824,7 +4910,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a3W",
+      "index": "a3a",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -4874,7 +4960,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a3X",
+      "index": "a3b",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -4924,7 +5010,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a3Y",
+      "index": "a3c",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -4974,7 +5060,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a3Z",
+      "index": "a3d",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -5024,7 +5110,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a3a",
+      "index": "a3e",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -5074,7 +5160,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a3b",
+      "index": "a3f",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -5124,7 +5210,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a3c",
+      "index": "a3g",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -5174,7 +5260,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a3d",
+      "index": "a3h",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -5224,7 +5310,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a3e",
+      "index": "a3i",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -5274,7 +5360,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a3f",
+      "index": "a3j",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -5324,7 +5410,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a3g",
+      "index": "a3k",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -5374,7 +5460,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a3h",
+      "index": "a3l",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -5424,7 +5510,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a3i",
+      "index": "a3m",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -5474,7 +5560,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a3j",
+      "index": "a3n",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -5524,7 +5610,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a3k",
+      "index": "a3o",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -5574,7 +5660,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a3l",
+      "index": "a3p",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -5624,7 +5710,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a3m",
+      "index": "a3q",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -5674,7 +5760,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a3n",
+      "index": "a3r",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -5724,7 +5810,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a3o",
+      "index": "a3s",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -5774,7 +5860,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a3p",
+      "index": "a3t",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -5824,7 +5910,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a3q",
+      "index": "a3u",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -5874,7 +5960,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a3r",
+      "index": "a3v",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -5924,7 +6010,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a3s",
+      "index": "a3w",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -5974,7 +6060,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a3t",
+      "index": "a3x",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -6024,7 +6110,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a3u",
+      "index": "a3y",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -6074,7 +6160,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a3v",
+      "index": "a3z",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -6124,7 +6210,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a3w",
+      "index": "a41",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -6174,7 +6260,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a3x",
+      "index": "a42",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -6224,7 +6310,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a3y",
+      "index": "a43",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -6274,7 +6360,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a3z",
+      "index": "a44",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -6324,7 +6410,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a41",
+      "index": "a45",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -6374,7 +6460,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a42",
+      "index": "a46",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -6424,7 +6510,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a43",
+      "index": "a47",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -6474,7 +6560,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a44",
+      "index": "a48",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -6524,7 +6610,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a45",
+      "index": "a49",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -6574,7 +6660,7 @@
       "isLocked": false,
       "opacity": 1,
       "parentId": "page:page",
-      "index": "a46",
+      "index": "a4A",
       "meta": {},
       "props": {
         "kind": "arc",
@@ -6593,6 +6679,206 @@
         "end": {
           "x": -500,
           "y": -10560
+        },
+        "bend": 0,
+        "richText": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "plots"
+                }
+              ]
+            }
+          ]
+        },
+        "labelPosition": 0.5,
+        "scale": 1,
+        "elbowMidPoint": 0.5
+      }
+    },
+    {
+      "typeName": "shape",
+      "id": "shape:gen_e_86",
+      "type": "arrow",
+      "x": 700,
+      "y": 10580,
+      "rotation": 0,
+      "isLocked": false,
+      "opacity": 1,
+      "parentId": "page:page",
+      "index": "a4B",
+      "meta": {},
+      "props": {
+        "kind": "arc",
+        "labelColor": "black",
+        "color": "black",
+        "fill": "none",
+        "dash": "draw",
+        "size": "m",
+        "arrowheadStart": "none",
+        "arrowheadEnd": "arrow",
+        "font": "sans",
+        "start": {
+          "x": 0,
+          "y": 0
+        },
+        "end": {
+          "x": 0,
+          "y": 440
+        },
+        "bend": 0,
+        "richText": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "runs"
+                }
+              ]
+            }
+          ]
+        },
+        "labelPosition": 0.5,
+        "scale": 1,
+        "elbowMidPoint": 0.5
+      }
+    },
+    {
+      "typeName": "shape",
+      "id": "shape:gen_e_87",
+      "type": "arrow",
+      "x": 700,
+      "y": 11020,
+      "rotation": 0,
+      "isLocked": false,
+      "opacity": 1,
+      "parentId": "page:page",
+      "index": "a4C",
+      "meta": {},
+      "props": {
+        "kind": "arc",
+        "labelColor": "black",
+        "color": "black",
+        "fill": "none",
+        "dash": "draw",
+        "size": "m",
+        "arrowheadStart": "none",
+        "arrowheadEnd": "arrow",
+        "font": "sans",
+        "start": {
+          "x": 0,
+          "y": 0
+        },
+        "end": {
+          "x": -500,
+          "y": -10780
+        },
+        "bend": 0,
+        "richText": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "plots"
+                }
+              ]
+            }
+          ]
+        },
+        "labelPosition": 0.5,
+        "scale": 1,
+        "elbowMidPoint": 0.5
+      }
+    },
+    {
+      "typeName": "shape",
+      "id": "shape:gen_e_88",
+      "type": "arrow",
+      "x": 700,
+      "y": 10580,
+      "rotation": 0,
+      "isLocked": false,
+      "opacity": 1,
+      "parentId": "page:page",
+      "index": "a4D",
+      "meta": {},
+      "props": {
+        "kind": "arc",
+        "labelColor": "black",
+        "color": "black",
+        "fill": "none",
+        "dash": "draw",
+        "size": "m",
+        "arrowheadStart": "none",
+        "arrowheadEnd": "arrow",
+        "font": "sans",
+        "start": {
+          "x": 0,
+          "y": 0
+        },
+        "end": {
+          "x": 0,
+          "y": 660
+        },
+        "bend": 0,
+        "richText": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "runs"
+                }
+              ]
+            }
+          ]
+        },
+        "labelPosition": 0.5,
+        "scale": 1,
+        "elbowMidPoint": 0.5
+      }
+    },
+    {
+      "typeName": "shape",
+      "id": "shape:gen_e_89",
+      "type": "arrow",
+      "x": 700,
+      "y": 11240,
+      "rotation": 0,
+      "isLocked": false,
+      "opacity": 1,
+      "parentId": "page:page",
+      "index": "a4E",
+      "meta": {},
+      "props": {
+        "kind": "arc",
+        "labelColor": "black",
+        "color": "black",
+        "fill": "none",
+        "dash": "draw",
+        "size": "m",
+        "arrowheadStart": "none",
+        "arrowheadEnd": "arrow",
+        "font": "sans",
+        "start": {
+          "x": 0,
+          "y": 0
+        },
+        "end": {
+          "x": -500,
+          "y": -11000
         },
         "bend": 0,
         "richText": {

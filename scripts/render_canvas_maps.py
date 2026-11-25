@@ -113,12 +113,23 @@ def serve_dashboard(port: int, *, reload: bool = True) -> None:
     ui.configure_from_env()
 
     print(f"dashboard serving at http://127.0.0.1:{port}  (canvas: /canvas)")
+    # Experiment runs write CSVs/PNGs/MDs under the watched tree: exclude result
+    # artifact extensions (and caches) so outputs never trigger a reload — only
+    # code does. Patterns must stay relative: watchfiles rejects absolute globs.
     uvicorn.run(
         "broadway.reports.experiments_dashboard:app",
         host="127.0.0.1",
         port=port,
         reload=reload,
         reload_dirs=[str(REPO_ROOT / "src"), str(REPO_ROOT / "project" / "experiments")],
+        reload_excludes=[
+            "*.csv",
+            "*.png",
+            "*.md",
+            "*.parquet",
+            "*.log",
+            "*/__pycache__/*",
+        ],
     )
 
 

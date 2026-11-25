@@ -79,6 +79,7 @@ def test_dashboard_launcher_enables_reload(monkeypatch) -> None:
     assert call["port"] == 8123
     assert call["reload"] is True
     assert str(module.REPO_ROOT / "src") in call["reload_dirs"]
+    assert "*.csv" in call["reload_excludes"]
 
 
 def test_dashboard_launcher_mounts_configured_results(monkeypatch, tmp_path) -> None:

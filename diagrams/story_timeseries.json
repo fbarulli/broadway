@@ -25,6 +25,66 @@
    "id": "01_series_profile/01_series_profile_hourly_counts.csv",
    "label": "01_series_profile_hourly_counts.csv",
    "group": "step-01_series_profile"
+  },
+  {
+   "id": "02_seasonality",
+   "label": "02_seasonality: day-of-week and hour-of-day demand seasonality (read-only).",
+   "group": "step-02_seasonality"
+  },
+  {
+   "id": "02_seasonality/02_seasonality.png",
+   "label": "02_seasonality.png",
+   "group": "step-02_seasonality"
+  },
+  {
+   "id": "02_seasonality/02_seasonality.md",
+   "label": "02_seasonality.md",
+   "group": "step-02_seasonality"
+  },
+  {
+   "id": "02_seasonality/02_seasonality_dow.csv",
+   "label": "02_seasonality_dow.csv",
+   "group": "step-02_seasonality"
+  },
+  {
+   "id": "02_seasonality/02_seasonality_hour_profile.csv",
+   "label": "02_seasonality_hour_profile.csv",
+   "group": "step-02_seasonality"
+  },
+  {
+   "id": "02_seasonality/02_seasonality_hour_x_dow.csv",
+   "label": "02_seasonality_hour_x_dow.csv",
+   "group": "step-02_seasonality"
+  },
+  {
+   "id": "03_stationarity_acf",
+   "label": "03_stationarity_acf: stationarity (ADF) and autocorrelation (ACF) per aggregate (read-only).",
+   "group": "step-03_stationarity_acf"
+  },
+  {
+   "id": "03_stationarity_acf/03_stationarity_acf.png",
+   "label": "03_stationarity_acf.png",
+   "group": "step-03_stationarity_acf"
+  },
+  {
+   "id": "03_stationarity_acf/03_stationarity_acf.md",
+   "label": "03_stationarity_acf.md",
+   "group": "step-03_stationarity_acf"
+  },
+  {
+   "id": "03_stationarity_acf/03_stationarity_acf_acf_daily.csv",
+   "label": "03_stationarity_acf_acf_daily.csv",
+   "group": "step-03_stationarity_acf"
+  },
+  {
+   "id": "03_stationarity_acf/03_stationarity_acf_acf_hourly.csv",
+   "label": "03_stationarity_acf_acf_hourly.csv",
+   "group": "step-03_stationarity_acf"
+  },
+  {
+   "id": "03_stationarity_acf/03_stationarity_acf_adf.csv",
+   "label": "03_stationarity_acf_adf.csv",
+   "group": "step-03_stationarity_acf"
   }
  ],
  "edges": [
@@ -46,6 +106,66 @@
   {
    "from": "01_series_profile",
    "to": "01_series_profile/01_series_profile_hourly_counts.csv",
+   "label": "produces"
+  },
+  {
+   "from": "01_series_profile",
+   "to": "02_seasonality",
+   "label": "next"
+  },
+  {
+   "from": "02_seasonality",
+   "to": "02_seasonality/02_seasonality.png",
+   "label": "produces"
+  },
+  {
+   "from": "02_seasonality",
+   "to": "02_seasonality/02_seasonality.md",
+   "label": "produces"
+  },
+  {
+   "from": "02_seasonality",
+   "to": "02_seasonality/02_seasonality_dow.csv",
+   "label": "produces"
+  },
+  {
+   "from": "02_seasonality",
+   "to": "02_seasonality/02_seasonality_hour_profile.csv",
+   "label": "produces"
+  },
+  {
+   "from": "02_seasonality",
+   "to": "02_seasonality/02_seasonality_hour_x_dow.csv",
+   "label": "produces"
+  },
+  {
+   "from": "02_seasonality",
+   "to": "03_stationarity_acf",
+   "label": "next"
+  },
+  {
+   "from": "03_stationarity_acf",
+   "to": "03_stationarity_acf/03_stationarity_acf.png",
+   "label": "produces"
+  },
+  {
+   "from": "03_stationarity_acf",
+   "to": "03_stationarity_acf/03_stationarity_acf.md",
+   "label": "produces"
+  },
+  {
+   "from": "03_stationarity_acf",
+   "to": "03_stationarity_acf/03_stationarity_acf_acf_daily.csv",
+   "label": "produces"
+  },
+  {
+   "from": "03_stationarity_acf",
+   "to": "03_stationarity_acf/03_stationarity_acf_acf_hourly.csv",
+   "label": "produces"
+  },
+  {
+   "from": "03_stationarity_acf",
+   "to": "03_stationarity_acf/03_stationarity_acf_adf.csv",
    "label": "produces"
   }
  ]

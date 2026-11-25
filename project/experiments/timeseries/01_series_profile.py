@@ -9,6 +9,7 @@ Outputs (all under results/timeseries/):
 """
 
 from pathlib import Path
+from typing import Any
 
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -24,7 +25,9 @@ def main() -> None:
 
     hourly = ts.dt.floor("h").value_counts().sort_index()
     full_hours = pd.date_range(hourly.index.min(), hourly.index.max(), freq="h")
-    missing_hours = full_hours.difference(hourly.index)
+    # Index.difference stubs take list[Any]: materialize the hourly labels so the
+    # call typechecks without changing the result (verified identical).
+    missing_hours = full_hours.difference(list(hourly.index))
     print(f"hours covered: {len(hourly)}/{len(full_hours)} (missing: {len(missing_hours)})")
 
     stem = Path(__file__).stem
@@ -39,7 +42,10 @@ def main() -> None:
     # plots and extrema so a two-row boundary does not look like demand collapse.
     complete_hourly = hourly[hourly.index < end.floor("h")]
     complete_daily = daily[daily.index < end.normalize()]
-    figure, axes = plt.subplots(2, 1, figsize=(14, 8), constrained_layout=True)
+    # plt.subplots is untyped (partially unknown): pin the boundary to Any once
+    # so figure/axes unpack clean instead of poisoning every use below.
+    subplots: Any = plt.subplots(2, 1, figsize=(14, 8), constrained_layout=True)
+    figure, axes = subplots
     complete_hourly.plot(ax=axes[0], color="#2563eb", linewidth=0.8)
     axes[0].set(title="Hourly NYC taxi demand", xlabel="", ylabel="trips")
     complete_daily.plot(ax=axes[1], color="#0f766e", linewidth=1.5)

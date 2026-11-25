@@ -243,12 +243,22 @@
   },
   {
    "id": "track-timeseries",
-   "label": "timeseries (1 steps)",
+   "label": "timeseries (3 steps)",
    "group": "series"
   },
   {
    "id": "timeseries/01_series_profile",
    "label": "01_series_profile",
+   "group": "series"
+  },
+  {
+   "id": "timeseries/02_seasonality",
+   "label": "02_seasonality",
+   "group": "series"
+  },
+  {
+   "id": "timeseries/03_stationarity_acf",
+   "label": "03_stationarity_acf",
    "group": "series"
   }
  ],
@@ -680,6 +690,26 @@
   },
   {
    "from": "timeseries/01_series_profile",
+   "to": "dashboard",
+   "label": "plots"
+  },
+  {
+   "from": "track-timeseries",
+   "to": "timeseries/02_seasonality",
+   "label": "runs"
+  },
+  {
+   "from": "timeseries/02_seasonality",
+   "to": "dashboard",
+   "label": "plots"
+  },
+  {
+   "from": "track-timeseries",
+   "to": "timeseries/03_stationarity_acf",
+   "label": "runs"
+  },
+  {
+   "from": "timeseries/03_stationarity_acf",
    "to": "dashboard",
    "label": "plots"
   }
