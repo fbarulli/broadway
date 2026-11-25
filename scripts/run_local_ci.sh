@@ -213,7 +213,12 @@ run_bg shell-scripts bash -c 'for f in k8s/optuna/*.sh scripts/*.sh; do bash -n 
 # here in seconds, not after a 10-minute image build. Workload images skip
 # with notice on project-less lines (see scripts/check_docker_paths.sh).
 run_bg docker-paths bash scripts/check_docker_paths.sh
-collect ruff mypy pyright-advisory vulture configs shell-scripts docker-paths
+# Factory gates (SSOT laws): dependency registry + import boundary
+# (CODE_STANDARD.md §4) and cross-file duplication (CONSOLIDATION.md §4).
+# The duplication detector is ADVISORY until its config baseline is clean.
+run_bg deps bash scripts/uv.sh run --extra dev python scripts/check_dependencies.py
+run_bg consolidation bash scripts/uv.sh run --extra dev python scripts/check_duplication.py
+collect ruff mypy pyright-advisory vulture configs shell-scripts docker-paths deps consolidation
 if [[ $STATIC -eq 0 && $TIER == "full" ]]; then
   # Main-branch platform subset: taxi-coupled suites (ledger probes,
   # state_records, project loader paths) cannot pass where project/ and the
@@ -243,7 +248,7 @@ fi
 if [[ $fail -eq 0 ]]; then
   CL_NOTE=""
   [[ $CLEAN_LINT -eq 1 ]] && CL_NOTE=" + clean-lint(ruff+mypy@HEAD-snapshot)"
-  [[ $TIER == "fast" ]] && echo "$FAST_BANNERS (tiers: parity/ruff/mypy/pyright-advisory/vulture/configs/shell-scripts/docker-paths)$CL_NOTE" \
+  [[ $TIER == "fast" ]] && echo "$FAST_BANNERS (tiers: parity/ruff/mypy/pyright-advisory/vulture/configs/shell-scripts/docker-paths/deps/consolidation)$CL_NOTE" \
                         || echo "$FULL_BANNERS$CL_NOTE"
 else
   echo "LOCAL-CI RED — fix above before commit/push"
