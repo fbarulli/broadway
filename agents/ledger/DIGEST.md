@@ -1,6 +1,6 @@
 # DIGEST.md — rendered from agents/ledger/gates.yaml · NEVER HAND-EDIT ·
 
-> 170 gates · rendered 2026-11-25 @ HEAD a6befa1 · load THIS into context;
+> 170 gates · rendered 2026-11-25 @ HEAD 5d1ed94 · load THIS into context;
 > gates.yaml is the sole SSOT; the retired GATES.md/gates/*.md markdown world survives in agents/ledger/arbitration/2026-08-24/surface-and-analysis-preservation.md.
 
 | band | phase | gates | findings |
@@ -321,59 +321,59 @@
   [tracked *.py corpus via git ls-files (src/project/tests/scripts), pyproject [project.scripts] entrypoint table] → [data/processed/deadcode_census.md suspicion report (gitignored sink); stdout default] · pins: none direct
 - **GATE-INFRA-148** `agents/tools/state_records.py apply_record_operation()`
   [STATE CURRENT record and immutable EVENTS section] → [atomic branch-tracked CURRENT update or terminal archive entry] · pins: 3
-- **GATE-INFRA-149** `src/broadway/observability/context.py:20 new_run_id()`
+- **GATE-INFRA-154** `src/broadway/observability/context.py:20 new_run_id()`
   [] → [] · pins: 3
-- **GATE-INFRA-150** `src/broadway/observability/logging.py:39 setup_logging()`
+- **GATE-INFRA-155** `src/broadway/observability/logging.py:39 setup_logging()`
   [] → [] · pins: 4
-- **GATE-INFRA-151** `src/broadway/observability/profiling.py:155 StepProfiler`
+- **GATE-INFRA-156** `src/broadway/observability/profiling.py:155 StepProfiler`
   [] → [] · pins: 4
-- **GATE-INFRA-152** `configs/profiling.yaml:1 measurement-seam SSOT`
+- **GATE-INFRA-157** `configs/profiling.yaml:1 measurement-seam SSOT`
   [] → [] · pins: none direct
-- **GATE-INFRA-153** `src/broadway/calibration/contracts.py:13 CalibrationConfig`
+- **GATE-INFRA-158** `src/broadway/calibration/contracts.py:13 CalibrationConfig`
   [] → [] · pins: 2
-- **GATE-INFRA-154** `src/broadway/calibration/conformal.py:10 SplitConformal`
+- **GATE-INFRA-159** `src/broadway/calibration/conformal.py:10 SplitConformal`
   [] → [] · pins: 3
-- **GATE-INFRA-155** `src/broadway/calibration/metrics.py:11 coverage()`
+- **GATE-INFRA-160** `src/broadway/calibration/metrics.py:11 coverage()`
   [] → [] · pins: 3
-- **GATE-INFRA-156** `src/broadway/data/splitter.py:66 calibration_split()`
+- **GATE-INFRA-161** `src/broadway/data/splitter.py:66 calibration_split()`
   [CFG-DATASET-CONTRACT] → [] · pins: 1
-- **GATE-INFRA-157** `src/broadway/evaluate/contracts.py:42 EvaluationResult`
+- **GATE-INFRA-162** `src/broadway/evaluate/contracts.py:42 EvaluationResult`
   [] → [] · pins: 3
-- **GATE-INFRA-158** `src/broadway/training/contracts.py:8 TrainingResult`
+- **GATE-INFRA-163** `src/broadway/training/contracts.py:8 TrainingResult`
   [] → [] · pins: 3
-- **GATE-INFRA-159** `scripts/check_dependencies.py:217 main()`
+- **GATE-INFRA-164** `scripts/check_dependencies.py:217 main()`
   [] → [] · pins: 2
-- **GATE-INFRA-160** `configs/dependencies.yaml:1 dependency registry SSOT`
+- **GATE-INFRA-165** `configs/dependencies.yaml:1 dependency registry SSOT`
   [] → [] · pins: none direct
-- **GATE-INFRA-161** `scripts/check_duplication.py:416 main()`
+- **GATE-INFRA-166** `scripts/check_duplication.py:416 main()`
   [] → [] · pins: 2
-- **GATE-INFRA-162** `configs/duplication.yaml:1 duplicate-detection thresholds SSOT`
+- **GATE-INFRA-167** `configs/duplication.yaml:1 duplicate-detection thresholds SSOT`
   [] → [] · pins: none direct
-- **GATE-INFRA-163** `scripts/verify_live.py:281 main()`
+- **GATE-INFRA-168** `scripts/verify_live.py:281 main()`
   [] → [] · pins: 4
-- **GATE-INFRA-164** `configs/verification.yaml:1 live-verification evidence SSOT`
+- **GATE-INFRA-169** `configs/verification.yaml:1 live-verification evidence SSOT`
   [] → [] · pins: none direct
-- **GATE-INFRA-165** `src/broadway/config/schema.py:296 EvaluateStep`
+- **GATE-INFRA-170** `src/broadway/config/schema.py:296 EvaluateStep`
   [CFG-STEP-EVALUATE] → [] · pins: 2
-- **GATE-INFRA-166** `gpu_training/memory_probe.py:259 main()`
+- **GATE-INFRA-171** `gpu_training/memory_probe.py:259 main()`
+  [] → [] · pins: 3
+- **GATE-INFRA-172** `gpu_training/run_hpo.py:135 main()`
+  [] → [] · pins: 4
+- **GATE-INFRA-173** `gpu_training/config/memory_probe.yaml:1 memory-sweep SSOT`
   [] → [] · pins: 1
-- **GATE-INFRA-167** `gpu_training/run_hpo.py:100 main()`
-  [] → [] · pins: 2
-- **GATE-INFRA-168** `gpu_training/config/memory_probe.yaml:1 memory-sweep SSOT`
+- **GATE-INFRA-174** `gpu_training/config/hpo_run.yaml:1 HPO fan-out SSOT`
   [] → [] · pins: 1
-- **GATE-INFRA-169** `gpu_training/config/hpo_run.yaml:1 HPO fan-out SSOT`
+- **GATE-INFRA-175** `gpu_training/adapters/cpu_smoke.py:22 step()`
   [] → [] · pins: 1
-- **GATE-INFRA-170** `gpu_training/adapters/cpu_smoke.py:22 step()`
-  [] → [] · pins: 1
-- **GATE-INFRA-171** `gpu_training/er_reference/config/laya_hpo_space.yaml:1 laya HPO reference space (copied from ER; tree is not executable here)`
+- **GATE-INFRA-176** `gpu_training/er_reference/config/laya_hpo_space.yaml:1 laya HPO reference space (copied from ER; tree is not executable here)`
   [] → [] · pins: none direct
-- **GATE-INFRA-172** `src/broadway/pipeline.py:16 run()`
+- **GATE-INFRA-177** `src/broadway/pipeline.py:16 run()`
   [] → [] · pins: 1
-- **GATE-INFRA-173** `configs/step/train.yaml:1 training step config`
+- **GATE-INFRA-178** `configs/step/train.yaml:1 training step config`
   [] → [] · pins: none direct
-- **GATE-INFRA-174** `configs/step/evaluate.yaml:1 evaluation policy config`
+- **GATE-INFRA-179** `configs/step/evaluate.yaml:1 evaluation policy config`
   [] → [] · pins: none direct
-- **GATE-INFRA-175** `project/config/experiment/taxi.yaml:1 calibration opt-in overlay (split_conformal)`
+- **GATE-INFRA-180** `project/config/experiment/taxi.yaml:1 calibration opt-in overlay (split_conformal)`
   [] → [] · pins: none direct
 
 ### 81-object-custody — object-custody

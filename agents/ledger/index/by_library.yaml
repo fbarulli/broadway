@@ -330,8 +330,8 @@ numpy:
 - GATE-STATS-48
 - GATE-HPO-81
 - GATE-HPO-88
-- GATE-INFRA-154
-- GATE-INFRA-155
+- GATE-INFRA-159
+- GATE-INFRA-160
 numpy(np.isinf sibling require_finite):
 - GATE-FEAT-28
 numpy(np.log1p):
@@ -383,8 +383,8 @@ pandas:
 - GATE-SURF-101
 - GATE-HPO-81
 - GATE-HPO-84
-- GATE-INFRA-155
-- GATE-INFRA-156
+- GATE-INFRA-160
+- GATE-INFRA-161
 pandas (df ops):
 - GATE-ETL-17
 pandas (via df.to_parquet at call site):
@@ -447,7 +447,7 @@ psycopg2-binary:
 - GATE-HPO-86
 pyarrow:
 - GATE-TRAIN-32
-- GATE-INFRA-163
+- GATE-INFRA-168
 pydantic:
 - GATE-INGEST-05
 - GATE-INGEST-06
@@ -457,16 +457,16 @@ pydantic:
 - GATE-ETL-15
 - GATE-ETL-116
 - GATE-HPO-89
-- GATE-INFRA-151
-- GATE-INFRA-153
-- GATE-INFRA-157
+- GATE-INFRA-156
 - GATE-INFRA-158
-- GATE-INFRA-159
-- GATE-INFRA-161
+- GATE-INFRA-162
 - GATE-INFRA-163
-- GATE-INFRA-165
+- GATE-INFRA-164
 - GATE-INFRA-166
-- GATE-INFRA-167
+- GATE-INFRA-168
+- GATE-INFRA-170
+- GATE-INFRA-171
+- GATE-INFRA-172
 pydantic (extra=forbid models :25-45):
 - GATE-STATS-49
 python -m broadway.cli equivalent:
@@ -478,21 +478,21 @@ pyyaml:
 - GATE-TRAIN-32
 - GATE-HPO-87
 - GATE-HPO-89
-- GATE-INFRA-151
-- GATE-INFRA-152
-- GATE-INFRA-159
-- GATE-INFRA-160
-- GATE-INFRA-161
-- GATE-INFRA-162
-- GATE-INFRA-163
+- GATE-INFRA-156
+- GATE-INFRA-157
 - GATE-INFRA-164
+- GATE-INFRA-165
 - GATE-INFRA-166
 - GATE-INFRA-167
 - GATE-INFRA-168
 - GATE-INFRA-169
+- GATE-INFRA-171
+- GATE-INFRA-172
 - GATE-INFRA-173
 - GATE-INFRA-174
-- GATE-INFRA-175
+- GATE-INFRA-178
+- GATE-INFRA-179
+- GATE-INFRA-180
 re:
 - GATE-ETL-10
 - GATE-ETL-19
@@ -516,7 +516,7 @@ scikit-learn:
 - GATE-TRAIN-36
 - GATE-HPO-81
 - GATE-HPO-87
-- GATE-INFRA-156
+- GATE-INFRA-161
 scipy.stats:
 - GATE-STATS-45
 scipy.stats (levene/skew/kurtosis/shapiro):
@@ -635,8 +635,8 @@ tests/test_samples.py fixtures writing configs/sample/*.yaml:
 tests/test_walkthrough.py:
 - GATE-TLINE-55
 torch:
-- GATE-INFRA-166
-- GATE-INFRA-170
+- GATE-INFRA-171
+- GATE-INFRA-175
 training HPO engine:
 - GATE-CFG-76
 typing(Any):
