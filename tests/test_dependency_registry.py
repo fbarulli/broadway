@@ -23,15 +23,15 @@ def _load_checker():
     return module
 
 
-def _row(name: str) -> dict[str, str]:
+def _row(name: str, scope: str = "platform") -> dict[str, str]:
     return {
         "name": name,
         "owner": "platform",
-        "scope": "platform",
+        "scope": scope,
         "purpose": f"{name} test purpose",
         "adapter": "",
         "license": "MIT",
-        "added": "2026-11-25",
+        "registered": "2026-11-25",
     }
 
 
@@ -49,4 +49,30 @@ def test_check_registry_passes_when_complete_and_flags_a_missing_row(
     incomplete = {"dependencies": [_row("alpha")]}
     assert checker.check_registry(pyproject, incomplete, source_root) == [
         "missing registry row: beta"
+    ]
+
+
+def test_project_scoped_dependency_imported_under_src_is_one_boundary_violation(
+    tmp_path: Path,
+) -> None:
+    """The import-boundary check fires exactly once for a platform import of a project dep."""
+    checker = _load_checker()
+    pyproject = {
+        "project": {
+            "name": "demo",
+            "dependencies": ["alpha>=1.0", "project-only-lib>=1.0"],
+        }
+    }
+    source_root = tmp_path / "src" / "broadway"
+    package = source_root / "data"
+    package.mkdir(parents=True)
+    (package / "uses_project.py").write_text(
+        "import project_only_lib\n", encoding="utf-8"
+    )
+    registry = {
+        "dependencies": [_row("alpha"), _row("project-only-lib", scope="project")]
+    }
+
+    assert checker.check_registry(pyproject, registry, source_root) == [
+        "import boundary: data/uses_project.py imports project-scoped 'project-only-lib'"
     ]

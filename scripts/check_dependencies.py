@@ -57,7 +57,7 @@ class RegistryRow(BaseModel):
     purpose: str
     adapter: str = ""
     license: str = ""
-    added: date
+    registered: date
 
 
 class DependencyRegistry(BaseModel):

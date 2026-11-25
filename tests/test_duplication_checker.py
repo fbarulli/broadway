@@ -6,6 +6,7 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
 import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
@@ -76,3 +77,36 @@ def test_cross_file_duplicate_reported_and_unique_ignored(tmp_path: Path) -> Non
     assert all(
         site["function"] != "unique" for group in groups for site in group["sites"]
     )
+
+
+def test_missing_scan_root_skipped_with_notice_and_existing_root_scanned(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A project-less checkout skips the absent root instead of raising."""
+    present = tmp_path / "owners" / "present"
+    present.mkdir(parents=True)
+    (present / "alpha.py").write_text(
+        f"def shared(values):\n{SHARED_BODY}", encoding="utf-8"
+    )
+    absent = tmp_path / "project"
+    report_path = tmp_path / "duplicates.json"
+    config_path = tmp_path / "duplication.yaml"
+    config_path.write_text(
+        yaml.safe_dump(
+            {
+                "advisory": False,
+                "min_statements": 8,
+                "scan_roots": [str(absent), str(present)],
+                "exclude": ["**/__init__.py"],
+                "report": str(report_path),
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    assert main(["--config", str(config_path)]) == 0
+    notice = capsys.readouterr().out
+    assert f"skip missing scan root: {absent}" in notice
+    payload = json.loads(report_path.read_text(encoding="utf-8"))
+    assert payload["files_scanned"] == 1
+    assert payload["scan_roots"] == [str(absent), str(present)]

@@ -190,6 +190,26 @@ gate_ruff() {
   for p in "${candidates[@]}"; do [[ -e "$p" ]] && paths+=("$p"); done
   bash scripts/uv.sh run --extra dev ruff check "${paths[@]}"
 }
+# shellcheck disable=SC2317  # reached via `run_bg … gate_logging` indirection
+gate_logging() {
+  # LOGGING.md §7: handler construction may live ONLY in the setup module.
+  # Scoped to src/broadway — scripts/ tooling is out of the law's scope.
+  if [[ ! -d src/broadway ]]; then
+    echo "SKIP logging (no src/broadway on this checkout)"
+    return 0
+  fi
+  local hits
+  hits="$(grep -RnE 'basicConfig|addHandler|FileHandler|StreamHandler' \
+    src/broadway --include='*.py' \
+    | grep -v '^src/broadway/observability/logging\.py:' || true)"
+  if [[ -z "$hits" ]]; then
+    echo "logging: setup confined to src/broadway/observability/logging.py"
+    return 0
+  fi
+  echo "FAIL logging: handler construction outside src/broadway/observability/logging.py:"
+  printf '%s\n' "$hits"
+  return 1
+}
 run_bg ruff    gate_ruff
 run_bg mypy    dispatch bash scripts/uv.sh run --extra dev mypy src/broadway
 # Pyright CONSULTANT (strict, advisory-only): always green by design — reports
@@ -214,11 +234,13 @@ run_bg shell-scripts bash -c 'for f in k8s/optuna/*.sh scripts/*.sh; do bash -n 
 # with notice on project-less lines (see scripts/check_docker_paths.sh).
 run_bg docker-paths bash scripts/check_docker_paths.sh
 # Factory gates (SSOT laws): dependency registry + import boundary
-# (CODE_STANDARD.md §4) and cross-file duplication (CONSOLIDATION.md §4).
-# The duplication detector is ADVISORY until its config baseline is clean.
+# (CODE_STANDARD.md §4), cross-file duplication (CONSOLIDATION.md §4), and the
+# process-logging handler boundary (LOGGING.md §7). The duplication detector is
+# ADVISORY until its config baseline is clean.
 run_bg deps bash scripts/uv.sh run --extra dev python scripts/check_dependencies.py
 run_bg consolidation bash scripts/uv.sh run --extra dev python scripts/check_duplication.py
-collect ruff mypy pyright-advisory vulture configs shell-scripts docker-paths deps consolidation
+run_bg logging gate_logging
+collect ruff mypy pyright-advisory vulture configs shell-scripts docker-paths deps consolidation logging
 if [[ $STATIC -eq 0 && $TIER == "full" ]]; then
   # Main-branch platform subset: taxi-coupled suites (ledger probes,
   # state_records, project loader paths) cannot pass where project/ and the
@@ -248,7 +270,7 @@ fi
 if [[ $fail -eq 0 ]]; then
   CL_NOTE=""
   [[ $CLEAN_LINT -eq 1 ]] && CL_NOTE=" + clean-lint(ruff+mypy@HEAD-snapshot)"
-  [[ $TIER == "fast" ]] && echo "$FAST_BANNERS (tiers: parity/ruff/mypy/pyright-advisory/vulture/configs/shell-scripts/docker-paths/deps/consolidation)$CL_NOTE" \
+  [[ $TIER == "fast" ]] && echo "$FAST_BANNERS (tiers: parity/ruff/mypy/pyright-advisory/vulture/configs/shell-scripts/docker-paths/deps/consolidation/logging)$CL_NOTE" \
                         || echo "$FULL_BANNERS$CL_NOTE"
 else
   echo "LOCAL-CI RED — fix above before commit/push"

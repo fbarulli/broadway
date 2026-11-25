@@ -10,7 +10,10 @@ owners is a pointer to verify.
 All thresholds, roots, exclusions, and the report path resolve from the
 duplication config, whose default location derives from this script's own name
 (``scripts/check_<name>.py`` -> ``configs/<name>.yaml``) — no value is copied
-into code. Advisory mode always exits 0; blocking mode exits 1 on any group.
+into code. A configured root absent from this checkout (e.g. ``project/`` on
+the data-agnostic main line) is skipped with a notice; only a config with no
+existing root fails. Advisory mode always exits 0; blocking mode exits 1 on any
+group.
 """
 
 from __future__ import annotations
@@ -27,9 +30,11 @@ from typing import Any
 import yaml
 from pydantic import BaseModel, ConfigDict, Field
 
+from broadway.paths import repo_root
+
 LOGGER = logging.getLogger("duplication-checker")
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = repo_root()
 CONFIG_DIR = "configs"
 FUNCTION_NODES = (ast.FunctionDef, ast.AsyncFunctionDef)
 Signature = tuple[Any, ...]
@@ -209,12 +214,6 @@ class DuplicationScanner:
         """Scan every configured root and return the full report."""
         files = self._source_files()
         sites = [site for rel in files for site in self._file_sites(rel)]
-        LOGGER.info(
-            "scanned %d files; %d functions with >= %d statements",
-            len(files),
-            len(sites),
-            self._config.min_statements,
-        )
         return DuplicationReport(
             files_scanned=len(files),
             functions_scanned=len(sites),
@@ -223,13 +222,18 @@ class DuplicationScanner:
         )
 
     def _source_files(self) -> list[str]:
-        """Resolve every root to sorted, non-excluded repo-relative python paths."""
+        """Resolve existing roots to sorted, non-excluded repo-relative python paths."""
         found: set[str] = set()
+        scanned = 0
         for raw in self._config.scan_roots:
             root = Path(raw) if Path(raw).is_absolute() else self._root / raw
             if not root.is_dir():
-                raise FileNotFoundError(f"duplication scan root missing: {root}")
+                print(f"duplication: skip missing scan root: {root}")
+                continue
+            scanned += 1
             found.update(self._rel(path) for path in root.rglob("*.py"))
+        if scanned == 0:
+            raise FileNotFoundError(f"no duplication scan root exists: {self._config.scan_roots}")
         return sorted(rel for rel in found if not self._excluded(rel))
 
     def _rel(self, path: Path) -> str:

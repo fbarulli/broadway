@@ -88,7 +88,7 @@ platform through an owned seam.
 | `purpose` | the capability it provides |
 | `adapter` | module that wraps it (empty only for dev tooling) |
 | `license` | SPDX id, recorded for provenance only |
-| `added` | date, so age is visible |
+| `registered` | the day the row entered this registry (not the package's publication date) |
 
 **Rules.**
 
