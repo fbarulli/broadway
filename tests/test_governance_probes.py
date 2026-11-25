@@ -1244,21 +1244,21 @@ UV_CACHE_NEEDLE = "UV_CACHE_DIR="
 UV_CACHE_RUNTIME_OWNER = "scripts/uv.sh"
 UV_CACHE_EXEMPTIONS: tuple[tuple[str, str, str], ...] = (
     ("agents/ledger/DECISIONS.md",
-     "historical D28/D32 measured-run records; re-verified prose-only 2026-09-19", "2026-10-19"),
+     "historical D28/D32 measured-run records; re-verified prose-only 2026-11-25", "2027-02-25"),
     ("agents/ledger/STATE.md",
-     "courtesy D28 suite-tail baseline command; re-verified prose-only 2026-09-19", "2026-10-19"),
+     "courtesy D28 suite-tail baseline command; re-verified prose-only 2026-11-25", "2027-02-25"),
     ("agents/ledger/archive/2026-08.md",
-     "historical D28 suite-tail baseline command; re-verified prose-only 2026-09-19", "2026-10-19"),
+     "historical D28 suite-tail baseline command; re-verified prose-only 2026-11-25", "2027-02-25"),
     ("agents/audits/B-TRUTH-ENFORCEMENT.md",
-     "audit prose quoting an in-venv run observation; re-verified prose-only 2026-09-19", "2026-10-19"),
+     "audit prose quoting an in-venv run observation; re-verified prose-only 2026-11-25", "2027-02-25"),
     ("agents/ledger/arbitration/2026-08-24/H-infra-custody-verdicts.md",
-     "row-146 cache-root fork-law verdict prose; re-verified prose-only 2026-09-19", "2026-10-19"),
+     "row-146 cache-root fork-law verdict prose; re-verified prose-only 2026-11-25", "2027-02-25"),
     ("agents/ledger/arbitration/2026-08-24/consolidation-slate.md",
-     "GATE-INFRA-146 slate entry (historical proposal record); re-verified prose-only 2026-09-19", "2026-10-19"),
+     "GATE-INFRA-146 slate entry (historical proposal record); re-verified prose-only 2026-11-25", "2027-02-25"),
     ("agents/ledger/arbitration/2026-08-24/gap-object-creators.md",
-     "packet-H finding that created the fork-site law; re-verified prose-only 2026-09-19", "2026-10-19"),
+     "packet-H finding that created the fork-site law; re-verified prose-only 2026-11-25", "2027-02-25"),
     ("agents/ledger/gates.yaml",
-     "HISTORY finding string documenting the retired ship.sh fork site; re-verified prose-only 2026-09-19", "2026-10-19"),
+     "HISTORY finding string documenting the retired ship.sh fork site; re-verified prose-only 2026-11-25", "2027-02-25"),
 )
 
 
