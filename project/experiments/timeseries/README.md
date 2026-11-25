@@ -23,7 +23,9 @@ autocorrelation, seasonality decomposition, and time-based validation).
 3. Stationarity (ADF) + autocorrelation (ACF) per aggregate.
 4. `04_forecast_models.py` — chronological last-14-day holdout comparison:
    persistence (t-1), seasonal-naive (t-24), train mean, Prophet, GluonTS
-   DeepAR + WaveNet (torch), and zero-shot TimesFM.
+   DeepAR + WaveNet (torch), and zero-shot TimesFM. DeepAR/WaveNet are
+   stochastic and run 3 seeds (mean ± std); the other five are deterministic
+   single runs.
 5. Deeper model work (covariates, tuning, longer holds) only after 2-4 hold.
 
 Step scripts follow the `NN_name.py` convention. Run from the repo root, e.g.

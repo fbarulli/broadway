@@ -8,10 +8,14 @@ Models: persistence (t-1), seasonal-naive-24h (t-24), train mean, Prophet
 (daily + weekly seasonality), GluonTS torch DeepAR, GluonTS torch WaveNet (the
 CNN stand-in for MQCNN, which GluonTS >= 0.16 no longer ships in torch), and
 zero-shot TimesFM.
+Stochastic models (DeepAR, WaveNet) are retrained on REPEATS seeds; the rest
+are deterministic single runs. Metrics are reported per seed and as mean ± std.
+
 Outputs (all under results/timeseries/):
-- 04_forecast_models_metrics.csv: long form model, metric, value
+- 04_forecast_models_metrics.csv: per-run long form model, seed, metric, value
+- 04_forecast_models_aggregate.csv: model, metric, runs, mean, std
 - 04_forecast_models.md: holdout window, ranking, verdict, method notes
-- 04_forecast_models.png: actual vs each model, last 7 holdout days
+- 04_forecast_models.png: actual vs each model (seed mean), last 7 holdout days
 """
 
 import importlib
@@ -26,7 +30,9 @@ import pandas as pd
 
 RESULTS = Path(__file__).resolve().parent.parent / "results" / "timeseries"
 HOURLY_CSV = RESULTS / "01_series_profile_hourly_counts.csv"
-SEED = 0
+REPEATS = 3
+SEEDS = tuple(range(REPEATS))
+DETERMINISTIC_SEED = -1
 HOLDOUT_HOURS = 24 * 14
 PLOT_HOURS = 24 * 7
 DEEPAR_EPOCHS = 3
@@ -96,10 +102,15 @@ def _forecast_timesfm(train: pd.Series, horizon: pd.DatetimeIndex) -> pd.Series:
 
 
 def _fit_gluonts(
-    estimator_cls: Any, epochs: int, extra: dict[str, Any], dataset: Any, horizon: pd.DatetimeIndex
+    estimator_cls: Any,
+    epochs: int,
+    extra: dict[str, Any],
+    dataset: Any,
+    horizon: pd.DatetimeIndex,
+    seed: int,
 ) -> pd.Series:
     lightning = _import_module("pytorch_lightning", "gluonts[torch]")
-    lightning.seed_everything(SEED, workers=True)
+    lightning.seed_everything(seed, workers=True)
     with tempfile.TemporaryDirectory(prefix="broadway-forecast-") as root:
         estimator = estimator_cls(
             freq="h",
@@ -120,7 +131,9 @@ def _fit_gluonts(
     return pd.Series(forecast.mean, index=horizon)
 
 
-def _gluonts_forecasts(train: pd.Series, horizon: pd.DatetimeIndex) -> dict[str, pd.Series]:
+def _gluonts_forecasts(
+    train: pd.Series, horizon: pd.DatetimeIndex
+) -> dict[str, list[tuple[int, pd.Series]]]:
     deepar = _import_module("gluonts.torch.model.deepar", "gluonts[torch]")
     wavenet = _import_module("gluonts.torch.model.wavenet", "gluonts[torch]")
     common = _import_module("gluonts.dataset.common", "gluonts[torch]")
@@ -132,9 +145,18 @@ def _gluonts_forecasts(train: pd.Series, horizon: pd.DatetimeIndex) -> dict[str,
         ("gluonts_wavenet", wavenet.WaveNetEstimator, WAVENET_EPOCHS, {"seasonality": 24}),
     )
     return {
-        name: _fit_gluonts(cls, epochs, extra, dataset, horizon)
+        name: [(seed, _fit_gluonts(cls, epochs, extra, dataset, horizon, seed)) for seed in SEEDS]
         for name, cls, epochs, extra in specs
     }
+
+
+def _deterministic_forecasts(
+    train: pd.Series, series: pd.Series, horizon: pd.DatetimeIndex
+) -> dict[str, list[tuple[int, pd.Series]]]:
+    forecasts = _baseline_forecasts(train, series, horizon)
+    forecasts["prophet"] = _forecast_prophet(train, horizon)
+    forecasts["timesfm"] = _forecast_timesfm(train, horizon)
+    return {model: [(DETERMINISTIC_SEED, predicted)] for model, predicted in forecasts.items()}
 
 
 def _metrics(actual: pd.Series, predicted: pd.Series) -> dict[str, float]:
@@ -147,40 +169,81 @@ def _metrics(actual: pd.Series, predicted: pd.Series) -> dict[str, float]:
     }
 
 
-def _metrics_frame(actual: pd.Series, forecasts: dict[str, pd.Series]) -> pd.DataFrame:
+def _metrics_frame(actual: pd.Series, runs: dict[str, list[tuple[int, pd.Series]]]) -> pd.DataFrame:
     rows = [
-        {"model": model, "metric": metric, "value": round(value, 4)}
-        for model, predicted in forecasts.items()
+        {"model": model, "seed": seed, "metric": metric, "value": round(value, 4)}
+        for model, model_runs in runs.items()
+        for seed, predicted in model_runs
         for metric, value in _metrics(actual, predicted).items()
     ]
-    return pd.DataFrame(rows, columns=["model", "metric", "value"])
+    return pd.DataFrame(rows, columns=["model", "seed", "metric", "value"])
 
 
-def _plot_holdout(stem: str, actual: pd.Series, forecasts: dict[str, pd.Series]) -> None:
+def _aggregate_frame(metrics: pd.DataFrame) -> pd.DataFrame:
+    aggregate = (
+        metrics.groupby(["model", "metric"])["value"]
+        .agg(["mean", "std", "count"])
+        .reset_index()
+        .rename(columns={"count": "runs"})
+    )
+    aggregate[["mean", "std"]] = aggregate[["mean", "std"]].round(4)
+    return aggregate[["model", "metric", "runs", "mean", "std"]]
+
+
+def _mean_paths(runs: dict[str, list[tuple[int, pd.Series]]]) -> dict[str, pd.Series]:
+    return {
+        model: (
+            model_runs[0][1]
+            if len(model_runs) == 1
+            else pd.concat([predicted for _, predicted in model_runs], axis=1).mean(axis=1)
+        )
+        for model, model_runs in runs.items()
+    }
+
+
+def _plot_holdout(stem: str, actual: pd.Series, paths: dict[str, pd.Series]) -> None:
     window = actual.iloc[-PLOT_HOURS:]
     # plt.subplots is untyped (partially unknown): pin the boundary to Any once.
     subplots: Any = plt.subplots(figsize=(15, 6), constrained_layout=True)
     figure, axis = subplots
     axis.plot(window.index, window.to_numpy(), color="black", linewidth=1.8, label="actual")
-    for model, predicted in forecasts.items():
+    for model, predicted in paths.items():
         axis.plot(
             window.index, predicted.reindex(window.index).to_numpy(), linewidth=1.0, label=model
         )
-    axis.set(title="Holdout forecast — last 7 of the 14 holdout days", xlabel="", ylabel="trips")
+    axis.set(
+        title="Holdout forecast — last 7 of the 14 holdout days (seed mean for stochastic)",
+        xlabel="",
+        ylabel="trips",
+    )
     axis.legend(ncol=4, fontsize=8)
     figure.savefig(RESULTS / f"{stem}.png", dpi=160)
     plt.close(figure)
 
 
-def _write_report(stem: str, train: pd.Series, actual: pd.Series, metrics: pd.DataFrame) -> None:
-    wide = metrics.pivot(index="model", columns="metric", values="value").sort_values("MAE")
+def _metric_cell(mean: float, std: float) -> str:
+    return f"{mean:.1f}" if pd.isna(std) else f"{mean:.1f} ± {std:.1f}"
+
+
+def _report_table(wide: pd.DataFrame, spread: pd.DataFrame, runs: pd.Series) -> list[str]:
+    rows = []
+    for name in wide.index:
+        count = int(runs[name])
+        kind = "deterministic (single)" if count == 1 else f"stochastic ({count} seeds)"
+        cells = " | ".join(
+            _metric_cell(wide.loc[name, metric], spread.loc[name, metric])
+            for metric in ("MAE", "RMSE", "MAPE")
+        )
+        rows.append(f"| {name} | {kind} | {cells} |")
+    return rows
+
+
+def _write_report(stem: str, train: pd.Series, actual: pd.Series, aggregate: pd.DataFrame) -> None:
+    wide = aggregate.pivot(index="model", columns="metric", values="mean").sort_values("MAE")
+    spread = aggregate.pivot(index="model", columns="metric", values="std")
+    runs = aggregate.groupby("model")["runs"].max()
     best = str(wide.index[0])
     gain = float(wide.loc["persistence", "MAE"]) - float(wide.loc[best, "MAE"])
-    verdict = f"{best} wins the holdout: {gain:+.1f} trips MAE versus persistence."
-    table = [
-        f"| {name} | {row.MAE:.1f} | {row.RMSE:.1f} | {row.MAPE:.1f} |"
-        for name, row in wide.iterrows()
-    ]
     lines = [
         "# Forecast model comparison — hourly demand",
         "",
@@ -194,11 +257,16 @@ def _write_report(stem: str, train: pd.Series, actual: pd.Series, metrics: pd.Da
             "- baseline convention: persistence/seasonal-naive are one-step lags of the observed "
             "series (t-1, t-24); the learned models forecast all 336 hours in one shot."
         ),
-        f"- verdict: {verdict}",
+        (
+            f"- repeatability: DeepAR and WaveNet are stochastic and retrained on seeds {SEEDS}; "
+            "std is across seeds. Persistence, seasonal-naive, train-mean, Prophet and "
+            "zero-shot TimesFM are deterministic single runs, so their std is blank."
+        ),
+        f"- verdict: {best} wins on mean MAE: {gain:+.1f} trips versus persistence.",
         "",
-        "| model | MAE | RMSE | MAPE % |",
-        "|---|---|---|---|",
-        *table,
+        "| model | repeats | MAE | RMSE | MAPE % |",
+        "|---|---|---|---|---|",
+        *_report_table(wide, spread, runs),
         "",
         (
             "- context: 02 found the hour-of-day/weekday shape and 03 the 24h/168h ACF dominance "
@@ -214,12 +282,16 @@ def _write_report(stem: str, train: pd.Series, actual: pd.Series, metrics: pd.Da
             "- GluonTS: `gluonts_mqcnn` is unavailable in GluonTS >= 0.16 (MQCNN removed with "
             "the MXNet API); `gluonts_wavenet` is the torch CNN used as the second model."
         ),
+        "- plot: stochastic models are drawn as their seed-mean path.",
         "",
-        f"Artifacts: {stem}_metrics.csv, {stem}.md, {stem}.png (this directory).",
+        (
+            f"Artifacts: {stem}_metrics.csv, {stem}_aggregate.csv, {stem}.md, "
+            f"{stem}.png (this directory)."
+        ),
     ]
     (RESULTS / f"{stem}.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
     print("\n".join(lines[4:]))
-    print(f"wrote {stem}_metrics.csv, {stem}.md, {stem}.png")
+    print(f"wrote {stem}_metrics.csv, {stem}_aggregate.csv, {stem}.md, {stem}.png")
 
 
 def main() -> None:
@@ -229,16 +301,16 @@ def main() -> None:
     train, actual = series.iloc[:-HOLDOUT_HOURS], series.iloc[-HOLDOUT_HOURS:]
     print(f"train {len(train)}h -> holdout {len(actual)}h {actual.index[0]} .. {actual.index[-1]}")
 
-    forecasts = _baseline_forecasts(train, series, actual.index)
-    forecasts["prophet"] = _forecast_prophet(train, actual.index)
-    forecasts.update(_gluonts_forecasts(train, actual.index))
-    forecasts["timesfm"] = _forecast_timesfm(train, actual.index)
+    runs = _deterministic_forecasts(train, series, actual.index)
+    runs.update(_gluonts_forecasts(train, actual.index))
 
-    metrics = _metrics_frame(actual, forecasts)
+    metrics = _metrics_frame(actual, runs)
+    aggregate = _aggregate_frame(metrics)
     metrics.to_csv(RESULTS / f"{stem}_metrics.csv", index=False)
-    _plot_holdout(stem, actual, forecasts)
-    _write_report(stem, train, actual, metrics)
-    print(metrics.pivot(index="model", columns="metric", values="value").to_string())
+    aggregate.to_csv(RESULTS / f"{stem}_aggregate.csv", index=False)
+    _plot_holdout(stem, actual, _mean_paths(runs))
+    _write_report(stem, train, actual, aggregate)
+    print(aggregate[aggregate["metric"] == "MAE"].sort_values("mean").to_string(index=False))
 
 
 if __name__ == "__main__":
