@@ -273,3 +273,31 @@ dependencies:
     adapter: ""
     license: NOASSERTION
     registered: 2026-11-25
+  - name: prophet
+    owner: project
+    scope: optional
+    purpose: Additive seasonality baseline for the timeseries forecast comparison.
+    adapter: ""
+    license: MIT
+    registered: 2026-11-25
+  - name: gluonts
+    owner: project
+    scope: optional
+    purpose: DeepAR and WaveNet probabilistic forecast estimators (torch backend).
+    adapter: ""
+    license: Apache-2.0
+    registered: 2026-11-25
+  - name: torch
+    owner: project
+    scope: optional
+    purpose: PyTorch runtime behind the GluonTS estimators and TimesFM.
+    adapter: ""
+    license: BSD-3-Clause
+    registered: 2026-11-25
+  - name: timesfm
+    owner: project
+    scope: optional
+    purpose: Zero-shot time-series foundation model for the forecast comparison.
+    adapter: ""
+    license: Apache-2.0
+    registered: 2026-11-25

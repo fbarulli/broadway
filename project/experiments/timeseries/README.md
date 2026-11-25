@@ -21,11 +21,16 @@ autocorrelation, seasonality decomposition, and time-based validation).
 1. `01_series_profile.py` — temporal coverage, frequency, gaps (read-only).
 2. Hourly/daily demand aggregates + seasonality plots.
 3. Stationarity (ADF) + autocorrelation (ACF) per aggregate.
-4. Naive baselines (persistence, seasonal-naive) with time-based splits.
-5. Model comparison only after 2-4 hold.
+4. `04_forecast_models.py` — chronological last-14-day holdout comparison:
+   persistence (t-1), seasonal-naive (t-24), train mean, Prophet, GluonTS
+   DeepAR + WaveNet (torch), and zero-shot TimesFM.
+5. Deeper model work (covariates, tuning, longer holds) only after 2-4 hold.
 
 Step scripts follow the `NN_name.py` convention. Run from the repo root, e.g.
 `bash scripts/uv.sh run python project/experiments/timeseries/01_series_profile.py`.
+Step 4's forecast stack is an optional extra: `bash scripts/uv.sh sync --extra forecast`
+(or, for an isolated venv, `uv pip install --python <venv>/bin/python prophet
+"gluonts[torch]" torch "timesfm[torch]"`).
 Results land in `project/experiments/results/timeseries/`. Artifact names begin
 with their step stem so the experiment dashboard can group and preview them
 (CSVs tracked, PNGs ignored).

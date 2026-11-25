@@ -51,7 +51,8 @@ dev = [
 spark = ["pyspark>=4.0.0"]
 db = ["psycopg[binary]>=3.3.0", "sqlalchemy>=2.0.0"]
 k8s = ["kubernetes>=32.0.0"]
-all = ["broadway[spark,db,k8s,dev]"]
+forecast = ["prophet>=1.1", "gluonts[torch]>=0.16", "torch>=2.2", "timesfm[torch]>=2.5"]
+all = ["broadway[spark,db,k8s,dev,forecast]"]
 
 [project.scripts]
 ds-pipeline = "broadway.cli:main"
