@@ -11,7 +11,11 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class CalibrationConfig(BaseModel):
-    """Experiment-level calibration request (``experiment.calibration``)."""
+    """Experiment-level calibration request (``experiment.calibration``).
+
+    ``calibration_size`` is a fraction of the TRAINING split (fit + calibration),
+    not of the full dataset; the holdout is never used to fit ``q``.
+    """
 
     model_config = ConfigDict(extra="forbid")
 

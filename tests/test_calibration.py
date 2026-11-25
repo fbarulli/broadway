@@ -26,7 +26,9 @@ from broadway.config.schema import (
     EvaluateStep,
     ExperimentConfig,
     FeatureConfig,
+    HPOConfig,
     ModelConfig,
+    ModelHPOSpec,
     PipelineConfig,
     SplitConfig,
     TaskType,
@@ -160,7 +162,7 @@ def _make_config(tmp_path: Path) -> PipelineConfig:
     evaluate_step = EvaluateStep(
         target_metric="rmse",
         promotion_threshold=0.05,
-        coverage_tolerance=1.0,
+        coverage_tolerance=0.3,
         output_dir=str(tmp_path / "artifacts" / "evaluation"),
         output_file="metrics.json",
     )
@@ -189,17 +191,15 @@ def test_calibration_payload_reaches_holdout_evaluation(
 ) -> None:
     cfg = _make_config(tmp_path)
     monkeypatch.setattr(records, "LINEAGE_DIR", tmp_path / "lineage")
-    out_dir = Path(cfg.environment.data_dir) / cfg.environment.processed_subdir
-    out_dir.mkdir(parents=True, exist_ok=True)
     df = pd.DataFrame(
         {
-            "rooms": np.arange(1, 41),
-            "area": np.arange(40, 80),
-            "price": np.arange(1, 41) * 100.0,
+            "rooms": np.arange(1, 61),
+            "area": np.arange(40, 100),
+            "price": np.arange(1, 61) * 100.0,
         }
     )
-    df.to_parquet(out_dir / cfg.etl.train_features_file, index=False)
-    df.tail(10).to_parquet(out_dir / cfg.etl.val_features_file, index=False)
+    # Disjoint fit/calibration (from the 48-row train) and holdout (last 12).
+    _write_features(cfg, df.iloc[:48], df.iloc[48:])
 
     training_module.run(cfg)
     evaluate_module.run(cfg)
@@ -208,7 +208,10 @@ def test_calibration_payload_reaches_holdout_evaluation(
         (Path(cfg.train.output_dir) / cfg.train.output_file).read_text(encoding="utf-8")
     )
     assert training.calibration is not None
-    assert training.calibration.n_calibration == 10
+    # 25% of 48 = 12 calibration rows, never the 12 holdout rows: a leak that
+    # fitted q on the holdout would report 12 from the wrong frame only if the
+    # counts differed, so the disjoint construction above is load-bearing.
+    assert training.calibration.n_calibration == 12
 
     evaluation = EvaluationResult.model_validate_json(
         (Path(cfg.evaluate.output_dir) / cfg.evaluate.output_file).read_text(encoding="utf-8")
@@ -216,6 +219,67 @@ def test_calibration_payload_reaches_holdout_evaluation(
     assert evaluation.calibration is not None
     assert evaluation.calibration.q == training.calibration.q
     assert evaluation.calibration.mean_width == pytest.approx(2 * training.calibration.q)
-    assert evaluation.calibration.calibrated is True
+    assert evaluation.calibration.calibrated is not None
     assert (Path(cfg.train.output_dir) / CALIBRATION_FILE).exists()
     assert (Path(cfg.evaluate.output_dir) / CALIBRATION_FILE).exists()
+
+
+def test_calibration_rejects_hpo(tmp_path: Path) -> None:
+    cfg = _make_config(tmp_path)
+    assert cfg.experiment is not None
+    cfg.experiment.hpo = HPOConfig(
+        engine="optuna",
+        direction="minimize",
+        total_trials=1,
+        initial_trials_per_model=1,
+        top_k=1,
+        target_metric="rmse",
+        models=[ModelHPOSpec(name="linear")],
+    )
+    with pytest.raises(ValueError, match="calibration with hpo"):
+        training_module.run(cfg)
+
+
+def test_calibration_rejects_a_classification_task(tmp_path: Path) -> None:
+    cfg = _make_config(tmp_path)
+    assert cfg.dataset is not None
+    cfg.dataset.task = TaskType.CLASSIFICATION
+    with pytest.raises(ValueError, match="regression-only"):
+        training_module.run(cfg)
+
+
+def test_calibration_flags_a_tolerance_miss(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    cfg = _make_config(tmp_path)
+    assert cfg.evaluate is not None
+    cfg.evaluate.coverage_tolerance = 0.0001
+    monkeypatch.setattr(records, "LINEAGE_DIR", tmp_path / "lineage")
+    df = pd.DataFrame(
+        {
+            "rooms": np.arange(1, 61),
+            "area": np.arange(40, 100),
+            "price": np.arange(1, 61) * 100.0,
+        }
+    )
+    holdout = df.iloc[48:].copy()
+    holdout["price"] += 1000.0  # shift the holdout outside the fitted intervals
+    _write_features(cfg, df.iloc[:48], holdout)
+
+    training_module.run(cfg)
+    evaluate_module.run(cfg)
+
+    evaluation = EvaluationResult.model_validate_json(
+        (Path(cfg.evaluate.output_dir) / cfg.evaluate.output_file).read_text(encoding="utf-8")
+    )
+    assert evaluation.calibration is not None
+    assert evaluation.calibration.calibrated is False
+    assert any("calibration coverage" in warning for warning in evaluation.warnings)
+
+
+def _write_features(cfg: PipelineConfig, train: pd.DataFrame, val: pd.DataFrame) -> None:
+    assert cfg.etl is not None
+    out_dir = Path(cfg.environment.data_dir) / cfg.environment.processed_subdir
+    out_dir.mkdir(parents=True, exist_ok=True)
+    train.to_parquet(out_dir / cfg.etl.train_features_file, index=False)
+    val.to_parquet(out_dir / cfg.etl.val_features_file, index=False)

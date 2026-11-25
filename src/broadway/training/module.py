@@ -18,7 +18,7 @@ from broadway.baseline.module import load_persisted
 from broadway.calibration import CALIBRATION_FILE
 from broadway.calibration.conformal import SplitConformal
 from broadway.calibration.contracts import CalibrationConfig, CalibrationSummary
-from broadway.config.schema import PipelineConfig
+from broadway.config.schema import PipelineConfig, TaskType
 from broadway.data.splitter import calibration_split, split
 from broadway.evaluate.metrics import compute_metrics
 from broadway.features.generic import validate_engineered_frame
@@ -101,6 +101,14 @@ def _calibration_config(cfg: PipelineConfig) -> CalibrationConfig | None:
     """
     assert cfg.experiment is not None
     calibration = cfg.experiment.calibration
+    if calibration is not None:
+        assert cfg.dataset is not None
+        if cfg.dataset.task is not TaskType.REGRESSION:
+            raise ValueError(
+                "calibration is regression-only: split-conformal intervals are "
+                "fitted on absolute residuals, but the dataset task is "
+                f"'{cfg.dataset.task.value}'"
+            )
     if calibration is not None and cfg.experiment.hpo is not None:
         raise ValueError(
             "calibration with hpo is unsupported in this slice: calibration "

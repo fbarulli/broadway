@@ -298,8 +298,8 @@ class EvaluateStep(BaseModel):
     promotion_threshold: float
     output_dir: str
     output_file: str
-    coverage_tolerance: float | None = None
-    min_period_rows: int | None = None
+    coverage_tolerance: float | None = Field(default=None, ge=0.0, le=1.0)
+    min_period_rows: int | None = Field(default=None, ge=1)
 
 
 class BaselineStep(BaseModel):
