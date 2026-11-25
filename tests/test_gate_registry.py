@@ -48,10 +48,11 @@ INDEX_FILES = [
 ]
 
 # Band ranges: bands 01–09 + 80–89 are FULL to their dense ceilings (slate §0);
-# appended ids 100…153 continue the GLOBAL dense order prefixed by the owning
+# appended ids 100…175 continue the GLOBAL dense order prefixed by the owning
 # band, so several prefixes carry a second (appended) range. Burned ids
 # (121,130,132,134,135,136,140,153 + not-landed 106/109/110/115) simply hold
-# no rows; future mints append ≥154.
+# no rows; INFRA minted 149…175 for the 2026-11-25 observability/calibration/
+# tooling/GPU-lane registry batches; future mints append ≥176.
 BAND_RANGES = {
     "INGEST": [(1, 9)],
     "ETL": [(10, 19), (115, 117)],
@@ -62,7 +63,7 @@ BAND_RANGES = {
     "SURF": [(60, 69), (100, 102)],
     "CFG": [(70, 79), (103, 112)],
     "HPO": [(80, 89)],
-    "INFRA": [(90, 99), (121, 148)],
+    "INFRA": [(90, 99), (121, 175)],
     "CUST": [(147, 153)],
 }
 ID_RX = re.compile(r"^GATE-[A-Z]+-\d{2,3}$")

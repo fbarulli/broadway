@@ -11,8 +11,8 @@ retired:
   successor: 'src/broadway/etl/module.py + src/broadway/data/loader.py (CONTRACT pipeline)'
   history_rows_retained: ['GATE-INGEST-01', 'GATE-INGEST-04', 'GATE-ETL-17', 'GATE-ETL-18', 'GATE-ETL-19', 'GATE-ETL-116', 'GATE-ETL-117']
 meta:
-  head: '7addcbe'
-  assembled: '2026-09-19'
+  head: 'a6befa1'
+  assembled: '2026-11-25'
   source_fragments:
   - agents/ledger/gates/01-ingest.md
   - agents/ledger/gates/02-etl-lookup.md
@@ -25,7 +25,7 @@ meta:
   - agents/ledger/gates/09-infra.md
   - agents/ledger/gates/80-hpo-optuna.md
   counts:
-    total: 143
+    total: 170
     gates_with_findings: 84
     finding_strings: 109
     by_band:
@@ -66,7 +66,7 @@ meta:
         flagged: 9
         finding_strings: 13
       09-infra:
-        gates: 31
+        gates: 58
         flagged: 17
         finding_strings: 25
       81-object-custody:
@@ -1059,7 +1059,7 @@ gates:
 - id: GATE-TRAIN-30
   phase: training-eval
   order: 32
-  owner: src/broadway/training/module.py:89 run()
+  owner: src/broadway/training/module.py:344 run()
   inputs:
   - CFG-DATASET-CONTRACT
   - CFG-STEP-TRAIN
@@ -1071,7 +1071,9 @@ gates:
   transforms:
   - 'config-section guard: missing dataset/experiment/train/etl → ValueError naming them all (:90-91)'
   - 'analysis-mode gate: require_mode(cfg.analysis, AnalysisMode.PREDICTION) before any IO (:92)'
-  - orchestration only — delegates to GATE-TRAIN-31..34 then opens the MLflow run (:95-145)
+  - orchestration only — delegates to GATE-TRAIN-31..34 then opens the MLflow run (:344-356)
+  - 'calibration: experiment.calibration present → calibration_split carves the fit/calibration frames (phase "split"), q is fitted on the calibration slice only (phase "calibration_fit"), and val_df stays the untouched holdout; HPO+calibration and non-regression tasks refuse loud (:98-122, :179-224)'
+  - 'phase seams load_features/split/model_fit/calibration_fit/mlflow_log/persist come from the GATE-INFRA-151 profiler and are inert unless profiling is enabled (:165-232, :310-323)'
   touched_by:
   - mlflow@3.15.1
   - pandas@2.3.3
@@ -1080,11 +1082,17 @@ gates:
   - tests/test_cli.py::TestTrainCLI::test_train_without_analysis_exits_1_naming_contract_requirement
   - tests/test_training_contracts.py::test_module_run_writes_training_result
   - tests/test_full_dispatch.py::test_flows_dispatch_per_mode
+  - tests/test_calibration.py::test_calibration_payload_reaches_holdout_evaluation
+  - tests/test_calibration.py::test_calibration_rejects_hpo
+  - tests/test_calibration.py::test_calibration_rejects_a_classification_task
   if_changed:
   - full-flow prediction order (configs/step/full.yaml)
   - ARTIFACT-TRAINING-RESULT existence contract of GATE-TRAIN-35
   - lineage graph node training:<dataset>
   - tests/test_cli.py TestTrainCLI pins
+  - GATE-INFRA-153 calibration summary shape
+  - GATE-INFRA-156 calibration frames
+  - tests/test_calibration.py
   findings:
   - both entry raises are pinned ONLY through the CLI wrapper (exit-1 stderr substrings in test_cli.py) — no test calls training.module.run with a deficient PipelineConfig directly, so a refactor of run()'s guard clauses (not the CLI dispatch) would pass the whole suite silently.
 - id: GATE-TRAIN-31
@@ -1199,6 +1207,7 @@ gates:
   - 'seed pinning: random_state injected from cfg.experiment.random_state ONLY if registry allows it and params don''t carry one — explicit wins, YAML stays SSOT (:36-37; allowed_params src/broadway/training/models/registry.py:87-92)'
   - single composition shared by trainer AND HPO objective so preprocessing cannot drift between fit and search (docstring :26-28; consumed hpo.py:54)
   - unknown registry key → get_model ValueError listing valid keys (registry.py:73-74)
+  - 'train_time_seconds now comes from the GATE-INFRA-151 seam clock (timed() over perf_counter) instead of time.time(); phase("model_fit") is inert unless profiling is enabled (:60-73)'
   touched_by:
   - pandas@2.3.3
   - scikit-learn@1.7.2
@@ -1213,27 +1222,31 @@ gates:
   - the exact fitted artifact logged by GATE-TRAIN-39 log_model
   - CV model re-composition in evaluate (evaluate/module.py:135-139 reuses this builder)
   - signature inference at module.py:138-144
+  - GATE-INFRA-151 profiling seam
   findings:
   - both experiment-required raises (:31-32, :59-60) are unpinned — grep 'requires an experiment config' / 'model pipeline requires' in tests/ returns nothing (only the unrelated baseline 'requires an experiment binding' in test_structural_cleaning.py:434).
 - id: GATE-TRAIN-35
   phase: training-eval
   order: 37
-  owner: src/broadway/evaluate/module.py:82 run()
+  owner: src/broadway/evaluate/module.py:174 run()
   inputs:
   - CFG-STEP-EVALUATE
+  - CFG-DATASET-CONTRACT
   - val_features_file parquet (REQUIRED)
   - train_features_file parquet
   - ARTIFACT-TRAINING-RESULT
   - champion via models:/<dataset>@champion
   outputs:
   - ARTIFACT-EVALUATION-RESULT
-  - lineage node evaluation:<dataset> (:166-171)
-  - conditional champion promotion (:181-194)
+  - lineage node evaluation:<dataset> (:269-270)
+  - conditional champion promotion (:289)
   transforms:
   - 'config guard: dataset/experiment/evaluate/etl/train all required → ValueError (:83-84) + require_mode PREDICTION (:85)'
   - '_load_val_features: missing val file → FileNotFoundError ''evaluate requires a held-out set'' — NO silent train-fallback (:45-48), then engineered-contract re-validation (:50)'
   - '_load_training_result: missing file → FileNotFoundError ''run the train step first'' (:67-68); _load_candidate: empty artifact_path → ValueError ''model was not logged to MLflow'', else pyfunc load (:72-75)'
   - 'champion optional-by-design: get_champion None → warning appended to result.warnings, comparison deltas become None (:110-114, :132-133; compare_models zero-champion division guarded to None src/broadway/evaluate/comparison.py:19)'
+  - 'calibration evaluation: only when the training result carries a CalibrationSummary — SplitConformal().interval(pred, q) on the untouched holdout → coverage/mean_width plus per-ISO-week periods (min_period_rows from GATE-INFRA-165, 1 when unset); a tolerance miss appends a warning and calibrated=False (:98-141, :190-197)'
+  - 'calibration.json is written beside metrics.json and coverage/mean_width are logged to MLflow (:154-171, :267-268)'
   touched_by:
   - mlflow@3.15.1
   - pandas@2.3.3
@@ -1243,10 +1256,16 @@ gates:
   - tests/test_pyfunc_inference.py::test_champion_predicts_on_raw_frame
   - tests/test_pyfunc_inference.py::test_wrong_column_set_fails_loud
   - tests/test_pyfunc_inference.py::test_wrong_dtype_fails_loud
+  - tests/test_calibration.py::test_calibration_payload_reaches_holdout_evaluation
+  - tests/test_calibration.py::test_calibration_flags_a_tolerance_miss
   if_changed:
   - GATE-TRAIN-37 ordering guarantees (this function owns the terminal block)
   - EvaluationResult schema consumers (tests/test_evaluate_contracts.py round-trips)
   - full-flow prediction step
+  - GATE-INFRA-153 calibration evaluation shape
+  - GATE-INFRA-155 coverage metrics
+  - GATE-INFRA-165 EvaluateStep tolerance/min_period_rows
+  - tests/test_calibration.py
   findings:
   - asymmetric loader hardening — _load_train_features (:55-61) lacks the missing-file guard its val twin has (:45-48); a deleted train parquet surfaces as a raw pyarrow FileNotFoundError from pd.read_parquet (:58) instead of the named loud failure pattern the module promises in its docstring (:3-5). No test covers the train-file-missing branch.
 - id: GATE-TRAIN-36
@@ -2680,6 +2699,7 @@ gates:
   - 'FullStep._validate_flow_modes (schema.py:308-316): flow keys ⊆ AnalysisMode values'
   - PreprocessingStepConfig Literal kind gate (schema.py:176) + extra='forbid' (:175)
   - SplitConfig Literal['time','random','stratified'] + validation_size∈[0,1] (schema.py:114-116)
+  - 'calibration: CalibrationConfig | None on ExperimentConfig (schema.py:198) — method Literal["split_conformal"], alpha/calibration_size strictly in (0,1); the regression-only and HPO-exclusive guards live in training.module._calibration_config (GATE-TRAIN-30)'
   touched_by:
   - _build_config (loader.py:136)
   - training HPO engine
@@ -2700,6 +2720,7 @@ gates:
   - src/broadway/config/schema.py
   - src/broadway/training/models/registry.py
   - configs/experiment/*.yaml
+  - GATE-INFRA-153 calibration config shape
   findings:
   - B1 include-validation NOT LANDED (slate v4 row QUEUED — agents/ledger/FIXES.md:38; DECISIONS.md:12-13, absorbed into Tier2 by D13 DECISIONS.md:67-68). Today build_generic_feature_specs SILENTLY SKIPS any FeatureConfig.include name absent from contract.columns (features/generic.py:16-19, `if col in contract.columns:` with no else) — a typo'd include shrinks the feature surface invisibly, violating the very "YAML declares everything" doctrine; no tripwire test pins the silence either (tests/test_generic_features.py::test_build_generic_feature_specs exercises only resolvable includes).
 - id: GATE-CFG-77
@@ -3306,23 +3327,31 @@ gates:
 - id: GATE-INFRA-92
   phase: infra-meta
   order: 109
-  owner: scripts/run_local_ci.sh:102 gate battery (ruff, mypy, Vulture, configs, shell-scripts, pytest+cov floor=95, project-tests)
+  owner: scripts/run_local_ci.sh:102 gate battery (ruff, mypy, pyright-advisory, Vulture, configs, shell-scripts, docker-paths, deps, consolidation, logging, pytest+cov floor=95, project-tests)
   inputs:
   - src/** tests/test_project_paths.py project/experiments/** project/experiments.py project/dashboard.py project/paths.py project/working.py project/data.py scripts/check_project_paths.py scripts/ (ruff)
   - project/config/ (project-owned layout, experiment, and taxi config-overlay SSOT)
   - src/broadway/** (mypy)
+  - src/broadway/** + pyrightconfig.json via scripts/pyright_advisory.sh (pyright-advisory, consultant)
   - configs/experiment/*.yaml via load_config(dataset='test') (configs)
   - k8s/optuna/*.sh + scripts/*.sh via sh -n + shellcheck (shell-scripts)
+  - scripts/check_docker_paths.sh (docker-paths)
+  - scripts/check_dependencies.py + configs/dependencies.yaml via scripts/uv.sh (deps)
+  - scripts/check_duplication.py + configs/duplication.yaml via scripts/uv.sh (consolidation)
+  - src/broadway/** handler-construction grep census (logging)
   - src/broadway project scripts via Vulture --min-confidence 95 (vulture)
   - tests/** (pytest -n 4 --dist worksteal, --cov-fail-under=95)
   - 'project/tests/** (project-tests: full tier only, -q --dist worksteal, NO coverage flags)'
   outputs:
-  - PASS/FAIL ruff|mypy|configs|project-paths|shell-scripts|vulture|pytest|project-tests banners + 40-line tails
+  - PASS/FAIL ruff|mypy|pyright-advisory|vulture|configs|shell-scripts|docker-paths|deps|consolidation|logging|pytest|project-tests banners + 40-line tails
   - cov floor breach ⇒ FAIL pytest
   transforms:
-  - ruff/mypy/Vulture/configs/shell-scripts run in EVERY tier incl. fast/static
+  - ruff/mypy/pyright-advisory/Vulture/configs/shell-scripts/docker-paths/deps/consolidation/logging run in EVERY tier incl. fast/static
   - 'shell-scripts widened to BOTH glob dirs (:93) — sh -n + shellcheck over k8s/optuna/*.sh AND scripts/*.sh, command-identical to ci.yml ''Shell scripts'' step (gate-divergence law comment :91)'
   - 'Vulture is fail-closed at 95% confidence through the direct scripts/uv.sh invocation: a finding is printed and exits non-zero; no allowlist or wrapper exists'
+  - 'factory/SSOT gates: deps (dependency registry + import boundary) and consolidation (cross-file duplicates, ADVISORY exit 0 until its baseline is clean) plus the logging handler-construction census join the parallel static phase (:234-240); each Python gate is invoked as python <script> through scripts/uv.sh --extra dev'
+  - 'pyright-advisory is consultant-only: scripts/pyright_advisory.sh always exits 0 and reports counts (never blocks); mypy enforces'
+  - 'the parallel static phase launches every non-pytest gate with run_bg and collects banners in gate order (:222-241); each background job clears the EXIT trap so --clean-lint teardown cannot fire early'
   - 'project-tests step (:97, full-tier-only): uv run pytest project/tests -q --dist worksteal with NO coverage flags — the >=95 floor deliberately stays on tests/ (header :7-8); closes the data-gate hole (human ruling): 26 tests / 6 files collected+passing at HEAD eb9ea18'
   - coverage floor value 95 owned here; docs must quote it identically
   - configs gate asserts non-empty glob then loads every experiment config
@@ -3943,10 +3972,542 @@ gates:
   - tests/test_state_records.py
   - agents/ledger/STATE.md CURRENT schema
   findings: []
+- id: GATE-INFRA-149
+  phase: infra-meta
+  order: 138
+  owner: 'src/broadway/observability/context.py:20 new_run_id()'
+  inputs: []
+  outputs: []
+  transforms:
+  - 'RUN_ID_ENV="BROADWAY_RUN_ID" + DEFAULT_RUN_ID="-": a ContextVar carries the id and the placeholder keeps the log formatter valid before an entry point mints one (:14-17)'
+  - 'new_run_id() mints uuid4().hex; current_run_id() returns the bound id or "-"; set_run_id() binds it for the current invocation/context (:20-32)'
+  - 'one run id is shared by the log lines, the profile record, the evidence record, and the MLflow run (module docstring :3-6)'
+  touched_by: []
+  validated_by:
+  - tests/test_logging.py::test_cli_main_writes_run_id_in_the_configured_log_line
+  - tests/test_verify_live.py::test_verify_live_honors_and_propagates_run_id
+  - tests/test_profiling.py::test_enabled_profiler_writes_a_record_with_the_run_id
+  if_changed:
+  - src/broadway/cli.py entry-point minting
+  - scripts/verify_live.py RUN_ID_ENV propagation
+  - GATE-INFRA-151 ProfileRecord.run_id
+  - LOGGING.md §5 correlation contract
+  findings: []
+- id: GATE-INFRA-150
+  phase: infra-meta
+  order: 139
+  owner: 'src/broadway/observability/logging.py:39 setup_logging()'
+  inputs: []
+  outputs: []
+  transforms:
+  - 'idempotent single configuration: the _configured guard makes repeat calls no-ops (:18, :41-43)'
+  - 'root logger gets exactly one console StreamHandler + one FileHandler, both with RunIdFilter and FORMAT "asctime [level] run=%(run_id)s name: message" (:16, :46-56)'
+  - 'log path = environment.log_dir (absolute kept, relative resolved against repo_root()) / environment.log_file; either missing → ValueError naming the field (:29-36)'
+  - 'setup_logging is the ONLY handler-construction site in src/broadway, enforced by the run_local_ci logging gate (GATE-INFRA-92)'
+  touched_by: []
+  validated_by:
+  - tests/test_logging.py::test_setup_is_idempotent_and_writes_the_configured_file
+  - tests/test_logging.py::test_missing_log_path_field_raises_naming_it[log_dir]
+  - tests/test_logging.py::test_missing_log_path_field_raises_naming_it[log_file]
+  - tests/test_logging.py::test_cli_main_writes_run_id_in_the_configured_log_line
+  if_changed:
+  - GATE-INFRA-92 logging gate scope
+  - GATE-CFG-73 EnvironmentConfig log_level/log_dir/log_file fields
+  - LOGGING.md §1-3 and §7 boundary law
+  findings: []
+- id: GATE-INFRA-151
+  phase: infra-meta
+  order: 140
+  owner: 'src/broadway/observability/profiling.py:155 StepProfiler'
+  inputs: []
+  outputs: []
+  transforms:
+  - 'enabled = ProfileConfig.enabled OR BROADWAY_PROFILE=="1"; disabled means no timing and no file but the callable still runs (:166-181)'
+  - '_measure runs fn ProfileConfig.runs times under a fresh Phases collector, recording wall (perf_counter) and process CPU seconds; phases come from the LAST run (:183-199)'
+  - 'phase(name) accumulates into the active collector through a ContextVar and is inert outside a profiled call, so instrumenting a function never enables profiling (:65-120)'
+  - 'ProfileRecord carries wall_p50/p95 (statistics.quantiles inclusive), mean CPU, peak RSS from ru_maxrss/1024, run_id from the GATE-INFRA-149 context, and rows/throughput None at the seam because a derived number would be invented (:123-152, :201-225)'
+  - 'writes <output_dir>/<step>.json via model_dump_json(indent=2); a relative output_dir resolves against repo_root() (:227-234)'
+  touched_by:
+  - pydantic@2.11.7
+  - pyyaml@6.0.2
+  validated_by:
+  - tests/test_profiling.py::test_enabled_profiler_writes_a_record_with_the_run_id
+  - tests/test_profiling.py::test_disabled_profiler_runs_the_callable_and_writes_nothing
+  - tests/test_profiling.py::test_phase_records_only_into_the_active_profile
+  - tests/test_profiling.py::test_timed_reports_elapsed_wall_seconds
+  if_changed:
+  - GATE-INFRA-152
+  - GATE-TRAIN-34 train_time_seconds clock
+  - src/broadway/pipeline.py profiler seam
+  - PROFILING.md §1-§4
+  findings: []
+- id: GATE-INFRA-152
+  phase: infra-meta
+  order: 141
+  owner: 'configs/profiling.yaml:1 measurement-seam SSOT'
+  inputs: []
+  outputs: []
+  transforms:
+  - 'enabled: false by default; the only switches are this flag or BROADWAY_PROFILE=1, never a code edit'
+  - 'output_dir artifacts/profiles is git-ignored and regenerable; runs: 1 because pipeline steps have side effects; noise_band_pct: 5.0 is report-only'
+  - 'budgets per step (etl/features/train/evaluate) are 0.0 = not yet baselined; the profile gate is PLANNED and a missing budget is recorded as missing, never read as passing'
+  touched_by:
+  - pyyaml@6.0.2
+  validated_by: []
+  if_changed:
+  - GATE-INFRA-151
+  - PROFILING.md §2-§5
+  findings: []
+- id: GATE-INFRA-153
+  phase: infra-meta
+  order: 142
+  owner: 'src/broadway/calibration/contracts.py:13 CalibrationConfig'
+  inputs: []
+  outputs: []
+  transforms:
+  - 'CalibrationConfig: method Literal["split_conformal"], alpha and calibration_size strictly in (0,1); calibration_size is a fraction of the TRAINING split, never the holdout (:13-24)'
+  - 'CalibrationSummary carries the fitted q with n_calibration/calibration_size provenance (:27-34)'
+  - 'CalibrationEvaluation carries alpha/q/nominal_coverage/coverage/mean_width/periods plus optional coverage_tolerance/calibrated; PeriodCoverage is one ISO week YYYY-Www (:37-55)'
+  touched_by:
+  - pydantic@2.11.7
+  validated_by:
+  - tests/test_calibration.py::test_calibration_payload_reaches_holdout_evaluation
+  - tests/test_calibration.py::test_calibration_flags_a_tolerance_miss
+  if_changed:
+  - GATE-INFRA-154
+  - GATE-INFRA-155
+  - GATE-CFG-76
+  - GATE-TRAIN-30
+  - GATE-TRAIN-35
+  findings: []
+- id: GATE-INFRA-154
+  phase: infra-meta
+  order: 143
+  owner: 'src/broadway/calibration/conformal.py:10 SplitConformal'
+  inputs: []
+  outputs: []
+  transforms:
+  - 'quantile: sort absolute residuals ascending, rank = ceil((n+1)(1-alpha)) clamped to [1,n]; zero residuals → ValueError (:22-31)'
+  - 'interval: symmetric (pred-q, pred+q) (:33-36)'
+  - 'finite-sample split-conformal guarantee of at least 1-alpha coverage under exchangeability is declared in the class docstring (:10-20)'
+  touched_by:
+  - numpy@2.5.2
+  validated_by:
+  - tests/test_calibration.py::test_split_conformal_holdout_coverage_matches_nominal
+  - tests/test_calibration.py::test_split_conformal_quantile_is_deterministic
+  - tests/test_calibration.py::test_split_conformal_quantile_grows_as_alpha_decreases
+  if_changed:
+  - GATE-TRAIN-30 calibration_fit
+  - GATE-TRAIN-35 interval evaluation
+  - tests/test_calibration.py quantile pins
+  findings: []
+- id: GATE-INFRA-155
+  phase: infra-meta
+  order: 144
+  owner: 'src/broadway/calibration/metrics.py:11 coverage()'
+  inputs: []
+  outputs: []
+  transforms:
+  - 'coverage: fraction of y_true inside the inclusive [lower, upper] interval; empty input → ValueError (:11-19)'
+  - 'mean_width: mean(upper - lower); empty input → ValueError (:22-27)'
+  - 'coverage_by_period: group by ISO week YYYY-Www in chronological order and drop periods with fewer than min_rows; min_rows < 1 → ValueError, and a partial terminal week is never reported as a coverage collapse (:30-66)'
+  touched_by:
+  - numpy@2.5.2
+  - pandas@2.3.3
+  validated_by:
+  - tests/test_calibration.py::test_coverage_by_period_labels_iso_weeks
+  - tests/test_calibration.py::test_coverage_by_period_excludes_partial_periods
+  - tests/test_calibration.py::test_split_conformal_holdout_coverage_matches_nominal
+  if_changed:
+  - GATE-TRAIN-35 calibration evaluation
+  - configs/step/evaluate.yaml min_period_rows
+  findings: []
+- id: GATE-INFRA-156
+  phase: infra-meta
+  order: 145
+  owner: 'src/broadway/data/splitter.py:66 calibration_split()'
+  inputs:
+  - CFG-DATASET-CONTRACT
+  outputs: []
+  transforms:
+  - 'calibration_split applies the split kind with calibration_size as the second part: time keeps chronology (last calibration_size fraction), stratified/random use the canonical helpers (:66-79, :32-48)'
+  - 'time split requires dataset.datetime_column; stratified requires a classification task; else loud ValueError (:40-47)'
+  - 'one partition rule shared by split(), chronological_split(), and calibration_split() via _time_partition/_split_with_fraction, so the helpers cannot drift (:16-63)'
+  touched_by:
+  - pandas@2.3.3
+  - scikit-learn@1.7.2
+  validated_by:
+  - tests/test_splitter_extended.py::test_calibration_split_keeps_calibration_later_than_fit_in_time
+  if_changed:
+  - GATE-TRAIN-30 calibration frames
+  - validation_size split semantics
+  - tests/test_splitter_extended.py chronological pins
+  findings: []
+- id: GATE-INFRA-157
+  phase: infra-meta
+  order: 146
+  owner: 'src/broadway/evaluate/contracts.py:42 EvaluationResult'
+  inputs: []
+  outputs: []
+  transforms:
+  - 'EvaluationResult: metrics/promote/reason plus optional cv_metrics/residuals/comparison/baseline/calibration/warnings; extra="forbid" (:30-46)'
+  - 'the calibration field embeds CalibrationEvaluation, which the evaluate step writes into metrics.json and calibration.json (:42-46)'
+  - 'MetricComparison/ModelComparison/BaselineComparison shapes are unchanged (:10-28)'
+  touched_by:
+  - pydantic@2.11.7
+  validated_by:
+  - tests/test_calibration.py::test_calibration_payload_reaches_holdout_evaluation
+  - tests/test_calibration.py::test_calibration_flags_a_tolerance_miss
+  - tests/test_evaluate_contracts.py::test_module_run_writes_evaluation_result
+  if_changed:
+  - GATE-TRAIN-35
+  - ARTIFACT-EVALUATION-RESULT consumers
+  - tests/test_evaluate_contracts.py round-trips
+  findings: []
+- id: GATE-INFRA-158
+  phase: infra-meta
+  order: 147
+  owner: 'src/broadway/training/contracts.py:8 TrainingResult'
+  inputs: []
+  outputs: []
+  transforms:
+  - 'TrainingResult: model_type/params/train_time_seconds plus optional artifact_path and calibration (CalibrationSummary); no extra="forbid" (:8-15)'
+  - 'train_time_seconds is produced by the profiling-seam clock and rounded to 3 decimals by the trainer (GATE-TRAIN-34)'
+  touched_by:
+  - pydantic@2.11.7
+  validated_by:
+  - tests/test_training_contracts.py::test_module_run_writes_training_result
+  - tests/test_training_contracts.py::test_trainer_returns_training_result
+  - tests/test_calibration.py::test_calibration_payload_reaches_holdout_evaluation
+  if_changed:
+  - GATE-TRAIN-30
+  - GATE-TRAIN-34
+  - ARTIFACT-TRAINING-RESULT consumers
+  findings: []
+- id: GATE-INFRA-159
+  phase: infra-meta
+  order: 148
+  owner: 'scripts/check_dependencies.py:217 main()'
+  inputs: []
+  outputs: []
+  transforms:
+  - 'blocking violations: unregistered direct dependency, orphan registry row, duplicate row, and a project-scoped dependency imported under src/broadway (:158-195)'
+  - 'PEP 503 canonical_name normalization over pyproject dependencies + optional-dependency groups (:71-78); imports are top-level only via ast (:109-124)'
+  - 'notes never fail: missing license and empty adapter on non-dev rows (:127-135, :163-169)'
+  - 'exit 0 prints DEPENDENCIES OK with the direct-dependency count; exit 1 prints VIOLATION lines and DEPENDENCIES FAILED (:217-233)'
+  touched_by:
+  - pyyaml@6.0.2
+  - pydantic@2.11.7
+  validated_by:
+  - tests/test_dependency_registry.py::test_check_registry_passes_when_complete_and_flags_a_missing_row
+  - tests/test_dependency_registry.py::test_project_scoped_dependency_imported_under_src_is_one_boundary_violation
+  if_changed:
+  - GATE-INFRA-92 deps gate
+  - GATE-INFRA-160
+  - pyproject.toml direct dependencies
+  - CODE_STANDARD.md §4
+  findings: []
+- id: GATE-INFRA-160
+  phase: infra-meta
+  order: 149
+  owner: 'configs/dependencies.yaml:1 dependency registry SSOT'
+  inputs: []
+  outputs: []
+  transforms:
+  - 'one row per direct dependency with name/owner/scope platform|project|dev|optional/purpose/adapter/license/registered date; version specs stay in pyproject.toml (the version SSOT)'
+  - 'licenses are recorded, not gated (internal undistributed platform); an empty adapter means the library is used directly and is an advisory note for non-dev rows'
+  - 'consumed only by scripts/check_dependencies.py (registry coverage + import boundary)'
+  touched_by:
+  - pyyaml@6.0.2
+  validated_by: []
+  if_changed:
+  - GATE-INFRA-159
+  - GATE-INFRA-92 deps gate
+  - pyproject.toml dependency additions
+  findings: []
+- id: GATE-INFRA-161
+  phase: infra-meta
+  order: 150
+  owner: 'scripts/check_duplication.py:416 main()'
+  inputs: []
+  outputs: []
+  transforms:
+  - 'AST signature erases identifiers/constants/docstrings and keeps node types plus argument shape; only functions with at least min_statements statements enter the scan (:102-184, :275-290)'
+  - 'a cross-file group is one signature across 2+ files; a name collision is one function name under 2+ owners (dunder names excluded) (:292-326)'
+  - 'config path derives from this script name (scripts/check_<name>.py → configs/<name>.yaml); an absent configured root is skipped with a notice and no existing root → FileNotFoundError (:224-243, :410-413)'
+  - 'writes the JSON report and prints groups/collisions; advisory: true means always exit 0, blocking exits 1 on any group (:329-427)'
+  touched_by:
+  - pyyaml@6.0.2
+  - pydantic@2.11.7
+  validated_by:
+  - tests/test_duplication_checker.py::test_cross_file_duplicate_reported_and_unique_ignored
+  - tests/test_duplication_checker.py::test_missing_scan_root_skipped_with_notice_and_existing_root_scanned
+  if_changed:
+  - GATE-INFRA-92 consolidation gate
+  - GATE-INFRA-162
+  - CONSOLIDATION.md §4
+  findings: []
+- id: GATE-INFRA-162
+  phase: infra-meta
+  order: 151
+  owner: 'configs/duplication.yaml:1 duplicate-detection thresholds SSOT'
+  inputs: []
+  outputs: []
+  transforms:
+  - 'advisory: true = report only and exit 0 until the baseline is clean; flipping to false makes any cross-file group exit 1'
+  - 'min_statements: 8 keeps small getters out of the signal; scan_roots src/broadway + project + scripts; exclude **/__init__.py and **/test_*.py'
+  - 'report artifacts/consolidation/duplicates.json is the git-ignored advisory artifact'
+  touched_by:
+  - pyyaml@6.0.2
+  validated_by: []
+  if_changed:
+  - GATE-INFRA-161
+  - GATE-INFRA-92 consolidation gate
+  - CONSOLIDATION.md §4
+  findings: []
+- id: GATE-INFRA-163
+  phase: infra-meta
+  order: 152
+  owner: 'scripts/verify_live.py:281 main()'
+  inputs: []
+  outputs: []
+  transforms:
+  - 'runs the real command once via shlex.split with BROADWAY_RUN_ID injected, capturing exit code/stdout/stderr/wall time; a timeout records exit_code None (:123-153)'
+  - 'evidence record: run_id, git short HEAD, step, command, dataset, rows, duration, exit code, output tails, log path, created_at (:77-95, :217-246)'
+  - 'rows come from the parquet footer only (no data load); a missing/corrupt parquet records rows=None with rows_error (:170-182)'
+  - 'provenance only: nothing validates, hashes, sizes or gates data; main prints the JSON path and exits with the recorded exit code (1 on timeout) (:8-10, :281-294)'
+  touched_by:
+  - pyarrow@19.0.1
+  - pyyaml@6.0.2
+  - pydantic@2.11.7
+  validated_by:
+  - tests/test_verify_live.py::test_verify_live_records_evidence_and_preserves_exit_code
+  - tests/test_verify_live.py::test_verify_live_honors_and_propagates_run_id
+  - tests/test_verify_live.py::test_verify_live_records_unreadable_parquet_rows_with_reason[missing]
+  - tests/test_verify_live.py::test_verify_live_records_unreadable_parquet_rows_with_reason[corrupt]
+  if_changed:
+  - GATE-INFRA-164
+  - artifacts/verification custody
+  - LIVE_VERIFICATION.md §3-§4
+  findings: []
+- id: GATE-INFRA-164
+  phase: infra-meta
+  order: 153
+  owner: 'configs/verification.yaml:1 live-verification evidence SSOT'
+  inputs: []
+  outputs: []
+  transforms:
+  - 'output_dir artifacts/verification, default_timeout_seconds 1800, output_tail_lines 20'
+  - 'consumed only by scripts/verify_live.py; the provenance-only policy records rows/timestamps for traceability and never accepts or rejects data'
+  touched_by:
+  - pyyaml@6.0.2
+  validated_by: []
+  if_changed:
+  - GATE-INFRA-163
+  - LIVE_VERIFICATION.md §3-§4
+  findings: []
+- id: GATE-INFRA-165
+  phase: infra-meta
+  order: 154
+  owner: 'src/broadway/config/schema.py:296 EvaluateStep'
+  inputs:
+  - CFG-STEP-EVALUATE
+  outputs: []
+  transforms:
+  - 'EvaluateStep gained optional coverage_tolerance and min_period_rows (:296-303); the evaluate consumer defaults min_period_rows to 1 when unset (evaluate/module.py:107)'
+  - 'coverage_tolerance drives the calibrated flag and the tolerance-miss warning; a miss is reported as a warning, never promoted and never gated (GATE-TRAIN-35)'
+  touched_by:
+  - pydantic@2.11.7
+  validated_by:
+  - tests/test_calibration.py::test_calibration_flags_a_tolerance_miss
+  - tests/test_calibration.py::test_calibration_payload_reaches_holdout_evaluation
+  if_changed:
+  - GATE-TRAIN-35
+  - configs/step/evaluate.yaml
+  - GATE-CFG-76
+  findings: []
+- id: GATE-INFRA-166
+  phase: infra-meta
+  order: 155
+  owner: 'gpu_training/memory_probe.py:259 main()'
+  inputs: []
+  outputs: []
+  transforms:
+  - 'sweeps the configured micro-batches in ascending order, running one real forward+backward+optimizer step per batch through the module:function adapter (:126-165, :202-211)'
+  - 'cuda records peak allocated/reserved VRAM plus free/total via torch; cpu records peak RSS from ru_maxrss and MemAvailable/MemTotal from /proc/meminfo (:92-113, :174-200)'
+  - 'after the first OOM the remaining (monotonic) batches are recorded as skipped, never re-attempted (:131-145)'
+  - 'baseline = largest batch whose peak fits under headroom × total, its per-trial footprint, and floor(free × headroom / footprint) concurrent trials on cuda; every value comes from the config (:213-236)'
+  - 'writes <output> as model_dump_json(indent=2) (a relative path resolves next to this script) and prints the baseline JSON; torch is a lazy import resolved from the GPU/ER venv, not a broadway dependency (:187-206, :250-285)'
+  touched_by:
+  - pydantic@2.11.7
+  - pyyaml@6.0.2
+  - torch@2.14.0+cu130
+  validated_by: 
+  - tests/test_gpu_training.py::test_probe_writes_a_cpu_baseline
+  if_changed:
+  - GATE-INFRA-167
+  - GATE-INFRA-168
+  - GATE-INFRA-170
+  findings: []
+- id: GATE-INFRA-167
+  phase: infra-meta
+  order: 156
+  owner: 'gpu_training/run_hpo.py:100 main()'
+  inputs: []
+  outputs: []
+  transforms:
+  - 'chooses worker count = config.workers or baseline.concurrent_trials, capped at len(gpus) × mps_slots_per_gpu, and splits n_trials ceil-wise across workers (:57-66)'
+  - 'assigns gpu = gpus[worker % len(gpus)] and renders the config command template with {study}/{storage}/{n_trials}/{micro_batch}/{worker}/{gpu}; micro_batch comes from the baseline (:64-83)'
+  - 'a baseline whose max_batch is null (every micro-batch failed) → ValueError naming the dead baseline (:68-69)'
+  - 'dry-run is the default posture; --execute pins CUDA_VISIBLE_DEVICES and OMP_NUM_THREADS=1 per worker and refuses to start when the storage env var is unset (:86-97, :119-129)'
+  touched_by:
+  - pydantic@2.11.7
+  - pyyaml@6.0.2
+  validated_by: 
+  - tests/test_gpu_training.py::test_plan_splits_the_trial_budget_over_measured_concurrency
+  - tests/test_gpu_training.py::test_plan_requires_a_fitting_batch
+  if_changed:
+  - GATE-INFRA-166
+  - GATE-INFRA-169
+  findings: []
+- id: GATE-INFRA-168
+  phase: infra-meta
+  order: 157
+  owner: 'gpu_training/config/memory_probe.yaml:1 memory-sweep SSOT'
+  inputs: []
+  outputs: []
+  transforms:
+  - 'declares the adapter entry point step: adapters.cpu_smoke:step, device cpu|cuda, dtype fp32|fp16|bf16, seq_len 256, the micro-batch ladder [1,2,4,8,16,32], headroom 0.90, and output baseline/memory_baseline.json'
+  - 'read only by gpu_training/memory_probe.py ProbeConfig.from_yaml (frozen, extra="forbid"); no sweep value is repeated in code'
+  touched_by:
+  - pyyaml@6.0.2
+  validated_by: 
+  - tests/test_gpu_training.py::test_probe_writes_a_cpu_baseline
+  if_changed:
+  - GATE-INFRA-166
+  - GATE-INFRA-170
+  findings: []
+- id: GATE-INFRA-169
+  phase: infra-meta
+  order: 158
+  owner: 'gpu_training/config/hpo_run.yaml:1 HPO fan-out SSOT'
+  inputs: []
+  outputs: []
+  transforms:
+  - 'declares the per-worker command template with placeholders {study}/{storage}/{n_trials}/{micro_batch}/{worker}/{gpu}, n_trials 10, study laya, gpus [0], mps_slots_per_gpu 2, and workers null (= use the baseline concurrency)'
+  - 'the shared Optuna URL is named only as storage_env OPTUNA_STORAGE_URL; the value comes from the secret store and never from this file'
+  touched_by:
+  - pyyaml@6.0.2
+  validated_by: 
+  - tests/test_gpu_training.py::test_plan_splits_the_trial_budget_over_measured_concurrency
+  if_changed:
+  - GATE-INFRA-167
+  findings: []
+- id: GATE-INFRA-170
+  phase: infra-meta
+  order: 159
+  owner: 'gpu_training/adapters/cpu_smoke.py:22 step()'
+  inputs: []
+  outputs: []
+  transforms:
+  - 'reference implementation of the probe adapter contract step(batch_size, seq_len, device, dtype) -> param_count: one real forward+backward+AdamW step on a 3-layer MLP, returning the parameter count (:22-44)'
+  - 'maps fp32/fp16/bf16 to a torch dtype and is selected by gpu_training/config/memory_probe.yaml step: adapters.cpu_smoke:step; the GPU host points the same contract at the real trainer adapter (:30-33)'
+  touched_by:
+  - torch@2.14.0+cu130
+  validated_by: 
+  - tests/test_gpu_training.py::test_probe_writes_a_cpu_baseline
+  if_changed:
+  - GATE-INFRA-166
+  - GATE-INFRA-168
+  findings: []
+- id: GATE-INFRA-171
+  phase: infra-meta
+  order: 160
+  owner: 'gpu_training/er_reference/config/laya_hpo_space.yaml:1 laya HPO reference space (copied from ER; tree is not executable here)'
+  inputs: []
+  outputs: []
+  transforms:
+  - 'REFERENCE-ONLY surface: 66 files copied from /home/opc/ONE/ER (src/cli kaggle/colab/laya_*, scripts/, config/training.yaml, config/laya_hpo_space.yaml); they import ER core/model_tracks/laya modules that were not copied, so nothing in this tree runs in this repo (gpu_training/README.md :5-12)'
+  - 'records ER HPO baseline facts: 421M-param laya, T4 15GB, micro_batch 16 with grad_accum 4, Optuna/TPE 10 trials, n_jobs 2 per session, objective dev_accuracy (never test) (gpu_training/README.md :23-35)'
+  - 'the runnable replacement is GATE-INFRA-166/167; the copied files are deliberately not gated individually, because a reference copy must not carry execution ownership it cannot honor'
+  touched_by: []
+  validated_by: []
+  if_changed:
+  - GATE-INFRA-166
+  - GATE-INFRA-167
+  findings: []
+- id: GATE-INFRA-172
+  phase: infra-meta
+  order: 161
+  owner: 'src/broadway/pipeline.py:16 run()'
+  inputs: []
+  outputs: []
+  transforms:
+  - 'the ONE step-dispatch loop: STEP_MODULES[step], discover skipped with a warning, module.run(cfg) per step (:16-26)'
+  - 'constructs StepProfiler.from_default_config() ONCE per orchestration and wraps each step with profiler.run(step, dataset, partial(module.run, cfg)) — the actual GATE-INFRA-151 call site (:17, :25)'
+  - 'the dataset label recorded in the profile comes from cfg.dataset, None when absent (:18)'
+  touched_by: []
+  validated_by:
+  - tests/test_onboarding_e2e.py::test_init_and_run_external_dataset
+  if_changed:
+  - GATE-INFRA-151
+  - GATE-TRAIN-30
+  - src/broadway/config/loader.py STEP_MODULES
+  - tests/test_onboarding_e2e.py
+  findings: []
+- id: GATE-INFRA-173
+  phase: infra-meta
+  order: 162
+  owner: 'configs/step/train.yaml:1 training step config'
+  inputs: []
+  outputs: []
+  transforms:
+  - 'declares the training knobs: random_state 42, n_jobs -1, cv_folds 5, cv_kind kfold, model_file model.pkl, n_estimators 500, learning_rate 0.05, num_leaves 63, subsample/colsample_bytree 0.8, quantile_tail 0.9, output artifacts/training + training_result.json'
+  - 'consumed as TrainStep through the GATE-TRAIN-30 orchestration (CFG-STEP-TRAIN); no value is repeated in code'
+  touched_by:
+  - pyyaml@6.0.2
+  validated_by: []
+  if_changed:
+  - GATE-TRAIN-30
+  - CFG-STEP-TRAIN consumers
+  findings: []
+- id: GATE-INFRA-174
+  phase: infra-meta
+  order: 163
+  owner: 'configs/step/evaluate.yaml:1 evaluation policy config'
+  inputs: []
+  outputs: []
+  transforms:
+  - 'declares target_metric rmse, promotion_threshold 0.05, coverage_tolerance 0.05, min_period_rows 100 (partial terminal weeks excluded), output artifacts/evaluation + metrics.json'
+  - 'consumed as EvaluateStep by GATE-TRAIN-35 (CFG-STEP-EVALUATE); the tolerance and min-period knobs feed the calibration checks of GATE-INFRA-165'
+  touched_by:
+  - pyyaml@6.0.2
+  validated_by: []
+  if_changed:
+  - GATE-TRAIN-35
+  - GATE-INFRA-165
+  findings: []
+- id: GATE-INFRA-175
+  phase: infra-meta
+  order: 164
+  owner: 'project/config/experiment/taxi.yaml:1 calibration opt-in overlay (split_conformal)'
+  inputs: []
+  outputs: []
+  transforms:
+  - 'taxi experiment overlay: joined/engineered data_source, feature include/derived/builder_params/encodings, linear model, time split with validation_size 0.2, random_state 42, target_metric rmse'
+  - 'calibration block method split_conformal, alpha 0.2, calibration_size 0.2 of the training split — the project-line opt-in consumed by GATE-TRAIN-30 through the GATE-INFRA-153 shape'
+  touched_by:
+  - pyyaml@6.0.2
+  validated_by: []
+  if_changed:
+  - GATE-TRAIN-30
+  - GATE-INFRA-153
+  - project/config/experiment/ overlays
+  findings: []
 # --- BAND 81-OBJECT-CUSTODY (minted per slate §0; header law above) ------
 - id: GATE-CUST-147
   phase: object-custody
-  order: 138
+  order: 165
   owner: 'src/broadway/training/mlflow_utils.py:162 promote_candidate()'
   inputs:
   - 'model_uri + alias="champion"'
@@ -3965,7 +4526,7 @@ gates:
   findings: []
 - id: GATE-CUST-148
   phase: object-custody
-  order: 139
+  order: 166
   owner: 'src/broadway/training/mlflow_utils.py:163 register_model call sites'
   inputs:
   - candidate model_uri + dataset name
@@ -3981,7 +4542,7 @@ gates:
   findings: []
 - id: GATE-CUST-149
   phase: object-custody
-  order: 140
+  order: 167
   owner: 'project/experiments/mlflow/03_optuna_worker.py:111 set_tag trio (model/study/seed) + hpo callback tags + battle writers'
   inputs:
   - every mlflow.set_tag call across the independent writer sites
@@ -3998,7 +4559,7 @@ gates:
   findings: []
 - id: GATE-CUST-150
   phase: object-custody
-  order: 141
+  order: 168
   owner: 'src/broadway/training/mlflow_utils.py:59 set_experiment auto-create chokepoint (inside setup_mlflow :54-63)'
   inputs:
   - experiment_name argument at setup time
@@ -4013,7 +4574,7 @@ gates:
   findings: []
 - id: GATE-CUST-151
   phase: object-custody
-  order: 142
+  order: 169
   owner: 'k8s/optuna/lifecycle.sh:149 dump_state() snapshot generations (keep-N cap) + training-plane registry-prune policy (non-champion versions)'
   inputs:
   - registry versions + $BACKUP_DIR snapshot generations
@@ -4030,7 +4591,7 @@ gates:
   findings: []
 - id: GATE-CUST-152
   phase: object-custody
-  order: 143
+  order: 170
   owner: 'project/experiments/mlflow/03_optuna_worker.py:106 optuna_{model} run-name convention (+ {study} trial {n}, battle names)'
   inputs:
   - every run-name emission across optuna/battle/callback writers

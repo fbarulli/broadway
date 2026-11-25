@@ -120,6 +120,8 @@ CFG-DATASET-CONTRACT:
 - GATE-INGEST-09
 - GATE-TRAIN-30
 - GATE-TRAIN-32
+- GATE-TRAIN-35
+- GATE-INFRA-156
 CFG-ENV-PROCESSED-SUBDIR:
 - GATE-ETL-16
 CFG-ETL-SPLIT-FILES:
@@ -149,6 +151,7 @@ CFG-K8S-OPTUNA-INFRA:
 CFG-STEP-EVALUATE:
 - GATE-TRAIN-35
 - GATE-TRAIN-37
+- GATE-INFRA-165
 CFG-STEP-TRAIN:
 - GATE-TRAIN-30
 - GATE-TRAIN-32
@@ -241,8 +244,8 @@ PARITY_ALLOWLIST=() prefix skips (:168-177):
 - GATE-INFRA-95
 PARITY_MAIN_ANCHOR=18607091ddbb2602ad4475341ad377bafee5ec4b (:114):
 - GATE-INFRA-95
-PASS/FAIL ruff|mypy|configs|project-paths|shell-scripts|vulture|pytest|project-tests banners + 40-line tails:
-- GATE-INFRA-92
+? PASS/FAIL ruff|mypy|pyright-advisory|vulture|configs|shell-scripts|docker-paths|deps|consolidation|logging|pytest|project-tests banners + 40-line tails
+: - GATE-INFRA-92
 PipelineConfig (cfg.dataset + cfg.etl + cfg.experiment):
 - GATE-ETL-10
 PipelineConfig (cfg.dataset/cfg.stats/cfg.analysis):
@@ -453,7 +456,7 @@ compose stack definition:
 - GATE-INFRA-137
 conclusion.json (runners.py:499); plus figures under reports/figures/ referenced by FigureRef:
 - GATE-TLINE-56
-conditional champion promotion (:181-194):
+conditional champion promotion (:289):
 - GATE-TRAIN-35
 config-load pass:
 - GATE-CFG-77
@@ -647,7 +650,7 @@ left_key/right_key:
 - GATE-ETL-12
 lineage --analysis/--dataset (cli.py:40-42):
 - GATE-TLINE-59
-lineage node evaluation:<dataset> (:166-171):
+lineage node evaluation:<dataset> (:269-270):
 - GATE-TRAIN-35
 lineage node training:<dataset> (:153-158):
 - GATE-TRAIN-30
@@ -977,6 +980,12 @@ sample.column_mapping logical→source resolution (:132):
 - GATE-STATS-49
 sample_name/sample_role:
 - GATE-TLINE-58
+scripts/check_dependencies.py + configs/dependencies.yaml via scripts/uv.sh (deps):
+- GATE-INFRA-92
+scripts/check_docker_paths.sh (docker-paths):
+- GATE-INFRA-92
+scripts/check_duplication.py + configs/duplication.yaml via scripts/uv.sh (consolidation):
+- GATE-INFRA-92
 selected series id via focus query parameter and selected artifact filename via artifact query parameter:
 - GATE-SURF-102
 seven module-level config singletons resolved at import (_contract/_project/_etl/_features and siblings):
@@ -1010,6 +1019,10 @@ source_group_column:
 src/broadway project scripts via Vulture --min-confidence 95 (vulture):
 - GATE-INFRA-92
 src/broadway/** (mypy):
+- GATE-INFRA-92
+src/broadway/** + pyrightconfig.json via scripts/pyright_advisory.sh (pyright-advisory, consultant):
+- GATE-INFRA-92
+src/broadway/** handler-construction grep census (logging):
 - GATE-INFRA-92
 stats run|describe --sample (cli.py:80-84); console-script entry ds-pipeline = broadway.cli:main (pyproject.toml:53-54):
 - GATE-TLINE-59

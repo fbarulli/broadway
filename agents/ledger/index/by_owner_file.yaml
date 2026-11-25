@@ -9,9 +9,33 @@
 - GATE-SURF-68
 agents/tools/state_records.py:
 - GATE-INFRA-148
+configs/dependencies.yaml:
+- GATE-INFRA-160
+configs/duplication.yaml:
+- GATE-INFRA-162
+configs/profiling.yaml:
+- GATE-INFRA-152
+configs/step/evaluate.yaml:
+- GATE-INFRA-174
+configs/step/train.yaml:
+- GATE-INFRA-173
+configs/verification.yaml:
+- GATE-INFRA-164
 docker-compose.yml:
 - GATE-INFRA-128
 - GATE-INFRA-137
+gpu_training/adapters/cpu_smoke.py:
+- GATE-INFRA-170
+gpu_training/config/hpo_run.yaml:
+- GATE-INFRA-169
+gpu_training/config/memory_probe.yaml:
+- GATE-INFRA-168
+gpu_training/er_reference/config/laya_hpo_space.yaml:
+- GATE-INFRA-171
+gpu_training/memory_probe.py:
+- GATE-INFRA-166
+gpu_training/run_hpo.py:
+- GATE-INFRA-167
 k8s/api-deployment.yaml:
 - GATE-INFRA-131
 k8s/optuna/Dockerfile.worker:
@@ -27,6 +51,8 @@ k8s/optuna/teardown.sh:
 - GATE-INFRA-145
 k8s/postgres-deployment.yaml:
 - GATE-INFRA-133
+project/config/experiment/taxi.yaml:
+- GATE-INFRA-175
 project/dashboard.py:
 - GATE-INFRA-123
 project/data.py:
@@ -53,6 +79,10 @@ scripts/check_branch_parity.sh:
 - GATE-INFRA-94
 - GATE-INFRA-95
 - GATE-INFRA-142
+scripts/check_dependencies.py:
+- GATE-INFRA-159
+scripts/check_duplication.py:
+- GATE-INFRA-161
 scripts/check_e2e_determinism.sh:
 - GATE-INFRA-97
 scripts/deadcode_census.py:
@@ -68,8 +98,16 @@ scripts/tier_classifier.py:
 - GATE-INFRA-98
 scripts/uv.sh:
 - GATE-INFRA-146
+scripts/verify_live.py:
+- GATE-INFRA-163
 src/broadway/baseline/module.py:
 - GATE-TRAIN-118
+src/broadway/calibration/conformal.py:
+- GATE-INFRA-154
+src/broadway/calibration/contracts.py:
+- GATE-INFRA-153
+src/broadway/calibration/metrics.py:
+- GATE-INFRA-155
 src/broadway/causal/module.py:
 - GATE-TRAIN-119
 src/broadway/cleaning/structural.py:
@@ -90,6 +128,7 @@ src/broadway/config/schema.py:
 - GATE-CFG-74
 - GATE-CFG-76
 - GATE-HPO-89
+- GATE-INFRA-165
 src/broadway/contracts/pandera.py:
 - GATE-INGEST-09
 - GATE-CFG-75
@@ -105,6 +144,8 @@ src/broadway/data/loader.py:
 - GATE-CFG-107
 src/broadway/data/lookup_value_audit.py:
 - GATE-ETL-14
+src/broadway/data/splitter.py:
+- GATE-INFRA-156
 src/broadway/discover/columns.py:
 - GATE-SURF-101
 src/broadway/discover/module.py:
@@ -113,6 +154,8 @@ src/broadway/etl/module.py:
 - GATE-INGEST-03
 - GATE-INGEST-07
 - GATE-ETL-10
+src/broadway/evaluate/contracts.py:
+- GATE-INFRA-157
 src/broadway/evaluate/metrics.py:
 - GATE-TRAIN-36
 src/broadway/evaluate/module.py:
@@ -143,10 +186,18 @@ src/broadway/lineage/records.py:
 - GATE-TLINE-58
 src/broadway/lineage/state.py:
 - GATE-TLINE-114
+src/broadway/observability/context.py:
+- GATE-INFRA-149
+src/broadway/observability/logging.py:
+- GATE-INFRA-150
+src/broadway/observability/profiling.py:
+- GATE-INFRA-151
 src/broadway/onboard/infer.py:
 - GATE-CFG-108
 src/broadway/onboard/module.py:
 - GATE-CFG-105
+src/broadway/pipeline.py:
+- GATE-INFRA-172
 src/broadway/reports/__init__.py:
 - GATE-SURF-69
 src/broadway/reports/audit.py:
@@ -198,6 +249,8 @@ src/broadway/timeline/walkthrough.py:
 - GATE-TLINE-54
 - GATE-SURF-60
 - GATE-SURF-61
+src/broadway/training/contracts.py:
+- GATE-INFRA-158
 src/broadway/training/hpo.py:
 - GATE-HPO-80
 - GATE-HPO-81

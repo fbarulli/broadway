@@ -1,6 +1,6 @@
 # DIGEST.md — rendered from agents/ledger/gates.yaml · NEVER HAND-EDIT ·
 
-> 143 gates · rendered 2026-09-21 @ HEAD 5b17a92 · load THIS into context;
+> 170 gates · rendered 2026-11-25 @ HEAD a6befa1 · load THIS into context;
 > gates.yaml is the sole SSOT; the retired GATES.md/gates/*.md markdown world survives in agents/ledger/arbitration/2026-08-24/surface-and-analysis-preservation.md.
 
 | band | phase | gates | findings |
@@ -14,9 +14,9 @@
 | 07-surfaces | surfaces | 13 | 1 |
 | 08-config | config-schema | 17 | 11 |
 | 80-hpo-optuna | hpo-optuna | 10 | 9 |
-| 09-infra | infra-meta | 31 | 17 |
+| 09-infra | infra-meta | 58 | 17 |
 | 81-object-custody | object-custody | 6 | 0 |
-| **total** | | **143** | **84** |
+| **total** | | **170** | **84** |
 
 ### 01-ingest — ingest
 
@@ -91,8 +91,8 @@
 
 ### 04-training — training-eval
 
-- **GATE-TRAIN-30** `src/broadway/training/module.py:89 run()` ⚠FINDING
-  [CFG-DATASET-CONTRACT, CFG-STEP-TRAIN, experiment+etl config sections, analysis contract] → [ARTIFACT-TRAINING-RESULT, lineage node training:<dataset> (:153-158)] · pins: 4
+- **GATE-TRAIN-30** `src/broadway/training/module.py:344 run()` ⚠FINDING
+  [CFG-DATASET-CONTRACT, CFG-STEP-TRAIN, experiment+etl config sections, analysis contract] → [ARTIFACT-TRAINING-RESULT, lineage node training:<dataset> (:153-158)] · pins: 7
 - **GATE-TRAIN-31** `src/broadway/training/module.py:39 _load_features()` ⚠FINDING
   [ARTIFACT-CANONICAL-FRAME derivatives: etl train_features_file parquet, optional val_features_file parquet] → [train_df, val_df (validated engineered frames)] · pins: 7
 - **GATE-TRAIN-32** `project/data.py:166 read_training_sample()` ⚠FINDING
@@ -101,8 +101,8 @@
   [CFG-STEP-TRAIN.model.params, optional HPO block (models/search_space/total_trials/top_k/storage_url), X/y train+val from GATE-TRAIN-31] → [final model param dict fed to GATE-TRAIN-34] · pins: 8
 - **GATE-TRAIN-34** `src/broadway/training/trainer.py:17 build_model_pipeline()` ⚠FINDING
   [PipelineConfig with experiment block, model_type registry key, params dict (bare + pre__ prefixed)] → [fitted sklearn Pipeline + TrainingResult{train_time_seconds} (via train() :52-69)] · pins: 6
-- **GATE-TRAIN-35** `src/broadway/evaluate/module.py:82 run()` ⚠FINDING
-  [CFG-STEP-EVALUATE, val_features_file parquet (REQUIRED), train_features_file parquet, ARTIFACT-TRAINING-RESULT, champion via models:/<dataset>@champion] → [ARTIFACT-EVALUATION-RESULT, lineage node evaluation:<dataset> (:166-171), conditional champion promotion (:181-194)] · pins: 5
+- **GATE-TRAIN-35** `src/broadway/evaluate/module.py:174 run()` ⚠FINDING
+  [CFG-STEP-EVALUATE, CFG-DATASET-CONTRACT, val_features_file parquet (REQUIRED), train_features_file parquet, ARTIFACT-TRAINING-RESULT, champion via models:/<dataset>@champion] → [ARTIFACT-EVALUATION-RESULT, lineage node evaluation:<dataset> (:269-270), conditional champion promotion (:289)] · pins: 7
 - **GATE-TRAIN-36** `src/broadway/evaluate/metrics.py:23 compute_metrics()` ⚠FINDING
   [y_true/y_pred arrays from holdout predict, CV folds via cross_validate (src/broadway/evaluate/validation.py:42)] → [rounded metric dicts persisted in ARTIFACT-EVALUATION-RESULT / ARTIFACT-MLFLOW-RUN] · pins: 9
 - **GATE-TRAIN-37** `src/broadway/evaluate/promotion.py:6 should_promote()` ⚠FINDING
@@ -263,8 +263,8 @@
   [argv[1] ∈ {unset, --static, --tier=fast, --tier=full, --clean-lint} (else usage exit 2), sub-gate verdicts via run() <name> <cmd...>] → [banner FAST-GREEN | LOCAL-CI GREEN | LOCAL-CI RED, exit 0 green / 1 red / 2 usage] · pins: none direct
 - **GATE-INFRA-91** `scripts/run_local_ci.sh:30 gate_parity() (F1b pin-guard, wired at :43)` ⚠FINDING
   [refs/remotes/origin/sklearn:scripts/check_branch_parity.sh via `git show` (:33)] → [parity sub-verdict to run() aggregator, FAIL parity (F1b): origin/sklearn unavailable | legacy pre-D16 checker on track ref] · pins: 3
-- **GATE-INFRA-92** `scripts/run_local_ci.sh:102 gate battery (ruff, mypy, Vulture, configs, shell-scripts, pytest+cov floor=95, project-tests)` ⚠FINDING
-  [src/** tests/test_project_paths.py project/experiments/** project/experiments.py project/dashboard.py project/paths.py project/working.py project/data.py scripts/check_project_paths.py scripts/ (ruff), project/config/ (project-owned layout, experiment, and taxi config-overlay SSOT), src/broadway/** (mypy), configs/experiment/*.yaml via load_config(dataset='test') (configs), k8s/optuna/*.sh + scripts/*.sh via sh -n + shellcheck (shell-scripts), src/broadway project scripts via Vulture --min-confidence 95 (vulture), tests/** (pytest -n 4 --dist worksteal, --cov-fail-under=95), project/tests/** (project-tests: full tier only, -q --dist worksteal, NO coverage flags)] → [PASS/FAIL ruff|mypy|configs|project-paths|shell-scripts|vulture|pytest|project-tests banners + 40-line tails, cov floor breach ⇒ FAIL pytest] · pins: 4
+- **GATE-INFRA-92** `scripts/run_local_ci.sh:102 gate battery (ruff, mypy, pyright-advisory, Vulture, configs, shell-scripts, docker-paths, deps, consolidation, logging, pytest+cov floor=95, project-tests)` ⚠FINDING
+  [src/** tests/test_project_paths.py project/experiments/** project/experiments.py project/dashboard.py project/paths.py project/working.py project/data.py scripts/check_project_paths.py scripts/ (ruff), project/config/ (project-owned layout, experiment, and taxi config-overlay SSOT), src/broadway/** (mypy), src/broadway/** + pyrightconfig.json via scripts/pyright_advisory.sh (pyright-advisory, consultant), configs/experiment/*.yaml via load_config(dataset='test') (configs), k8s/optuna/*.sh + scripts/*.sh via sh -n + shellcheck (shell-scripts), scripts/check_docker_paths.sh (docker-paths), scripts/check_dependencies.py + configs/dependencies.yaml via scripts/uv.sh (deps), scripts/check_duplication.py + configs/duplication.yaml via scripts/uv.sh (consolidation), src/broadway/** handler-construction grep census (logging), src/broadway project scripts via Vulture --min-confidence 95 (vulture), tests/** (pytest -n 4 --dist worksteal, --cov-fail-under=95), project/tests/** (project-tests: full tier only, -q --dist worksteal, NO coverage flags)] → [PASS/FAIL ruff|mypy|pyright-advisory|vulture|configs|shell-scripts|docker-paths|deps|consolidation|logging|pytest|project-tests banners + 40-line tails, cov floor breach ⇒ FAIL pytest] · pins: 4
 - **GATE-INFRA-93** `scripts/check_branch_parity.sh:71 check() (SHARED lockstep, list at :43-69) + sync_to_main() :89` ⚠FINDING
   [24-entry SHARED surface: src/ tests/ demo/ configs/dataset/test.yaml configs/experiment/{baseline,engineered,hyperopt}.yaml configs/analysis/{test,test_hypothesis,test_causal}.yaml configs/step/{causal,etl}.yaml configs/environment/ configs/flow/ k8s/ docker/ .github/workflows/ pyproject.toml Dockerfile docker-compose.yml .gitignore .dockerignore README.md scripts/, origin/main vs origin/taxi tips] → [PARITY OK | DRIFT: <path> differs … PARITY FAILED — run $0 --sync, sync mode: taxi→main checkout + deletion mirror (:89-103)] · pins: 3
 - **GATE-INFRA-94** `scripts/check_branch_parity.sh:111 inline era declaration PARITY_ERA/PARITY_TRACK_BRANCH/PARITY_ALLOWLIST/PARITY_MAIN_ANCHOR (:111-114) + anchor guards :121-132 + dev-era dispatch :192-226` ⚠FINDING
@@ -321,6 +321,60 @@
   [tracked *.py corpus via git ls-files (src/project/tests/scripts), pyproject [project.scripts] entrypoint table] → [data/processed/deadcode_census.md suspicion report (gitignored sink); stdout default] · pins: none direct
 - **GATE-INFRA-148** `agents/tools/state_records.py apply_record_operation()`
   [STATE CURRENT record and immutable EVENTS section] → [atomic branch-tracked CURRENT update or terminal archive entry] · pins: 3
+- **GATE-INFRA-149** `src/broadway/observability/context.py:20 new_run_id()`
+  [] → [] · pins: 3
+- **GATE-INFRA-150** `src/broadway/observability/logging.py:39 setup_logging()`
+  [] → [] · pins: 4
+- **GATE-INFRA-151** `src/broadway/observability/profiling.py:155 StepProfiler`
+  [] → [] · pins: 4
+- **GATE-INFRA-152** `configs/profiling.yaml:1 measurement-seam SSOT`
+  [] → [] · pins: none direct
+- **GATE-INFRA-153** `src/broadway/calibration/contracts.py:13 CalibrationConfig`
+  [] → [] · pins: 2
+- **GATE-INFRA-154** `src/broadway/calibration/conformal.py:10 SplitConformal`
+  [] → [] · pins: 3
+- **GATE-INFRA-155** `src/broadway/calibration/metrics.py:11 coverage()`
+  [] → [] · pins: 3
+- **GATE-INFRA-156** `src/broadway/data/splitter.py:66 calibration_split()`
+  [CFG-DATASET-CONTRACT] → [] · pins: 1
+- **GATE-INFRA-157** `src/broadway/evaluate/contracts.py:42 EvaluationResult`
+  [] → [] · pins: 3
+- **GATE-INFRA-158** `src/broadway/training/contracts.py:8 TrainingResult`
+  [] → [] · pins: 3
+- **GATE-INFRA-159** `scripts/check_dependencies.py:217 main()`
+  [] → [] · pins: 2
+- **GATE-INFRA-160** `configs/dependencies.yaml:1 dependency registry SSOT`
+  [] → [] · pins: none direct
+- **GATE-INFRA-161** `scripts/check_duplication.py:416 main()`
+  [] → [] · pins: 2
+- **GATE-INFRA-162** `configs/duplication.yaml:1 duplicate-detection thresholds SSOT`
+  [] → [] · pins: none direct
+- **GATE-INFRA-163** `scripts/verify_live.py:281 main()`
+  [] → [] · pins: 4
+- **GATE-INFRA-164** `configs/verification.yaml:1 live-verification evidence SSOT`
+  [] → [] · pins: none direct
+- **GATE-INFRA-165** `src/broadway/config/schema.py:296 EvaluateStep`
+  [CFG-STEP-EVALUATE] → [] · pins: 2
+- **GATE-INFRA-166** `gpu_training/memory_probe.py:259 main()`
+  [] → [] · pins: 1
+- **GATE-INFRA-167** `gpu_training/run_hpo.py:100 main()`
+  [] → [] · pins: 2
+- **GATE-INFRA-168** `gpu_training/config/memory_probe.yaml:1 memory-sweep SSOT`
+  [] → [] · pins: 1
+- **GATE-INFRA-169** `gpu_training/config/hpo_run.yaml:1 HPO fan-out SSOT`
+  [] → [] · pins: 1
+- **GATE-INFRA-170** `gpu_training/adapters/cpu_smoke.py:22 step()`
+  [] → [] · pins: 1
+- **GATE-INFRA-171** `gpu_training/er_reference/config/laya_hpo_space.yaml:1 laya HPO reference space (copied from ER; tree is not executable here)`
+  [] → [] · pins: none direct
+- **GATE-INFRA-172** `src/broadway/pipeline.py:16 run()`
+  [] → [] · pins: 1
+- **GATE-INFRA-173** `configs/step/train.yaml:1 training step config`
+  [] → [] · pins: none direct
+- **GATE-INFRA-174** `configs/step/evaluate.yaml:1 evaluation policy config`
+  [] → [] · pins: none direct
+- **GATE-INFRA-175** `project/config/experiment/taxi.yaml:1 calibration opt-in overlay (split_conformal)`
+  [] → [] · pins: none direct
 
 ### 81-object-custody — object-custody
 
