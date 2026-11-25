@@ -1,0 +1,19 @@
+# HPO fan-out config (SSOT). No study name, budget, or storage URL in code.
+#
+# `command` is the per-worker command template. Placeholders:
+#   {study} {storage} {n_trials} {micro_batch} {worker} {gpu}
+# Replace it with the ER HPO kernel invocation on the GPU host.
+command: "python -m hpo.kernel --study {study} --storage {storage} --n-trials {n_trials} --micro-batch {micro_batch} --worker {worker}"
+
+n_trials: 10
+study: laya
+# Env var that holds the shared Optuna URL. ER resolves it from the secret
+# store; never put the value here.
+storage_env: OPTUNA_STORAGE_URL
+
+# GPU ids visible to the launcher (one worker per MPS slot).
+gpus: [0]
+mps_slots_per_gpu: 2
+
+# Optional override; null means "use the baseline's concurrent_trials".
+workers: null
