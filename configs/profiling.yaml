@@ -1,0 +1,21 @@
+# configs/profiling.yaml — measurement seam (PROFILING.md §2-§5).
+#
+# Disabled by default and never on a production path. Enable here or with
+# BROADWAY_PROFILE=1 for one run — never with a code edit.
+enabled: false
+# Machine records: <output_dir>/<step>.json, git-ignored and regenerable.
+output_dir: artifacts/profiles
+# Pipeline steps have side effects, so the pipeline seam measures one run.
+# Direct callers measuring side-effect-free benchmarks may raise this to get
+# p50/p95 over N runs.
+runs: 1
+# Differences below this band are reported, not gated (gate is planned).
+noise_band_pct: 5.0
+# Wall-second ceilings per step. 0.0 means not yet baselined: the gate is
+# planned, so these are advisory placeholders until a tracked baseline lands
+# (PROFILING.md §4-§6: a missing budget is recorded as missing, not passing).
+budgets:
+  etl: 0.0
+  features: 0.0
+  train: 0.0
+  evaluate: 0.0

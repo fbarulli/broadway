@@ -1,1 +1,1 @@
-"""Observability surfaces — process logging setup lives in ``logging``."""
+"""Observability surfaces — process logging setup and the profiling seam."""
