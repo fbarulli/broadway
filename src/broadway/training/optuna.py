@@ -66,7 +66,7 @@ def run_study_rdb(
         grace_period=int(GRACE_PERIOD),
     )
     sampler = (
-        optuna.samplers.TPESampler(seed=random_state) if random_state is not None else None
+        optuna.samplers.TPESampler(seed=random_state, constant_liar=True) if random_state is not None else None
     )
     study = _create_study_with_retry(study_name, storage, direction, sampler)
     study.optimize(objective, n_trials=n_trials)
@@ -86,7 +86,7 @@ def run_study(
     reproduces the same trajectory across runs.
     """
     sampler = (
-        optuna.samplers.TPESampler(seed=random_state) if random_state is not None else None
+        optuna.samplers.TPESampler(seed=random_state, constant_liar=True) if random_state is not None else None
     )
     study = optuna.create_study(direction=direction, sampler=sampler)
 

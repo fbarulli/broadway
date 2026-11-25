@@ -137,7 +137,7 @@ def run_model_study(
     (params, full metrics, tags) against the ambient MLFLOW_TRACKING_URI.
     """
     study_name = f"hpo-{model.name}"
-    sampler = optuna.samplers.TPESampler(seed=random_state)
+    sampler = optuna.samplers.TPESampler(seed=random_state, constant_liar=True)
     if storage_url is None:
         study = optuna.create_study(direction=direction, sampler=sampler)
     else:
