@@ -1,0 +1,27 @@
+# configs/duplication.yaml — CONSOLIDATION.md §4 duplicate-detection SSOT.
+#
+# Consumer: scripts/check_duplication.py (the single owner of duplicate
+# detection). Every threshold, root, exclusion, and report path lives HERE;
+# the script resolves this file from its own name and hardcodes none of it.
+#
+# advisory: true  — report only, exit 0 (baseline not yet clean).
+# When the baseline is clean, flip to false: exit 1 on any cross-file group.
+advisory: true
+
+# Minimum statement count for a function/method to enter the scan. Docstrings
+# do not count; 8 keeps small getters/setters out of the signal.
+min_statements: 8
+
+# Duplicate-block detector surface (CONSOLIDATION.md §4).
+scan_roots:
+  - src/broadway
+  - project
+  - scripts
+
+# Glob patterns relative to each scan root, matched on the repo-relative path.
+exclude:
+  - "**/__init__.py"
+  - "**/test_*.py"
+
+# Advisory JSON artifact (gitignored under artifacts/).
+report: artifacts/consolidation/duplicates.json
