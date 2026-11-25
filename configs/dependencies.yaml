@@ -1,0 +1,274 @@
+# Dependency registry — one row per direct dependency (CODE_STANDARD.md §4).
+# Version specs stay in pyproject.toml (the version SSOT); this file records the
+# owner, scope, purpose, adapter seam, license provenance, and age of each library.
+# Licenses are recorded, not gated: the platform is internal and undistributed.
+#
+# scope: platform | project | dev | optional
+# adapter: dotted module that owns the seam; empty when the library is used directly.
+dependencies:
+  - name: lightgbm
+    owner: platform
+    scope: platform
+    purpose: Gradient-boosted decision trees for tabular modeling.
+    adapter: ""
+    license: MIT
+    added: 2026-11-25
+  - name: optuna
+    owner: platform
+    scope: platform
+    purpose: Hyperparameter search and study storage.
+    adapter: ""
+    license: MIT
+    added: 2026-11-25
+  - name: pandas
+    owner: platform
+    scope: platform
+    purpose: DataFrame loading, cleaning, and analysis.
+    adapter: ""
+    license: BSD-3-Clause
+    added: 2026-11-25
+  - name: pyarrow
+    owner: platform
+    scope: platform
+    purpose: Columnar engine behind pandas parquet IO.
+    adapter: ""
+    license: Apache-2.0
+    added: 2026-11-25
+  - name: psycopg
+    owner: platform
+    scope: optional
+    purpose: PostgreSQL driver for Optuna RDB storage.
+    adapter: ""
+    license: LGPL-3.0-only
+    added: 2026-11-25
+  - name: pydantic
+    owner: platform
+    scope: platform
+    purpose: Typed config and contract models at every boundary.
+    adapter: ""
+    license: MIT
+    added: 2026-11-25
+  - name: pyyaml
+    owner: platform
+    scope: platform
+    purpose: YAML config loading.
+    adapter: ""
+    license: MIT
+    added: 2026-11-25
+  - name: scikit-learn
+    owner: platform
+    scope: platform
+    purpose: Classical estimators, metrics, splits, and pipelines.
+    adapter: ""
+    license: BSD-3-Clause
+    added: 2026-11-25
+  - name: scipy
+    owner: platform
+    scope: platform
+    purpose: Statistical distributions and optimization routines.
+    adapter: ""
+    license: BSD-3-Clause
+    added: 2026-11-25
+  - name: sqlalchemy
+    owner: platform
+    scope: platform
+    purpose: Optuna storage backend and database error handling.
+    adapter: ""
+    license: MIT
+    added: 2026-11-25
+  - name: tqdm
+    owner: platform
+    scope: platform
+    purpose: Progress bars for long-running loops.
+    adapter: ""
+    license: MPL-2.0 AND MIT
+    added: 2026-11-25
+  - name: xgboost
+    owner: platform
+    scope: platform
+    purpose: Gradient-boosted decision trees for tabular modeling.
+    adapter: broadway.training.models.xgboost
+    license: Apache-2.0
+    added: 2026-11-25
+  - name: joblib
+    owner: project
+    scope: project
+    purpose: Parallel execution inside project experiments.
+    adapter: ""
+    license: BSD-3-Clause
+    added: 2026-11-25
+  - name: kubernetes
+    owner: platform
+    scope: optional
+    purpose: Kubernetes API client for cluster jobs.
+    adapter: ""
+    license: Apache-2.0
+    added: 2026-11-25
+  - name: python-dotenv
+    owner: platform
+    scope: optional
+    purpose: Loading environment files into the process.
+    adapter: ""
+    license: BSD-3-Clause
+    added: 2026-11-25
+  - name: pytest
+    owner: dev
+    scope: dev
+    purpose: Test runner.
+    adapter: ""
+    license: MIT
+    added: 2026-11-25
+  - name: pytest-xdist
+    owner: dev
+    scope: dev
+    purpose: Parallel test distribution.
+    adapter: ""
+    license: MIT
+    added: 2026-11-25
+  - name: pingouin
+    owner: platform
+    scope: platform
+    purpose: Effect sizes and post-hoc statistics.
+    adapter: broadway.stats.post_hoc
+    license: GPL-3.0
+    added: 2026-11-25
+  - name: statsmodels
+    owner: platform
+    scope: platform
+    purpose: Regression, diagnostics, and time-series models.
+    adapter: ""
+    license: BSD-3-Clause
+    added: 2026-11-25
+  - name: matplotlib
+    owner: platform
+    scope: platform
+    purpose: Static plots and diagnostic figures.
+    adapter: ""
+    license: PSF-2.0
+    added: 2026-11-25
+  - name: requests
+    owner: dev
+    scope: dev
+    purpose: HTTP client for tests and service probes.
+    adapter: ""
+    license: Apache-2.0
+    added: 2026-11-25
+  - name: pandera
+    owner: platform
+    scope: platform
+    purpose: DataFrame schema validation.
+    adapter: ""
+    license: MIT
+    added: 2026-11-25
+  - name: mlflow
+    owner: platform
+    scope: platform
+    purpose: Experiment tracking and model registry.
+    adapter: ""
+    license: Apache-2.0
+    added: 2026-11-25
+  - name: polars
+    owner: platform
+    scope: platform
+    purpose: Lazy columnar scans for sample loading.
+    adapter: broadway.data.loader
+    license: MIT
+    added: 2026-11-25
+  - name: seaborn
+    owner: platform
+    scope: platform
+    purpose: Statistical plot styling.
+    adapter: broadway.viz
+    license: BSD-3-Clause
+    added: 2026-11-25
+  - name: shap
+    owner: platform
+    scope: platform
+    purpose: Model explanation values and summary plots.
+    adapter: broadway.evaluate.explain
+    license: MIT
+    added: 2026-11-25
+  - name: lime
+    owner: project
+    scope: project
+    purpose: Local surrogate explanations inside project experiments.
+    adapter: ""
+    license: BSD-2-Clause
+    added: 2026-11-25
+  - name: optuna-integration
+    owner: platform
+    scope: platform
+    purpose: Optuna-to-MLflow storage integration plugin.
+    adapter: ""
+    license: MIT
+    added: 2026-11-25
+  - name: psycopg2-binary
+    owner: platform
+    scope: optional
+    purpose: PostgreSQL driver for worker images.
+    adapter: ""
+    license: LGPL-3.0-or-later
+    added: 2026-11-25
+  - name: fastapi
+    owner: platform
+    scope: platform
+    purpose: HTTP serving API and dashboard routing.
+    adapter: ""
+    license: MIT
+    added: 2026-11-25
+  - name: uvicorn
+    owner: platform
+    scope: platform
+    purpose: ASGI server entry point for serving.
+    adapter: ""
+    license: BSD-3-Clause
+    added: 2026-11-25
+  - name: ruff
+    owner: dev
+    scope: dev
+    purpose: Linter and formatter.
+    adapter: ""
+    license: MIT
+    added: 2026-11-25
+  - name: mypy
+    owner: dev
+    scope: dev
+    purpose: Static type checker.
+    adapter: ""
+    license: MIT
+    added: 2026-11-25
+  - name: pytest-cov
+    owner: dev
+    scope: dev
+    purpose: Coverage reporting for tests.
+    adapter: ""
+    license: MIT
+    added: 2026-11-25
+  - name: vulture
+    owner: dev
+    scope: dev
+    purpose: Dead-code detection.
+    adapter: ""
+    license: MIT
+    added: 2026-11-25
+  - name: graphifyy
+    owner: dev
+    scope: dev
+    purpose: Code knowledge graph and blast-radius queries.
+    adapter: ""
+    license: Apache-2.0
+    added: 2026-11-25
+  - name: httpx2
+    owner: dev
+    scope: dev
+    purpose: HTTP client required by the Starlette TestClient.
+    adapter: ""
+    license: BSD-3-Clause
+    added: 2026-11-25
+  - name: pyspark
+    owner: platform
+    scope: optional
+    purpose: Spark execution backend behind the spark extra.
+    adapter: ""
+    license: NOASSERTION
+    added: 2026-11-25
