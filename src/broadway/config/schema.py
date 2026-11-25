@@ -61,6 +61,8 @@ class DatasetContract(BaseModel):
 
 class EnvironmentConfig(BaseModel):
     log_level: str
+    log_dir: str | None = None
+    log_file: str | None = None
     data_dir: str
     raw_subdir: str
     processed_subdir: str

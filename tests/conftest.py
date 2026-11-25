@@ -1,11 +1,17 @@
 from __future__ import annotations
 
 import hashlib
+import logging
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
 
 _SNAPSHOT_DIRS = ["artifacts", "reports"]
+# Only the CLI's configured process log directory is exempt: a real CLI
+# invocation in a test (subprocess) writes it by design. Config SSOT:
+# configs/environment/*.yaml `log_dir`.
+_LOG_DIR = Path("artifacts/logs")
 _snapshot: dict[str, dict[str, str]] = {}
 
 
@@ -25,12 +31,37 @@ def _isolate_tracking_dir(
     monkeypatch.setenv("BROADWAY_TRACKING_DIR", str(tmp_path / "tracking"))
 
 
+@pytest.fixture(autouse=True)
+def _isolate_process_logging(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> Iterator[None]:
+    """Keep process log files out of the shared tree.
+
+    CLI entry points write the configured ``artifacts/logs/<log_file>`` by
+    design; the custody guard below forbids test writes there. Redirect the
+    logging owner's repo root into tmp_path and reset its one-shot sentinel so
+    each test either sets logging up from scratch or exercises the no-op.
+    """
+    from broadway.observability import logging as broadway_logging
+
+    root = logging.getLogger()
+    level_before = root.level
+    monkeypatch.setattr(broadway_logging, "repo_root", lambda: tmp_path)
+    monkeypatch.setattr(broadway_logging, "_configured", False)
+    yield
+    for handler in list(root.handlers):
+        if type(handler) in (logging.StreamHandler, logging.FileHandler):
+            root.removeHandler(handler)
+            handler.close()
+    root.setLevel(level_before)
+
+
 def _tree_hashes(root: Path) -> dict[str, str]:
     out: dict[str, str] = {}
     if not root.is_dir():
         return out
     for p in sorted(root.rglob("*")):
-        if p.is_file():
+        if p.is_file() and not p.is_relative_to(_LOG_DIR):
             out[str(p)] = hashlib.sha256(p.read_bytes()).hexdigest()
     return out
 

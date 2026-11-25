@@ -3,15 +3,16 @@
 from __future__ import annotations
 
 import argparse
-import logging
 
 from broadway.config.loader import (
     DEFAULT_ENVIRONMENT,
     STEP_MODELS,
     load_config,
+    load_environment,
     resolve_full_steps,
 )
 from broadway.lineage.sample import load_sample
+from broadway.observability.logging import setup_logging
 
 STEPS = list(STEP_MODELS.keys())
 
@@ -103,9 +104,8 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> None:
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
-
     args = _build_parser().parse_args()
+    setup_logging(load_environment(getattr(args, "environment", DEFAULT_ENVIRONMENT)))
 
     if args.step == "discover":
         from broadway.discover.module import run as discover_run

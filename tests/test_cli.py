@@ -34,6 +34,13 @@ def _write_csv(path: Path, rows: list[dict[str, object]]) -> None:
 def _copy_viz_config(configs_dir: Path) -> None:
     (configs_dir / "step").mkdir(parents=True, exist_ok=True)
     shutil.copy(REPO_ROOT / "configs" / "step" / "viz.yaml", configs_dir / "step" / "viz.yaml")
+    # Every CLI entry point resolves environment config to configure logging.
+    environment_dir = configs_dir / "environment"
+    environment_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy(
+        REPO_ROOT / "configs" / "environment" / "development.yaml",
+        environment_dir / "development.yaml",
+    )
 
 
 class TestDiscoverCLI:

@@ -190,6 +190,11 @@ def resolve_full_steps(cfg: PipelineConfig) -> list[str]:
     return flow.steps
 
 
+def load_environment(name: str = DEFAULT_ENVIRONMENT) -> EnvironmentConfig:
+    """Load one environment section, resolving ``${ENV}`` exactly as load_config does."""
+    return EnvironmentConfig(**resolve_values(_load_yaml(f"environment/{name}.yaml")))
+
+
 def load_config(
     step: str,
     dataset: str | None = None,

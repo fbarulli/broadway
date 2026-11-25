@@ -1,4 +1,6 @@
 log_level: INFO
+log_dir: artifacts/logs
+log_file: broadway.log
 data_dir: data
 raw_subdir: raw
 processed_subdir: processed
