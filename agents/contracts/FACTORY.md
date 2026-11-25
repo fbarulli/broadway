@@ -12,8 +12,8 @@ Law index:
 | code shape, two-pass construction | `CODE_STANDARD.md` | ruff / mypy / review |
 | library-first, dependencies | `CODE_STANDARD.md` §3–§4 | dependency gate |
 | one canonical implementation | `CONSOLIDATION.md` | duplicate + import-boundary gate |
-| measurement and budgets | `PROFILING.md` | profile gate |
-| profile-driven optimization | `OPTIMIZATION.md` | profile gate + equivalence check |
+| measurement and budgets | `PROFILING.md` | profile gate (planned) |
+| profile-driven optimization | `OPTIMIZATION.md` | profile gate + equivalence check (planned) |
 | process logging, run correlation | `LOGGING.md` | logging gate |
 | evidence on real data | `LIVE_VERIFICATION.md` | contract acceptance checks |
 | custody, sizing, review | `MAIN_AGENT_CONTRACT.md`, `WORKER_CONTRACT.md`, `REVIEWER_CONTRACT.md` | dispatch + review |

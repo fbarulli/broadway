@@ -65,8 +65,8 @@ the profiler overhead. No symbol replaces a number.
 
 ## 7. Enforcement
 
-- Profile gate over the configured surfaces; advisory until the first baseline
-  exists, blocking after.
+- Profile gate over the configured surfaces — **planned, not yet wired**; advisory
+  until the first baseline exists, blocking after.
 - Reviewer checks that new loops/IO carry a tier-2 record and that no scattered
   timer was introduced.
 - The harness rule "log timing when time is a concern" is satisfied by this seam,

@@ -18,6 +18,9 @@ imported by reference and enforced here.
 - The log file name comes from config and is **stable across runs** (never a
   per-run or timestamped filename). Rotation and retention are config values.
 - The log path is config-driven; a hardcoded path or filename in code is a defect.
+- The CLI is repo-bound: every command resolves `configs/environment/<name>.yaml`
+  before dispatch. Bootstrap commands (`init`, `discover`, `columns`) run from a
+  checkout that ships that tree; a bare directory is not a supported surface.
 
 ## 2. Level from config
 
@@ -72,8 +75,9 @@ or the profile that measured it.
 
 ## 7. Enforcement
 
-- Gate: no `basicConfig` or handler construction outside the single setup module;
-  the setup is idempotent (a second call adds no handler).
+- Gate: no `basicConfig` or handler construction under `src/broadway/` outside
+  `observability/logging.py`; the setup is idempotent (a second call adds no
+  handler). Script tooling under `scripts/` is out of this gate's scope.
 - Gate: the effective level equals `environment.log_level`.
 - Gate: `print` outside the configured user-output allowlist fails.
 - Reviewer checks run correlation: the log, profile, and evidence for one invocation
