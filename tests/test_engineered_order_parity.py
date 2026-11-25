@@ -2,7 +2,7 @@
 
 The ordered read schema of the engineered read contract
 (``engineered_schema_for`` with ``ordered=True``) rebuilds its column order
-from the experiment config's ``features.include`` list, while the features step
+from the experiment's resolved ``ColumnPlan`` order, while the features step
 preserves the ETL frame's column order and appends derived then encoded columns
 (``FeaturePipeline.transform``). If an experiment's include order ever drifts
 from the producer's stable write order, ANY real read through the
@@ -36,6 +36,7 @@ from broadway.config.loader import load_config
 from broadway.config.schema import PipelineConfig
 from broadway.features.generic import build_generic_feature_specs
 from broadway.features.pipeline import FeaturePipeline
+from broadway.features.plan import ColumnPlan
 
 _CONFIGS_DIR = Path("configs")
 
@@ -49,14 +50,15 @@ def _all_pairs() -> list[tuple[str, str]]:
 
 
 def _referenced_names(cfg: PipelineConfig) -> set[str]:
-    """Every name the experiment's feature graph references: include columns,
-    derived ``source``s, and encoding ``columns``."""
+    """Every name the experiment's plan references: source columns, derived
+    ``sources``, and encoding ``sources``."""
     assert cfg.experiment is not None
-    features = cfg.experiment.features
-    names = set(features.include)
-    names.update(derived.source for derived in features.derived)
-    for encoding in features.encodings:
-        names.update(encoding.columns)
+    names: set[str] = set()
+    for op in cfg.experiment.plan.columns:
+        if op.op == "source":
+            names.add(op.name)
+        else:
+            names.update(op.sources)
     return names
 
 
@@ -102,10 +104,10 @@ def _contract_declared_frame(cfg: PipelineConfig, n: int = 16) -> pd.DataFrame:
         else:
             data[name] = [float(k) + 0.5 for k in range(1 + idx, n + 1 + idx)]
     frame = pd.DataFrame(data)
-    if cfg.experiment is not None and cfg.experiment.features.builder_params is not None:
-        params = cfg.experiment.features.builder_params
-        frame[params.group_col] = [f"grp_{k % 3}" for k in range(n)]
-        frame[params.lookup_col] = [f"grp_{k % 3}" for k in range(n)]
+    if cfg.experiment is not None and cfg.experiment.plan.builder_params:
+        params = cfg.experiment.plan.builder_params
+        for column in (params["group_col"], params["lookup_col"]):
+            frame[column] = [f"grp_{k % 3}" for k in range(n)]
     return frame
 
 
@@ -124,11 +126,12 @@ def test_specs_order_matches_producer_write_order(dataset: str, experiment: str)
     """
     cfg = load_config("features", dataset=dataset, experiment=experiment)
     assert cfg.dataset is not None and cfg.experiment is not None
-    specs = build_generic_feature_specs(cfg.dataset, cfg.experiment.features)
+    plan = ColumnPlan.from_config(cfg.dataset, cfg.experiment)
+    specs = build_generic_feature_specs(cfg.dataset, plan)
     frame = _contract_declared_frame(cfg)
-    pipeline = FeaturePipeline(encodings=cfg.experiment.features.encodings)
-    pipeline.fit(frame, cfg.dataset.target, cfg.features.encoding_smoothing)
+    pipeline = FeaturePipeline()
+    pipeline.fit(frame, plan, cfg.dataset.target)
     transformed = pipeline.transform(
-        frame, cfg.experiment.features, cfg.dataset.target, cfg.features.frequency_fill
+        frame, plan, cfg.dataset.target, cfg.features.frequency_fill
     )
     assert list(specs) == [column for column in transformed.columns if column in specs]

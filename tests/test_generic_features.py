@@ -6,19 +6,17 @@ import pandas as pd
 import pytest
 
 from broadway.config.schema import (
-    BuilderParams,
     ColumnRole,
     ColumnSchema,
     DatasetContract,
     DerivedFeature,
-    EncodingConfig,
-    FeatureConfig,
     TaskType,
 )
 from broadway.features import builders
 from broadway.features.builders import build_derived, load_custom_builders
 from broadway.features.generic import build_generic_feature_specs
 from broadway.features.pipeline import FeaturePipeline
+from broadway.features.plan import ColumnOp, ColumnPlan
 
 
 class _FakeImportlib:
@@ -97,13 +95,22 @@ def test_build_generic_feature_specs() -> None:
         },
         lookup_tables={},
     )
-    features = FeatureConfig(
+    plan = ColumnPlan.from_declaration(
+        contract,
         include=["rooms"],
-        exclude=[],
         derived=[DerivedFeature(name="ts_hour", func="datetime_hour", source="ts")],
-        encodings=[EncodingConfig(type="target", columns=["hood"], smoothing=20)],
+        encodings=[
+            ColumnOp(
+                op="encode",
+                name="hood_target_enc",
+                dtype="float64",
+                sources=("hood",),
+                encoder="target",
+                params={"smoothing": 20},
+            )
+        ],
     )
-    specs = build_generic_feature_specs(contract, features)
+    specs = build_generic_feature_specs(contract, plan)
     assert set(specs) == {"rooms", "ts_hour", "hood_target_enc"}
     assert specs["ts_hour"].dtype == "int64"
 
@@ -114,15 +121,19 @@ def test_feature_pipeline_transform_with_custom_builder(tmp_path, monkeypatch) -
         'BUILDERS = {\n    "double": lambda df, src, **kw: df[src] * 2,\n}\n'
     )
     monkeypatch.syspath_prepend(str(tmp_path))
-    cfg = FeatureConfig(
-        include=["x"],
-        exclude=[],
-        derived=[DerivedFeature(name="d", func="double", source="x")],
-        encodings=[],
+    plan = ColumnPlan(
+        target="t",
+        datetime_column=None,
+        columns=(
+            ColumnOp(op="source", name="x", dtype="int64"),
+            ColumnOp(
+                op="derive", name="d", dtype="float64", sources=("x",), func="double"
+            ),
+        ),
         builder_module="custom_builders_mod",
     )
     df = pd.DataFrame({"x": [1, 2, 3]})
-    result = FeaturePipeline(encodings=[]).transform(df, cfg, "t", 0)
+    result = FeaturePipeline().transform(df, plan, "t", 0)
     assert result["d"].tolist() == [2, 4, 6]
 
 
@@ -134,16 +145,21 @@ def test_feature_pipeline_same_group_with_builder_params() -> None:
             "pickup_location_id": [1, 2, 3, 4],
         }
     )
-    cfg = FeatureConfig(
-        include=[],
-        exclude=[],
-        derived=[
-            DerivedFeature(name="same_borough", func="same_group", source="pickup_location_id")
-        ],
-        encodings=[],
-        builder_params=BuilderParams(group_col="Borough", lookup_col="Borough_lookup"),
+    plan = ColumnPlan(
+        target="t",
+        datetime_column=None,
+        columns=(
+            ColumnOp(
+                op="derive",
+                name="same_borough",
+                dtype="int64",
+                sources=("pickup_location_id",),
+                func="same_group",
+            ),
+        ),
+        builder_params={"group_col": "Borough", "lookup_col": "Borough_lookup"},
     )
-    result = FeaturePipeline(encodings=[]).transform(df, cfg, "t", 0)
+    result = FeaturePipeline().transform(df, plan, "t", 0)
     expected = (df.Borough == df.Borough_lookup).astype(int).rename("same_borough")
     pd.testing.assert_series_equal(result["same_borough"], expected)
 
@@ -156,16 +172,21 @@ def test_feature_pipeline_same_group_without_builder_params_raises() -> None:
             "pickup_location_id": [1],
         }
     )
-    cfg = FeatureConfig(
-        include=[],
-        exclude=[],
-        derived=[
-            DerivedFeature(name="same_borough", func="same_group", source="pickup_location_id")
-        ],
-        encodings=[],
+    plan = ColumnPlan(
+        target="t",
+        datetime_column=None,
+        columns=(
+            ColumnOp(
+                op="derive",
+                name="same_borough",
+                dtype="int64",
+                sources=("pickup_location_id",),
+                func="same_group",
+            ),
+        ),
     )
     with pytest.raises(ValueError, match="same_group requires column 'group'"):
-        FeaturePipeline(encodings=[]).transform(df, cfg, "t", 0)
+        FeaturePipeline().transform(df, plan, "t", 0)
 
 
 def test_feature_pipeline_absent_builder_params_is_inert() -> None:
@@ -175,18 +196,23 @@ def test_feature_pipeline_absent_builder_params_is_inert() -> None:
             "src": pd.Series([1.5, 2.5], dtype="float64"),
         }
     )
-    cfg = FeatureConfig(
-        include=[],
-        exclude=[],
-        derived=[
-            DerivedFeature(name="h", func="datetime_hour", source="ts"),
-            DerivedFeature(name="copy", func="source_copy", source="src"),
-        ],
-        encodings=[],
+    plan = ColumnPlan(
+        target="t",
+        datetime_column=None,
+        columns=(
+            ColumnOp(op="derive", name="h", dtype="int64", sources=("ts",), func="datetime_hour"),
+            ColumnOp(
+                op="derive", name="copy", dtype="float64", sources=("src",), func="source_copy"
+            ),
+        ),
     )
-    assert cfg.builder_params is None
-    pipeline_out = FeaturePipeline(encodings=[]).transform(df, cfg, "t", 0)
+    assert plan.builder_params == {}
+    pipeline_out = FeaturePipeline().transform(df, plan, "t", 0)
     direct_out = build_derived(
-        df, cfg.derived, "t", extra_builders=load_custom_builders(cfg.builder_module)
+        df,
+        [DerivedFeature(name="h", func="datetime_hour", source="ts"),
+         DerivedFeature(name="copy", func="source_copy", source="src")],
+        "t",
+        extra_builders=load_custom_builders(plan.builder_module),
     )
     pd.testing.assert_frame_equal(pipeline_out, direct_out)

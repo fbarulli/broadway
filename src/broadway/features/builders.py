@@ -1,12 +1,11 @@
 """Feature derivation — compute derived columns from source data.
 
 ``BUILDERS`` is the shared registry of pure column transforms. Both the
-feature-engineering pipeline (``features.derived[].func`` in experiment
-configs) and the named-sample pipeline (``SampleSpec.derived[].formula`` in
-sample configs) resolve their functions here. It is an *implementation*
-registry only — which features exist, their names, and their dtypes are
-declared in the dataset layer (``project/features.py`` for model-facing
-features; sample configs declare their own derived columns).
+column plan (``ColumnPlan`` derive ops) and the named-sample pipeline
+(``SampleSpec.derived[].formula`` in sample configs) resolve their functions
+here. It is an *implementation* registry only — which features exist, their
+names, and their dtypes are declared by the plan (or by a sample config's own
+derived columns).
 """
 
 from __future__ import annotations

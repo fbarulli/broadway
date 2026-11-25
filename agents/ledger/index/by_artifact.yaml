@@ -170,6 +170,10 @@ CV folds via cross_validate (src/broadway/evaluate/validation.py:42):
 - GATE-TRAIN-36
 ChampionArtifact records bucketed bare_model / pipeline_signature / ambiguous (:21-23):
 - GATE-TRAIN-39
+? ColumnPlan keep-set (14 ops) consumed by the project ML pipeline projection and project/config/experiment/taxi.yaml feature_plan
+: - GATE-INFRA-181
+ColumnPlan|None (resolved from ExperimentConfig.feature_plan):
+- GATE-FEAT-29
 ? 'DETERMINISM OK + exit 0 | one `<file>: <field-path>` line per offender + exit 1 | `<file>: missing counterpart` | usage exit 2'
 : - GATE-INFRA-97
 DatasetContract:
@@ -177,6 +181,8 @@ DatasetContract:
 - GATE-FEAT-29
 DatasetContract (contract.columns order IS the projection order):
 - GATE-ETL-17
+DatasetContract (target/datetime/columns) via project.features.load_contract:
+- GATE-INFRA-181
 DatasetContract with dict[str, ColumnSchema]:
 - GATE-CFG-74
 DatasetContract.columns (declared dtypes/null_count):
@@ -195,8 +201,6 @@ DerivedFeature(name,func,source):
 - GATE-INFRA-137
 ? 'FRAME ORDER PRESERVED not sorted (utils.py:33,42 docstring :23); raise sites: missing experiment/dataset ⇒ ValueError (utils.py:26); eligible categorical neither preprocessing-claimed nor numeric ⇒ ValueError with exact pinned message (utils.py:37-41)'
 : - GATE-FEAT-28
-FeatureConfig|None:
-- GATE-FEAT-29
 FigureRef (models.py:24):
 - GATE-TLINE-50
 'FileNotFoundError "canonical dataset not found: … — run the etl step first" (:32-33)':
@@ -592,7 +596,7 @@ frame/groups from runners.load_frame_and_groups (runners.py:86):
 - GATE-TLINE-54
 freq_fill (cfg.features.frequency_fill):
 - GATE-FEAT-24
-? 'frozenset declared surface feeding GATE-FEAT-28 (utils.py:27-31) and recipe.validate_preprocessing_columns binding check (recipe.py:129-133); raise sites: ''engineered'' without features config ⇒ ValueError (schemas/__init__.py:25-30); unknown schema_contract ⇒ ValueError listing supported modules (schemas/__init__.py:53-57)'
+? 'frozenset declared surface feeding GATE-FEAT-28 (utils.py:27-31) and recipe.validate_preprocessing_columns binding check (recipe.py:129-133); raise sites: ''engineered'' without a resolved plan ⇒ ValueError (schemas/__init__.py:21-29); unknown schema_contract ⇒ ValueError listing supported modules (schemas/__init__.py:53-57)'
 : - GATE-FEAT-29
 full-tier verdict of scripts/run_local_ci.sh:
 - GATE-INFRA-96

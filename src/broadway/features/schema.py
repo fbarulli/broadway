@@ -1,9 +1,9 @@
 """Feature definitions and schema generation.
 
 ``FeatureSpec`` is the generic feature contract; ``build_engineered_schema``
-generates a Pandera schema from a registry of specs. Dataset-specific feature
-registries (dataset-specific features) live in ``project/features.py`` and derive
-their name/dtype/schema views from a single ``FEATURE_SPECS`` dict.
+generates a Pandera schema from a registry of specs. Specs are projected from
+each experiment's ``ColumnPlan`` — the single keep-set — rather than a second
+column list.
 """
 
 from __future__ import annotations

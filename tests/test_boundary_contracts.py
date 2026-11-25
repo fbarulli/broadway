@@ -70,6 +70,7 @@ from broadway.data.loader import load_with_audit
 from broadway.features.generic import build_generic_feature_specs
 from broadway.features.module import _load_split
 from broadway.features.pipeline import FeaturePipeline
+from broadway.features.plan import ColumnPlan
 from broadway.features.schema import build_engineered_schema
 from broadway.lineage.models import DatasetRef, DerivedSpec, SampleSpec
 
@@ -210,12 +211,13 @@ def test_split_to_features_boundary_rejects_dtype_mutation(tmp_path: Path) -> No
 
     def thunk() -> None:
         train, _ = _load_split(cfg)
-        pipeline = FeaturePipeline(encodings=cfg.experiment.features.encodings)
-        pipeline.fit(train, cfg.dataset.target, cfg.features.encoding_smoothing)
+        plan = ColumnPlan.from_config(cfg.dataset, cfg.experiment)
+        pipeline = FeaturePipeline()
+        pipeline.fit(train, plan, cfg.dataset.target)
         transformed = pipeline.transform(
-            train, cfg.experiment.features, cfg.dataset.target, cfg.features.frequency_fill
+            train, plan, cfg.dataset.target, cfg.features.frequency_fill
         )
-        specs = build_generic_feature_specs(cfg.dataset, cfg.experiment.features)
+        specs = build_generic_feature_specs(cfg.dataset, plan)
         build_engineered_schema(specs).validate(transformed)
 
     _assert_loud(

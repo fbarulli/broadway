@@ -25,7 +25,6 @@ from broadway.config.schema import (
     EtlStep,
     EvaluateStep,
     ExperimentConfig,
-    FeatureConfig,
     HPOConfig,
     ModelConfig,
     ModelHPOSpec,
@@ -36,6 +35,7 @@ from broadway.config.schema import (
 )
 from broadway.evaluate import module as evaluate_module
 from broadway.evaluate.contracts import EvaluationResult
+from broadway.features.plan import resolve_plan
 from broadway.lineage import records
 from broadway.training import module as training_module
 from broadway.training.contracts import TrainingResult
@@ -126,13 +126,14 @@ def _make_config(tmp_path: Path) -> PipelineConfig:
     )
     experiment = ExperimentConfig(
         data_source=DataSourceRef(loader="canonical", schema_contract="raw"),
-        features=FeatureConfig(include=["rooms", "area"], exclude=[], derived=[], encodings=[]),
+        feature_plan="broadway.features.plans:contract_numeric_features",
         model=ModelConfig(type="linear", params={}),
         split=SplitConfig(type="random", validation_size=0.2),
         random_state=42,
         target_metric="rmse",
         calibration=CalibrationConfig(method="split_conformal", alpha=0.2, calibration_size=0.25),
     )
+    experiment.bind_plan(resolve_plan(experiment.feature_plan, dataset))
     etl = EtlStep(
         ci_sample_size=0,
         max_drop_fraction=0.5,

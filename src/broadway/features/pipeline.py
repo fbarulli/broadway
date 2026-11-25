@@ -1,4 +1,10 @@
-"""FeaturePipeline dataclass — fit on train, transform on any DataFrame."""
+"""FeaturePipeline dataclass — fit on train, transform on any DataFrame.
+
+The plan is the single declaration: derived operations and encoded outputs are
+read from ``ColumnPlan.columns`` in declared order. Encoders are still fitted
+and persisted by the features step (Phase 3 owns any read-side execution); the
+plan only supplies the declarations.
+"""
 
 from __future__ import annotations
 
@@ -7,47 +13,72 @@ from typing import Any
 
 import pandas as pd
 
-from broadway.config.schema import EncodingConfig, FeatureConfig
+from broadway.config.schema import DerivedFeature
 from broadway.features.builders import build_derived, load_custom_builders
+from broadway.features.plan import ColumnOp, ColumnPlan
 from broadway.features.transformers import FrequencyEncoding, TargetEncoding
+
+
+def _derived_feature(op: ColumnOp) -> DerivedFeature:
+    return DerivedFeature(name=op.name, func=op.func or "", source=op.sources[0])
 
 
 @dataclass
 class FeaturePipeline:
-    encodings: list[EncodingConfig] = field(default_factory=list)
-    _target_encoders: list[TargetEncoding] = field(default_factory=list)
-    _freq_encoders: list[FrequencyEncoding] = field(default_factory=list)
+    _encoders: list[tuple[str, str, TargetEncoding | FrequencyEncoding]] = field(
+        default_factory=list
+    )
 
-    def fit(self, df: pd.DataFrame, target: str, smoothing: int) -> FeaturePipeline:
-        self._target_encoders = []
-        self._freq_encoders = []
-        for enc in self.encodings:
-            for col in enc.columns:
-                if enc.type == "target":
-                    encoder = TargetEncoding(columns=[col], smoothing=smoothing)
-                    self._target_encoders.append(encoder.fit(df, df[target]))
-                elif enc.type == "frequency":
-                    encoder = FrequencyEncoding(columns=[col])
-                    self._freq_encoders.append(encoder.fit(df))
+    def fit(self, df: pd.DataFrame, plan: ColumnPlan, target: str) -> FeaturePipeline:
+        self._encoders = []
+        for op in plan.columns:
+            if op.op != "encode":
+                continue
+            if op.encoder == "target":
+                smoothing = op.params.get("smoothing")
+                if smoothing is None:
+                    raise ValueError(
+                        f"column plan: target encoding '{op.name}' requires a smoothing param"
+                    )
+                encoder = TargetEncoding(
+                    columns=list(op.sources),
+                    smoothing=float(smoothing),
+                    feature_name=op.name,
+                )
+                self._encoders.append(
+                    (op.name, "target", encoder.fit(df, df[target]))
+                )
+            elif op.encoder == "frequency":
+                encoder = FrequencyEncoding(
+                    columns=list(op.sources),
+                    feature_name=op.name,
+                    normalize=bool(op.params.get("normalize", True)),
+                )
+                self._encoders.append((op.name, "frequency", encoder.fit(df)))
         return self
 
-    def transform(self, df: pd.DataFrame, cfg: FeatureConfig, target: str, freq_fill: float) -> pd.DataFrame:
+    def transform(
+        self, df: pd.DataFrame, plan: ColumnPlan, target: str, freq_fill: float
+    ) -> pd.DataFrame:
         result = df.copy()
-        builder_kwargs: dict[str, Any] = {}
-        if cfg.builder_params is not None:
-            builder_kwargs = {
-                "group_col": cfg.builder_params.group_col,
-                "lookup_col": cfg.builder_params.lookup_col,
-            }
-        result = build_derived(
-            result,
-            cfg.derived,
-            target,
-            extra_builders=load_custom_builders(cfg.builder_module),
-            **builder_kwargs,
-        )
-        for encoder in self._freq_encoders:
-            result = encoder.transform(result, fill=freq_fill)
-        for encoder in self._target_encoders:
-            result = encoder.transform(result)
+        builder_kwargs: dict[str, Any] = dict(plan.builder_params)
+        for op in plan.columns:
+            if op.op != "derive":
+                continue
+            result = build_derived(
+                result,
+                [_derived_feature(op)],
+                target,
+                extra_builders=load_custom_builders(plan.builder_module),
+                **builder_kwargs,
+            )
+            result[op.name] = result[op.name].astype(op.dtype)
+        for name, _encoding_type, encoder in self._encoders:
+            if isinstance(encoder, FrequencyEncoding):
+                result = encoder.transform(result, fill=freq_fill)
+            else:
+                result = encoder.transform(result)
+            declared = next(column for column in plan.columns if column.name == name)
+            if str(result[name].dtype) != declared.dtype:
+                result[name] = result[name].astype(declared.dtype)
         return result

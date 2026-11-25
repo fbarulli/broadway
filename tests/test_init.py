@@ -37,6 +37,8 @@ def _isolate(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(module, "CONFIGS_DIR", configs)
     monkeypatch.setattr(module, "ARTIFACTS_DIR", tmp_path / "artifacts")
     monkeypatch.setattr(records, "LINEAGE_DIR", tmp_path / "lineage")
+    monkeypatch.setattr(module, "PLANS_DIR", tmp_path / "features")
+    monkeypatch.setattr(module, "PLAN_PACKAGE", "gen_features")
 
 
 def test_init_writes_configs(tmp_path, monkeypatch) -> None:
@@ -62,6 +64,7 @@ def test_init_writes_configs(tmp_path, monkeypatch) -> None:
     assert (tmp_path / "configs" / "dataset" / "houses.yaml").exists()
     assert (tmp_path / "configs" / "analysis" / "houses.yaml").exists()
     assert (tmp_path / "configs" / "experiment" / "houses.yaml").exists()
+    assert (tmp_path / "features" / "houses.py").exists()
     assert (tmp_path / "artifacts" / "discover" / "profile.json").exists()
     assert (tmp_path / "lineage" / "records" / "profile_houses.json").exists()
 
@@ -72,6 +75,8 @@ def test_init_writes_configs(tmp_path, monkeypatch) -> None:
 
     experiment = yaml.safe_load((tmp_path / "configs" / "experiment" / "houses.yaml").read_text())
     assert experiment["split"]["type"] == "random"
+    assert experiment["feature_plan"] == "gen_features.houses:plan"
+    assert "features" not in experiment
     # Scaffolded random_state must equal the configs/onboard.yaml default —
     # the literal lives in YAML only (determinism ledger item b).
     assert experiment["random_state"] == 42

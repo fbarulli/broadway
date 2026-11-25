@@ -23,7 +23,6 @@ from broadway.config.schema import (
     DataSourceRef,
     EnvironmentConfig,
     ExperimentConfig,
-    FeatureConfig,
     HPOConfig,
     ModelConfig,
     ModelHPOSpec,
@@ -33,6 +32,7 @@ from broadway.config.schema import (
     TaskType,
 )
 from broadway.features import recipe as recipe_module
+from broadway.features.plan import resolve_plan
 from broadway.training import hpo
 from broadway.training import hpo as hpo_module
 from broadway.training.hpo import (
@@ -81,13 +81,14 @@ def _pipeline_config(
     )
     experiment = ExperimentConfig(
         data_source=DataSourceRef(loader="canonical", schema_contract="raw"),
-        features=FeatureConfig(include=["cat", "num"], exclude=[], derived=[], encodings=[]),
+        feature_plan="broadway.features.plans:contract_numeric_features",
         model=ModelConfig(type="linear", params={}),
         split=SplitConfig(type="random", validation_size=0.2),
         random_state=42,
         target_metric="rmse",
         preprocessing=preprocessing or [],
     )
+    experiment.bind_plan(resolve_plan(experiment.feature_plan, dataset))
     return PipelineConfig(dataset=dataset, environment=environment, experiment=experiment)
 
 

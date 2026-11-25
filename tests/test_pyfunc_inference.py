@@ -34,7 +34,6 @@ from broadway.config.schema import (
     DataSourceRef,
     EnvironmentConfig,
     ExperimentConfig,
-    FeatureConfig,
     ModelConfig,
     PipelineConfig,
     PreprocessingStepConfig,
@@ -42,6 +41,7 @@ from broadway.config.schema import (
     TaskType,
 )
 from broadway.evaluate.module import _load_champion
+from broadway.features.plan import resolve_plan
 from broadway.training.mlflow_utils import log_model, setup_mlflow
 from broadway.training.trainer import build_model_pipeline
 
@@ -80,13 +80,14 @@ def _pipeline_config() -> PipelineConfig:
     )
     experiment = ExperimentConfig(
         data_source=DataSourceRef(loader="canonical", schema_contract="raw"),
-        features=FeatureConfig(include=["cat", "num"], exclude=[], derived=[], encodings=[]),
+        feature_plan="broadway.features.plans:contract_numeric_features",
         model=ModelConfig(type="linear", params={}),
         split=SplitConfig(type="random", validation_size=0.2),
         random_state=42,
         target_metric="rmse",
         preprocessing=[PreprocessingStepConfig(type="one_hot", columns=["cat"], params={})],
     )
+    experiment.bind_plan(resolve_plan(experiment.feature_plan, dataset))
     return PipelineConfig(dataset=dataset, environment=environment, experiment=experiment)
 
 

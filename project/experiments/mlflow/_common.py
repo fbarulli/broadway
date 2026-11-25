@@ -35,12 +35,12 @@ from broadway.config.schema import (
     DataSourceRef,
     EnvironmentConfig,
     ExperimentConfig,
-    FeatureConfig,
     ModelConfig,
     PipelineConfig,
     SplitConfig,
     TaskType,
 )
+from broadway.features.plan import resolve_plan
 from broadway.training.mlflow_utils import log_model
 from broadway.training.models.registry import display_name, model_keys
 from broadway.training.trainer import build_model_pipeline
@@ -181,12 +181,13 @@ def battle_pipeline_config() -> PipelineConfig:
     )
     experiment = ExperimentConfig(
         data_source=DataSourceRef(loader="canonical", schema_contract="raw"),
-        features=FeatureConfig(include=[], exclude=[], derived=[], encodings=[]),
+        feature_plan="broadway.features.plans:contract_features",
         model=ModelConfig(type="linear", params={}),
         split=SplitConfig(type="random", validation_size=TEST_FRACTION),
         random_state=SEED,
         target_metric="mae",
     )
+    experiment.bind_plan(resolve_plan(experiment.feature_plan, dataset))
     return PipelineConfig(dataset=dataset, environment=environment, experiment=experiment)
 
 

@@ -301,3 +301,31 @@ dependencies:
     adapter: ""
     license: Apache-2.0
     registered: 2026-11-25
+  - name: tsfresh
+    owner: platform
+    scope: optional
+    purpose: Time-series feature extraction behind the feature_engineering extra.
+    adapter: broadway.features.engineering
+    license: MIT
+    registered: 2026-11-25
+  - name: feature-engine
+    owner: platform
+    scope: optional
+    purpose: Tabular transformers (imputation, winsorizing) in the feature plan.
+    adapter: broadway.features.engineering
+    license: BSD-3-Clause
+    registered: 2026-11-25
+  - name: sktime
+    owner: platform
+    scope: optional
+    purpose: Series transformer (summary statistics) in the feature plan.
+    adapter: broadway.features.engineering
+    license: BSD-3-Clause
+    registered: 2026-11-25
+  - name: darts
+    owner: platform
+    scope: optional
+    purpose: Series transformers (Scaler/BoxCox/Diff) in the feature plan.
+    adapter: broadway.features.engineering
+    license: Apache-2.0
+    registered: 2026-11-25

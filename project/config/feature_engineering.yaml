@@ -1,0 +1,49 @@
+# Feature-engineering engine plan (the config SSOT for FeatureEngineer.build).
+# Ordered: each entry runs on the same input frame and produces its own frame.
+# Value columns come from the caller's ColumnPlan projection, not this file.
+time_column: pickup_datetime
+id_columns: []
+engines:
+  - id: tsfresh_minimal
+    kind: tsfresh
+    feature_set: minimal
+    n_jobs: 1
+  - id: feature_engine_clean
+    kind: feature_engine
+    transformers:
+      - kind: MeanMedianImputer
+        params:
+          imputation_method: median
+      - kind: Winsorizer
+        params:
+          capping_method: quantiles
+          tail: both
+          fold: 0.05
+  - id: sktime_summary
+    kind: sktime
+    transformer: SummaryTransformer
+    params:
+      summary_function:
+        - mean
+        - std
+        - min
+        - max
+      quantiles: null
+  - id: darts_scaler
+    kind: darts
+    transformer: Scaler
+    freq: h
+    params:
+      scaler: StandardScaler
+  - id: darts_boxcox
+    kind: darts
+    transformer: BoxCox
+    freq: h
+    params:
+      lmbda: 0.5
+  - id: darts_diff
+    kind: darts
+    transformer: Diff
+    freq: h
+    params:
+      lags: 1

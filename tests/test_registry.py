@@ -11,7 +11,6 @@ from pydantic import ValidationError
 from broadway.config.schema import (
     DataSourceRef,
     ExperimentConfig,
-    FeatureConfig,
     HPOConfig,
     ModelConfig,
     ModelHPOSpec,
@@ -65,7 +64,7 @@ def test_schema_rejects_search_space_outside_allowed_params() -> None:
     with pytest.raises(ValidationError):
         ExperimentConfig(
             data_source=DataSourceRef(loader="canonical", schema_contract="raw"),
-            features=FeatureConfig(include=["rooms"], exclude=[], derived=[], encodings=[]),
+            feature_plan="broadway.features.plans:contract_features",
             model=ModelConfig(type="lgbm", params={}),
             split=SplitConfig(type="random", validation_size=0.2),
             random_state=42,

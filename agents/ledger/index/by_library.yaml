@@ -68,8 +68,9 @@ broadway.config.loader.CONFIGS_DIR:
 broadway.config.schema:
 - GATE-ETL-10
 - GATE-ETL-11
-broadway.config.schema(DatasetContract, FeatureConfig):
+broadway.config.schema(DatasetContract):
 - GATE-FEAT-29
+- GATE-INFRA-181
 broadway.config.schema(DatasetContract, FeatureConfig, PipelineConfig):
 - GATE-FEAT-26
 - GATE-FEAT-27
@@ -135,6 +136,10 @@ broadway.features.generic(build_generic_feature_specs):
 - GATE-FEAT-25
 broadway.features.pipeline(FeaturePipeline):
 - GATE-FEAT-25
+broadway.features.plan(ColumnPlan):
+- GATE-FEAT-29
+broadway.features.plan(ColumnPlan, ColumnOp):
+- GATE-INFRA-181
 broadway.features.schema(FeatureSpec):
 - GATE-FEAT-26
 - GATE-FEAT-27

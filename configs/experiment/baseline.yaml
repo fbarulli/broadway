@@ -1,13 +1,7 @@
 data_source:
   loader: canonical
   schema_contract: engineered
-features:
-  include:
-    - feature_1
-    - feature_2
-  exclude: []
-  derived: []
-  encodings: []
+feature_plan: broadway.features.plans:baseline
 model:
   type: linear
   params: {}

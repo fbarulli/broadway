@@ -44,7 +44,7 @@ _DATASET = {
 
 _EXPERIMENT = {
     "data_source": {"loader": "canonical", "schema_contract": "raw"},
-    "features": {"include": ["feature_1"], "exclude": [], "derived": [], "encodings": []},
+    "feature_plan": "broadway.features.plans:contract_features",
     "model": {"type": "linear", "params": {}},
     "split": {"type": "random", "validation_size": 0.2},
     "random_state": 42,

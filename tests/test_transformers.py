@@ -13,8 +13,8 @@ import pandas as pd
 import pytest
 from sklearn.base import clone
 
-from broadway.config.schema import EncodingConfig, FeatureConfig
 from broadway.features.pipeline import FeaturePipeline
+from broadway.features.plan import ColumnOp, ColumnPlan
 from broadway.features.transformers import FrequencyEncoding, TargetEncoding
 
 
@@ -163,18 +163,30 @@ def test_pipeline_reexpression_output_identical() -> None:
     frame = pd.DataFrame(
         {"x": [1, 2, 3, 4, 5], "city": ["NYC", "LA", "NYC", "SF", "LA"], "price": [100, 200, 150, 300, 250]}
     )
-    cfg = FeatureConfig(
-        include=["x"],
-        exclude=[],
-        derived=[],
-        encodings=[
-            EncodingConfig(type="frequency", columns=["city"], smoothing=None),
-            EncodingConfig(type="target", columns=["city"], smoothing=10),
-        ],
-        builder_module=None,
+    plan = ColumnPlan(
+        target="price",
+        datetime_column=None,
+        columns=(
+            ColumnOp(op="source", name="x", dtype="int64"),
+            ColumnOp(
+                op="encode",
+                name="city_freq_enc",
+                dtype="float64",
+                sources=("city",),
+                encoder="frequency",
+            ),
+            ColumnOp(
+                op="encode",
+                name="city_target_enc",
+                dtype="float64",
+                sources=("city",),
+                encoder="target",
+                params={"smoothing": 10},
+            ),
+        ),
     )
-    pipeline = FeaturePipeline(encodings=cfg.encodings).fit(frame, "price", 10)
-    out = pipeline.transform(frame, cfg, "price", 0)
+    pipeline = FeaturePipeline().fit(frame, plan, "price")
+    out = pipeline.transform(frame, plan, "price", 0)
     assert list(out.columns) == ["x", "city", "price", "city_freq_enc", "city_target_enc"]
     assert out["city_freq_enc"].tolist() == [0.4, 0.4, 0.4, 0.2, 0.4]
     assert out["city_target_enc"].round(10).tolist() == [187.5, 204.1666666667, 187.5, 209.0909090909, 204.1666666667]

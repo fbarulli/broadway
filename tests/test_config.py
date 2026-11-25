@@ -6,10 +6,8 @@ from pydantic import ValidationError
 
 from broadway.config.loader import load_config
 from broadway.config.schema import (
-    BuilderParams,
     DataSourceRef,
     ExperimentConfig,
-    FeatureConfig,
     HPOConfig,
     LookupSpec,
     ModelConfig,
@@ -128,7 +126,7 @@ def test_stats_config_fields(stats_cfg) -> None:
 def _experiment_config(model_type: str, search_space: dict[str, list[float | int]]) -> ExperimentConfig:
     return ExperimentConfig(
         data_source=DataSourceRef(loader="canonical", schema_contract="raw"),
-        features=FeatureConfig(include=["rooms"], exclude=[], derived=[], encodings=[]),
+        feature_plan="broadway.features.plans:contract_features",
         model=ModelConfig(type=model_type, params={}),
         split=SplitConfig(type="random", validation_size=0.2),
         random_state=42,
@@ -162,7 +160,7 @@ def test_hpo_search_space_validated_per_model() -> None:
     with pytest.raises(ValidationError):
         ExperimentConfig(
             data_source=DataSourceRef(loader="canonical", schema_contract="raw"),
-            features=FeatureConfig(include=["rooms"], exclude=[], derived=[], encodings=[]),
+            feature_plan="broadway.features.plans:contract_features",
             model=ModelConfig(type="lgbm", params={}),
             split=SplitConfig(type="random", validation_size=0.2),
             random_state=42,
@@ -240,7 +238,7 @@ def test_hpo_configs_parse() -> None:
 
 def _experiment_kwargs() -> dict[str, object]:
     return {
-        "features": FeatureConfig(include=["rooms"], exclude=[], derived=[], encodings=[]),
+        "feature_plan": "broadway.features.plans:contract_features",
         "model": ModelConfig(type="linear", params={}),
         "split": SplitConfig(type="random", validation_size=0.2),
         "random_state": 42,
@@ -341,20 +339,13 @@ def test_preprocessing_step_extra_fields_forbidden() -> None:
         )
 
 
-def test_experiment_builder_params_round_trip_from_yaml() -> None:
+def test_experiment_feature_plan_round_trips_from_yaml() -> None:
     raw = yaml.safe_load(
         """
         data_source:
           loader: canonical
           schema_contract: raw
-        features:
-          include: [rooms]
-          exclude: []
-          derived: []
-          encodings: []
-          builder_params:
-            group_col: Borough
-            lookup_col: Borough_lookup
+        feature_plan: broadway.features.plans:baseline
         model:
           type: linear
           params: {}
@@ -366,14 +357,17 @@ def test_experiment_builder_params_round_trip_from_yaml() -> None:
         """
     )
     config = ExperimentConfig(**raw)
-    assert config.features.builder_params == BuilderParams(
-        group_col="Borough", lookup_col="Borough_lookup"
-    )
+    assert config.feature_plan == "broadway.features.plans:baseline"
 
 
-def test_feature_config_builder_params_absent_is_none() -> None:
-    config = ExperimentConfig(
-        data_source=DataSourceRef(loader="canonical", schema_contract="raw"),
-        **_experiment_kwargs(),
-    )
-    assert config.features.builder_params is None
+@pytest.mark.parametrize("reference", ["baseline", "module:", ":callable"])
+def test_experiment_rejects_malformed_feature_plan(reference: str) -> None:
+    with pytest.raises(ValidationError, match="module:callable"):
+        ExperimentConfig(
+            data_source=DataSourceRef(loader="canonical", schema_contract="raw"),
+            feature_plan=reference,
+            model=ModelConfig(type="linear", params={}),
+            split=SplitConfig(type="random", validation_size=0.2),
+            random_state=42,
+            target_metric="rmse",
+        )

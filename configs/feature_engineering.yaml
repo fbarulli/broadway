@@ -1,0 +1,52 @@
+# Generic feature-engineering example plan (the config shape, not a dataset
+# binding). FeatureEngineer.build resolves this through
+# broadway.config.loader.config_path, so a project overlay placed at
+# <overlay>/feature_engineering.yaml wins when BROADWAY_CONFIG_OVERLAY_DIR is
+# set. Value columns come from the caller's ColumnPlan projection — never a
+# YAML column list.
+time_column: timestamp
+id_columns: []
+engines:
+  - id: tsfresh_minimal
+    kind: tsfresh
+    feature_set: minimal
+    n_jobs: 1
+  - id: feature_engine_clean
+    kind: feature_engine
+    transformers:
+      - kind: MeanMedianImputer
+        params:
+          imputation_method: median
+      - kind: Winsorizer
+        params:
+          capping_method: quantiles
+          tail: both
+          fold: 0.05
+  - id: sktime_summary
+    kind: sktime
+    transformer: SummaryTransformer
+    params:
+      summary_function:
+        - mean
+        - std
+        - min
+        - max
+      quantiles: null
+  - id: darts_scaler
+    kind: darts
+    transformer: Scaler
+    freq: h
+    params:
+      scaler: StandardScaler
+  - id: darts_boxcox
+    kind: darts
+    transformer: BoxCox
+    freq: h
+    params:
+      lmbda: 0.5
+  - id: darts_diff
+    kind: darts
+    transformer: Diff
+    freq: h
+    params:
+      lags: 1

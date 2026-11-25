@@ -14,6 +14,7 @@ from sklearn.linear_model import LinearRegression
 from sklearn.pipeline import Pipeline
 
 from broadway.config.schema import PipelineConfig
+from broadway.features.plan import resolve_plan
 from broadway.training.mlflow_utils import (
     log_dataset,
     log_datasets,
@@ -179,27 +180,38 @@ def _training_config(tmp_path: Path) -> PipelineConfig:
         EnvironmentConfig,
         EtlStep,
         ExperimentConfig,
-        FeatureConfig,
         ModelConfig,
         SplitConfig,
         TaskType,
         TrainStep,
     )
 
+    dataset = DatasetContract(
+        name="synthetic",
+        path="synthetic.parquet",
+        target="price",
+        task=TaskType.REGRESSION,
+        datetime_column=None,
+        columns={
+            "rooms": ColumnSchema(dtype="int64", null_count=0, role=ColumnRole.FEATURE),
+            "area": ColumnSchema(dtype="int64", null_count=0, role=ColumnRole.FEATURE),
+            "price": ColumnSchema(dtype="float64", null_count=0, role=ColumnRole.TARGET),
+        },
+        lookup_tables={},
+    )
+    experiment = ExperimentConfig(
+        data_source=DataSourceRef(loader="canonical", schema_contract="raw"),
+        feature_plan="broadway.features.plans:contract_numeric_features",
+        model=ModelConfig(type="linear", params={}),
+        split=SplitConfig(type="random", validation_size=0.2),
+        random_state=42,
+        target_metric="rmse",
+        hpo=None,
+    )
+    experiment.bind_plan(resolve_plan(experiment.feature_plan, dataset))
+
     return PipelineConfig(
-        dataset=DatasetContract(
-            name="synthetic",
-            path="synthetic.parquet",
-            target="price",
-            task=TaskType.REGRESSION,
-            datetime_column=None,
-            columns={
-                "rooms": ColumnSchema(dtype="int64", null_count=0, role=ColumnRole.FEATURE),
-                "area": ColumnSchema(dtype="int64", null_count=0, role=ColumnRole.FEATURE),
-                "price": ColumnSchema(dtype="float64", null_count=0, role=ColumnRole.TARGET),
-            },
-            lookup_tables={},
-        ),
+        dataset=dataset,
         environment=EnvironmentConfig(
             log_level="INFO",
             data_dir=str(tmp_path / "data"),
@@ -217,15 +229,7 @@ def _training_config(tmp_path: Path) -> PipelineConfig:
             api_replicas_max=3,
             api_hpa_cpu_threshold=80,
         ),
-        experiment=ExperimentConfig(
-            data_source=DataSourceRef(loader="canonical", schema_contract="raw"),
-            features=FeatureConfig(include=["rooms", "area"], exclude=[], derived=[], encodings=[]),
-            model=ModelConfig(type="linear", params={}),
-            split=SplitConfig(type="random", validation_size=0.2),
-            random_state=42,
-            target_metric="rmse",
-            hpo=None,
-        ),
+        experiment=experiment,
         etl=EtlStep(
             ci_sample_size=0,
             max_drop_fraction=0.5,

@@ -1,17 +1,7 @@
 data_source:
   loader: canonical
   schema_contract: engineered
-features:
-  include:
-    - feature_1
-    - feature_2
-  exclude: []
-  derived: []
-  encodings:
-    - type: target
-      columns:
-        - feature_3
-      smoothing: 20
+feature_plan: broadway.features.plans:hyperopt
 model:
   type: lgbm
   params: {}

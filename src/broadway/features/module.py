@@ -11,6 +11,7 @@ import pandas as pd
 from broadway.config.schema import PipelineConfig
 from broadway.features.generic import build_generic_feature_specs
 from broadway.features.pipeline import FeaturePipeline
+from broadway.features.plan import ColumnPlan
 from broadway.features.schema import build_engineered_schema
 from broadway.lineage.ids import node_id
 from broadway.lineage.models import TransformAudit
@@ -32,12 +33,13 @@ def run(cfg: PipelineConfig) -> None:
     if not cfg.dataset or not cfg.experiment or not cfg.features or not cfg.etl:
         raise ValueError("features step requires dataset, experiment, features, and etl config")
     train, val = _load_split(cfg)
-    pipeline = FeaturePipeline(encodings=cfg.experiment.features.encodings)
-    pipeline.fit(train, cfg.dataset.target, cfg.features.encoding_smoothing)
+    plan = ColumnPlan.from_config(cfg.dataset, cfg.experiment)
+    pipeline = FeaturePipeline()
+    pipeline.fit(train, plan, cfg.dataset.target)
     rows_in = len(train)
     columns_before = list(train.columns)
-    train_out = pipeline.transform(train, cfg.experiment.features, cfg.dataset.target, cfg.features.frequency_fill)
-    specs = build_generic_feature_specs(cfg.dataset, cfg.experiment.features)
+    train_out = pipeline.transform(train, plan, cfg.dataset.target, cfg.features.frequency_fill)
+    specs = build_generic_feature_specs(cfg.dataset, plan)
     build_engineered_schema(specs).validate(train_out)
     rows_out = len(train_out)
     columns_after = list(train_out.columns)
@@ -45,7 +47,7 @@ def run(cfg: PipelineConfig) -> None:
     train_out.to_parquet(out_dir / cfg.etl.train_features_file, index=False)
     logger.info(f"train features written ({len(train_out)} rows)")
     if val is not None:
-        val_out = pipeline.transform(val, cfg.experiment.features, cfg.dataset.target, cfg.features.frequency_fill)
+        val_out = pipeline.transform(val, plan, cfg.dataset.target, cfg.features.frequency_fill)
         build_engineered_schema(specs).validate(val_out)
         val_out.to_parquet(out_dir / cfg.etl.val_features_file, index=False)
         logger.info(f"val features written ({len(val_out)} rows)")

@@ -6,7 +6,7 @@ import pandas as pd
 
 from broadway.stats import baseline
 from project import data
-from project.features import ENGINEERED_FEATURES, TARGET
+from project.features import PLAN
 from project.ml_pipeline import FeaturePipeline
 
 
@@ -35,8 +35,8 @@ def load_and_split() -> tuple[pd.DataFrame, pd.DataFrame, np.ndarray, np.ndarray
         night_end=data.FEATURE_NIGHT_END,
     )
     pipeline.fit(train)
-    y_train = train[TARGET].values if TARGET in train else None
-    y_test = test[TARGET].values if TARGET in test else None
+    y_train = train[PLAN.target].values if PLAN.target in train else None
+    y_test = test[PLAN.target].values if PLAN.target in test else None
     train_feat = pipeline.transform(train)
     test_feat = pipeline.transform(test)
 
@@ -46,7 +46,7 @@ def load_and_split() -> tuple[pd.DataFrame, pd.DataFrame, np.ndarray, np.ndarray
 def _print_feature_importance(model: object) -> None:
     print("\n=== Feature importance (top 15) ===")
     importance = pd.Series(
-        model.feature_importances_, index=ENGINEERED_FEATURES
+        model.feature_importances_, index=PLAN.names
     ).sort_values(ascending=False)
     print(importance.head(15))
 
@@ -57,7 +57,7 @@ def main() -> None:
 
     print("\nTraining LightGBM baseline...")
     model = baseline.train_lgbm(
-        train_feat[ENGINEERED_FEATURES],
+        train_feat[list(PLAN.names)],
         y_train,
         objective="regression",
         n_estimators=data.N_ESTIMATORS,
@@ -71,7 +71,7 @@ def main() -> None:
     print("\n=== Holdout performance (time-based split) ===")
     metrics = baseline.evaluate(
         model,
-        test_feat[ENGINEERED_FEATURES],
+        test_feat[list(PLAN.names)],
         y_test,
         tail_quantile=data.QUANTILE_TAIL,
     )

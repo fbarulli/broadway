@@ -23,11 +23,13 @@ from broadway.config.schema import PipelineConfig, TaskType
 from broadway.data.splitter import calibration_split, split
 from broadway.evaluate.metrics import compute_metrics
 from broadway.features.generic import validate_engineered_frame
+from broadway.features.plan import ColumnPlan
 from broadway.lineage.ids import node_id
 from broadway.lineage.records import write_record
 from broadway.observability.profiling import phase
 from broadway.training.contracts import TrainingResult
 from broadway.training.hpo import run_hpo
+from broadway.training.learning_curve import LearningCurve, LearningCurveResult
 from broadway.training.mlflow_utils import (
     log_datasets,
     log_metrics,
@@ -35,8 +37,7 @@ from broadway.training.mlflow_utils import (
     log_params,
     setup_mlflow,
 )
-from broadway.training.trainer import train
-from broadway.utils import eligible_feature_columns
+from broadway.training.trainer import build_model_pipeline, train
 
 logger = logging.getLogger(__name__)
 
@@ -61,20 +62,20 @@ def _load_features(cfg: PipelineConfig) -> tuple[pd.DataFrame, pd.DataFrame | No
 
 
 def _xy(cfg: PipelineConfig, df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series]:
-    assert cfg.dataset is not None
-    return eligible_feature_columns(df, cfg), df[cfg.dataset.target]
+    assert cfg.dataset is not None and cfg.experiment is not None
+    X, _ = ColumnPlan.from_config(cfg.dataset, cfg.experiment).apply(df)
+    return X, df[cfg.dataset.target]
 
 
 def _resolve_params(
-    cfg: PipelineConfig,
-    X_train: pd.DataFrame,
-    y_train: pd.Series,
-    X_val: pd.DataFrame,
-    y_val: pd.Series,
+    cfg: PipelineConfig, fit_df: pd.DataFrame, val_df: pd.DataFrame
 ) -> dict[str, float | int | str]:
+    """Resolve final params (HPO-best when configured) on the deployed fit slice."""
     assert cfg.experiment is not None
     if cfg.experiment.hpo is None:
         return cfg.experiment.model.params
+    X_train, y_train = _xy(cfg, fit_df)
+    X_val, y_val = _xy(cfg, val_df)
     result = run_hpo(
         cfg,
         cfg.experiment.hpo,
@@ -199,17 +200,41 @@ def _calibration_frames(
         )
 
 
+def _run_learning_curve(
+    cfg: PipelineConfig,
+    fit_df: pd.DataFrame,
+    val_df: pd.DataFrame,
+    params: dict[str, float | int | str],
+) -> LearningCurveResult | None:
+    """Run the training-size curve on the deployed fit slice before the full fit.
+
+    The curve refits the same pipeline the final model trains: the slice after
+    the calibration split and the resolved (HPO-best when configured) params.
+    It works on fresh frames, so the final training and the persisted frames
+    are untouched.
+    """
+    assert cfg.train is not None and cfg.experiment is not None
+    if cfg.train.learning_curve is None:
+        return None
+    model_type = cfg.experiment.model.type
+    return LearningCurve(
+        cfg,
+        cfg.train.learning_curve,
+        lambda: build_model_pipeline(cfg, model_type, params),
+    ).run(fit_df, val_df)
+
+
 def _fit_model(
     cfg: PipelineConfig,
     fit_df: pd.DataFrame,
     val_df: pd.DataFrame,
     calibration: CalibrationConfig | None,
     calibration_df: pd.DataFrame | None,
+    params: dict[str, float | int | str],
 ) -> _Fitted:
-    """Resolve params, fit the model, and fit the calibration slice when configured."""
+    """Fit the model with the resolved params and the calibration slice."""
     X_train, y_train = _xy(cfg, fit_df)
     X_val, y_val = _xy(cfg, val_df)
-    params = _resolve_params(cfg, X_train, y_train, X_val, y_val)
     model, result = train(cfg, X_train, y_train, **params)
     summary: CalibrationSummary | None = None
     if calibration is not None:
@@ -302,8 +327,40 @@ def _log_evaluation(cfg: PipelineConfig, fitted: _Fitted) -> str:
     return log_model(fitted.model, "model", signature=signature)
 
 
+def _log_learning_curve(cfg: PipelineConfig, curve: LearningCurveResult) -> None:
+    """Log the curve's artifacts plus the reference and minimum-data answer."""
+    assert cfg.train is not None and cfg.train.learning_curve is not None
+    config = cfg.train.learning_curve
+    for path in (config.output_path, config.csv_path, config.png_path):
+        mlflow.log_artifact(str(path))
+    log_params(
+        {
+            "learning_curve.split": curve.split,
+            "learning_curve.direction": curve.direction,
+            "learning_curve.target_metric": curve.target_metric,
+        }
+    )
+    metrics: dict[str, float] = {
+        "learning_curve.tolerance": curve.tolerance,
+        "learning_curve.absolute_tolerance": curve.absolute_tolerance,
+    }
+    if curve.metric_threshold is not None:
+        metrics["learning_curve.metric_threshold"] = curve.metric_threshold
+    if curve.reference.mean is not None:
+        metrics["learning_curve.reference"] = curve.reference.mean
+    if curve.min_fraction is not None:
+        metrics["learning_curve.min_fraction"] = curve.min_fraction
+        if curve.min_rows is not None:
+            metrics["learning_curve.min_rows"] = float(curve.min_rows)
+    log_metrics(metrics)
+
+
 def _log_training(
-    cfg: PipelineConfig, fitted: _Fitted, train_df: pd.DataFrame, val_df: pd.DataFrame
+    cfg: PipelineConfig,
+    fitted: _Fitted,
+    train_df: pd.DataFrame,
+    val_df: pd.DataFrame,
+    curve: LearningCurveResult | None,
 ) -> str:
     """Open the MLflow run and log its inputs and model artifact."""
     assert cfg.dataset is not None
@@ -311,6 +368,8 @@ def _log_training(
         setup_mlflow(cfg.environment.mlflow_tracking_uri, cfg.dataset.name)
         with mlflow.start_run():
             _log_inputs(cfg, fitted, train_df, val_df)
+            if curve is not None:
+                _log_learning_curve(cfg, curve)
             return _log_evaluation(cfg, fitted)
 
 
@@ -350,7 +409,11 @@ def run(cfg: PipelineConfig) -> None:
     calibration = _calibration_config(cfg)
     train_df, val_df = _load_frames(cfg)
     fit_df, calibration_df = _calibration_frames(cfg, train_df, calibration)
-    fitted = _fit_model(cfg, fit_df, val_df, calibration, calibration_df)
-    artifact_path = _log_training(cfg, fitted, train_df, val_df)
+    # Params first (HPO when configured), then the curve on the deployed fit
+    # slice with those params: the 100% point matches the final model's data.
+    params = _resolve_params(cfg, fit_df, val_df)
+    curve = _run_learning_curve(cfg, fit_df, val_df, params)
+    fitted = _fit_model(cfg, fit_df, val_df, calibration, calibration_df, params)
+    artifact_path = _log_training(cfg, fitted, train_df, val_df, curve)
     result = fitted.result.model_copy(update={"artifact_path": artifact_path})
     _persist(cfg, result, fitted.summary)

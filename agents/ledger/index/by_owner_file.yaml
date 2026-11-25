@@ -72,6 +72,8 @@ project/experiments/mlflow/03_optuna_worker.py:
 - GATE-CUST-152
 project/experiments/mlflow/_common.py:
 - GATE-CFG-111
+project/features/__init__.py:
+- GATE-INFRA-181
 scripts/check_branch_parity.sh:
 - GATE-INFRA-93
 - GATE-INFRA-94

@@ -11,7 +11,7 @@ retired:
   successor: 'src/broadway/etl/module.py + src/broadway/data/loader.py (CONTRACT pipeline)'
   history_rows_retained: ['GATE-INGEST-01', 'GATE-INGEST-04', 'GATE-ETL-17', 'GATE-ETL-18', 'GATE-ETL-19', 'GATE-ETL-116', 'GATE-ETL-117']
 meta:
-  head: '72212b5'
+  head: 'd3935a9'
   assembled: '2026-11-25'
   source_fragments:
   - agents/ledger/gates/01-ingest.md
@@ -25,7 +25,7 @@ meta:
   - agents/ledger/gates/09-infra.md
   - agents/ledger/gates/80-hpo-optuna.md
   counts:
-    total: 169
+    total: 170
     gates_with_findings: 84
     finding_strings: 109
     by_band:
@@ -66,7 +66,7 @@ meta:
         flagged: 9
         finding_strings: 13
       09-infra:
-        gates: 57
+        gates: 58
         flagged: 17
         finding_strings: 25
       81-object-custody:
@@ -1032,20 +1032,21 @@ gates:
   inputs:
   - cfg.experiment.data_source.schema_contract string
   - DatasetContract
-  - FeatureConfig|None
+  - ColumnPlan|None (resolved from ExperimentConfig.feature_plan)
   outputs:
-  - 'frozenset declared surface feeding GATE-FEAT-28 (utils.py:27-31) and recipe.validate_preprocessing_columns binding check (recipe.py:129-133); raise sites: ''engineered'' without features config ⇒ ValueError (schemas/__init__.py:25-30); unknown schema_contract ⇒ ValueError listing supported modules (schemas/__init__.py:53-57)'
+  - 'frozenset declared surface feeding GATE-FEAT-28 (utils.py:27-31) and recipe.validate_preprocessing_columns binding check (recipe.py:129-133); raise sites: ''engineered'' without a resolved plan ⇒ ValueError (schemas/__init__.py:21-29); unknown schema_contract ⇒ ValueError listing supported modules (schemas/__init__.py:53-57)'
   transforms:
-  - registry dispatch _SCHEMA_MODULES {'raw'|'joined'|'engineered'} (schemas/__init__.py:34-38); raw/joined IGNORE features, engineered REQUIRES it (docstring :48-50)
+  - registry dispatch _SCHEMA_MODULES {'raw'|'joined'|'engineered'} (schemas/__init__.py:34-38); raw/joined IGNORE the plan, engineered REQUIRES the experiment's resolved ColumnPlan
   - lazy import of build_generic_feature_specs inside the resolver (schemas/__init__.py:23) keeps the builders registry off every schemas consumer's package-import path
   touched_by:
   - collections.abc(Callable)
-  - broadway.config.schema(DatasetContract, FeatureConfig)
+  - broadway.config.schema(DatasetContract)
+  - broadway.features.plan(ColumnPlan)
   - broadway.schemas.joined(joined_schema_columns)
   - broadway.features.generic(build_generic_feature_specs — LAZY, function-scope only)
   validated_by:
-  - tests/test_decision5_columns.py::test_engineered_requires_features_config
-  - tests/test_decision5_columns.py::test_raw_and_joined_ignore_features_argument
+  - tests/test_decision5_columns.py::test_engineered_requires_a_resolved_plan
+  - tests/test_decision5_columns.py::test_raw_and_joined_ignore_plan_argument
   - tests/test_recipe.py::test_unknown_schema_contract_fails_loud
   - tests/test_recipe.py::test_lookup_derived_column_passes_joined_fails_raw
   - tests/test_recipe.py::test_cross_check_rejects_column_outside_bound_schema
@@ -2734,7 +2735,7 @@ gates:
   - or ValueError naming offending step/columns/schema_contract
   transforms:
   - bound-surface resolution via schema_columns (recipe.py:129-133 → schemas/__init__.py:41-58; unknown contract raises 'unknown schema_contract' :52-57)
-  - '''engineered'' requires features config (schemas/__init__.py:26-30)'
+  - "'engineered' requires the experiment's resolved ColumnPlan (schemas/__init__.py:21-29)"
   - joined surface = contract ∪ lookup-derived renames, read live from lookup file headers (schemas/joined.py:23-31; missing lookup file FileNotFoundError :19)
   - strict-subset column gate per step (recipe.py:134-141)
   - one_hot sole-step gate (recipe.py:119-128)
@@ -2755,8 +2756,8 @@ gates:
   - tests/test_recipe.py::test_target_encoding_requires_smoothing
   - tests/test_recipe.py::test_normalize_accepts_string_bools
   - tests/test_recipe.py::test_normalize_rejects_non_bool_values
-  - tests/test_decision5_columns.py::test_engineered_requires_features_config
-  - tests/test_decision5_columns.py::test_raw_and_joined_ignore_features_argument
+  - tests/test_decision5_columns.py::test_engineered_requires_a_resolved_plan
+  - tests/test_decision5_columns.py::test_raw_and_joined_ignore_plan_argument
   if_changed:
   - src/broadway/features/recipe.py
   - src/broadway/schemas/__init__.py
@@ -4496,9 +4497,31 @@ gates:
   - project/config/experiment/ overlays
   findings: []
 # --- BAND 81-OBJECT-CUSTODY (minted per slate §0; header law above) ------
+- id: GATE-INFRA-181
+  phase: infra-meta
+  order: 164
+  owner: 'project/features/__init__.py:48 taxi()  # package plan callable resolved by ExperimentConfig.feature_plan'
+  inputs:
+  - DatasetContract (target/datetime/columns) via project.features.load_contract
+  outputs:
+  - ColumnPlan keep-set (14 ops) consumed by the project ML pipeline projection and project/config/experiment/taxi.yaml feature_plan
+  transforms:
+  - 'single keep-set in project.ml_pipeline write order: pickup_hour/dayofweek/month, passenger_count/trip_distance/pickup_location_id/dropoff_location_id, is_weekend/rush_hour/is_night/log_distance/same_borough, route_avg_duration (target) + route_frequency (frequency)'
+  - 'builder_params group_col=Borough lookup_col=Borough_lookup feed same_group; module-level PLAN = taxi(CONTRACT) is the resolved project plan instance'
+  touched_by:
+  - broadway.features.plan(ColumnPlan, ColumnOp)
+  - broadway.config.schema(DatasetContract)
+  validated_by:
+  - tests/test_column_plan.py::test_plan_apply_matches_eligible_surface_for_the_taxi_contract
+  - project/tests/test_ml_pipeline.py::test_transform_matches_pre_change_golden
+  if_changed:
+  - GATE-FEAT-29
+  - GATE-CFG-77
+  - project/config/experiment/taxi.yaml feature_plan reference
+  findings: []
 - id: GATE-CUST-147
   phase: object-custody
-  order: 164
+  order: 165
   owner: 'src/broadway/training/mlflow_utils.py:162 promote_candidate()'
   inputs:
   - 'model_uri + alias="champion"'
@@ -4517,7 +4540,7 @@ gates:
   findings: []
 - id: GATE-CUST-148
   phase: object-custody
-  order: 165
+  order: 166
   owner: 'src/broadway/training/mlflow_utils.py:163 register_model call sites'
   inputs:
   - candidate model_uri + dataset name
@@ -4533,7 +4556,7 @@ gates:
   findings: []
 - id: GATE-CUST-149
   phase: object-custody
-  order: 166
+  order: 167
   owner: 'project/experiments/mlflow/03_optuna_worker.py:111 set_tag trio (model/study/seed) + hpo callback tags + battle writers'
   inputs:
   - every mlflow.set_tag call across the independent writer sites
@@ -4550,7 +4573,7 @@ gates:
   findings: []
 - id: GATE-CUST-150
   phase: object-custody
-  order: 167
+  order: 168
   owner: 'src/broadway/training/mlflow_utils.py:59 set_experiment auto-create chokepoint (inside setup_mlflow :54-63)'
   inputs:
   - experiment_name argument at setup time
@@ -4565,7 +4588,7 @@ gates:
   findings: []
 - id: GATE-CUST-151
   phase: object-custody
-  order: 168
+  order: 169
   owner: 'k8s/optuna/lifecycle.sh:149 dump_state() snapshot generations (keep-N cap) + training-plane registry-prune policy (non-champion versions)'
   inputs:
   - registry versions + $BACKUP_DIR snapshot generations
@@ -4582,7 +4605,7 @@ gates:
   findings: []
 - id: GATE-CUST-152
   phase: object-custody
-  order: 169
+  order: 170
   owner: 'project/experiments/mlflow/03_optuna_worker.py:106 optuna_{model} run-name convention (+ {study} trial {n}, battle names)'
   inputs:
   - every run-name emission across optuna/battle/callback writers

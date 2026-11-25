@@ -243,7 +243,7 @@ def _write_config_tree(tmp_path: Path, preprocessing: list[dict[str, object]]) -
     }
     experiment = {
         "data_source": {"loader": "canonical", "schema_contract": "raw"},
-        "features": {"include": ["a"], "exclude": [], "derived": [], "encodings": []},
+        "feature_plan": "broadway.features.plans:contract_features",
         "model": {"type": "linear", "params": {}},
         "split": {"type": "random", "validation_size": 0.2},
         "random_state": 42,

@@ -33,6 +33,7 @@ from broadway.evaluate.metrics import compute_metrics
 from broadway.evaluate.promotion import should_promote
 from broadway.evaluate.validation import cross_validate, residual_summary
 from broadway.features.generic import validate_engineered_frame
+from broadway.features.plan import ColumnPlan
 from broadway.lineage.ids import node_id
 from broadway.lineage.records import write_record
 from broadway.training.contracts import TrainingResult
@@ -43,9 +44,14 @@ from broadway.training.mlflow_utils import (
     setup_mlflow,
 )
 from broadway.training.trainer import build_model_pipeline
-from broadway.utils import eligible_feature_columns
 
 logger = logging.getLogger(__name__)
+
+
+def _feature_frame(cfg: PipelineConfig, frame: pd.DataFrame) -> pd.DataFrame:
+    """Project a persisted feature frame through the experiment's column plan."""
+    assert cfg.dataset is not None and cfg.experiment is not None
+    return ColumnPlan.from_config(cfg.dataset, cfg.experiment).apply(frame)[0]
 
 
 def _processed_dir(cfg: PipelineConfig) -> Path:
@@ -65,7 +71,7 @@ def _load_val_features(
     val_df = pd.read_parquet(val_path)
     validate_engineered_frame(cfg, val_df)
     assert cfg.dataset is not None
-    return eligible_feature_columns(val_df, cfg), val_df[cfg.dataset.target], val_df
+    return _feature_frame(cfg, val_df), val_df[cfg.dataset.target], val_df
 
 
 def _load_train_features(cfg: PipelineConfig) -> tuple[pd.DataFrame, pd.Series]:
@@ -74,7 +80,7 @@ def _load_train_features(cfg: PipelineConfig) -> tuple[pd.DataFrame, pd.Series]:
     train_df = pd.read_parquet(out_dir / cfg.etl.train_features_file)
     validate_engineered_frame(cfg, train_df)
     assert cfg.dataset is not None
-    return eligible_feature_columns(train_df, cfg), train_df[cfg.dataset.target]
+    return _feature_frame(cfg, train_df), train_df[cfg.dataset.target]
 
 
 def _load_training_result(cfg: PipelineConfig) -> TrainingResult:

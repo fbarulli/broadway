@@ -14,3 +14,22 @@ colsample_bytree: 0.8
 quantile_tail: 0.9
 output_dir: artifacts/training
 output_file: training_result.json
+# Training-size curve: metric vs fraction of the deployed fit slice, run after
+# HPO and the calibration split and BEFORE the full fit. Reports the smallest
+# fraction within the tolerance band — the minimum-data answer. COST: every
+# train run with this block enabled pays one refit per fraction before the
+# full fit (4 extra fits for the fractions below). `repeats` applies to
+# random/stratified draws; a time split always uses one chronological prefix.
+learning_curve:
+  fractions: [0.1, 0.25, 0.5, 1.0]
+  repeats: 3
+  direction: minimize
+  tolerance: 0.02
+  # Absolute floor on the band (metric units); keeps a zero full-data metric
+  # from collapsing the band to exact equality.
+  absolute_tolerance: 0.05
+  # Binary target split for roc_auc/pr_auc; required for classification and
+  # ignored for regression.
+  # metric_threshold: 0.5
+  output_dir: artifacts/training
+  output_file: learning_curve.json

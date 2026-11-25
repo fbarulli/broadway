@@ -4,33 +4,30 @@ import pandas as pd
 import pandera as pa
 from pandera.errors import SchemaError, SchemaErrors
 
-from broadway.config.schema import DatasetContract, FeatureConfig, PipelineConfig
+from broadway.config.schema import DatasetContract, PipelineConfig
 from broadway.contracts.pandera import pandera_dtype
-from broadway.features.builders import builder_dtype
+from broadway.features.plan import ColumnOp, ColumnPlan
 from broadway.features.schema import FeatureSpec
 from broadway.schemas.joined import joined_schema_columns
 
 
-def build_generic_feature_specs(contract: DatasetContract, features: FeatureConfig) -> dict[str, FeatureSpec]:
-    specs: dict[str, FeatureSpec] = {}
-    for col in features.include:
-        if col in contract.columns:
-            col_schema = contract.columns[col]
-            specs[col] = FeatureSpec(name=col, dtype=col_schema.dtype, nullable=col_schema.null_count > 0)
-    for derived in features.derived:
-        specs[derived.name] = FeatureSpec(name=derived.name, dtype=builder_dtype(derived.func))
-    # Encoding emission order mirrors FeaturePipeline.transform's write order:
-    # all frequency encoders run before all target encoders, so the ordered
-    # read-side schema can match a conformant features-step frame.
-    for enc in features.encodings:
-        for col in enc.columns:
-            if enc.type == "frequency":
-                specs[f"{col}_freq_enc"] = FeatureSpec(name=f"{col}_freq_enc", dtype="float64")
-    for enc in features.encodings:
-        for col in enc.columns:
-            if enc.type == "target":
-                specs[f"{col}_target_enc"] = FeatureSpec(name=f"{col}_target_enc", dtype="float64")
-    return specs
+def build_generic_feature_specs(
+    contract: DatasetContract, plan: ColumnPlan
+) -> dict[str, FeatureSpec]:
+    """Feature specs in the plan's declared production order.
+
+    Encoding emission order mirrors ``FeaturePipeline.transform``'s write order
+    (all frequency encoders before all target encoders), so the ordered
+    read-side schema can match a conformant features-step frame.
+    """
+    return {op.name: _spec_for(contract, op) for op in plan.columns}
+
+
+def _spec_for(contract: DatasetContract, op: ColumnOp) -> FeatureSpec:
+    """One spec, with nullability taken from the contract for source columns."""
+    column = contract.columns.get(op.name)
+    nullable = op.op == "source" and column is not None and column.null_count > 0
+    return FeatureSpec(name=op.name, dtype=op.dtype, nullable=nullable)
 
 
 def engineered_schema_for(cfg: PipelineConfig) -> pa.DataFrameSchema:
@@ -46,7 +43,8 @@ def engineered_schema_for(cfg: PipelineConfig) -> pa.DataFrameSchema:
     cannot silently reach training/evaluation.
     """
     assert cfg.dataset is not None and cfg.experiment is not None
-    specs = build_generic_feature_specs(cfg.dataset, cfg.experiment.features)
+    plan = ColumnPlan.from_config(cfg.dataset, cfg.experiment)
+    specs = build_generic_feature_specs(cfg.dataset, plan)
     return pa.DataFrameSchema(
         {
             spec.name: pa.Column(pandera_dtype(spec.dtype), nullable=spec.nullable)
@@ -100,11 +98,8 @@ def _assert_no_extra_columns(cfg: PipelineConfig, df: pd.DataFrame) -> None:
     contract columns ∪ joined-lookup columns ∪ feature specs.
     """
     assert cfg.dataset is not None and cfg.experiment is not None
-    declared = (
-        set(cfg.dataset.columns)
-        | set(joined_schema_columns(cfg.dataset))
-        | set(build_generic_feature_specs(cfg.dataset, cfg.experiment.features))
-    )
+    plan = ColumnPlan.from_config(cfg.dataset, cfg.experiment)
+    declared = set(cfg.dataset.columns) | set(joined_schema_columns(cfg.dataset)) | set(plan.names)
     extra = sorted(set(df.columns) - declared)
     if extra:
         raise SchemaError(

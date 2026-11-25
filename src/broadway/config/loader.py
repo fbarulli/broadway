@@ -143,11 +143,22 @@ def _build_config(merged: dict, step: str) -> PipelineConfig:
         raise ValueError(
             f"step '{step}' requires config section(s) not found: {', '.join(sorted(missing))}"
         )
+    dataset = DatasetContract(**merged["dataset"]) if "dataset" in merged else None
+    experiment = (
+        ExperimentConfig(**merged["experiment"]) if "experiment" in merged else None
+    )
+    if experiment is not None and dataset is not None:
+        # Lazy: the plan module imports the builders registry, which must not
+        # ride along on every loader import. Without a dataset the plan stays
+        # unresolved so each step's missing-config guard fires first.
+        from broadway.features.plan import resolve_plan
+
+        experiment.bind_plan(resolve_plan(experiment.feature_plan, dataset))
     config = PipelineConfig(
         analysis=AnalysisContract(**merged["analysis"]) if "analysis" in merged else None,
-        dataset=DatasetContract(**merged["dataset"]) if "dataset" in merged else None,
+        dataset=dataset,
         environment=EnvironmentConfig(**merged["environment"]),
-        experiment=ExperimentConfig(**merged["experiment"]) if "experiment" in merged else None,
+        experiment=experiment,
         **{step: step_model(**merged["step"])},
     )
     validate_preprocessing_columns(config)

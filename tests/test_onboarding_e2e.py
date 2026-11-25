@@ -42,6 +42,10 @@ def test_init_and_run_external_dataset(
     monkeypatch.setattr(onboard_module, "ARTIFACTS_DIR", tmp_path / "artifacts")
     monkeypatch.setattr(discover_module, "ARTIFACTS_DIR", tmp_path / "artifacts")
     monkeypatch.setattr(records, "LINEAGE_DIR", tmp_path / "lineage")
+    plans_dir = tmp_path / "gen_features"
+    monkeypatch.setattr(onboard_module, "PLANS_DIR", plans_dir)
+    monkeypatch.setattr(onboard_module, "PLAN_PACKAGE", "gen_features")
+    monkeypatch.syspath_prepend(str(tmp_path))
 
     # 2. Write a synthetic external CSV.
     rng = np.random.default_rng(42)
@@ -86,6 +90,7 @@ def test_init_and_run_external_dataset(
     assert (configs_dir / "dataset" / "houses.yaml").exists()
     assert (configs_dir / "analysis" / "houses.yaml").exists()
     assert (configs_dir / "experiment" / "houses.yaml").exists()
+    assert (plans_dir / "houses.py").exists()
 
     # 4. Load the full config and redirect all writes into tmp_path.
     cfg = load_config("full", dataset="houses", analysis="houses", experiment="houses")
@@ -115,6 +120,23 @@ def test_init_and_run_external_dataset(
                     update={"output_dir": str(tmp_path / "artifacts" / dirname)}
                 ),
             )
+            learning_curve = getattr(step_cfg, "learning_curve", None)
+            if learning_curve is not None:
+                setattr(
+                    cfg,
+                    attr,
+                    getattr(cfg, attr).model_copy(
+                        update={
+                            "learning_curve": learning_curve.model_copy(
+                                update={
+                                    "output_dir": str(
+                                        tmp_path / "artifacts" / dirname
+                                    )
+                                }
+                            )
+                        }
+                    ),
+                )
 
     # 5. Run the full flow (discover is skipped inside pipeline.run anyway).
     steps = resolve_full_steps(cfg)

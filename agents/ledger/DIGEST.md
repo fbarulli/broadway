@@ -1,6 +1,6 @@
 # DIGEST.md — rendered from agents/ledger/gates.yaml · NEVER HAND-EDIT ·
 
-> 169 gates · rendered 2026-11-25 @ HEAD 72212b5 · load THIS into context;
+> 170 gates · rendered 2026-11-25 @ HEAD d3935a9 · load THIS into context;
 > gates.yaml is the sole SSOT; the retired GATES.md/gates/*.md markdown world survives in agents/ledger/arbitration/2026-08-24/surface-and-analysis-preservation.md.
 
 | band | phase | gates | findings |
@@ -14,9 +14,9 @@
 | 07-surfaces | surfaces | 13 | 1 |
 | 08-config | config-schema | 17 | 11 |
 | 80-hpo-optuna | hpo-optuna | 10 | 9 |
-| 09-infra | infra-meta | 57 | 17 |
+| 09-infra | infra-meta | 58 | 17 |
 | 81-object-custody | object-custody | 6 | 0 |
-| **total** | | **169** | **84** |
+| **total** | | **170** | **84** |
 
 ### 01-ingest — ingest
 
@@ -87,7 +87,7 @@
 - **GATE-FEAT-28** `src/broadway/utils.py:16 eligible_feature_columns()`
   [engineered frame (post GATE-FEAT-27 validation), PipelineConfig.experiment.data_source.schema_contract, PipelineConfig.dataset.target, PipelineConfig.experiment.preprocessing claims (utils.py:32)] → [model-input matrix X = declared surface ∩ frame − target, FRAME ORDER PRESERVED not sorted (utils.py:33,42 docstring :23); raise sites: missing experiment/dataset ⇒ ValueError (utils.py:26); eligible categorical neither preprocessing-claimed nor numeric ⇒ ValueError with exact pinned message (utils.py:37-41)] · pins: 12
 - **GATE-FEAT-29** `src/broadway/schemas/__init__.py:17 _engineered_schema_columns()  # dispatch at schemas/__init__.py:41 schema_columns()`
-  [cfg.experiment.data_source.schema_contract string, DatasetContract, FeatureConfig|None] → [frozenset declared surface feeding GATE-FEAT-28 (utils.py:27-31) and recipe.validate_preprocessing_columns binding check (recipe.py:129-133); raise sites: 'engineered' without features config ⇒ ValueError (schemas/__init__.py:25-30); unknown schema_contract ⇒ ValueError listing supported modules (schemas/__init__.py:53-57)] · pins: 6
+  [cfg.experiment.data_source.schema_contract string, DatasetContract, ColumnPlan|None (resolved from ExperimentConfig.feature_plan)] → [frozenset declared surface feeding GATE-FEAT-28 (utils.py:27-31) and recipe.validate_preprocessing_columns binding check (recipe.py:129-133); raise sites: 'engineered' without a resolved plan ⇒ ValueError (schemas/__init__.py:21-29); unknown schema_contract ⇒ ValueError listing supported modules (schemas/__init__.py:53-57)] · pins: 6
 
 ### 04-training — training-eval
 
@@ -373,6 +373,8 @@
   [] → [] · pins: none direct
 - **GATE-INFRA-180** `project/config/experiment/taxi.yaml:1 calibration opt-in overlay (split_conformal)`
   [] → [] · pins: none direct
+- **GATE-INFRA-181** `project/features/__init__.py:48 taxi()  # package plan callable resolved by ExperimentConfig.feature_plan`
+  [DatasetContract (target/datetime/columns) via project.features.load_contract] → [ColumnPlan keep-set (14 ops) consumed by the project ML pipeline projection and project/config/experiment/taxi.yaml feature_plan] · pins: 2
 
 ### 81-object-custody — object-custody
 

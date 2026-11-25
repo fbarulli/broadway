@@ -1,20 +1,7 @@
 data_source:
   loader: canonical
   schema_contract: engineered
-features:
-  include:
-    - feature_1
-    - feature_2
-  exclude: []
-  derived:
-    - name: engineered_feature_1
-      func: source_copy
-      source: feature_2
-  encodings:
-    - type: target
-      columns:
-        - feature_3
-      smoothing: 20
+feature_plan: broadway.features.plans:engineered
 model:
   type: linear
   params: {}

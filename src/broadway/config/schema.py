@@ -1,13 +1,24 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Literal
+from pathlib import Path
+from typing import TYPE_CHECKING, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    PrivateAttr,
+    field_validator,
+    model_validator,
+)
 
 from broadway.analysis.contracts import AnalysisContract, AnalysisMode
 from broadway.calibration.contracts import CalibrationConfig
 from broadway.training.models.registry import allowed_params
+
+if TYPE_CHECKING:
+    from broadway.features.plan import ColumnPlan
 
 
 class TaskType(str, Enum):
@@ -84,28 +95,6 @@ class DerivedFeature(BaseModel):
     name: str
     func: str
     source: str
-
-
-class EncodingConfig(BaseModel):
-    type: str
-    columns: list[str]
-    smoothing: int | None
-
-
-class BuilderParams(BaseModel):
-    """Declared inputs for multi-input builders (e.g. ``same_group``).
-    Absent block -> builders keep their generic-column defaults."""
-    group_col: str
-    lookup_col: str
-
-
-class FeatureConfig(BaseModel):
-    include: list[str]
-    exclude: list[str]
-    derived: list[DerivedFeature]
-    encodings: list[EncodingConfig]
-    builder_module: str | None = None
-    builder_params: BuilderParams | None = None
 
 
 class ModelConfig(BaseModel):
@@ -188,7 +177,7 @@ PRE_PARAM_PREFIX = "pre__"
 
 class ExperimentConfig(BaseModel):
     data_source: DataSourceRef
-    features: FeatureConfig
+    feature_plan: str
     model: ModelConfig
     split: SplitConfig
     random_state: int
@@ -196,6 +185,35 @@ class ExperimentConfig(BaseModel):
     hpo: HPOConfig | None = None
     preprocessing: list[PreprocessingStepConfig] = []
     calibration: CalibrationConfig | None = None
+
+    # Resolved by the loader from ``feature_plan`` + the dataset contract.
+    _plan: ColumnPlan | None = PrivateAttr(default=None)
+
+    @field_validator("feature_plan")
+    @classmethod
+    def _validate_plan_reference(cls, value: str) -> str:
+        module, separator, attribute = value.partition(":")
+        if not separator or not module or not attribute:
+            raise ValueError(
+                "feature_plan must be a 'module:callable' reference "
+                f"(e.g. 'broadway.features.plans:baseline'), got {value!r}"
+            )
+        return value
+
+    @property
+    def plan(self) -> ColumnPlan:
+        """The resolved column plan; unbound plans fail loud at the read boundary."""
+        if self._plan is None:
+            raise ValueError(
+                f"experiment feature_plan '{self.feature_plan}' is not resolved — "
+                "load the config through broadway.config.loader (or bind the dataset plan)"
+            )
+        return self._plan
+
+    def bind_plan(self, plan: ColumnPlan) -> ExperimentConfig:
+        """Attach the plan resolved from this experiment's code reference."""
+        self._plan = plan
+        return self
 
     @model_validator(mode="after")
     def _validate_hpo_search_space(self) -> ExperimentConfig:
@@ -277,6 +295,63 @@ class CausalStep(BaseModel):
     output_file: str
 
 
+class LearningCurveConfig(BaseModel):
+    """Training-size curve knobs: metric vs fraction of the training frame.
+
+    ``fractions`` must include 1.0 (the full-data reference). The tolerance
+    band is ``tolerance * |reference|`` with ``absolute_tolerance`` as a floor,
+    so a zero reference does not collapse it to exact equality. ``direction``
+    says which way the metric improves; the minimum-data answer is the
+    smallest fraction inside the band. ``metric_threshold`` is the binary
+    target split used by classification metrics (``roc_auc``/``pr_auc``) and
+    is required for a classification task.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    fractions: list[float]
+    repeats: int = Field(ge=1)
+    direction: Literal["minimize", "maximize"]
+    tolerance: float = Field(ge=0.0)
+    absolute_tolerance: float = Field(ge=0.0)
+    metric_threshold: float | None = None
+    output_dir: str
+    output_file: str
+
+    @field_validator("fractions")
+    @classmethod
+    def _validate_fractions(cls, values: list[float]) -> list[float]:
+        if not values:
+            raise ValueError("learning_curve.fractions must not be empty")
+        if len(set(values)) != len(values):
+            raise ValueError(f"learning_curve.fractions has duplicates: {values}")
+        invalid = [value for value in values if not 0.0 < value <= 1.0]
+        if invalid:
+            raise ValueError(
+                f"learning_curve.fractions must be in (0, 1]; got {invalid}"
+            )
+        if 1.0 not in values:
+            raise ValueError(
+                "learning_curve.fractions must include 1.0 (the full-data reference)"
+            )
+        return values
+
+    @property
+    def output_path(self) -> Path:
+        """JSON result path (``output_dir/output_file``)."""
+        return Path(self.output_dir) / self.output_file
+
+    @property
+    def csv_path(self) -> Path:
+        """CSV table path: same stem as the JSON result."""
+        return self.output_path.with_suffix(".csv")
+
+    @property
+    def png_path(self) -> Path:
+        """PNG plot path: same stem as the JSON result."""
+        return self.output_path.with_suffix(".png")
+
+
 class TrainStep(BaseModel):
     random_state: int
     n_jobs: int
@@ -291,6 +366,7 @@ class TrainStep(BaseModel):
     quantile_tail: float
     output_dir: str
     output_file: str
+    learning_curve: LearningCurveConfig | None = None
 
 
 class EvaluateStep(BaseModel):

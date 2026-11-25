@@ -2,10 +2,14 @@ from __future__ import annotations
 
 import pandas as pd
 
+from broadway.features.generic import build_generic_feature_specs
+from broadway.features.schema import build_engineered_schema
 from broadway.features.transformers import FrequencyEncoding, TargetEncoding
 from project.basic import add_basic_features
 from project.boroughs import add_borough_features, load_zones
-from project.features import ENGINEERED_FEATURES, ENGINEERED_SCHEMA, ROUTE_KEYS, TARGET
+from project.features import CONTRACT, PLAN, ROUTE_KEYS
+
+_ENGINEERED_SCHEMA = build_engineered_schema(build_generic_feature_specs(CONTRACT, PLAN))
 
 
 class FeaturePipeline:
@@ -41,13 +45,13 @@ class FeaturePipeline:
         engineered = self._add_deterministic_features(train_df)
 
         self._route_target_encoder = TargetEncoding(
-            columns=ROUTE_KEYS,
+            columns=list(ROUTE_KEYS),
             smoothing=self.encoding_smoothing,
             feature_name="route_avg_duration",
-        ).fit(engineered, engineered[TARGET])
+        ).fit(engineered, engineered[PLAN.target])
 
         self._route_frequency_encoder = FrequencyEncoding(
-            columns=ROUTE_KEYS,
+            columns=list(ROUTE_KEYS),
             feature_name="route_frequency",
             normalize=False,
         ).fit(engineered)
@@ -81,8 +85,8 @@ class FeaturePipeline:
                 "Row-to-row alignment with the input dataframe can no "
                 "longer be trusted."
             )
-        result = engineered[list(ENGINEERED_FEATURES)]
-        return ENGINEERED_SCHEMA.validate(result)
+        result, _ = PLAN.apply(engineered)
+        return _ENGINEERED_SCHEMA.validate(result)
 
     def fit_transform(self, train_df: pd.DataFrame) -> pd.DataFrame:
         self.fit(train_df)

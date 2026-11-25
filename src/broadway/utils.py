@@ -6,40 +6,21 @@ import numpy as np
 import pandas as pd
 
 from broadway.config.schema import PipelineConfig
-from broadway.schemas import schema_columns
-
-# Decision 5 pin: numeric-category matching over the OBSERVED runtime dtypes
-# ({int32, int64, float64}); object and datetime64 are excluded by the assertion.
-_NUMERIC_CATEGORY_DTYPES = frozenset({"int32", "int64", "float64"})
+from broadway.features.plan import ColumnPlan
 
 
 def eligible_feature_columns(df: pd.DataFrame, cfg: PipelineConfig) -> pd.DataFrame:
-    """Eligible model-input columns: declared feature surface ∩ frame − target.
+    """Eligible model-input columns: the plan's ordered projection.
 
-    The declared surface comes from ``data_source.schema_contract`` (for
-    ``engineered``, resolved through the features config). A categorical
-    eligible column not claimed by a preprocessing step fails loud, naming the
-    column (Decision 5 — dtype-driven selection is retired). Frame column
-    order is preserved, NOT sorted.
+    The plan resolves the declared feature surface from the experiment config
+    (including the categorical-claimed guard) and projects the frame to that
+    ordered surface, excluding the target. This public shim keeps the historical
+    function name/signature while delegating to the single add/drop path.
     """
     if cfg.experiment is None or cfg.dataset is None:
         raise ValueError("eligible_feature_columns requires experiment and dataset config")
-    declared = schema_columns(
-        cfg.experiment.data_source.schema_contract,
-        cfg.dataset,
-        features=cfg.experiment.features,
-    )
-    claimed = {col for step in cfg.experiment.preprocessing for col in step.columns}
-    eligible = [name for name in df.columns if name in declared and name != cfg.dataset.target]
-    for name in eligible:
-        if name in claimed or str(df[name].dtype) in _NUMERIC_CATEGORY_DTYPES:
-            continue
-        raise ValueError(
-            f"categorical column '{name}' has no preprocessing step and no "
-            "numeric-selector fallback applies — add a preprocessing step claiming "
-            "it, or repoint the schema contract so it is not eligible"
-        )
-    return df[eligible]
+    plan = ColumnPlan.from_config(cfg.dataset, cfg.experiment)
+    return plan.apply(df)[0]
 
 
 def require_keys(config: dict, keys: list[str], context: str) -> None:

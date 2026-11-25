@@ -15,12 +15,9 @@ from pandas.testing import assert_frame_equal
 from sklearn.linear_model import LinearRegression
 
 from broadway.config.loader import load_config
-from broadway.config.schema import (
-    FeatureConfig,
-    PipelineConfig,
-    PreprocessingStepConfig,
-)
+from broadway.config.schema import PipelineConfig, PreprocessingStepConfig
 from broadway.evaluate.metrics import compute_metrics
+from broadway.features.plan import ColumnPlan
 from broadway.schemas import schema_columns
 from broadway.utils import eligible_feature_columns
 
@@ -44,11 +41,11 @@ def _cfg(
             PreprocessingStepConfig(**step) for step in (preprocessing or [])
         ],
     }
+    experiment = cfg.experiment.model_copy(update=updates)
     if include is not None:
-        updates["features"] = FeatureConfig(
-            include=include, exclude=[], derived=[], encodings=[]
-        )
-    return cfg.model_copy(update={"experiment": cfg.experiment.model_copy(update=updates)})
+        assert cfg.dataset is not None
+        experiment.bind_plan(ColumnPlan.from_declaration(cfg.dataset, include=include))
+    return cfg.model_copy(update={"experiment": experiment})
 
 
 def _mixed_frame(n: int = 40, seed: int = 42) -> pd.DataFrame:
@@ -163,18 +160,17 @@ def test_datetime64_fires_the_assertion() -> None:
         eligible_feature_columns(df, _cfg(include=["feature_1"]))
 
 
-def test_engineered_requires_features_config() -> None:
+def test_engineered_requires_a_resolved_plan() -> None:
     cfg = load_config("train", dataset="test", experiment="baseline")
     assert cfg.dataset is not None
     with pytest.raises(ValueError, match="'engineered' requires"):
         schema_columns("engineered", cfg.dataset)
 
 
-def test_raw_and_joined_ignore_features_argument() -> None:
+def test_raw_and_joined_ignore_plan_argument() -> None:
     cfg = load_config("train", dataset="test", experiment="baseline")
-    assert cfg.dataset is not None
-    features = FeatureConfig(include=["feature_1"], exclude=[], derived=[], encodings=[])
-    assert schema_columns("raw", cfg.dataset, features=features) == frozenset(
+    assert cfg.dataset is not None and cfg.experiment is not None
+    assert schema_columns("raw", cfg.dataset, plan=cfg.experiment.plan) == frozenset(
         cfg.dataset.columns
     )
 
@@ -182,7 +178,8 @@ def test_raw_and_joined_ignore_features_argument() -> None:
 def _shipped_post_features_frame(cfg: PipelineConfig) -> pd.DataFrame:
     """Synthetic post-features frame shaped by the experiment's own declarations
     (the features step keeps raw columns and appends derived/encoded ones)."""
-    feats = cfg.experiment.features
+    assert cfg.experiment is not None
+    plan = cfg.experiment.plan
     n = 12
     rng = np.random.default_rng(7)
     data: dict[str, object] = {
@@ -190,12 +187,9 @@ def _shipped_post_features_frame(cfg: PipelineConfig) -> pd.DataFrame:
         "feature_2": rng.integers(0, 100, n),
         "feature_3": rng.choice(["A", "B"], n),
     }
-    for derived in feats.derived:
-        data[derived.name] = rng.normal(size=n)
-    for enc in feats.encodings:
-        for col in enc.columns:
-            suffix = "target_enc" if enc.type == "target" else "freq_enc"
-            data[f"{col}_{suffix}"] = rng.normal(size=n)
+    for op in plan.columns:
+        if op.op == "derive" or op.op == "encode":
+            data[op.name] = rng.normal(size=n)
     data["target"] = rng.integers(0, 100, n)
     return pd.DataFrame(data)
 
@@ -215,7 +209,7 @@ def test_shipped_config_passes_and_matches_retired_selector(
     declared = schema_columns(
         cfg.experiment.data_source.schema_contract,
         cfg.dataset,
-        features=cfg.experiment.features,
+        plan=cfg.experiment.plan,
     )
     numeric = set(df.select_dtypes(include="number").columns) - {"target"}
     assert numeric - declared == set()
