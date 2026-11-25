@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import time
 from collections.abc import Mapping
 
 import pandas as pd
@@ -10,6 +9,7 @@ from sklearn.pipeline import Pipeline
 
 from broadway.config.schema import PRE_PARAM_PREFIX, PipelineConfig
 from broadway.features.recipe import build_pipeline
+from broadway.observability.profiling import phase, timed
 from broadway.training.contracts import TrainingResult
 from broadway.training.models.registry import allowed_params, get_model
 
@@ -60,14 +60,14 @@ def train(
         raise ValueError("train requires an experiment config")
     model = build_model_pipeline(cfg, cfg.experiment.model.type, params)
     # DOCUMENTED SILENCE (determinism ledger g): wall-clock timing —
-    # train_time_seconds comes from time.time() and its persist path through
-    # TrainingResult is unverified for byte-stability; stays silent until a
-    # freeze flag (pinned-timer or recorded-metrics contract) exists.
-    start = time.time()
-    model.fit(X_train, y_train)
-    elapsed = time.time() - start
+    # train_time_seconds comes from the profiling seam's clock and its persist
+    # path through TrainingResult is unverified for byte-stability; stays
+    # silent until a freeze flag (pinned-timer or recorded-metrics contract)
+    # exists.
+    with phase("model_fit"), timed() as elapsed:
+        model.fit(X_train, y_train)
     return model, TrainingResult(
         model_type=cfg.experiment.model.type,
         params=params,
-        train_time_seconds=round(elapsed, 3),
+        train_time_seconds=round(elapsed(), 3),
     )

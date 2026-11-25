@@ -6,13 +6,21 @@ Owner: performance law.
 
 Three tiers. A contract names the tiers it touches; silence means tier 1 + tier 2.
 
-- **Tier 1 — mandatory: every pipeline step and public entry point.** `etl`,
-  `features`, `train`, `evaluate`, `inference`, and every CLI step: one record per
-  invocation.
-- **Tier 2 — mandatory: every function containing a loop, IO, parsing, or a
-  dataframe-wide operation.** This is where cost hides.
+- **Tier 1 — pipeline steps only, for now.** Wired for steps that run through
+  `pipeline.run` (`etl`, `contracts`, `features`, `stats`, `causal`, `train`,
+  `evaluate`, `baseline`, `full`): one record per invocation. Direct CLI entry
+  points (`ingest`, `stats`, `walkthrough`, `report`, `discover`, `decide`, …) are
+  **not yet wired** — planned.
+- **Tier 2 — where a step opts in.** Wired only for functions a step wraps with
+  `phase("…")` on the profiling seam; the train step is the first (`load_features`,
+  `split`, `model_fit`, `calibration_fit`, `mlflow_log`, `persist`). Every other
+  loop/IO/frame-wide function is **not yet instrumented** — planned. This is where
+  cost hides.
 - **Tier 3 — opt-in: any function under investigation.** Enabled by the profiler for
   one run; not permanent instrumentation.
+
+The "mandatory" scope above is the target contract, not a statement of current
+coverage: tier 2 is wired incrementally, one measured step at a time.
 
 Not measured: trivial accessors, config validation, one-line helpers, and anything
 with no loop, IO, or frame operation. Instrumenting those adds overhead and noise
@@ -20,9 +28,11 @@ without adding signal — that is a defect under the harness contract.
 
 ## 2. One seam
 
-Exactly one instrumentation module (the profiler seam) provides the context manager
-and decorator. No `time.time()`, `time.perf_counter()`, or ad-hoc timers anywhere
-else in `src/`. A scattered timer is a consolidation finding.
+Exactly one instrumentation module (the profiler seam) provides the context
+managers: `timed()` yields a wall-clock reader, and `phase(name)` records a named
+wall+CPU phase into the active step profile (inert outside one). No `time.time()`,
+`time.perf_counter()`, or ad-hoc timers anywhere else in `src/`. A scattered timer
+is a consolidation finding.
 
 - Disabled by default and never on a production path.
 - Enabled through config/env, not a code edit.
@@ -65,9 +75,12 @@ the profiler overhead. No symbol replaces a number.
 
 ## 7. Enforcement
 
+- Tier 1 is wired at `pipeline.run` only; direct CLI entry points are planned.
+- Tier 2 is wired at explicit `phase()` call sites, not by blanket instrumentation;
+  a new loop/IO added to a measured step carries its own `phase()`.
 - Profile gate over the configured surfaces — **planned, not yet wired**; advisory
   until the first baseline exists, blocking after.
-- Reviewer checks that new loops/IO carry a tier-2 record and that no scattered
-  timer was introduced.
+- Reviewer checks that new loops/IO in a measured step carry a tier-2 record and
+  that no scattered timer was introduced.
 - The harness rule "log timing when time is a concern" is satisfied by this seam,
   not by ad-hoc logging.

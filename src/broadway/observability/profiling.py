@@ -12,7 +12,9 @@ import os
 import resource
 import statistics
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -51,6 +53,73 @@ class ProfileConfig(BaseModel):
         return cls(**data)
 
 
+class PhaseTiming(BaseModel):
+    """Wall and CPU seconds recorded for one named phase of a step."""
+
+    model_config = ConfigDict(frozen=True)
+
+    wall_seconds: float
+    cpu_seconds: float
+
+
+class Phases:
+    """Named phase timings collected during one profiled call.
+
+    Repeated entries for the same name accumulate, so a phase wrapped around
+    separate call sites (both split calls, say) reports their combined cost.
+    """
+
+    def __init__(self) -> None:
+        self.timings: dict[str, PhaseTiming] = {}
+
+    def add(self, name: str, wall_seconds: float, cpu_seconds: float) -> None:
+        """Accumulate one phase observation under ``name``."""
+        prior = self.timings.get(name)
+        self.timings[name] = PhaseTiming(
+            wall_seconds=wall_seconds + (prior.wall_seconds if prior else 0.0),
+            cpu_seconds=cpu_seconds + (prior.cpu_seconds if prior else 0.0),
+        )
+
+
+_PHASES: ContextVar[Phases | None] = ContextVar("broadway_phases", default=None)
+
+
+@contextmanager
+def _collect_into(phases: Phases) -> Iterator[None]:
+    """Bind ``phases`` as the active collector for the enclosed call."""
+    token = _PHASES.set(phases)
+    try:
+        yield
+    finally:
+        _PHASES.reset(token)
+
+
+@contextmanager
+def timed() -> Iterator[Callable[[], float]]:
+    """Yield a callable returning wall seconds elapsed since entry."""
+    start = time.perf_counter()
+    yield lambda: time.perf_counter() - start
+
+
+@contextmanager
+def phase(name: str) -> Iterator[None]:
+    """Record one named phase into the active step profile.
+
+    A no-op outside a profiled call: the seam stays inert on production
+    paths, so instrumenting a function never turns profiling on.
+    """
+    phases = _PHASES.get()
+    if phases is None:
+        yield
+        return
+    cpu_start = time.process_time()
+    wall_start = time.perf_counter()
+    try:
+        yield
+    finally:
+        phases.add(name, time.perf_counter() - wall_start, time.process_time() - cpu_start)
+
+
 class ProfileRecord(BaseModel):
     """One measured step invocation (``artifacts/profiles/<step>.json``)."""
 
@@ -67,6 +136,7 @@ class ProfileRecord(BaseModel):
     runs: int
     dataset: str | None
     created_at: str
+    phases: dict[str, PhaseTiming] = Field(default_factory=dict)
 
 
 def _percentiles(values: list[float]) -> tuple[float, float]:
@@ -107,22 +177,34 @@ class StepProfiler:
         if not self.enabled:
             fn()
             return
-        walls, cpus = self._measure(fn)
-        self._write(self._record(step, dataset, walls, cpus))
+        walls, cpus, phases = self._measure(fn)
+        self._write(self._record(step, dataset, walls, cpus, phases))
 
-    def _measure(self, fn: Callable[[], None]) -> tuple[list[float], list[float]]:
+    def _measure(
+        self, fn: Callable[[], None]
+    ) -> tuple[list[float], list[float], dict[str, PhaseTiming]]:
+        """Time ``fn`` over the configured runs; phases come from the last run."""
         walls: list[float] = []
         cpus: list[float] = []
+        timings: dict[str, PhaseTiming] = {}
         for _ in range(self._config.runs):
+            phases = Phases()
             cpu_start = time.process_time()
             wall_start = time.perf_counter()
-            fn()
+            with _collect_into(phases):
+                fn()
             walls.append(time.perf_counter() - wall_start)
             cpus.append(time.process_time() - cpu_start)
-        return walls, cpus
+            timings = phases.timings
+        return walls, cpus, timings
 
     def _record(
-        self, step: str, dataset: str | None, walls: list[float], cpus: list[float]
+        self,
+        step: str,
+        dataset: str | None,
+        walls: list[float],
+        cpus: list[float],
+        phases: dict[str, PhaseTiming],
     ) -> ProfileRecord:
         wall_p50, wall_p95 = _percentiles(walls)
         return ProfileRecord(
@@ -139,6 +221,7 @@ class StepProfiler:
             runs=self._config.runs,
             dataset=dataset,
             created_at=datetime.now(UTC).isoformat(),
+            phases=phases,
         )
 
     def _write(self, record: ProfileRecord) -> None:
