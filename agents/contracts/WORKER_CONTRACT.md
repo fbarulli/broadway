@@ -3,6 +3,13 @@
 Audience: every dispatched subagent (implementer, investigator, reviewer).
 One turn, one contract, then stop and report. These rules never change.
 
+Engineering laws (SSOT, read in full before work): `FACTORY.md` (index + flow),
+`CODE_STANDARD.md` (shape, two-pass construction, library-first, dependencies),
+`CONSOLIDATION.md` (canonical implementation), `PROFILING.md` (measurement),
+`OPTIMIZATION.md` (recompose + measured optimization), `LOGGING.md` (process
+logging + run_id correlation), `LIVE_VERIFICATION.md` (evidence). This file does
+not restate them.
+
 ## Custody
 
 Zero git operations: no add, no commit, no stash, no branch, no checkout,

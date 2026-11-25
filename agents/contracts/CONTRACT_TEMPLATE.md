@@ -52,12 +52,39 @@ measured. Reviewers re-run the same command (REVIEWER_CONTRACT.md §4).
   any delta beyond the contracted files → halt-and-report.
 - Files NOT listed in the edit list must not change.
 
+## Engineering laws (mandatory — a blank field is an incomplete contract)
+
+- **Library decision** (`CODE_STANDARD.md` §3): name the external library or existing
+  helper used, or state why rungs 1–3 fail and new code is required.
+- **Recompose pass** (`CODE_STANDARD.md` §2): what pass 2 fused or vectorized
+  (traversals, loops, copies, IO), or why the pass-1 code already traverses once.
+  "None" without that evidence is an incomplete contract.
+- **Consolidation check** (`CONSOLIDATION.md`): name the canonical owner of every new
+  behavior and the existing implementation searched. A near-duplicate fails review.
+- **Profile budget** (`PROFILING.md`): tiers touched, metric, budget value, artifact
+  path. No budget is written as an explicit waiver naming the cost — never left blank.
+- **Optimization evidence** (`OPTIMIZATION.md`): baseline profile path, hot path
+  `file:line`, the change, and the before/after p50/p95; or "within budget, no
+  optimization attempted".
+- **Logging impact** (`LOGGING.md`): new/changed log lines and their level, or
+  "none"; no `print` in library code; the `run_id` correlation path for the run.
+- **Dependency impact** (`CODE_STANDARD.md` §4): new/removed dependency, its registry
+  row in `configs/dependencies.yaml`, owner, scope, and adapter seam.
+- **Live-data check** (`LIVE_VERIFICATION.md` §3): for artifact-producing changes,
+  dataset, row count, command, and the metric/artifact to compare. L1-only acceptance
+  is allowed only for pure functions.
+
 ## Acceptance checks (evidence format)
 
 Numbered; each is an exact command + expected result + what the worker pastes
 back (exit codes, counts, diffs, git status). Prefer structural checks over
 substring greps when the artifact is structured (e.g. for HTML: assert the JS
 sits between `<script>` tags, not merely that its text appears somewhere).
+At least one check must execute the live-data command from the row above and
+compare an artifact (§3 evidence pack) — a suite of unit checks alone does not
+satisfy the contract for artifact-producing changes. When pass 2 changes a hot
+path, one check must also compare the optimized artifact against the pass-1
+result within the declared tolerance (`OPTIMIZATION.md` §6).
 
 ## Commit (main agent ONLY) — workers never touch git
 

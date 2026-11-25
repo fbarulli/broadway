@@ -2,6 +2,24 @@
 
 Single source of truth for gates is `scripts/run_local_ci.sh`. `.github/workflows/ci.yml` calls that script — never edit the gate list in YAML.
 
+## Engineering laws (read before writing code)
+
+The software-factory laws are SSOT docs in `agents/contracts/` — one law per file,
+referenced by `agents/contracts/FACTORY.md`:
+
+| doc | owns |
+|---|---|
+| `FACTORY.md` | stations, roles, handoffs, definition of done |
+| `CODE_STANDARD.md` | code shape, two-pass construction, library-first ladder, dependency policy |
+| `CONSOLIDATION.md` | one canonical implementation per behavior |
+| `PROFILING.md` | measurement tiers, budgets, profile gate |
+| `OPTIMIZATION.md` | recomposition, vectorization, measured optimization loop |
+| `LOGGING.md` | one setup per process, config level, run correlation |
+| `LIVE_VERIFICATION.md` | evidence on real data |
+
+Every dispatch contract fills the matching sections of `agents/contracts/CONTRACT_TEMPLATE.md`.
+A law doc wins over this file; nothing restates a law outside its owner.
+
 ## 1. Make changes
 
 - Branch model: `main` (frozen platform) / `taxi` (active line) / feature branches like `time` (branched from `taxi`). Merge back into `taxi` when done.
