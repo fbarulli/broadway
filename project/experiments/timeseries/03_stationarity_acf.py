@@ -75,12 +75,12 @@ def main() -> None:
     # plt.subplots is untyped (partially unknown): pin the boundary to Any once.
     subplots: Any = plt.subplots(2, 1, figsize=(14, 8), constrained_layout=True)
     figure, axes = subplots
-    for axis, values, max_lag, unit in (
-        (axes[0], hourly_acf, MAX_HOURLY_LAG, "hours"),
-        (axes[1], daily_acf, MAX_DAILY_LAG, "days"),
+    for axis, values, unit, n in (
+        (axes[0], hourly_acf, "hours", len(hourly)),
+        (axes[1], daily_acf, "days", len(daily)),
     ):
         axis.stem(list(range(len(values))), values, linefmt="#2563eb", markerfmt=" ")
-        band = 1.96 / (len(values) ** 0.5)
+        band = 1.96 / (n ** 0.5)
         axis.axhspan(-band, band, color="grey", alpha=0.2)
         axis.set(title=f"ACF of trips ({unit})", xlabel="lag", ylabel="autocorrelation")
     figure.savefig(RESULTS / f"{stem}.png", dpi=160)
