@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import shlex
+import subprocess
 import sys
 import time
 import types
@@ -35,6 +37,9 @@ hpo_study = _load("hpo_study", "gpu_training/hpo_study.py")
 memory_probe = _load("gpu_training.memory_probe", "gpu_training/memory_probe.py")
 run_hpo = _load("gpu_training.run_hpo", "gpu_training/run_hpo.py")
 hpo_kernel = _load("gpu_training.hpo_kernel", "gpu_training/hpo_kernel.py")
+gluonts_step = _load("gpu_training.gluonts_step", "gpu_training/adapters/gluonts_step.py")
+timesfm_step = _load("gpu_training.timesfm_step", "gpu_training/adapters/timesfm_step.py")
+prophet_step = _load("gpu_training.prophet_step", "gpu_training/adapters/prophet_step.py")
 
 STUDY_CONFIG = _ROOT / "gpu_training/config/hpo_kernel.yaml"
 KAGGLE_PROFILE = _ROOT / "gpu_training/config/hpo_run_kaggle.yaml"
@@ -148,9 +153,7 @@ def _taxi_fixture(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
                 "dropoff_location_id": pa.array([1, 2, 3], type=pa.int32()),
                 "fare_amount": pa.array([10.0, 20.0, 30.0], type=pa.float64()),
                 "passenger_count": pa.array([1.0, 2.0, 1.0], type=pa.float64()),
-                "pickup_datetime": pa.array(
-                    [0, 86_400, 172_800], type=pa.timestamp("ns")
-                ),
+                "pickup_datetime": pa.array([0, 86_400, 172_800], type=pa.timestamp("ns")),
                 "pickup_location_id": pa.array([1, 2, 3], type=pa.int32()),
                 "trip_distance": pa.array([1.0, 2.0, 3.0], type=pa.float64()),
                 "trip_duration_minutes": pa.array([5.0, 10.0, 15.0], type=pa.float64()),
@@ -185,8 +188,7 @@ def _fake_objective_module(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> s
     """Hermetic adapter: `build(study) -> objective`, no data, no torch."""
     module = tmp_path / "fake_objective.py"
     module.write_text(
-        "def build(study):\n"
-        "    return lambda params, trial=None: float(sum(params.values()))\n",
+        "def build(study):\n    return lambda params, trial=None: float(sum(params.values()))\n",
         encoding="utf-8",
     )
     monkeypatch.syspath_prepend(str(tmp_path))
@@ -307,9 +309,9 @@ def test_kernel_boundary_accepts_the_launcher_rendered_command(
     assert invocation.objective == config.objective
     assert invocation.storage == secret
     # The study identity (model, space, dataset) travels through --config.
-    assert hpo_study.HpoStudyConfig.from_yaml(invocation.config) == hpo_study.HpoStudyConfig.from_yaml(
-        STUDY_CONFIG
-    )
+    assert hpo_study.HpoStudyConfig.from_yaml(
+        invocation.config
+    ) == hpo_study.HpoStudyConfig.from_yaml(STUDY_CONFIG)
 
 
 def test_per_worker_seeds_never_share_a_cold_start(
@@ -369,6 +371,185 @@ def test_per_worker_seeds_never_share_a_cold_start(
     assert record["study"] == f"hpo-{study.model}"
     assert record["dataset"]["rows"] == 3
     assert record["storage"] == "config"  # local SQLite fallback, no URL printed
+
+
+def test_parallel_workers_share_a_fresh_sqlite_study(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # A fresh host-local study: both workers race the schema creation. Before the
+    # inter-process lock, one worker died with "table study_directions already exists".
+    _taxi_fixture(tmp_path, monkeypatch)
+    study_config = _study_config(tmp_path)
+    objective = _fake_objective_module(tmp_path, monkeypatch)
+    environment = {
+        **os.environ,
+        "PYTHONPATH": os.pathsep.join(
+            [str(tmp_path), str(_ROOT / "gpu_training"), os.environ.get("PYTHONPATH", "")]
+        ),
+    }
+    processes = [
+        subprocess.Popen(
+            [
+                sys.executable,
+                str(_ROOT / "gpu_training/hpo_kernel.py"),
+                "--config",
+                str(study_config),
+                "--n-trials",
+                "2",
+                "--micro-batch",
+                "8",
+                "--worker",
+                str(worker),
+                "--seed",
+                "1729",
+                "--objective",
+                objective,
+            ],
+            env=environment,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        for worker in (0, 1)
+    ]
+    outputs = [(process.wait(), process.communicate()) for process in processes]
+    for code, (stdout, stderr) in outputs:
+        assert code == 0, stderr
+        assert json.loads(stdout)["n_trials"] == 2
+    assert {json.loads(stdout)["worker"] for _, (stdout, _) in outputs} == {0, 1}
+
+
+class _FakeTensor:
+    def mean(self) -> _FakeTensor:
+        return self
+
+    def __add__(self, other: object) -> _FakeTensor:
+        return self
+
+    def backward(self) -> None:
+        return None
+
+
+class _FakeOptimizer:
+    def step(self) -> None:
+        return None
+
+
+def _fake_torch() -> types.ModuleType:
+    torch = types.ModuleType("torch")
+    torch.float32 = "float32"
+    torch.float16 = "float16"
+    torch.bfloat16 = "bfloat16"
+    torch.bool = "bool"
+    torch.randn = lambda *args, **kwargs: _FakeTensor()
+    torch.ones = lambda *args, **kwargs: _FakeTensor()
+    torch.zeros = lambda *args, **kwargs: _FakeTensor()
+    torch.optim = types.SimpleNamespace(Adam=lambda parameters, lr: _FakeOptimizer())
+    return torch
+
+
+def _install(monkeypatch: pytest.MonkeyPatch, name: str, module: types.ModuleType) -> None:
+    """Register a fake module and every parent package so ``from a.b.c import d`` resolves."""
+    parts = name.split(".")
+    for index in range(1, len(parts)):
+        parent = ".".join(parts[:index])
+        package = types.ModuleType(parent)
+        package.__path__ = []  # type: ignore[attr-defined]
+        monkeypatch.setitem(sys.modules, parent, package)
+    monkeypatch.setitem(sys.modules, name, module)
+
+
+def test_gluonts_step_needs_the_package_and_runs_one_step(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setitem(sys.modules, "gluonts", None)
+    with pytest.raises(ImportError, match="gluonts\\[torch\\]"):
+        gluonts_step.step(2, 8, "cpu", "fp32")
+
+    model_module = types.ModuleType("gluonts.torch.model.simple_feedforward.module")
+
+    class _Model:
+        def __init__(self, **kwargs: int) -> None:
+            self.kwargs = kwargs
+
+        def to(self, **kwargs: str) -> _Model:
+            return self
+
+        def parameters(self) -> list[object]:
+            return [types.SimpleNamespace(numel=lambda: 11)]
+
+        def loss(self, **kwargs: object) -> _FakeTensor:
+            return _FakeTensor()
+
+    model_module.SimpleFeedForwardModel = _Model
+    for name in (
+        "gluonts",
+        "gluonts.torch",
+        "gluonts.torch.model",
+        "gluonts.torch.model.simple_feedforward",
+    ):
+        _install(monkeypatch, name, types.ModuleType(name))
+    _install(monkeypatch, "gluonts.torch.model.simple_feedforward.module", model_module)
+    monkeypatch.setitem(sys.modules, "torch", _fake_torch())
+    assert gluonts_step.step(2, 8, "cpu", "fp32") == 11
+
+
+def test_timesfm_step_needs_the_package_and_runs_one_step(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setitem(sys.modules, "timesfm", None)
+    with pytest.raises(ImportError, match="timesfm\\[torch\\]"):
+        timesfm_step.step(1, 32, "cpu", "fp32")
+
+    module = types.ModuleType("timesfm.timesfm_2p5.timesfm_2p5_torch")
+
+    class _Model:
+        p = 8
+
+        def to(self, **kwargs: str) -> _Model:
+            return self
+
+        def parameters(self) -> list[object]:
+            return [types.SimpleNamespace(numel=lambda: 7)]
+
+        def __call__(self, inputs: object, masks: object) -> tuple[tuple[object, ...], None]:
+            return (None, None, _FakeTensor(), _FakeTensor()), None
+
+    module.TimesFM_2p5_200M_torch_module = _Model
+    for name in ("timesfm", "timesfm.timesfm_2p5"):
+        _install(monkeypatch, name, types.ModuleType(name))
+    _install(monkeypatch, "timesfm.timesfm_2p5.timesfm_2p5_torch", module)
+    monkeypatch.setitem(sys.modules, "torch", _fake_torch())
+    assert timesfm_step.step(1, 32, "cpu", "fp32") == 7
+
+
+def test_prophet_step_needs_the_package_runs_a_cpu_fit_and_refuses_a_gpu(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setitem(sys.modules, "prophet", None)
+    with pytest.raises(ImportError, match="pip install prophet"):
+        prophet_step.step(1, 10, "cpu", "fp32")
+
+    numpy = types.ModuleType("numpy")
+    numpy.random = types.SimpleNamespace(
+        default_rng=lambda seed: types.SimpleNamespace(normal=lambda size: [0.0] * size)
+    )
+    pandas = types.ModuleType("pandas")
+    pandas.date_range = lambda *args, **kwargs: []
+    pandas.DataFrame = lambda data: data
+    prophet = types.ModuleType("prophet")
+
+    class _Prophet:
+        def fit(self, frame: object) -> _Prophet:
+            return self
+
+    prophet.Prophet = _Prophet
+    for name, module in (("numpy", numpy), ("pandas", pandas), ("prophet", prophet)):
+        _install(monkeypatch, name, module)
+
+    with pytest.raises(ValueError, match="CPU-only"):
+        prophet_step.step(1, 10, "cuda", "fp32")
+    assert prophet_step.step(1, 10, "cpu", "fp32") is None
 
 
 def test_preflight_requires_the_declared_dataset(

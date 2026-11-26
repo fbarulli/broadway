@@ -9,9 +9,11 @@ preflight) and every worker (search space + run record) read this one file.
 
 from __future__ import annotations
 
+import fcntl
 from pathlib import Path
 from typing import Any
 
+import optuna
 import yaml
 from pyarrow import parquet as pq
 from pydantic import BaseModel, ConfigDict
@@ -47,6 +49,34 @@ def _absolute_sqlite(url: str) -> str:
     if database == Path(":memory:") or database.is_absolute():
         return url
     return str(parsed.set(database=str(REPO_ROOT / database)))
+
+
+class SharedStudyStorage:
+    """Create a host-local study's schema once, even when its workers start together.
+
+    Two workers on a fresh SQLite study construct ``RDBStorage`` in the same
+    instant; SQLAlchemy's ``create_all`` checks-then-creates, so one loses with
+    ``table ... already exists`` and its whole budget dies before trial one. The
+    schema creation is serialized with an inter-process file lock beside the
+    database; the trials themselves stay concurrent afterwards.
+    """
+
+    @classmethod
+    def prepare(cls, url: str) -> None:
+        """Warm a SQLite study under a lock; a shared server owns its own DDL."""
+        parsed = make_url(url)
+        if parsed.get_backend_name() != "sqlite" or not parsed.database:
+            return
+        database = Path(parsed.database)
+        if database == Path(":memory:"):
+            return  # per-process memory DB: no other worker can share it
+        database.parent.mkdir(parents=True, exist_ok=True)
+        with open(database.with_name(f"{database.name}.lock"), "a", encoding="utf-8") as handle:
+            fcntl.flock(handle, fcntl.LOCK_EX)
+            try:
+                optuna.storages.RDBStorage(url=url).engine.dispose()
+            finally:
+                fcntl.flock(handle, fcntl.LOCK_UN)
 
 
 class DatasetIdentity(BaseModel):

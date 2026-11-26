@@ -28,7 +28,10 @@ Our models:
   (`hpo_run.yaml`, `hpo_run_kaggle.yaml`). SSOT; no values in code.
 - `adapters/` — the adapter contract; `cpu_smoke.py` is the probe's reference
   implementation and `taxi.py` is the real HPO objective for this project's
-  taxi dataset. Add one adapter per model (`gluonts`, `timesfm`, `prophet`).
+  taxi dataset. Probe adapters: `gluonts_step.py` (GluonTS SimpleFeedForward),
+  `timesfm_step.py` (TimesFM 2.5 200M torch module, no checkpoint download) and
+  `prophet_step.py` (CPU-only). Each imports its vendor package lazily and fails
+  loud with the install hint when it is absent — never a made-up number.
 
 
 ## The memory question
@@ -140,7 +143,10 @@ makes every worker draw the same cold-start sequence (`constant_liar` only
 guards observed points), which halves a parallel budget on duplicates — a real
 2xT4 run did exactly that. Storage resolves `--storage` → the study config's
 env var → the local SQLite study, so a host without a shared URL still runs one
-study. The URL is never printed and a traceback is scrubbed; every error exits
+study. On a fresh SQLite study the workers' schema creation is serialized with
+an inter-process lock (`SharedStudyStorage.prepare`); without it, two cold
+workers race `create_all` and one dies with `table ... already exists` before
+its first trial. The URL is never printed and a traceback is scrubbed; every error exits
 non-zero with a full traceback. The worker prints one JSON run record (study,
 model, worker, sampler seed, trial count, dataset path/rows/schema contract,
 best value/params, elapsed seconds).
@@ -179,18 +185,24 @@ python gpu_training/run_hpo.py \
 
 Transport for a live Kaggle run (the lane ships no Kaggle client on purpose):
 
-1. Upload the parquet as a private dataset once —
-   `kaggle datasets create -p <dir-with-training_data.parquet+dataset-metadata.json>`
-   (or `kaggle datasets version -p <dir> -m "..."`). Credentials come from
-   `/home/opc/ONE/.env` (`KAGGLE_USERNAME`, `KAGGLE_API_KEY`) via the documented
+1. Package `repo/` (this directory + `src/broadway` + `configs` + `project/config`
+   and `project/features`) and `data/training_data.parquet` into ONE tarball, and
+   upload it as a private dataset with a `dataset-metadata.json`
+   (`kaggle datasets create -p <dir>`, or `kaggle datasets version -p <dir> -m "..."`).
+   Kaggle extracts the tarball server-side, so the mount holds `repo/` and
+   `data/training_data.parquet`. Credentials come from `/home/opc/ONE/.env`
+   (`KAGGLE_USERNAME`, `KAGGLE_API_KEY`) via the documented
    `set -a; . /home/opc/ONE/.env; set +a`; never print or commit them.
-2. In the GPU kernel, attach that dataset and put the file where the dataset
-   config declares it (`data/processed/training_data.parquet`), or point the
-   config overlay (`BROADWAY_CONFIG_OVERLAY_DIR=<dir>` with `dataset/taxi.yaml`
-   + `experiment/taxi.yaml` whose `path` is the `/kaggle/input/...` mount).
-3. Run the lane in the kernel (repo root, project installed):
-   `python gpu_training/run_hpo.py --baseline <baseline>.json --config gpu_training/config/hpo_run_kaggle.yaml --execute`
-4. Fetch `artifacts/gpu_training/hpo_study.db` (the study) and the worker logs.
+2. In the GPU kernel, copy the mounted `repo/` to `/kaggle/working/repo` and
+   symlink the mounted parquet to `repo/data/processed/training_data.parquet`
+   (the dataset config's declared path), so every declared path resolves.
+3. Run the probe, then the lane, from the copied repo:
+   `python gpu_training/memory_probe.py --config gpu_training/config/memory_probe.yaml --device cuda --step adapters.timesfm_step:step`
+   and
+   `python gpu_training/run_hpo.py --baseline <baseline>.json --config gpu_training/config/hpo_run_kaggle.yaml --execute`.
+4. Fetch `artifacts/gpu_training/` (the study DB, probe baselines, worker logs):
+   `kaggle kernels output <owner>/<kernel> -p <dir>`; the console is
+   `kaggle kernels logs <owner>/<kernel>`.
 
 ## Transport
 

@@ -32,7 +32,7 @@ from pathlib import Path
 from typing import Any
 
 import optuna
-from hpo_study import DatasetIdentity, HpoStudyConfig
+from hpo_study import DatasetIdentity, HpoStudyConfig, SharedStudyStorage
 from lane_contract import resolve_callable
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -90,18 +90,6 @@ def _storage_target(invocation: WorkerInvocation, study: HpoStudyConfig) -> tupl
     return study.local_storage_url, "config"
 
 
-def _prepare_local_storage(url: str) -> None:
-    """SQLite cannot create a missing parent directory; make it for the local study."""
-    from sqlalchemy.engine import make_url
-
-    parsed = make_url(url)
-    if parsed.get_backend_name() != "sqlite" or not parsed.database:
-        return
-    database = Path(parsed.database)
-    if database != Path(":memory:"):
-        database.parent.mkdir(parents=True, exist_ok=True)
-
-
 def _redact(trace: str, secret: str) -> str:
     """Scrub the storage URL out of a traceback before it reaches stderr."""
     return trace.replace(secret, REDACTED) if secret else trace
@@ -141,7 +129,7 @@ class HpoWorker:
         adapter = resolve_callable(invocation.objective, "objective")(study.model_dump())
         if not callable(adapter):
             raise TypeError(f"objective factory {invocation.objective!r} returned {type(adapter)}")
-        _prepare_local_storage(storage_url)
+        SharedStudyStorage.prepare(storage_url)
         return cls(
             invocation=invocation,
             study=study,
