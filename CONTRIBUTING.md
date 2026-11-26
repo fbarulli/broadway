@@ -59,7 +59,7 @@ Coverage floor: ≥95% on `src/broadway` (enforced in the script, not in ad-hoc 
 
 Triggers on push/PR to `main`, `taxi`, `sklearn`; `**/*.md` pushes skip CI. Concurrent runs on the same ref cancel in-flight ones.
 
-- `platform` job: install (`uv sync --all-extras --frozen`) → `run_local_ci.sh` (SSOT) → shellcheck → kubeconform manifests → orchestrator dry-run → taxi-only `project/experiments.py verify`.
+- `platform` job: install (`uv sync --all-extras --locked`) → `run_local_ci.sh` (SSOT) → shellcheck → kubeconform manifests → orchestrator dry-run → taxi-only `project/experiments.py verify`.
 - `build-and-boot` job: builds docker images (worker/mlflow/platform/postgres), runs import/CLI/config boot checks. No cluster, never trains. Workload images skip loudly on project-less lines.
 - `cd` job (push to `main`/`taxi` only): ships bit-for-bit the tested images to GHCR — `:sha` always, plus `:latest` (main) or `:taxi` (taxi). PRs deploy nothing.
 
