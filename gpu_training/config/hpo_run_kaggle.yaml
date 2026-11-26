@@ -1,0 +1,18 @@
+# Kaggle 2xT4 hardware profile — extends the fan-out profile; only hardware deltas.
+#
+# Measured on the 2026-11-25 Kaggle 2xT4 run (hardware measurement, NOT taxi-model
+# numbers): one patched trial peaked at 10 699 MiB on a 15 360 MiB Tesla T4, so two
+# co-tenant trials on one card OOM. Hence exactly one trial per GPU here; the taxi
+# HPO in this profile has no GPU footprint measurement of its own (see README).
+#
+# Everything else — command, seed, objective adapter, storage env, and the study
+# config that owns the budget/search space/dataset — is inherited from
+# hpo_run.yaml (declared once).
+extends: hpo_run.yaml
+
+gpus: [0, 1]
+mps_slots_per_gpu: 1
+
+# No shared Optuna URL on Kaggle (the 2026-11-25 run had none either): both
+# workers share the study config's local SQLite study in the kernel working dir.
+storage_required: false

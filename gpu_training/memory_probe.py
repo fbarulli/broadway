@@ -14,7 +14,6 @@ No threshold or path is coded here: everything comes from the config (SSOT).
 from __future__ import annotations
 
 import argparse
-import importlib
 import json
 import math
 import resource
@@ -22,9 +21,10 @@ import sys
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 import yaml
+from lane_contract import resolve_callable
 from pydantic import BaseModel, ConfigDict, Field
 
 StepFn = Callable[[int, int, str, str], int | None]
@@ -251,14 +251,7 @@ class MemoryProbe:
 
 
 def _resolve_step(spec: str) -> StepFn:
-    module_name, _, function_name = spec.partition(":")
-    if not module_name or not function_name:
-        raise ValueError(f"step must be 'module:function', got {spec!r}")
-    module = importlib.import_module(module_name)
-    function = getattr(module, function_name)
-    if not callable(function):
-        raise TypeError(f"step {spec!r} is not callable")
-    return function
+    return cast(StepFn, resolve_callable(spec, "step"))
 
 
 def _write(baseline: Baseline, output: str) -> Path:

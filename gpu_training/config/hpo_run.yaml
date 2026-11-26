@@ -1,17 +1,25 @@
-# HPO fan-out config (SSOT). No study name, budget, or storage URL in code.
+# HPO fan-out profile (SSOT). No study name, budget, seed, or storage URL in code.
 #
-# Replace with the model HPO kernel once the per-model measurements land.
-command: "python gpu_training/hpo_kernel.py --study {study} --storage {storage} --n-trials {n_trials} --micro-batch {micro_batch} --worker {worker}"
+# The study itself — model, search space, direction, metric, budget, dataset,
+# experiment, storage policy — lives in the study config below. The project HPO
+# spec (hpo_spec there) owns the search space and the budget; no profile invents
+# either.
+command: "python gpu_training/hpo_kernel.py --config {kernel_config} --n-trials {n_trials} --micro-batch {micro_batch} --worker {worker} --seed {seed} --objective {objective} --storage {storage}"
+kernel_config: hpo_kernel.yaml
 
-n_trials: 10
-study: taxi_demand
+# Run seed. Each worker derives its sampler seed as seed + worker, so parallel
+# cold starts never draw the same TPE startup sequence.
+seed: 1729
+
+# The adapter factory: build(study) -> objective(params, trial) -> float.
+objective: adapters.taxi:build
+
 # Env var that holds the shared Optuna URL; never a file or a literal.
 storage_env: OPTUNA_STORAGE_URL
 
 # GPU ids visible to the launcher (one worker per MPS slot).
-# Kaggle 2xT4 (measured 1 trial/GPU): gpus: [0, 1], mps_slots_per_gpu: 1.
 # One T4 with MPS slots: gpus: [0], mps_slots_per_gpu: 2 — only if the measured
-# per-trial footprint fits twice (10.7 GB x 2 does NOT fit 15.6 GB).
+# per-trial footprint fits twice. The Kaggle 2xT4 profile overrides this block.
 gpus: [0]
 mps_slots_per_gpu: 2
 

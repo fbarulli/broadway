@@ -1,0 +1,23 @@
+# Study definition (SSOT): what is searched, on which data, and where it persists.
+#
+# The search space, direction, target metric and trial budget are NOT here: the
+# project HPO spec owns them, so the bandit orchestrator, the k8s per-model
+# worker and this lane all read one set of dials.
+hpo_spec: project/config/experiments/mlflow.yaml
+model: lgbm
+
+# Project config names the objective adapter resolves: the dataset contract owns
+# the parquet path, target, datetime and feature columns; the experiment owns the
+# split. The launcher preflights both before any worker starts.
+dataset: taxi
+experiment: taxi
+
+# The measured micro-batch reaches the objective under this name (the trainer's
+# own argument). Null for models without a batch dial — tabular models have none.
+micro_batch_param: null
+
+# Shared study URL (secret) comes from this env var when it is set...
+storage_env: OPTUNA_STORAGE_URL
+# ...otherwise the worker falls back to this local SQLite study. All workers on
+# one host share the same file, which is what the 2xT4 run relied on.
+local_storage_url: sqlite:///artifacts/gpu_training/hpo_study.db
