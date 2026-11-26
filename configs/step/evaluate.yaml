@@ -6,3 +6,23 @@ coverage_tolerance: 0.05
 min_period_rows: 100
 output_dir: artifacts/evaluation
 output_file: metrics.json
+# Error analysis ("where the model fails"): every holdout row is tracked with
+# its truth, prediction, residual and segment columns. Paths live here, never
+# as code literals.
+error_analysis:
+  ledger_file: errors.parquet
+  thresholds_file: thresholds.json
+  # Names must exist in the experiment's ColumnPlan; empty carries the whole
+  # plan into the ledger (the plan is the keep-set, never a code-side list).
+  segment_columns: []
+# Opt-in binary framing over a regression target: `threshold` is the truth
+# event (a row is positive when its value reaches it); the grid samples
+# candidate model cutoffs for the configured objective. Delete this block to
+# evaluate regression-only — the ledger still ships, thresholds.json does not.
+decision:
+  threshold: 15.0
+  objective: f1
+  grid:
+    min: 5.0
+    max: 60.0
+    steps: 12

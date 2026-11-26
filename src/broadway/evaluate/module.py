@@ -28,14 +28,21 @@ from broadway.calibration.contracts import (
 from broadway.calibration.metrics import coverage, coverage_by_period, mean_width
 from broadway.config.schema import PipelineConfig
 from broadway.evaluate.comparison import compare_models
-from broadway.evaluate.contracts import BaselineComparison, EvaluationResult
-from broadway.evaluate.metrics import compute_metrics
+from broadway.evaluate.contracts import (
+    BaselineComparison,
+    DecisionConfig,
+    DecisionReport,
+    ErrorAnalysisConfig,
+    EvaluationResult,
+)
+from broadway.evaluate.metrics import compute_metrics, tune_threshold
 from broadway.evaluate.promotion import should_promote
 from broadway.evaluate.validation import cross_validate, residual_summary
 from broadway.features.generic import validate_engineered_frame
 from broadway.features.plan import ColumnPlan
 from broadway.lineage.ids import node_id
 from broadway.lineage.records import write_record
+from broadway.observability.profiling import timed
 from broadway.training.contracts import TrainingResult
 from broadway.training.mlflow_utils import (
     get_champion,
@@ -177,6 +184,128 @@ def _persist_calibration(
     )
 
 
+class HoldoutErrorAnalysis:
+    """Per-row holdout error ledger, plus the declared binary-decision report.
+
+    The ledger always carries ``y_true``, ``y_pred``, ``residual`` (prediction
+    minus truth, this codebase's residual sign), ``abs_error`` and the segment
+    columns. Segment columns are the configured names validated against the
+    experiment's ColumnPlan, or the whole plan when none are configured — the
+    code never carries a column-name literal. ``thresholds.<json>`` is written
+    only for a configured ``decision`` block; without one no cutoff is invented.
+    """
+
+    def __init__(
+        self,
+        config: ErrorAnalysisConfig,
+        decision: DecisionConfig | None,
+        plan: ColumnPlan,
+        target: str,
+    ) -> None:
+        if decision is not None and decision.column is not None and decision.column != target:
+            raise ValueError(
+                f"decision column '{decision.column}' is not the scored target '{target}'"
+            )
+        self._config = config
+        self._decision = decision
+        self._plan = plan
+        self._target = target
+
+    @classmethod
+    def from_config(cls, cfg: PipelineConfig) -> HoldoutErrorAnalysis:
+        if cfg.dataset is None or cfg.experiment is None or cfg.evaluate is None:
+            raise ValueError("error analysis requires dataset, experiment, and evaluate config")
+        return cls(
+            cfg.evaluate.error_analysis,
+            cfg.evaluate.decision,
+            ColumnPlan.from_config(cfg.dataset, cfg.experiment),
+            cfg.dataset.target,
+        )
+
+    def write(
+        self,
+        eval_dir: Path,
+        features: pd.DataFrame,
+        y_true: np.ndarray,
+        y_pred: np.ndarray,
+    ) -> None:
+        with timed() as elapsed:
+            try:
+                ledger_path = self._write_ledger(eval_dir, features, y_true, y_pred)
+                report = self._write_thresholds(eval_dir, y_true, y_pred)
+            except Exception:
+                logger.exception("evaluate: error analysis failed")
+                raise
+        tuned = (
+            f", tuned threshold {report.chosen_threshold} -> {self._config.thresholds_file}"
+            if report is not None
+            else ""
+        )
+        logger.info(
+            "evaluate: error analysis wrote %d holdout rows -> %s in %.3fs%s",
+            len(y_true),
+            ledger_path.name,
+            elapsed(),
+            tuned,
+        )
+
+    def _segment_columns(self) -> tuple[str, ...]:
+        """Configured segment columns, or the whole plan when none are given."""
+        configured = self._config.segment_columns
+        unknown = sorted(set(configured) - set(self._plan.names))
+        if unknown:
+            raise ValueError(
+                f"error analysis segment column(s) not in the experiment column plan: {unknown}"
+            )
+        return tuple(dict.fromkeys(configured)) if configured else self._plan.names
+
+    def _write_ledger(
+        self,
+        eval_dir: Path,
+        features: pd.DataFrame,
+        y_true: np.ndarray,
+        y_pred: np.ndarray,
+    ) -> Path:
+        truth = np.asarray(y_true, dtype=float)
+        prediction = np.asarray(y_pred, dtype=float)
+        ledger = pd.DataFrame(
+            {
+                "y_true": truth,
+                "y_pred": prediction,
+                "residual": prediction - truth,
+                "abs_error": np.abs(prediction - truth),
+            }
+        )
+        # A segment colliding with a ledger column raises in the join rather
+        # than silently overwriting the measured values.
+        segments = features[list(self._segment_columns())].reset_index(drop=True)
+        ledger = ledger.join(segments)
+        path = eval_dir / self._config.ledger_file
+        ledger.to_parquet(path, index=False)
+        return path
+
+    def _write_thresholds(
+        self, eval_dir: Path, y_true: np.ndarray, y_pred: np.ndarray
+    ) -> DecisionReport | None:
+        decision = self._decision
+        if decision is None:
+            return None
+        labels = (np.asarray(y_true, dtype=float) >= decision.threshold).astype(int)
+        grid = np.linspace(decision.grid.min, decision.grid.max, decision.grid.steps)
+        chosen, rows = tune_threshold(labels, y_pred, grid, decision.objective)
+        report = DecisionReport(
+            column=decision.column or self._target,
+            objective=decision.objective,
+            label_threshold=decision.threshold,
+            chosen_threshold=chosen,
+            rows=rows,
+        )
+        (eval_dir / self._config.thresholds_file).write_text(
+            report.model_dump_json(indent=2), encoding="utf-8"
+        )
+        return report
+
+
 def run(cfg: PipelineConfig) -> None:
     if not cfg.dataset or not cfg.experiment or not cfg.evaluate or not cfg.etl or not cfg.train:
         raise ValueError("evaluate step requires dataset, experiment, evaluate, etl, and train config")
@@ -253,6 +382,10 @@ def run(cfg: PipelineConfig) -> None:
     )
     residuals = residual_summary(y_true, y_pred)
 
+    eval_dir = Path(cfg.evaluate.output_dir)
+    eval_dir.mkdir(parents=True, exist_ok=True)
+    HoldoutErrorAnalysis.from_config(cfg).write(eval_dir, X_val, y_true, y_pred)
+
     evaluation = EvaluationResult(
         metrics=candidate_metrics,
         promote=promote,
@@ -267,6 +400,8 @@ def run(cfg: PipelineConfig) -> None:
         warnings=warnings,
     )
 
+    eval_dir = Path(cfg.evaluate.output_dir)
+    eval_dir.mkdir(parents=True, exist_ok=True)
     eval_dir = Path(cfg.evaluate.output_dir)
     eval_dir.mkdir(parents=True, exist_ok=True)
     (eval_dir / cfg.evaluate.output_file).write_text(evaluation.model_dump_json(indent=2), encoding="utf-8")

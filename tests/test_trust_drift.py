@@ -208,3 +208,25 @@ def test_binned_ks_validation_branches() -> None:
         binned_ks([0.5, 0.5], [1.0])
     with pytest.raises(ValueError, match="non-empty"):
         binned_ks([], [])
+
+
+def test_tracking_bundle_scores_train_vs_serve(tmp_path) -> None:
+    """Production drift call: the train frame's numeric features score a serve frame."""
+    from broadway.config.loader import load_config
+    from broadway.tracking.bundle import TrackingBundle
+
+    cfg = load_config("train", dataset="test", experiment="baseline")
+    assert cfg.train is not None and cfg.train.tracking is not None
+    bundle = TrackingBundle.from_config(
+        dataset="test",
+        config=cfg.train.tracking,
+        clean_result_path=tmp_path / "absent_clean.json",
+        machine_dir=tmp_path / "tracking",
+        reports_dir=tmp_path / "reports",
+    )
+    train = _train_frame()
+    serve = train.copy()
+    serve["fare"] = serve["fare"] + 20.0
+    report = bundle.compare_serve(train, serve)
+    assert report.results["fare"].psi > 0.25
+    assert report.results["fare"].drifted is None  # no thresholds -> no decision

@@ -27,6 +27,8 @@ from broadway.features.plan import ColumnPlan
 from broadway.lineage.ids import node_id
 from broadway.lineage.records import write_record
 from broadway.observability.profiling import phase
+from broadway.tracking.bundle import TrackingBundle
+from broadway.tracking.manifest import MANIFEST_FILENAME
 from broadway.training.contracts import TrainingResult
 from broadway.training.hpo import run_hpo
 from broadway.training.learning_curve import LearningCurve, LearningCurveResult
@@ -175,6 +177,56 @@ def _load_frames(cfg: PipelineConfig) -> tuple[pd.DataFrame, pd.DataFrame]:
             )
     assert val_df is not None
     return train_df, val_df
+
+
+def _tracking_bundle(cfg: PipelineConfig) -> TrackingBundle | None:
+    """Resolve the optional Data Tracking bundle for this run."""
+    assert cfg.dataset is not None and cfg.train is not None
+    tracking = cfg.train.tracking
+    if tracking is None:
+        return None
+    processed_dir = _processed_dir(cfg)
+    return TrackingBundle.from_config(
+        dataset=cfg.dataset.name,
+        config=tracking,
+        clean_result_path=processed_dir / f"{cfg.dataset.name}_clean.json",
+    )
+
+
+def _record_tracking(cfg: PipelineConfig, train_df: pd.DataFrame) -> TrackingBundle | None:
+    """Write the training baseline, then read drift without gating the run.
+
+    Drift is data, and data is never checked: a failed or absent serve-frame
+    comparison is logged (full traceback) and training continues.
+    """
+    assert cfg.train is not None
+    bundle = _tracking_bundle(cfg)
+    if bundle is None:
+        return None
+    with phase("tracking_baseline"):
+        bundle.record_training_truth(train_df)
+    # Drift compares what the model actually sees, so fit on the plan-projected
+    # feature matrix (not the target or raw lookup columns), only when a serve
+    # frame is configured.
+    drift_train = train_df
+    if cfg.train.tracking is not None and cfg.train.tracking.drift.serve_frame is not None:
+        drift_train, _ = _xy(cfg, train_df)
+    try:
+        with phase("tracking_drift"):
+            report = bundle.compare_configured_serve(drift_train)
+    except Exception:
+        logger.exception("tracking: drift comparison failed — training continues")
+    else:
+        if report is not None:
+            for name, result in report.results.items():
+                logger.info(
+                    "tracking: drift %s psi=%.4f ks=%.4f kl=%.4f",
+                    name,
+                    result.psi,
+                    result.ks,
+                    result.kl,
+                )
+    return bundle
 
 
 def _calibration_frames(
@@ -355,12 +407,26 @@ def _log_learning_curve(cfg: PipelineConfig, curve: LearningCurveResult) -> None
     log_metrics(metrics)
 
 
+def _log_tracking_artifacts(bundle: TrackingBundle | None) -> None:
+    """Log the tracking bundle copy as MLflow run artifacts when it exists."""
+    if bundle is None:
+        return
+    for path in (
+        bundle.machine_dir / MANIFEST_FILENAME,
+        bundle.baseline_path,
+        bundle.data_card_path,
+    ):
+        if path.exists():
+            mlflow.log_artifact(str(path), artifact_path="tracking")
+
+
 def _log_training(
     cfg: PipelineConfig,
     fitted: _Fitted,
     train_df: pd.DataFrame,
     val_df: pd.DataFrame,
     curve: LearningCurveResult | None,
+    bundle: TrackingBundle | None,
 ) -> str:
     """Open the MLflow run and log its inputs and model artifact."""
     assert cfg.dataset is not None
@@ -368,6 +434,7 @@ def _log_training(
         setup_mlflow(cfg.environment.mlflow_tracking_uri, cfg.dataset.name)
         with mlflow.start_run():
             _log_inputs(cfg, fitted, train_df, val_df)
+            _log_tracking_artifacts(bundle)
             if curve is not None:
                 _log_learning_curve(cfg, curve)
             return _log_evaluation(cfg, fitted)
@@ -408,12 +475,13 @@ def run(cfg: PipelineConfig) -> None:
 
     calibration = _calibration_config(cfg)
     train_df, val_df = _load_frames(cfg)
+    bundle = _record_tracking(cfg, train_df)
     fit_df, calibration_df = _calibration_frames(cfg, train_df, calibration)
     # Params first (HPO when configured), then the curve on the deployed fit
     # slice with those params: the 100% point matches the final model's data.
     params = _resolve_params(cfg, fit_df, val_df)
     curve = _run_learning_curve(cfg, fit_df, val_df, params)
     fitted = _fit_model(cfg, fit_df, val_df, calibration, calibration_df, params)
-    artifact_path = _log_training(cfg, fitted, train_df, val_df, curve)
+    artifact_path = _log_training(cfg, fitted, train_df, val_df, curve, bundle)
     result = fitted.result.model_copy(update={"artifact_path": artifact_path})
     _persist(cfg, result, fitted.summary)

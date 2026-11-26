@@ -15,6 +15,7 @@ from pydantic import (
 
 from broadway.analysis.contracts import AnalysisContract, AnalysisMode
 from broadway.calibration.contracts import CalibrationConfig
+from broadway.evaluate.contracts import DecisionConfig, ErrorAnalysisConfig
 from broadway.training.models.registry import allowed_params
 
 if TYPE_CHECKING:
@@ -352,6 +353,55 @@ class LearningCurveConfig(BaseModel):
         return self.output_path.with_suffix(".png")
 
 
+class TrackingBaselineConfig(BaseModel):
+    """Train-time baseline writer: output file plus distribution knobs."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    output_file: str
+    n_bins: int = Field(ge=1)
+    top_k: int = Field(ge=1)
+    smoothing: float = Field(ge=0.0)
+
+
+class TrackingDataCardConfig(BaseModel):
+    """Data-card renderer: output file plus presentation knobs."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    output_file: str
+    missing_flag_rate: float = Field(ge=0.0, le=1.0)
+    biases: list[str] = Field(default_factory=list)
+    generated_at: str | None = None
+
+
+class TrackingDriftConfig(BaseModel):
+    """Train-vs-serve drift input.
+
+    No score threshold lives here: thresholds are caller parameters and the
+    train hook passes none, so drift is a report input, never a gate.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    bins: int = Field(ge=1)
+    epsilon: float = Field(gt=0.0)
+    serve_frame: str | None = None
+
+
+class TrackingConfig(BaseModel):
+    """The data-tracking bundle: ignored machine truth + tracked report surface."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    machine_dir: str
+    reports_dir: str
+    profile_file: str
+    baseline: TrackingBaselineConfig
+    data_card: TrackingDataCardConfig
+    drift: TrackingDriftConfig
+
+
 class TrainStep(BaseModel):
     random_state: int
     n_jobs: int
@@ -367,6 +417,7 @@ class TrainStep(BaseModel):
     output_dir: str
     output_file: str
     learning_curve: LearningCurveConfig | None = None
+    tracking: TrackingConfig | None = None
 
 
 class EvaluateStep(BaseModel):
@@ -376,6 +427,8 @@ class EvaluateStep(BaseModel):
     output_file: str
     coverage_tolerance: float | None = Field(default=None, ge=0.0, le=1.0)
     min_period_rows: int | None = Field(default=None, ge=1)
+    error_analysis: ErrorAnalysisConfig = Field(default_factory=ErrorAnalysisConfig)
+    decision: DecisionConfig | None = None
 
 
 class BaselineStep(BaseModel):

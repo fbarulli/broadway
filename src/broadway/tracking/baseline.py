@@ -228,25 +228,56 @@ def write_baseline_stats(stats: BaselineStats, path: str | Path) -> Path:
     return out
 
 
-def _date_range(profile: DatasetProfile | None) -> str:
-    if profile is None:
-        return "unknown (no DatasetProfile provided)"
-    mins = [c.datetime_min for c in profile.columns.values() if c.datetime_min]
-    maxs = [c.datetime_max for c in profile.columns.values() if c.datetime_max]
-    if not mins or not maxs:
-        return "unknown (profile carries no datetime bounds)"
-    return f"{min(mins)} .. {max(maxs)}"
+def _date_range(profile: DatasetProfile | None, baseline: BaselineStats | None) -> str:
+    """Date range from the profile when present, else the baseline's datetime bins."""
+    if profile is not None:
+        mins = [c.datetime_min for c in profile.columns.values() if c.datetime_min]
+        maxs = [c.datetime_max for c in profile.columns.values() if c.datetime_max]
+        if mins and maxs:
+            return f"{min(mins)} .. {max(maxs)}"
+        if baseline is None:
+            return "unknown (profile carries no datetime bounds)"
+    if baseline is not None:
+        starts = sorted(
+            feat.min_value
+            for feat in baseline.features.values()
+            if feat.kind == "datetime" and feat.min_value
+        )
+        ends = sorted(
+            feat.max_value
+            for feat in baseline.features.values()
+            if feat.kind == "datetime" and feat.max_value
+        )
+        if starts and ends:
+            return f"{starts[0]} .. {ends[-1]}"
+        return "unknown (baseline carries no datetime bounds)"
+    return "unknown (no DatasetProfile provided)"
 
 
-def _missingness_lines(profile: DatasetProfile | None, *, missing_flag_rate: float) -> list[str]:
-    if profile is None:
-        return ["unknown (no DatasetProfile provided)"]
-    lines = []
-    for name, col in profile.columns.items():
-        rate = (col.null_count / profile.row_count) if profile.row_count else 0.0
-        flag = " (above missing_flag_rate)" if rate > missing_flag_rate else ""
-        lines.append(f"- {name}: {col.null_count}/{profile.row_count} ({rate:.4f}){flag}")
-    return lines or ["no columns"]
+def _missingness_lines(
+    profile: DatasetProfile | None,
+    baseline: BaselineStats | None,
+    *,
+    missing_flag_rate: float,
+) -> list[str]:
+    """Per-column missingness from the profile, else the baseline snapshot."""
+    if profile is not None:
+        lines = []
+        for name, col in profile.columns.items():
+            rate = (col.null_count / profile.row_count) if profile.row_count else 0.0
+            flag = " (above missing_flag_rate)" if rate > missing_flag_rate else ""
+            lines.append(f"- {name}: {col.null_count}/{profile.row_count} ({rate:.4f}){flag}")
+        return lines or ["no columns"]
+    if baseline is not None:
+        lines = []
+        for name, feat in baseline.features.items():
+            flag = " (above missing_flag_rate)" if feat.missing_rate > missing_flag_rate else ""
+            lines.append(
+                f"- {name}: {feat.missing_count}/{baseline.row_count} "
+                f"({feat.missing_rate:.4f}){flag}"
+            )
+        return lines or ["no columns"]
+    return ["unknown (no DatasetProfile provided)"]
 
 
 def _exclusion_lines(audits: Sequence[TransformAudit]) -> list[str]:
@@ -275,15 +306,18 @@ def _baseline_lines(baseline: BaselineStats | None) -> list[str]:
         )
     ]
     for name, feat in baseline.features.items():
+        missing = f"missing={feat.missing_count}/{baseline.row_count}"
         if feat.kind == "numeric":
             lines.append(
                 f"- {name} (numeric, n={feat.count}): mean={feat.mean} std={feat.std} "
-                f"bins={len(feat.bin_counts)}"
+                f"{missing} bins={len(feat.bin_counts)}"
             )
         elif feat.kind == "categorical":
-            lines.append(f"- {name} (categorical, n={feat.count}): top_bins={len(feat.bin_counts)}")
+            lines.append(
+                f"- {name} (categorical, n={feat.count}): {missing} top_bins={len(feat.bin_counts)}"
+            )
         else:
-            lines.append(f"- {name} ({feat.kind}, n={feat.count})")
+            lines.append(f"- {name} ({feat.kind}, n={feat.count}): {missing}")
     return lines
 
 
@@ -310,7 +344,12 @@ def render_data_card(
         "",
         "## Date range",
         "",
-        _date_range(profile),
+        _date_range(profile, baseline),
+        "",
+        "## Row counts",
+        "",
+        f"- training frame: {baseline.row_count if baseline else 'unknown'}",
+        f"- profiled source: {profile.row_count if profile else 'unknown'}",
         "",
         "## Biases",
         "",
@@ -322,7 +361,7 @@ def render_data_card(
         "",
         "## Missingness",
         "",
-        *_missingness_lines(profile, missing_flag_rate=opts.missing_flag_rate),
+        *_missingness_lines(profile, baseline, missing_flag_rate=opts.missing_flag_rate),
         "",
         "## Training baseline",
         "",

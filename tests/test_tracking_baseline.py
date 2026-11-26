@@ -3,6 +3,8 @@ from __future__ import annotations
 import pandas as pd
 
 import broadway.tracking.baseline as baseline_module
+from broadway.cleaning.models import StructuralCleanResult
+from broadway.config.loader import load_config
 from broadway.discover.profile import build_profile
 from broadway.lineage.models import TransformAudit
 from broadway.tracking.baseline import (
@@ -18,6 +20,7 @@ from broadway.tracking.baseline import (
     write_baseline_stats,
     write_data_card,
 )
+from broadway.tracking.bundle import TrackingBundle
 
 
 def _frame() -> pd.DataFrame:
@@ -172,3 +175,40 @@ def test_write_data_card(tmp_path) -> None:
     path = write_data_card(card, tmp_path / "tracking" / "data_card.md")
     assert path.read_text().endswith("\n")
     assert isinstance(BaselineStats, type)
+
+
+def test_tracking_bundle_writes_baseline_and_renders_card(tmp_path) -> None:
+    """Production bundle: baseline JSON round-trips and the card renders from it."""
+    cfg = load_config("train", dataset="test", experiment="baseline")
+    assert cfg.train is not None and cfg.train.tracking is not None
+    df = _frame()
+    profile = build_profile("test", "test.parquet", df)
+    profile_path = tmp_path / "profile.json"
+    profile_path.write_text(profile.model_dump_json(indent=2), encoding="utf-8")
+    clean_path = tmp_path / "test_clean.json"
+    clean_path.write_text(
+        StructuralCleanResult(
+            audit=_audit(),
+            parse_failures=[],
+            missing_encodings={},
+            canonical_path="canonical.parquet",
+        ).model_dump_json(indent=2),
+        encoding="utf-8",
+    )
+    config = cfg.train.tracking.model_copy(update={"profile_file": str(profile_path)})
+    bundle = TrackingBundle.from_config(
+        dataset="test",
+        config=config,
+        clean_result_path=clean_path,
+        machine_dir=tmp_path / "tracking",
+        reports_dir=tmp_path / "reports",
+    )
+
+    bundle.record_training_truth(df)
+    card_path = bundle.publish_data_card()
+
+    assert load_baseline_stats(bundle.baseline_path).row_count == 8
+    card = card_path.read_text(encoding="utf-8")
+    assert "## Missingness" in card
+    assert "cat: 1/8" in card
+    assert "dedup: -2 rows" in card

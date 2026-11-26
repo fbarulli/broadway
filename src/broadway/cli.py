@@ -56,6 +56,10 @@ def _build_parser() -> argparse.ArgumentParser:
     audit.add_argument("--analysis", type=str, default=None)
     audit.add_argument("--environment", type=str, default=DEFAULT_ENVIRONMENT)
 
+    tracking = sub.add_parser("tracking")
+    tracking.add_argument("--dataset", type=str, required=True)
+    tracking.add_argument("--environment", type=str, default=DEFAULT_ENVIRONMENT)
+
     ingest = sub.add_parser("ingest")
     _add_step_args(ingest)
 
@@ -145,6 +149,10 @@ def main() -> None:
         from broadway.reports.audit import run as audit_run
 
         audit_run(args.dataset, args.analysis, args.environment)
+    elif args.step == "tracking":
+        from broadway.tracking.report import run as tracking_run
+
+        tracking_run(args.dataset, args.environment)
     elif args.step == "ingest":
         from broadway.etl.module import run as etl_run
 
