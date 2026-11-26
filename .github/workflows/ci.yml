@@ -38,9 +38,9 @@ jobs:
             pyproject.toml
             uv.lock
 
-      # --frozen: fails if pyproject.toml and uv.lock have drifted.
+      # --locked: asserts pyproject.toml and uv.lock agree (fails on drift).
       - name: Install
-        run: bash scripts/uv.sh sync --all-extras --frozen
+        run: bash scripts/uv.sh sync --all-extras --locked
 
       # Platform gates — SINGLE SOURCE OF TRUTH: this job runs
       # scripts/run_local_ci.sh (branch parity era-aware, ruff, mypy,
