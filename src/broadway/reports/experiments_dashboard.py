@@ -104,8 +104,12 @@ class ScriptProfile:
 
 
 def _series_dir(focus: str) -> Path:
-    """Return the folder for a series id (``experiments/<focus>``)."""
-    return EXPERIMENTS_ROOT / focus
+    """Return the folder for a series id, refusing any path outside the root."""
+    root = EXPERIMENTS_ROOT.resolve()
+    candidate = (root / focus).resolve()
+    if candidate != root and root not in candidate.parents:
+        raise ValueError(f"series focus escapes the experiments root: {focus!r}")
+    return candidate
 
 
 def _results_dir(focus: str) -> Path:
@@ -971,6 +975,8 @@ def experiment_source(
     name: str, focus: str = Query(default=DEFAULT_SERIES)
 ) -> PlainTextResponse:
     """Serve the step's actual ``.py`` file as plain text."""
+    if focus not in list_series():
+        return PlainTextResponse("unknown series", status_code=404)
     script = _script_for(name, focus)
     if script is None:
         return PlainTextResponse("unknown step", status_code=404)

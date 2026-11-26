@@ -342,3 +342,10 @@ def test_experiment_page_renders_the_decision_record(monkeypatch, tmp_path) -> N
     assert "ACT" in body
     assert "ks_fare_amount = 0.0120 [0.0110, 0.0130]" in body
     assert "review the policy" in body
+
+
+def test_source_route_rejects_a_traversing_focus(monkeypatch, tmp_path) -> None:
+    _seed_dashboard(monkeypatch, tmp_path)
+
+    assert ui.experiment_source("01_ingest", "../../../..").status_code == 404
+    assert ui.experiment_source("../../../etc/passwd", "alpha").status_code == 404
