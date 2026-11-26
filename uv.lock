@@ -302,6 +302,8 @@ dependencies = [
 
 [package.optional-dependencies]
 all = [
+    { name = "darts" },
+    { name = "feature-engine" },
     { name = "gluonts", extra = ["torch"] },
     { name = "graphifyy" },
     { name = "httpx2" },
@@ -312,9 +314,11 @@ all = [
     { name = "pyspark" },
     { name = "pytest-cov" },
     { name = "ruff" },
+    { name = "sktime" },
     { name = "sqlalchemy" },
     { name = "timesfm", extra = ["torch"] },
     { name = "torch" },
+    { name = "tsfresh" },
     { name = "vulture" },
 ]
 db = [
@@ -350,7 +354,7 @@ spark = [
 
 [package.metadata]
 requires-dist = [
-    { name = "broadway", extras = ["spark", "db", "k8s", "dev", "forecast"], marker = "extra == 'all'" },
+    { name = "broadway", extras = ["spark", "db", "k8s", "dev", "forecast", "feature-engineering"], marker = "extra == 'all'" },
     { name = "darts", marker = "extra == 'feature-engineering'", specifier = ">=0.48" },
     { name = "fastapi", specifier = ">=0.141.1" },
     { name = "feature-engine", marker = "extra == 'feature-engineering'", specifier = ">=1.9" },
