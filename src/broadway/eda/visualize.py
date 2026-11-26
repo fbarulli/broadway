@@ -2,7 +2,8 @@
 
 The repository already ships matplotlib/seaborn (no plotly), so the report
 stays a single self-contained HTML file with no new dependency and no
-external asset requests.
+external asset requests. The decision figures (effect, correlation, outlier
+share) live in ``eda.figures``; this renderer owns the descriptive ones.
 """
 
 from __future__ import annotations
@@ -16,22 +17,15 @@ import matplotlib
 matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 
 from broadway import viz
 from broadway.config.viz import VizConfig, load_viz_config
-from broadway.eda.models import (
-    EmbeddedFigure,
-    MissingResult,
-    QualityResult,
-    SummaryResult,
-)
+from broadway.eda.models import EmbeddedFigure, MissingResult, SummaryResult
 
 _PLOT_COLUMNS = 2
-_BAR_WIDTH = 0.4
 _PERCENT = 100.0
 
 
@@ -49,20 +43,31 @@ class FigureRenderer:
         frame: pd.DataFrame,
         summary: SummaryResult,
         missing: MissingResult,
-        quality: QualityResult,
     ) -> list[EmbeddedFigure]:
         figures: list[EmbeddedFigure] = []
         candidates = (
             ("Missing value rates", self._missing_figure(missing)),
             ("Numeric distributions", self._numeric_figure(frame, summary)),
-            ("Correlation heatmap", self._correlation_figure(frame, summary)),
             ("Categorical top values", self._categorical_figure(summary)),
-            ("Outlier rates", self._outlier_figure(quality)),
         )
         for title, figure in candidates:
             if figure is not None:
-                figures.append(self._embed(figure, title))
+                figures.append(self.embed(figure, title))
         return figures
+
+    def embed(self, figure: Figure, title: str) -> EmbeddedFigure:
+        """Encode one figure as a data URI payload and release it."""
+        buffer = BytesIO()
+        figure.savefig(
+            buffer, format=self._format, dpi=self._viz.dpi, bbox_inches="tight"
+        )
+        plt.close(figure)
+        mime = "image/png" if self._format == "png" else "image/svg+xml"
+        return EmbeddedFigure(
+            title=title,
+            mime_type=mime,
+            data_base64=base64.b64encode(buffer.getvalue()).decode("ascii"),
+        )
 
     def _missing_figure(self, missing: MissingResult) -> Figure | None:
         if not missing.columns:
@@ -101,30 +106,6 @@ class FigureRenderer:
         figure.suptitle("Numeric distributions")
         return figure
 
-    def _correlation_figure(
-        self, frame: pd.DataFrame, summary: SummaryResult
-    ) -> Figure | None:
-        names = [item.name for item in summary.detail if item.kind == "numeric"][
-            : self._max_plots
-        ]
-        if len(names) < 2:
-            return None
-        correlation = frame[names].corr(numeric_only=True)
-        figure, ax = plt.subplots(figsize=(7.5, max(4.0, 0.45 * len(names) + 2.0)))
-        image = ax.imshow(
-            correlation.to_numpy(),
-            vmin=-1.0,
-            vmax=1.0,
-            cmap=self._viz.diagnostics.colormap,
-        )
-        figure.colorbar(image, ax=ax, fraction=0.046, pad=0.04)
-        ax.set_xticks(range(len(names)))
-        ax.set_yticks(range(len(names)))
-        ax.set_xticklabels(names, rotation=45, ha="right")
-        ax.set_yticklabels(names)
-        ax.set_title("Numeric correlation")
-        return figure
-
     def _categorical_figure(self, summary: SummaryResult) -> Figure | None:
         items = [
             item
@@ -150,33 +131,6 @@ class FigureRenderer:
         figure.suptitle("Categorical top values")
         return figure
 
-    def _outlier_figure(self, quality: QualityResult) -> Figure | None:
-        items = quality.outliers[: self._max_plots]
-        if not items:
-            return None
-        labels = [item.column for item in items]
-        positions = np.arange(len(items))
-        figure, ax = plt.subplots(figsize=(8, max(3.0, 0.45 * len(items) + 1.5)))
-        ax.bar(
-            positions - _BAR_WIDTH / 2,
-            [item.iqr_rate * _PERCENT for item in items],
-            width=_BAR_WIDTH,
-            label="IQR",
-        )
-        ax.bar(
-            positions + _BAR_WIDTH / 2,
-            [item.z_rate * _PERCENT for item in items],
-            width=_BAR_WIDTH,
-            label="z-score",
-        )
-        ax.set_xticks(positions)
-        ax.set_xticklabels(labels, rotation=45, ha="right")
-        ax.set_ylabel("outlier %")
-        ax.set_title("Outlier rate by numeric column")
-        ax.legend()
-        viz.despine(ax)
-        return figure
-
     def _grid(self, count: int) -> Figure:
         rows = math.ceil(count / _PLOT_COLUMNS)
         size = self._viz.fig_size_per_subplot
@@ -192,16 +146,3 @@ class FigureRenderer:
     def _hide_unused(axes: list[Axes], used: int) -> None:
         for ax in axes[used:]:
             ax.set_visible(False)
-
-    def _embed(self, figure: Figure, title: str) -> EmbeddedFigure:
-        buffer = BytesIO()
-        figure.savefig(
-            buffer, format=self._format, dpi=self._viz.dpi, bbox_inches="tight"
-        )
-        plt.close(figure)
-        mime = "image/png" if self._format == "png" else "image/svg+xml"
-        return EmbeddedFigure(
-            title=title,
-            mime_type=mime,
-            data_base64=base64.b64encode(buffer.getvalue()).decode("ascii"),
-        )

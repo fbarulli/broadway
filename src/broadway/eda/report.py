@@ -7,8 +7,11 @@ from html import escape
 from broadway.eda.models import (
     ColumnSummary,
     CompareResult,
+    CorrelationResult,
     EdaResult,
+    FeatureTestBundle,
     MissingResult,
+    OutlierResult,
     QualityResult,
     SummaryResult,
 )
@@ -43,6 +46,8 @@ class EdaReportBuilder:
         body = [
             self._header(result),
             self._findings(result),
+            self._decisions_section(result),
+            self._correlation_section(result.correlation),
             self._summary_section(result.summary, result.missing),
             self._missing_section(result.missing),
             self._quality_section(result.quality),
@@ -126,7 +131,138 @@ class EdaReportBuilder:
             )
         else:
             items.append(f"Before/after ETL comparison skipped: {escape(compare.skip_reason or '')}.")
+        items.append(self._test_finding(result.feature_tests))
+        items.append(self._outlier_finding(result.outliers))
         return "<h2>Findings</h2><ul>" + "".join(f"<li>{item}</li>" for item in items) + "</ul>"
+
+    @staticmethod
+    def _counts(tests: FeatureTestBundle) -> dict[str, int]:
+        counts: dict[str, int] = {}
+        for row in tests.features:
+            key = row.verdict or "undecided"
+            counts[key] = counts.get(key, 0) + 1
+        return counts
+
+    def _test_finding(self, tests: FeatureTestBundle) -> str:
+        if tests.reason is not None:
+            return f"Feature tests: none ran — {escape(tests.reason)}."
+        if not tests.features:
+            return (
+                f"Feature tests: none ran ({len(tests.skipped)} column(s) untestable: "
+                f"{escape(', '.join(tests.skipped)) or 'no feature columns'})."
+            )
+        counts = self._counts(tests)
+        decided = ", ".join(f"{value} {key}" for key, value in sorted(counts.items()))
+        top = tests.features[0]
+        return (
+            f"Feature tests on the {escape(tests.target_kind or 'unknown')} target: "
+            f"{len(tests.features)} feature(s) tested ({escape(decided)}); "
+            f"strongest is {escape(top.feature)} "
+            f"({escape(top.test)} {escape(top.effect_name)} {self._fmt(top.effect)}, "
+            f"q={self._fmt(top.q_value)}). Skipped: "
+            f"{escape(', '.join(tests.skipped)) or 'none'}."
+        )
+
+    def _outlier_finding(self, outliers: OutlierResult) -> str:
+        acting = [item for item in outliers.columns if item.verdict == "act"]
+        return (
+            f"Outlier share above the {self._fmt_pct(outliers.max_share)} maximum: "
+            f"{len(acting)} of {len(outliers.columns)} screened column(s)"
+            + (f" — {escape(', '.join(item.column for item in acting))}." if acting else ".")
+        )
+
+    def _decisions_section(self, result: EdaResult) -> str:
+        tests = result.feature_tests
+        summary = tests.summary
+        headline = (
+            "<p class='note'>No feature test produced a decision"
+            + (f": {escape(tests.reason)}." if tests.reason else ".")
+            + "</p>"
+            if summary is None
+            else (
+                f"<p class='{self._verdict_class(summary.verdict)}'>"
+                f"Summary — {escape(summary.verdict)}: {escape(summary.metric)} = "
+                f"{self._fmt(summary.value)} [{self._fmt(summary.interval_low)}, "
+                f"{self._fmt(summary.interval_high)}] 95% vs threshold "
+                f"{self._fmt(summary.threshold)} at n={summary.sample_size:,}. "
+                f"Action ({escape(summary.owner)}): {escape(summary.action)}</p>"
+            )
+        )
+        feature_rows = [
+            [
+                escape(row.feature),
+                escape(row.test),
+                f"{escape(row.effect_name)} {self._fmt(row.effect)}",
+                f"p={self._fmt(row.p_value)}, q={self._fmt(row.q_value)}",
+                str(row.n),
+                self._verdict_cell(row.verdict),
+            ]
+            for row in tests.features
+        ]
+        outlier_rows = [
+            [
+                escape(item.column),
+                f"{item.iqr_count} ({self._fmt_pct(item.iqr_share)})",
+                f"{item.z_count} ({self._fmt_pct(item.z_share)})",
+                str(item.n),
+                self._verdict_cell(item.verdict),
+            ]
+            for item in result.outliers.columns
+        ]
+        return (
+            "<h2>Decisions</h2>"
+            f"<p class='note'>alpha={self._fmt(tests.alpha)}, min effect="
+            f"{self._fmt(tests.min_effect)}; the verdict is computed by "
+            "Decision.evaluate against the permutation null band at this n.</p>"
+            + headline
+            + "<h3>Feature tests</h3>"
+            + self._table(
+                ["feature", "test", "effect", "significance", "n", "verdict"], feature_rows
+            )
+            + "<h3>Outlier shares</h3>"
+            + self._table(
+                ["column", "IQR share", "z share", "n", "verdict"], outlier_rows
+            )
+        )
+
+    def _correlation_section(self, correlation: CorrelationResult) -> str:
+        if correlation.reason is not None:
+            return (
+                "<h2>Correlation</h2>"
+                f"<p class='note'>Not ranked: {escape(correlation.reason)}.</p>"
+            )
+        rows = [
+            [
+                escape(item.feature),
+                escape(item.method),
+                self._fmt(item.value),
+                self._fmt(item.p_value),
+                self._fmt(item.q_value),
+                str(item.n),
+            ]
+            for item in correlation.ranking
+        ]
+        return (
+            "<h2>Correlation</h2>"
+            f"<p class='note'>Target-vs-feature rank by |{escape(correlation.method)}|; "
+            "the pairwise table (both methods, n, p, q) is in the correlations CSV.</p>"
+            + self._table(
+                ["feature", "method", "|coefficient|", "p", "q", "n"], rows
+            )
+        )
+
+    def _verdict_cell(self, verdict: str | None) -> str:
+        if verdict is None:
+            return "<span class='note'>undecided</span>"
+        return f"<span class='{self._verdict_class(verdict)}'>{escape(verdict)}</span>"
+
+    @staticmethod
+    def _verdict_class(verdict: str) -> str:
+        if verdict == "act":
+            return "problem"
+        if verdict == "no_action":
+            return "ok"
+        return "note"
 
     def _summary_section(self, summary: SummaryResult, missing: MissingResult) -> str:
         missing_rate = {item.column: item.missing_rate for item in missing.columns}

@@ -77,6 +77,7 @@ class QualityAnalyzer:
         )
         return OutlierStats(
             column=name,
+            n=count,
             iqr_count=iqr_count,
             iqr_rate=self._rate(iqr_count, count),
             iqr_lower=self._finite(lower),

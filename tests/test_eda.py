@@ -7,28 +7,12 @@ from pathlib import Path
 import pandas as pd
 
 from broadway.config.loader import load_config
-from broadway.config.schema import EdaStep, TaskType
+from broadway.config.schema import TaskType
 from broadway.eda import module
 from broadway.eda.compare import EtlComparator
 from broadway.eda.missing import MissingnessAnalyzer
 from broadway.eda.quality import QualityAnalyzer
 from broadway.eda.summary import SummaryAnalyzer
-
-
-def _step(**overrides: object) -> EdaStep:
-    values: dict[str, object] = {
-        "sample_size": 0,
-        "plot_format": "png",
-        "output_dir": "unused",
-        "output_file": "eda.html",
-        "max_categories": 5,
-        "max_plots": 4,
-        "iqr_multiplier": 1.5,
-        "z_threshold": 3.0,
-        "imbalance_min_share": 0.2,
-    }
-    values.update(overrides)
-    return EdaStep(**values)
 
 
 def test_summary_and_missingness_count_a_frame() -> None:

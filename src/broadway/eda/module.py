@@ -1,20 +1,37 @@
-"""EDA pipeline step — orchestrates summary, missingness, quality and report."""
+"""EDA pipeline step — orchestrates summary, missingness, quality, decisions and report."""
 
 from __future__ import annotations
 
+import hashlib
 import logging
 from pathlib import Path
 
 import pandas as pd
+from matplotlib.figure import Figure
 
 from broadway.config.schema import DatasetContract, EdaStep, EtlStep, PipelineConfig
 from broadway.data.loader import canonical_path
+from broadway.eda.artifacts import EdaArtifactWriter
 from broadway.eda.compare import EtlComparator
+from broadway.eda.correlation import CorrelationAnalyzer
+from broadway.eda.figures import DecisionFigures
 from broadway.eda.missing import MissingnessAnalyzer
-from broadway.eda.models import CompareResult, EdaResult
+from broadway.eda.models import (
+    CompareResult,
+    CorrelationResult,
+    EdaDecisionBundle,
+    EdaResult,
+    EmbeddedFigure,
+    FeatureTestBundle,
+    MissingResult,
+    OutlierResult,
+    SummaryResult,
+)
+from broadway.eda.outliers import OutlierDecisionAnalyzer
 from broadway.eda.quality import QualityAnalyzer
 from broadway.eda.report import EdaReportBuilder
 from broadway.eda.summary import SummaryAnalyzer
+from broadway.eda.tests import FeatureTestAnalyzer
 from broadway.eda.visualize import FigureRenderer
 from broadway.observability.profiling import phase, timed
 
@@ -22,6 +39,7 @@ logger = logging.getLogger(__name__)
 
 _PRE_SPLIT_LABEL = "canonical (pre-split)"
 _POST_SPLIT_LABEL = "train+val (post-split)"
+_HASH_LENGTH = 16
 
 
 class EdaRunner:
@@ -34,15 +52,15 @@ class EdaRunner:
         self._dataset: DatasetContract = cfg.dataset
         self._step: EdaStep = cfg.eda
         self._etl: EtlStep = cfg.etl
-        self._random_state = (
-            cfg.experiment.random_state if cfg.experiment else cfg.etl.random_state
-        )
+        self._random_state = cfg.eda.random_state
+        self._source_rows = 0
 
     def run(self) -> Path:
         with timed() as elapsed:
             with phase("load"):
                 after, source_rows, notes = self._load_split()
                 before, before_rows, skip_reason = self._load_before()
+                self._source_rows = source_rows
             with phase("sample"):
                 profiled = self._sample(after)
                 before_sample = self._sample(before) if before is not None else None
@@ -60,12 +78,21 @@ class EdaRunner:
                 compare = self._compare(
                     before_sample, profiled, before_rows, source_rows, skip_reason, notes
                 )
+            with phase("decide"):
+                provenance = self._provenance(profile)
+                correlation = CorrelationAnalyzer(self._step).analyze(
+                    profile, self._dataset.target
+                )
+                feature_tests = FeatureTestAnalyzer(self._step, self._dataset.task).analyze(
+                    profile, self._dataset.target, provenance
+                )
+                outliers = OutlierDecisionAnalyzer(self._step).analyze(
+                    quality, profile, provenance
+                )
             with phase("figures"):
-                figures = FigureRenderer(
-                    self._step.plot_format,
-                    self._step.max_categories,
-                    self._step.max_plots,
-                ).render(profile, summary, missing, quality)
+                figures = self._figures(
+                    profile, summary, missing, correlation, feature_tests, outliers
+                )
             with phase("report"):
                 result = EdaResult(
                     dataset=self._dataset.name,
@@ -78,22 +105,93 @@ class EdaRunner:
                     missing=missing,
                     quality=quality,
                     compare=compare,
+                    correlation=correlation,
+                    feature_tests=feature_tests,
+                    outliers=outliers,
                     figures=figures,
                 )
                 out_path = self._write(result)
         logger.info("eda: report written to %s in %.2fs", out_path, elapsed())
         logger.info(
             "eda: rows=%d profiled=%d missing_cells=%d constant=%d duplicates=%d "
-            "outlier_columns=%d compare=%s",
+            "outlier_columns=%d features_tested=%d decisions=%s compare=%s",
             source_rows,
             len(profiled),
             missing.missing_cells,
             len(quality.constant_columns),
             quality.duplicate_rows,
             len(quality.outliers),
+            len(feature_tests.features),
+            self._verdict_counts(feature_tests),
             "available" if compare.available else f"skipped ({compare.skip_reason})",
         )
         return out_path
+
+    def _figures(
+        self,
+        frame: pd.DataFrame,
+        summary: SummaryResult,
+        missing: MissingResult,
+        correlation: CorrelationResult,
+        feature_tests: FeatureTestBundle,
+        outliers: OutlierResult,
+    ) -> list[EmbeddedFigure]:
+        """The descriptive figures plus one saved figure per decision metric."""
+        renderer = FigureRenderer(
+            self._step.plot_format, self._step.max_categories, self._step.max_plots
+        )
+        figures = renderer.render(frame, summary, missing)
+        decision_figures = DecisionFigures()
+        evidence: tuple[tuple[str, str, Figure | None], ...] = (
+            ("effects", f"associations with {self._dataset.target}", decision_figures.effects(feature_tests)),
+            ("correlations", "numeric correlation", decision_figures.correlation(correlation)),
+            ("outliers", "outlier share", decision_figures.outliers(outliers)),
+        )
+        writer = self._writer()
+        for name, title, figure in evidence:
+            if figure is None:
+                continue
+            writer.write_figure(name, figure, self._step.plot_format)
+            figures.append(renderer.embed(figure, title))
+        return figures
+
+    def _writer(self) -> EdaArtifactWriter:
+        return EdaArtifactWriter(self._step.output_path.parent, self._step.stem)
+
+    def _write(self, result: EdaResult) -> Path:
+        writer = self._writer()
+        writer.prepare()
+        writer.write_tables(result.feature_tests, result.correlation, result.outliers)
+        writer.write_decisions(
+            EdaDecisionBundle(
+                dataset=result.dataset,
+                summary=result.feature_tests.summary,
+                features=result.feature_tests.decisions,
+                outliers=result.outliers.decisions,
+            )
+        )
+        return writer.write_html(EdaReportBuilder().build(result))
+
+    def _provenance(self, frame: pd.DataFrame) -> dict[str, str]:
+        """The digest a reader needs to re-run this decision on the same rows."""
+        digest = hashlib.sha256(
+            pd.util.hash_pandas_object(frame, index=True).to_numpy().tobytes()
+        ).hexdigest()[:_HASH_LENGTH]
+        return {
+            "artifact": f"{self._etl.train_file}+{self._etl.val_file}",
+            "source": self._dataset.path,
+            "sample_sha256": digest,
+            "sample_size": str(self._step.sample_size),
+            "exclusions": "pairwise-complete rows per feature; exclude_from_profiling dropped",
+        }
+
+    @staticmethod
+    def _verdict_counts(tests: FeatureTestBundle) -> dict[str, int]:
+        counts: dict[str, int] = {}
+        for row in tests.features:
+            key = row.verdict or "undecided"
+            counts[key] = counts.get(key, 0) + 1
+        return counts
 
     def _load_split(self) -> tuple[pd.DataFrame, int, list[str]]:
         notes: list[str] = []
@@ -175,15 +273,6 @@ class EdaRunner:
             skip_reason,
             notes,
         )
-
-    def _write(self, result: EdaResult) -> Path:
-        out_path = self._step.output_path
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        html = EdaReportBuilder().build(result)
-        temporary = out_path.with_name(f"{out_path.name}.tmp")
-        temporary.write_text(html, encoding="utf-8")
-        temporary.replace(out_path)
-        return out_path
 
 
 def run(cfg: PipelineConfig) -> None:

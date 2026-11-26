@@ -349,12 +349,32 @@ class ContractsStep(BaseModel):
     null_threshold: float
 
 
+class EdaDecisionAction(BaseModel):
+    """The owner's action for one decision family, declared once in the config."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    action: str = Field(min_length=1)
+    owner: str = Field(min_length=1)
+
+
+class EdaDecisionsConfig(BaseModel):
+    """One declared action per EDA decision family (feature tests, outliers)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    features: EdaDecisionAction
+    outliers: EdaDecisionAction
+
+
 class EdaStep(BaseModel):
     """Exploratory-data-analysis knobs; every threshold lives in the config.
 
     ``sample_size`` of 0 means "all rows"; ``plot_format`` selects the image
     encoding embedded in the self-contained HTML report (plotly is not a
-    dependency — matplotlib renders the images).
+    dependency — matplotlib renders the images). The decision block carries the
+    multiple-testing level, the minimum effect, the permutation budget and the
+    sample-size floor that ``Decision.evaluate`` calibrates the verdicts with.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -368,11 +388,28 @@ class EdaStep(BaseModel):
     iqr_multiplier: float = Field(gt=0.0)
     z_threshold: float = Field(gt=0.0)
     imbalance_min_share: float = Field(gt=0.0, le=1.0)
+    alpha: float = Field(gt=0.0, lt=1.0)
+    min_effect: float = Field(gt=0.0, le=1.0)
+    correction: Literal["bh", "none"]
+    null_quantile: float = Field(gt=0.5, lt=1.0)
+    min_sample_size: int = Field(ge=1)
+    max_features: int = Field(ge=1)
+    permutations: int = Field(ge=10)
+    random_state: int
+    shapiro_sample: int = Field(ge=3)
+    correlation_method: Literal["pearson", "spearman"]
+    outlier_max_share: float = Field(gt=0.0, le=1.0)
+    decisions: EdaDecisionsConfig
 
     @property
     def output_path(self) -> Path:
         """Report path (``output_dir/output_file``)."""
         return Path(self.output_dir) / self.output_file
+
+    @property
+    def stem(self) -> str:
+        """Artifact stem shared by the report, its tables, figures and decisions."""
+        return Path(self.output_file).stem
 
 
 class MissingInjectionConfig(BaseModel):

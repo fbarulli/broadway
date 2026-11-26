@@ -9,3 +9,25 @@ max_plots: 12               # numeric/categorical columns plotted per figure
 iqr_multiplier: 1.5         # IQR fence: q25/q75 +/- multiplier * IQR
 z_threshold: 3.0            # |x - mean| > threshold * std
 imbalance_min_share: 0.2    # classification minority share below this is flagged
+
+# Decision calibration (agents/contracts/EXPERIMENT_OUTPUT.md): a feature acts
+# only when its effect clears the config minimum AND the no-effect null band at
+# this n; the verdict is computed by Decision.evaluate, never typed.
+alpha: 0.05                 # significance level for p-values and normality checks
+min_effect: 0.05            # smallest association worth acting on (|r|, eta2, V)
+correction: bh              # multiple-testing correction over the feature family
+null_quantile: 0.95         # quantile of the no-effect permutation null band
+min_sample_size: 100        # below this the verdict is `insufficient`
+max_features: 12            # features ranked, tested and plotted
+permutations: 200           # permutation-null and bootstrap draws per decision
+random_state: 42            # sampling seed and the permutation seed
+shapiro_sample: 5000        # rows per group used for the normality check
+correlation_method: spearman  # method that ranks target-vs-feature correlation
+outlier_max_share: 0.01     # share of rows outside the IQR fence that triggers act
+decisions:
+  features:
+    action: keep the feature whose association clears the minimum effect; drop or defer the trivial ones
+    owner: eda
+  outliers:
+    action: winsorize the flagged columns before training, or exclude them with a recorded reason
+    owner: eda
