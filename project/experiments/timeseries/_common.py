@@ -10,11 +10,32 @@ is therefore the cleaned canonical frame, not the sample.
 from pathlib import Path
 
 import pandas as pd
+import yaml
 
+from broadway.reports.decision import DecisionRule, DecisionRuleSet
+from broadway.utils import require_keys
 from project.paths import load_project_paths
 
 HERE = Path(__file__).resolve().parent
-RESULTS = load_project_paths().results / HERE.name
+PATHS = load_project_paths()
+RESULTS = PATHS.results / HERE.name
+EXPERIMENT_CONFIG = PATHS.experiment_configs / "timeseries.yaml"
+DECISION_RULES = DecisionRuleSet.from_yaml(EXPERIMENT_CONFIG)
+
+
+def _load_experiment_seed() -> int:
+    """Shared seed from the timeseries experiment config (YAML SSOT)."""
+    config = yaml.safe_load(EXPERIMENT_CONFIG.read_text(encoding="utf-8"))
+    require_keys(config, ["seed"], EXPERIMENT_CONFIG.name)
+    return int(config["seed"])
+
+
+SEED = _load_experiment_seed()
+
+
+def load_decision_rule(step: str) -> DecisionRule:
+    """The step's decision rule from the timeseries experiment config."""
+    return DECISION_RULES.rule(step)
 
 CANONICAL = Path("data/processed/taxi_canonical.parquet")
 RAW_MONTHS = {

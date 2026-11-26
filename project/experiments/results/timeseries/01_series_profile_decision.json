@@ -1,0 +1,48 @@
+{
+  "question": "Is the canonical frame contiguous enough for lag features?",
+  "metric": "missing_hour_share",
+  "value": 0.0004576659038901809,
+  "interval_low": 0.0,
+  "interval_high": 0.0014127512856475285,
+  "reference": null,
+  "delta": null,
+  "threshold": 0.01,
+  "null_threshold": null,
+  "direction": "max",
+  "verdict": "no_action",
+  "action": "repair the gaps or shorten the forecast horizon to the contiguous block",
+  "owner": "timeseries",
+  "sample_size": 2185,
+  "unit": "share",
+  "min_sample_size": 100,
+  "evidence": {
+    "baseline": "a complete hourly grid (every expected hour observed)",
+    "delta": null,
+    "segments": [
+      {
+        "segment": "first_half",
+        "value": 0.0,
+        "sample_size": 1104
+      },
+      {
+        "segment": "second_half",
+        "value": 0.0009250693802035359,
+        "sample_size": 1081
+      }
+    ],
+    "sensitivity": {
+      "missing_hours": 1.0,
+      "expected_hours": 2185.0
+    },
+    "falsifier": "the missing-hour share interval exceeds the 1% ceiling",
+    "provenance": {
+      "artifact": "taxi_canonical.parquet",
+      "source": "data/processed/taxi_canonical.parquet",
+      "seed": "42",
+      "analysis_sample": "2185",
+      "block": "day",
+      "resampling": "block",
+      "exclusions": "partial terminal hour/day retained in tables, excluded from plots"
+    }
+  }
+}

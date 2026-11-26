@@ -1,5 +1,4 @@
-"""03: stationarity (ADF), autocorrelation (ACF), partial autocorrelation (PACF),
-and cross-correlation (CCF) per aggregate (read-only).
+"""03: where does the series' memory live — is lag 24 strong enough to beat noise?
 
 Consumes the 01 hourly/daily count CSVs (complete buckets only — the partial
 terminal hour/day from 01 is dropped, never patched). The canonical frame is
@@ -25,8 +24,11 @@ from typing import Any
 
 import matplotlib.pyplot as plt
 import pandas as pd
-from _common import DATETIME_COL, RESULTS, load_canonical
+from _common import DATETIME_COL, RESULTS, SEED, load_canonical, load_decision_rule
 
+from broadway.reports.decision import Evidence, SegmentEvidence
+from broadway.reports.measurement import MeasurementEstimator, MeasurementSpec
+from broadway.reports.step_output import StepOutput
 from broadway.stats.time_series import ADFResult, acf, adf, cross_correlation, pacf
 
 HOURLY_CSV = RESULTS / "01_series_profile_hourly_counts.csv"
@@ -35,6 +37,14 @@ DURATION_COL = "trip_duration_minutes"
 MAX_HOURLY_LAG = 24 * 7
 MAX_DAILY_LAG = 30
 MAX_CCF_LAG = 24 * 7
+STEM = "03_stationarity_acf"
+BLOCK = "day"
+LAG = 24
+
+
+def _acf_at_lag(frame: pd.DataFrame) -> float:
+    """Autocorrelation of hourly trips at the daily lag (the baseline's memory)."""
+    return float(acf(frame["trips"], LAG)[LAG])
 
 
 def _is_stationary(result: ADFResult) -> bool:
@@ -92,9 +102,9 @@ def _ccf_frame(hourly: pd.DataFrame) -> tuple[pd.DataFrame, float]:
     return pd.DataFrame({"lag": lags, "ccf": values}), 1.96 / (len(aligned) ** 0.5)
 
 
-def _plot_acf_pacf(
+def _plot_acf_pacf_figure(
     hourly_acf: Any, daily_acf: Any, hourly_pacf: Any, daily_pacf: Any, n_hourly: int, n_daily: int
-) -> None:
+) -> Any:
     subplots: Any = plt.subplots(2, 2, figsize=(14, 8), constrained_layout=True)
     figure, axes = subplots
     panels = (
@@ -108,8 +118,7 @@ def _plot_acf_pacf(
         band = 1.96 / (n ** 0.5)
         axis.axhspan(-band, band, color="grey", alpha=0.2)
         axis.set(title=f"{label} of trips ({unit})", xlabel="lag", ylabel="correlation")
-    figure.savefig(RESULTS / f"{Path(__file__).stem}.png", dpi=160)
-    plt.close(figure)
+    return figure
 
 
 def _plot_ccf(frame: pd.DataFrame, band: float) -> None:
@@ -163,54 +172,95 @@ def main() -> None:
     daily_pacf_lags = _significant_lags(daily_pacf, len(daily), 1)
     peak = ccf_frame.loc[ccf_frame["ccf"].abs().idxmax()]
 
-    _plot_acf_pacf(hourly_acf, daily_acf, hourly_pacf, daily_pacf, len(hourly), len(daily))
-    _plot_ccf(ccf_frame, ccf_band)
+    rule = load_decision_rule(STEM)
+    series_frame = hourly.assign(day=hourly["pickup_datetime"].dt.floor("D"))
+    spec = MeasurementSpec(
+        bootstrap="block",
+        block_column=BLOCK,
+        null="block_shuffle",
+        null_column="trips",
+        iterations=200,
+        seed=SEED,
+    )
+    measurement = MeasurementEstimator().estimate(
+        series_frame, _acf_at_lag, spec, name=rule.metric, unit="correlation"
+    )
+    evidence = Evidence(
+        baseline="no memory: autocorrelation at lag 24 is zero",
+        segments=[
+            SegmentEvidence(
+                segment="first_half",
+                value=_acf_at_lag(series_frame.iloc[: len(series_frame) // 2]),
+                sample_size=len(series_frame) // 2,
+            ),
+            SegmentEvidence(
+                segment="second_half",
+                value=_acf_at_lag(series_frame.iloc[len(series_frame) // 2 :]),
+                sample_size=len(series_frame) - len(series_frame) // 2,
+            ),
+        ],
+        sensitivity={
+            "daily_acf_lag_1": float(daily_acf[1]),
+            "hourly_acf_lag_1": float(hourly_acf[1]),
+            "hourly_pacf_lag_24": float(hourly_pacf[LAG]),
+        },
+        falsifier="the lag-24 autocorrelation interval falls below the 0.20 floor",
+        provenance={
+            "artifact": "01_series_profile_hourly_counts.csv",
+            "source": str(HOURLY_CSV),
+            "seed": str(measurement.seed),
+            "analysis_sample": str(measurement.sample_size),
+            "block": BLOCK,
+            "resampling": measurement.resampling,
+            "exclusions": "partial terminal hour dropped",
+        },
+    )
+    decision = measurement.to_decision(
+        rule,
+        question="Is the 24h autocorrelation strong enough for a seasonal-naive baseline?",
+        evidence=evidence,
+    )
 
-    lines = [
-        "# Stationarity, autocorrelation, partial autocorrelation, cross-correlation",
-        "",
-        (
-            f"- hourly ADF: stat {adf.loc[0, 'adf_stat']}, p {adf.loc[0, 'p_value']} "
-            f"({'stationary' if adf.loc[0, 'stationary_at_5pct'] else 'NON-stationary'} @5%)"
-        ),
-        (
-            f"- daily ADF: stat {adf.loc[1, 'adf_stat']}, p {adf.loc[1, 'p_value']} "
-            f"({'stationary' if adf.loc[1, 'stationary_at_5pct'] else 'NON-stationary'} @5%)"
-        ),
-        (
-            "- top hourly ACF lags (24+): "
-            + ", ".join(f"{lag}h ({value:.2f})" for lag, value in hourly_peaks)
-        ),
-        (
-            "- top daily ACF lags (1+): "
-            + ", ".join(f"{lag}d ({value:.2f})" for lag, value in daily_peaks)
-        ),
-        (
-            "- hourly PACF outside the 95% band: "
-            + ", ".join(f"{lag}h ({value:+.2f})" for lag, value in hourly_pacf_lags)
-            if hourly_pacf_lags
-            else "- hourly PACF: no lag outside the 95% band"
-        ),
-        (
-            "- daily PACF outside the 95% band: "
-            + ", ".join(f"{lag}d ({value:+.2f})" for lag, value in daily_pacf_lags)
-            if daily_pacf_lags
-            else "- daily PACF: no lag outside the 95% band"
-        ),
-        (
-            f"- CCF demand vs mean trip duration: peak at lag {int(peak['lag'])}h "
-            f"({float(peak['ccf']):+.3f}); positive lag = demand leads duration, "
-            f"95% band ±{ccf_band:.3f}"
-        ),
-        "",
-        (
-            f"Artifacts: {stem}_adf.csv, {stem}_acf_hourly.csv, {stem}_acf_daily.csv, "
-            f"{stem}_pacf_hourly.csv, {stem}_pacf_daily.csv, {stem}_ccf.csv, "
-            f"{stem}.png, {stem}_ccf.png (this directory)."
-        ),
-    ]
-    (RESULTS / f"{stem}.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
-    print("\n".join(lines[2:10]))
+    figure = _plot_acf_pacf_figure(
+        hourly_acf, daily_acf, hourly_pacf, daily_pacf, len(hourly), len(daily)
+    )
+    _plot_ccf(ccf_frame, ccf_band)
+    output = StepOutput(
+        results_dir=RESULTS, stem=STEM, decision=decision, source=Path(__file__)
+    )
+
+    for name, frame in (
+        ("adf", adf),
+        ("acf_hourly", pd.DataFrame({"lag": range(len(hourly_acf)), "acf": hourly_acf})),
+        ("acf_daily", pd.DataFrame({"lag": range(len(daily_acf)), "acf": daily_acf})),
+        ("pacf_hourly", pd.DataFrame({"lag": range(len(hourly_pacf)), "pacf": hourly_pacf})),
+        ("pacf_daily", pd.DataFrame({"lag": range(len(daily_pacf)), "pacf": daily_pacf})),
+        ("ccf", ccf_frame),
+    ):
+        output_table = frame
+        if name != "adf":
+            output_table = output_table.head(200)
+        output.add_table(name, output_table)
+    output.save_figure(figure)
+    plt.close("all")
+    report, plot, decision_path = output.write()
+    print(
+        f"ADF hourly stat {adf.loc[0, 'adf_stat']} p {adf.loc[0, 'p_value']}; "
+        f"ACF lag24 {measurement.value:.3f}"
+    )
+    print(
+        f"top hourly ACF lags {hourly_peaks}; daily {daily_peaks}; "
+        f"PACF hourly {hourly_pacf_lags}, daily {daily_pacf_lags}; "
+        f"CCF peak {int(peak['lag'])}h ({float(peak['ccf']):+.3f})"
+    )
+    print(f"report: {report}")
+    print(f"plot: {plot}")
+    print(
+        f"decision: {decision_path} -> {decision.verdict} "
+        f"({rule.metric} {measurement.value:.4f} "
+        f"[{decision.interval_low:.4f}, {decision.interval_high:.4f}], "
+        f"n={measurement.sample_size:,}, null={decision.null_threshold:.4f})"
+    )
     print(f"wrote {stem}_adf/acf/pacf/ccf CSVs, {stem}.md, {stem}.png, {stem}_ccf.png")
 
 

@@ -1,21 +1,21 @@
-"""04: chronological holdout model comparison on the hourly demand series.
+"""04: which forecast model beats the seasonal-naive baseline on the hourly demand series?
 
 Consumes the 01 hourly count CSV (complete buckets only — the partial terminal
 hour is dropped, as 02/03 do). The last 14 days are a chronological holdout:
 every model forecasts them in one shot and never sees them in training.
 
-Models: persistence (t-1), seasonal-naive-24h (t-24), train mean, Prophet
-(daily + weekly seasonality), GluonTS torch DeepAR, GluonTS torch WaveNet (the
-CNN stand-in for MQCNN, which GluonTS >= 0.16 no longer ships in torch),
-zero-shot TimesFM, statsmodels SARIMAX, statsforecast AutoARIMA, and a
-quantile-LightGBM model. The ARIMA and quantile-LightGBM rows also carry a 95%
-interval; coverage and width are validated with the platform calibration
-metrics on the same holdout.
+Models: persistence (last train value repeated), seasonal-naive-24h (last 24
+train hours tiled), train mean, Prophet (daily + weekly seasonality), GluonTS
+torch DeepAR, GluonTS torch WaveNet (the CNN stand-in for MQCNN, which GluonTS
+>= 0.16 no longer ships in torch), zero-shot TimesFM, statsmodels SARIMAX,
+statsforecast AutoARIMA, and a quantile-LightGBM model. The ARIMA and
+quantile-LightGBM rows also carry a 95% interval; coverage and width are
+validated with the platform calibration metrics on the same holdout.
 
-Stochastic models (DeepAR, WaveNet) are retrained on REPEATS seeds; the rest
-are deterministic single runs. Metrics are reported per seed and as mean ± std.
-Models whose optional forecast package is absent are skipped with the reason
-recorded in the report instead of aborting the whole comparison.
+Every model is a MULTI-STEP forecast of the whole horizon: the naive baselines
+are tiled from the train tail (never read from inside the holdout), so the
+ranking compares like with like. Stochastic models (DeepAR, WaveNet) are
+retrained on REPEATS seeds; the rest are deterministic single runs.
 
 Outputs (all under results/timeseries/):
 - 04_forecast_models_metrics.csv: per-run long form model, seed, metric, value
@@ -24,6 +24,8 @@ Outputs (all under results/timeseries/):
 - 04_forecast_models.md: holdout window, ranking, interval validation, verdict
 - 04_forecast_models.png: actual vs each model (seed mean), last 7 holdout days
 - 04_forecast_models_<metric>.png: one ranked leaderboard per metric, top 3 highlighted
+- 04_forecast_models_decision.json: computed verdict vs the seasonal-naive baseline
+- 04_forecast_models_champion.json: the champion run with its 95% interval
 """
 
 import importlib
@@ -36,10 +38,15 @@ from typing import Any
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from _common import SEED, load_decision_rule
 
 from broadway.calibration.metrics import coverage, mean_width
 from broadway.calibration.quantile import QuantileInterval
-from broadway.evaluate.leaderboard import MetricDirection, MetricLeaderboard
+from broadway.evaluate.leaderboard import ChampionDecision, MetricDirection, MetricLeaderboard
+from broadway.evaluate.metrics import MAPE_PERCENT_SCALE, compute_metrics
+from broadway.reports.decision import Evidence, SegmentEvidence
+from broadway.reports.measurement import Measurement, MeasurementEstimator, MeasurementSpec
+from broadway.reports.step_output import StepOutput
 from broadway.stats.forecast import (
     ArimaOrder,
     AutoArimaForecaster,
@@ -52,6 +59,8 @@ from broadway.training.models.registry import get_model
 
 RESULTS = Path(__file__).resolve().parent.parent / "results" / "timeseries"
 HOURLY_CSV = RESULTS / "01_series_profile_hourly_counts.csv"
+STEM = "04_forecast_models"
+BLOCK = "day"
 REPEATS = 3
 SEEDS = tuple(range(REPEATS))
 DETERMINISTIC_SEED = -1
@@ -108,13 +117,19 @@ def _load_series() -> pd.Series:
     return complete.reindex(grid).interpolate(method="linear")
 
 
-def _baseline_forecasts(
-    train: pd.Series, series: pd.Series, horizon: pd.DatetimeIndex
-) -> dict[str, pd.Series]:
-    lags = {"persistence": 1, "seasonal_naive_24h": 24}
-    forecasts = {name: series.shift(lag).reindex(horizon) for name, lag in lags.items()}
-    forecasts["train_mean"] = pd.Series(float(train.mean()), index=horizon)
-    return forecasts
+def _baseline_forecasts(train: pd.Series, horizon: pd.DatetimeIndex) -> dict[str, pd.Series]:
+    """Multi-step naive baselines: the train tail tiled across the horizon.
+
+    Reading the holdout series' own lags (``shift(-1)``) would hand the naive
+    baseline the answers; tiling the last train value / last 24 train hours is
+    the honest multi-step counterpart of the learned forecasts.
+    """
+    season = train.to_numpy(dtype=float)[-24:]
+    return {
+        "persistence": pd.Series(float(train.iloc[-1]), index=horizon),
+        "seasonal_naive_24h": pd.Series(np.resize(season, len(horizon)), index=horizon),
+        "train_mean": pd.Series(float(train.mean()), index=horizon),
+    }
 
 
 def _forecast_prophet(train: pd.Series, horizon: pd.DatetimeIndex) -> pd.Series:
@@ -238,12 +253,11 @@ def _gluonts_forecasts(
 
 def _deterministic_forecasts(
     train: pd.Series,
-    series: pd.Series,
     horizon: pd.DatetimeIndex,
     skipped: list[str],
 ) -> tuple[dict[str, list[tuple[int, pd.Series]]], dict[str, ForecastResult]]:
     """Point paths for every deterministic model, plus the interval rows."""
-    forecasts = _baseline_forecasts(train, series, horizon)
+    forecasts = _baseline_forecasts(train, horizon)
     intervals: dict[str, ForecastResult] = {}
     optional: dict[str, Callable[[], Any]] = {
         "prophet": lambda: _forecast_prophet(train, horizon),
@@ -266,12 +280,16 @@ def _deterministic_forecasts(
 
 
 def _metrics(actual: pd.Series, predicted: pd.Series) -> dict[str, float]:
-    error = actual - predicted
-    positive = actual > 0
+    """MAE/RMSE/MAPE via the platform metrics owner (MAPE scaled to percent)."""
+    values = compute_metrics(
+        actual.to_numpy(dtype=float),
+        predicted.to_numpy(dtype=float),
+        metrics=("mae", "rmse", "mape"),
+    )
     return {
-        "MAE": float(error.abs().mean()),
-        "RMSE": float(np.sqrt((error**2).mean())),
-        "MAPE": float((error[positive].abs() / actual[positive]).mean() * 100.0),
+        "MAE": values["mae"],
+        "RMSE": values["rmse"],
+        "MAPE": values["mape"] * MAPE_PERCENT_SCALE,
     }
 
 
@@ -329,9 +347,8 @@ def _mean_paths(runs: dict[str, list[tuple[int, pd.Series]]]) -> dict[str, pd.Se
     }
 
 
-def _plot_holdout(stem: str, actual: pd.Series, paths: dict[str, pd.Series]) -> None:
+def _plot_holdout(actual: pd.Series, paths: dict[str, pd.Series]) -> Any:
     window = actual.iloc[-PLOT_HOURS:]
-    # plt.subplots is untyped (partially unknown): pin the boundary to Any once.
     subplots: Any = plt.subplots(figsize=(15, 6), constrained_layout=True)
     figure, axis = subplots
     axis.plot(window.index, window.to_numpy(), color="black", linewidth=1.8, label="actual")
@@ -345,8 +362,7 @@ def _plot_holdout(stem: str, actual: pd.Series, paths: dict[str, pd.Series]) -> 
         ylabel="trips",
     )
     axis.legend(ncol=4, fontsize=8)
-    figure.savefig(RESULTS / f"{stem}.png", dpi=160)
-    plt.close(figure)
+    return figure
 
 
 def _metric_cell(mean: float, std: float) -> str:
@@ -358,13 +374,80 @@ def _mean_wide(aggregate: pd.DataFrame) -> pd.DataFrame:
     return aggregate.pivot(index="model", columns="metric", values="mean")
 
 
-def _write_leaderboards(stem: str, aggregate: pd.DataFrame) -> None:
+def _write_leaderboards(stem: str, aggregate: pd.DataFrame) -> MetricLeaderboard:
     """One ranked figure per metric; prints the top 3 so the verdict is visible."""
     board = MetricLeaderboard.from_frame(
         _mean_wide(aggregate).reset_index(), id_column="model", metrics=FORECAST_DIRECTIONS
     )
     for metric, path in board.write(RESULTS, stem).items():
         print(f"leaderboard {metric}: top 3 {', '.join(board.top(metric))} -> {path.name}")
+    return board
+
+
+def _mae_interval(actual: pd.Series, predicted: pd.Series) -> tuple[float, float]:
+    """95% day-block interval of one model's holdout MAE."""
+    frame = pd.DataFrame(
+        {
+            "actual": actual.to_numpy(dtype=float),
+            "predicted": predicted.reindex(actual.index).to_numpy(dtype=float),
+            "day": actual.index.floor("D"),
+        }
+    )
+    spec = MeasurementSpec(
+        bootstrap="block", block_column=BLOCK, iterations=200, seed=SEED
+    )
+    measurement = MeasurementEstimator().estimate(
+        frame,
+        lambda part: float((part["actual"] - part["predicted"]).abs().mean()),
+        spec,
+        name="mae",
+    )
+    return measurement.interval_low, measurement.interval_high
+
+
+def _champion(
+    board: MetricLeaderboard, actual: pd.Series, paths: dict[str, pd.Series]
+) -> ChampionDecision:
+    intervals = {model: _mae_interval(actual, path) for model, path in paths.items()}
+    return board.champion("MAE", intervals)
+
+
+def _improvement(
+    actual: pd.Series, champion: pd.Series, naive: pd.Series
+) -> tuple[float, tuple[float, float], int, float | None, str]:
+    """Champion MAE improvement over seasonal-naive, day-blocked, with its null."""
+    frame = pd.DataFrame(
+        {
+            "actual": actual.to_numpy(dtype=float),
+            "champion": champion.reindex(actual.index).to_numpy(dtype=float),
+            "naive": naive.reindex(actual.index).to_numpy(dtype=float),
+            "day": actual.index.floor("D"),
+        }
+    )
+
+    def statistic(part: pd.DataFrame) -> float:
+        champion_mae = float((part["actual"] - part["champion"]).abs().mean())
+        naive_mae = float((part["actual"] - part["naive"]).abs().mean())
+        return 1.0 - champion_mae / naive_mae
+
+    spec = MeasurementSpec(
+        bootstrap="block",
+        block_column=BLOCK,
+        null="block_shuffle",
+        null_column="actual",
+        iterations=200,
+        seed=SEED,
+    )
+    measurement = MeasurementEstimator().estimate(
+        frame, statistic, spec, name="mae_improvement", unit="relative_improvement"
+    )
+    return (
+        measurement.value,
+        (measurement.interval_low, measurement.interval_high),
+        measurement.sample_size,
+        measurement.null_threshold,
+        measurement.resampling,
+    )
 
 
 def _report_table(wide: pd.DataFrame, spread: pd.DataFrame, runs: pd.Series) -> list[str]:
@@ -396,17 +479,17 @@ def _interval_section(intervals: pd.DataFrame) -> list[str]:
 
 
 def _write_report(
-    stem: str,
     train: pd.Series,
     actual: pd.Series,
     aggregate: pd.DataFrame,
     intervals: pd.DataFrame,
     skipped: list[str],
+    champion: ChampionDecision,
 ) -> None:
     wide = _mean_wide(aggregate).sort_values("MAE")
     spread = aggregate.pivot(index="model", columns="metric", values="std")
     runs = aggregate.groupby("model")["runs"].max()
-    best = str(wide.index[0])
+    best = champion.champion
     gain = float(wide.loc["persistence", "MAE"]) - float(wide.loc[best, "MAE"])
     lines = [
         "# Forecast model comparison — hourly demand",
@@ -418,8 +501,9 @@ def _write_report(
             "(2024-03-10 02:00) is linearly interpolated for contiguous lags — train only."
         ),
         (
-            "- baseline convention: persistence/seasonal-naive are one-step lags of the observed "
-            "series (t-1, t-24); the learned models forecast all 336 hours in one shot."
+            "- baseline convention: EVERY model is a multi-step forecast of the 336-hour "
+            "horizon. persistence tiles the last train value; seasonal-naive-24h tiles the "
+            "last 24 train hours. Neither reads the holdout, so the ranking is like-for-like."
         ),
         (
             f"- repeatability: DeepAR and WaveNet are stochastic and retrained on seeds {SEEDS}; "
@@ -430,7 +514,11 @@ def _write_report(
             f"native level) and quantile LightGBM (2.5/50/97.5%) report a {100 * (1 - INTERVAL_ALPHA):.0f}% "
             "holdout interval; coverage/width come from the platform calibration metrics."
         ),
-        f"- verdict: {best} wins on mean MAE: {gain:+.1f} trips versus persistence.",
+        (
+            f"- verdict: champion {best} on MAE = {champion.value:,.1f} trips "
+            f"[{champion.interval_low:,.1f}, {champion.interval_high:,.1f}] 95%; "
+            f"{gain:+.1f} trips versus persistence, runner-up {champion.runner_up}."
+        ),
         "",
         "| model | repeats | MAE | RMSE | MAPE % |",
         "|---|---|---|---|---|",
@@ -442,40 +530,26 @@ def _write_report(
             "for a series stationary at 5% hourly — hence the 24h naive lag and daily+weekly "
             "seasonality in the learned models (`02_seasonality.md`, `03_stationarity_acf.md`)."
         ),
-        (
-            f"- TimesFM: zero-shot `{TIMESFM_CHECKPOINT}`, package "
-            f"`timesfm=={importlib.metadata.version('timesfm')}` (3.0's torch API ships in the "
-            "separate unpublished `timesfm3` package, so 2.5 is the latest loadable checkpoint)."
-            if "timesfm" in wide.index
-            else "- TimesFM: not run in this environment (see the skipped line)."
-        ),
-        (
-            "- GluonTS: `gluonts_mqcnn` is unavailable in GluonTS >= 0.16 (MQCNN removed with "
-            "the MXNet API); `gluonts_wavenet` is the torch CNN used as the second model."
-        ),
         "- plot: stochastic models are drawn as their seed-mean path.",
         *(("", "- skipped: " + "; ".join(skipped)) if skipped else ()),
         "",
         (
-            f"Artifacts: {stem}_metrics.csv, {stem}_aggregate.csv, {stem}_intervals.csv, "
-            f"{stem}.md, {stem}.png, and one {stem}_<metric>.png leaderboard per metric "
-            "(this directory)."
+            f"Artifacts: {STEM}_metrics.csv, {STEM}_aggregate.csv, {STEM}_intervals.csv, "
+            f"{STEM}.md, {STEM}.png, one {STEM}_<metric>.png leaderboard per metric, "
+            f"{STEM}_champion.json, {STEM}_decision.json (this directory)."
         ),
     ]
-    (RESULTS / f"{stem}.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
-    print("\n".join(lines[4:]))
-    print(f"wrote {stem}_metrics.csv, {stem}_aggregate.csv, {stem}_intervals.csv, {stem}.md, {stem}.png")
+    (RESULTS / f"{STEM}.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def main() -> None:
     RESULTS.mkdir(parents=True, exist_ok=True)
-    stem = Path(__file__).stem
     series = _load_series()
     train, actual = series.iloc[:-HOLDOUT_HOURS], series.iloc[-HOLDOUT_HOURS:]
     print(f"train {len(train)}h -> holdout {len(actual)}h {actual.index[0]} .. {actual.index[-1]}")
 
     skipped: list[str] = []
-    runs, intervals = _deterministic_forecasts(train, series, actual.index, skipped)
+    runs, intervals = _deterministic_forecasts(train, actual.index, skipped)
     gluonts = _collect(skipped, "gluonts", lambda: _gluonts_forecasts(train, actual.index))
     if gluonts is not None:
         runs.update(gluonts)
@@ -483,14 +557,107 @@ def main() -> None:
     metrics = _metrics_frame(actual, runs)
     aggregate = _aggregate_frame(metrics)
     interval_frame = _interval_frame(actual, intervals)
-    metrics.to_csv(RESULTS / f"{stem}_metrics.csv", index=False)
-    aggregate.to_csv(RESULTS / f"{stem}_aggregate.csv", index=False)
-    interval_frame.to_csv(RESULTS / f"{stem}_intervals.csv", index=False)
-    _plot_holdout(stem, actual, _mean_paths(runs))
-    _write_leaderboards(stem, aggregate)
-    _write_report(stem, train, actual, aggregate, interval_frame, skipped)
+    metrics.to_csv(RESULTS / f"{STEM}_metrics.csv", index=False)
+    aggregate.to_csv(RESULTS / f"{STEM}_aggregate.csv", index=False)
+    interval_frame.to_csv(RESULTS / f"{STEM}_intervals.csv", index=False)
+
+    paths = _mean_paths(runs)
+    figure = _plot_holdout(actual, paths)
+    board = _write_leaderboards(STEM, aggregate)
+    champion = _champion(board, actual, paths)
+    (RESULTS / f"{STEM}_champion.json").write_text(
+        champion.model_dump_json(indent=2), encoding="utf-8"
+    )
+
+    naive_name = "seasonal_naive_24h"
+    value, (low, high), n, null_threshold, resampling = _improvement(
+        actual, paths[champion.champion], paths[naive_name]
+    )
+    weekend = actual.index.dayofweek.isin(WEEKEND_DAYS)
+    improvement_weekend = 1.0 - float(
+        (actual[weekend] - paths[champion.champion].reindex(actual.index)[weekend]).abs().mean()
+    ) / float((actual[weekend] - paths[naive_name].reindex(actual.index)[weekend]).abs().mean())
+    improvement_weekday = 1.0 - float(
+        (actual[~weekend] - paths[champion.champion].reindex(actual.index)[~weekend]).abs().mean()
+    ) / float((actual[~weekend] - paths[naive_name].reindex(actual.index)[~weekend]).abs().mean())
+    rule = load_decision_rule(STEM)
+    evidence = Evidence(
+        baseline=f"{naive_name} multi-step forecast (last 24 train hours tiled over the horizon)",
+        segments=[
+            SegmentEvidence(
+                segment="weekday",
+                value=improvement_weekday,
+                sample_size=int((~weekend).sum()),
+            ),
+            SegmentEvidence(
+                segment="weekend",
+                value=improvement_weekend,
+                sample_size=int(weekend.sum()),
+            ),
+        ],
+        sensitivity={
+            "runner_up_mae": float(
+                _mean_wide(aggregate).loc[str(champion.runner_up), "MAE"]
+            ),
+            "last_7_days_improvement": _improvement(
+                actual.iloc[-24 * 7:],
+                paths[champion.champion].iloc[-24 * 7:],
+                paths[naive_name].iloc[-24 * 7:],
+            )[0],
+        },
+        falsifier="the champion-vs-naive improvement interval falls below the 2% floor",
+        provenance={
+            "artifact": champion.champion,
+            "source": str(HOURLY_CSV),
+            "seed": str(SEED),
+            "analysis_sample": str(n),
+            "block": BLOCK,
+            "resampling": resampling,
+            "exclusions": "partial terminal hour dropped; DST hole interpolated in train only",
+        },
+    )
+    measured = Measurement(
+        statistic=rule.metric,
+        value=value,
+        interval_low=low,
+        interval_high=high,
+        null_threshold=null_threshold,
+        sample_size=n,
+        seed=SEED,
+        resampling=resampling,
+        block_column=BLOCK,
+        iterations=200,
+        confidence=0.95,
+        unit="relative_improvement",
+    )
+    decision = measured.to_decision(
+        rule,
+        question="Does the champion beat the seasonal-naive baseline on the holdout?",
+        evidence=evidence,
+        reference=None,
+    )
+    output = StepOutput(
+        results_dir=RESULTS, stem=STEM, decision=decision, source=Path(__file__)
+    )
+    output.add_table("metrics", metrics)
+    output.add_table("aggregate", aggregate)
+    output.add_table("intervals", interval_frame)
+    output.save_figure(figure)
+    plt.close("all")
+    decision_path = output.write_decision()
+    _write_report(train, actual, aggregate, interval_frame, skipped, champion)
     print(aggregate[aggregate["metric"] == "MAE"].sort_values("mean").to_string(index=False))
     print(interval_frame.to_string(index=False))
+    print(
+        f"champion: {champion.champion} MAE {champion.value:.1f} "
+        f"[{champion.interval_low:.1f}, {champion.interval_high:.1f}] "
+        f"(runner-up {champion.runner_up}, margin {champion.margin:+.1f})"
+    )
+    print(
+        f"decision: {decision_path} -> {decision.verdict} "
+        f"({rule.metric} {value:.4f} [{low:.4f}, {high:.4f}], "
+        f"n={n}, null={null_threshold})"
+    )
 
 
 if __name__ == "__main__":

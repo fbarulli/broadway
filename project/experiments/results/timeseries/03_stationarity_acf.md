@@ -1,11 +1,53 @@
-# Stationarity, autocorrelation, partial autocorrelation, cross-correlation
+# 03_stationarity_acf
 
-- hourly ADF: stat -5.527, p 1.82e-06 (stationary @5%)
-- daily ADF: stat -2.077, p 0.254 (NON-stationary @5%)
-- top hourly ACF lags (24+): 168h (0.89), 24h (0.88), 167h (0.85)
-- top daily ACF lags (1+): 7d (0.67), 14d (0.56), 6d (0.50)
-- hourly PACF outside the 95% band: 1h (+0.94), 2h (-0.70), 4h (-0.35)
-- daily PACF outside the 95% band: 1d (+0.46), 6d (+0.42), 7d (+0.39)
-- CCF demand vs mean trip duration: peak at lag -4h (+0.566); positive lag = demand leads duration, 95% band ±0.042
+## question
 
-Artifacts: 03_stationarity_acf_adf.csv, 03_stationarity_acf_acf_hourly.csv, 03_stationarity_acf_acf_daily.csv, 03_stationarity_acf_pacf_hourly.csv, 03_stationarity_acf_pacf_daily.csv, 03_stationarity_acf_ccf.csv, 03_stationarity_acf.png, 03_stationarity_acf_ccf.png (this directory).
+Is the 24h autocorrelation strong enough for a seasonal-naive baseline?
+
+## decision — investigate
+
+- metric: hourly_acf_lag24 = 0.8816 [0.7482, 0.8816] 95% (n=2,183, unit=correlation)
+- rule: max 0.8180 (permutation null 0.8180)
+- action (timeseries): use the 24h seasonal-naive lag as the forecast baseline
+
+![figure](03_stationarity_acf.png)
+
+## evidence
+
+- baseline: no memory: autocorrelation at lag 24 is zero
+
+### segments
+
+| segment | value | n |
+| --- | ---: | ---: |
+| first_half | 0.8490 | 1,091 |
+| second_half | 0.8808 | 1,092 |
+
+### sensitivity
+
+- daily_acf_lag_1: 0.4580
+- hourly_acf_lag_1: 0.9416
+- hourly_pacf_lag_24: -0.1292
+
+### falsifier
+
+the lag-24 autocorrelation interval falls below the 0.20 floor
+
+### provenance
+
+- artifact: 01_series_profile_hourly_counts.csv
+- source: /home/opc/ONE/broad-way/project/experiments/results/timeseries/01_series_profile_hourly_counts.csv
+- seed: 42
+- analysis_sample: 2183
+- block: day
+- resampling: block+block_shuffle
+- exclusions: partial terminal hour dropped
+
+## tables
+
+- [adf](03_stationarity_acf_adf.csv)
+- [acf_hourly](03_stationarity_acf_acf_hourly.csv)
+- [acf_daily](03_stationarity_acf_acf_daily.csv)
+- [pacf_hourly](03_stationarity_acf_pacf_hourly.csv)
+- [pacf_daily](03_stationarity_acf_pacf_daily.csv)
+- [ccf](03_stationarity_acf_ccf.csv)
