@@ -165,3 +165,51 @@ def test_min_direction_null_band_can_only_tighten_the_bar() -> None:
     assert with_null.threshold == pytest.approx(0.022)
     assert with_null.verdict == "no_action"
     assert with_null.min_sample_size == rule.min_sample_size
+
+
+def test_decision_rule_set_names_an_undeclared_step(tmp_path) -> None:
+    import yaml
+
+    from broadway.reports.decision import DecisionRuleError, DecisionRuleSet
+
+    path = tmp_path / "experiment.yaml"
+    path.write_text(
+        yaml.safe_dump(
+            {
+                "seed": 42,
+                "decisions": {
+                    "01_step": {
+                        "metric": "ks_demo",
+                        "direction": "max",
+                        "min_effect": 0.01,
+                        "action": "review",
+                        "owner": "demo",
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    rules = DecisionRuleSet.from_yaml(path)
+    assert rules.rule("01_step").metric == "ks_demo"
+    with pytest.raises(DecisionRuleError, match="declared: 01_step"):
+        rules.rule("02_missing")
+
+    path.write_text(
+        yaml.safe_dump(
+            {
+                "decisions": {
+                    "02_bad": {
+                        "metric": "ks_demo",
+                        "direction": "max",
+                        "min_effect": 0,
+                        "action": "review",
+                        "owner": "demo",
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(DecisionRuleError, match="invalid decisions block"):
+        DecisionRuleSet.from_yaml(path)

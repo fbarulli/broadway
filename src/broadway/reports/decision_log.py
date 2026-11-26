@@ -48,6 +48,11 @@ class DecisionLog:
     """Project a step's decision record into MLflow (injectable into StepOutput)."""
 
     def __init__(self, *, tracking_uri: str | None, experiment: str = EXPERIMENT) -> None:
+        # A projection is an optional side channel: an unreachable server must
+        # fail in seconds, not retry for minutes and stall the step. These are
+        # MLflow's own HTTP knobs (setdefault keeps an operator override).
+        os.environ.setdefault("MLFLOW_HTTP_REQUEST_TIMEOUT", "2")
+        os.environ.setdefault("MLFLOW_HTTP_REQUEST_MAX_RETRIES", "1")
         self._tracking_uri = (tracking_uri or "").strip() or None
         self._experiment = experiment
         self._reason: str | None = None

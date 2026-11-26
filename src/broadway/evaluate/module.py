@@ -333,8 +333,8 @@ class PromotionDecision:
 
     @property
     def promote(self) -> bool:
-        assert self._cfg.evaluate is not None
-        return self.relative_interval[0] > self._cfg.evaluate.promotion_threshold
+        """Promotion is the computed verdict, not a bare interval comparison."""
+        return self.decision().verdict == "act"
 
     def _segment_values(self, half: slice) -> tuple[float, float]:
         """Candidate and champion metric on one holdout half."""
