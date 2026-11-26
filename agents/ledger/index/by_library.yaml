@@ -349,6 +349,7 @@ lookup value audit (data/lookup_value_audit.py:48):
 - GATE-CFG-74
 matplotlib:
 - GATE-SURF-66
+- GATE-INFRA-182
 matplotlib (Agg):
 - GATE-STATS-48
 matplotlib Agg (:8):
@@ -361,6 +362,7 @@ mlflow:
 - GATE-HPO-83
 - GATE-HPO-84
 - GATE-HPO-87
+- GATE-INFRA-182
 mlflow.exceptions.MlflowException:
 - GATE-TRAIN-120
 mlflow.tracking.MlflowClient:
@@ -436,6 +438,7 @@ pandas:
 - GATE-INFRA-160
 - GATE-INFRA-161
 - GATE-INFRA-176
+- GATE-INFRA-182
 pandas (df ops):
 - GATE-ETL-17
 pandas (via df.to_parquet at call site):

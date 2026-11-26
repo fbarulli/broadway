@@ -735,6 +735,8 @@ markdown link regex :23:
 - GATE-SURF-67
 matched count from JoinAudit:
 - GATE-ETL-14
+measured 95% intervals per run (ChampionDecision):
+- GATE-INFRA-182
 merged environment section (post GATE-CFG-71):
 - GATE-CFG-73
 merged_names:
@@ -791,6 +793,8 @@ omnibus.json (runners.py:324):
 - GATE-INFRA-176
 one pa.Column per contract entry:
 - GATE-CFG-75
+one ranked leaderboard figure per metric + <stem>_champion.json:
+- GATE-INFRA-182
 one save-site per key family; size-budget watch; purge as invoked workflow step:
 - GATE-INFRA-143
 ? one validated AnalysisStep record per analysis step; serialized by timeline/module.save_step to artifacts/timeline/<analysis>/steps/<step_id>.json; consumed by suggest.py
@@ -938,6 +942,8 @@ random_state base seed:
 - GATE-HPO-88
 random_state seed int:
 - GATE-HPO-80
+ranked frame (one row per run) + declared metric directions:
+- GATE-INFRA-182
 raw CSV path (ds-pipeline columns subparser argv):
 - GATE-SURF-101
 raw CSV/parquet frame:
@@ -1042,6 +1048,8 @@ retention as INVOKED operations with logged outcomes (no accidental append-only)
 - GATE-CUST-151
 retire-or-own verdict per named ref; detect-and-retire loop execution record:
 - GATE-INFRA-142
+rfe curve, SHAP/permutation/PDP tables, data manifest, GPU adapter step():
+- GATE-INFRA-182
 runner-computed result_summary dicts:
 - GATE-TLINE-50
 ? runner-local evidence models from timeline/evidence.py (NormalityEvidence evidence.py:14, VarianceEvidence evidence.py:22, PosthocEvidence evidence.py:40, ConclusionEvidence evidence.py:48)

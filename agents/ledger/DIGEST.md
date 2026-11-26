@@ -1,6 +1,6 @@
 # DIGEST.md — rendered from agents/ledger/gates.yaml · NEVER HAND-EDIT ·
 
-> 171 gates · rendered 2026-11-26 @ HEAD ff9d9ab · load THIS into context;
+> 172 gates · rendered 2026-11-26 @ HEAD e5ebb33 · load THIS into context;
 > gates.yaml is the sole SSOT; the retired GATES.md/gates/*.md markdown world survives in agents/ledger/arbitration/2026-08-24/surface-and-analysis-preservation.md.
 
 | band | phase | gates | findings |
@@ -14,9 +14,9 @@
 | 07-surfaces | surfaces | 13 | 1 |
 | 08-config | config-schema | 17 | 11 |
 | 80-hpo-optuna | hpo-optuna | 10 | 9 |
-| 09-infra | infra-meta | 59 | 17 |
+| 09-infra | infra-meta | 60 | 17 |
 | 81-object-custody | object-custody | 6 | 0 |
-| **total** | | **171** | **84** |
+| **total** | | **172** | **84** |
 
 ### 01-ingest — ingest
 
@@ -377,6 +377,8 @@
   [] → [] · pins: none direct
 - **GATE-INFRA-181** `project/features/__init__.py:48 taxi()  # package plan callable resolved by ExperimentConfig.feature_plan`
   [DatasetContract (target/datetime/columns) via project.features.load_contract] → [ColumnPlan keep-set (14 ops) consumed by the project ML pipeline projection and project/config/experiment/taxi.yaml feature_plan] · pins: 2
+- **GATE-INFRA-182** `src/broadway/evaluate/leaderboard.py:45 MetricDirection + src/broadway/evaluate/feature_selection.py rfe_curve + src/broadway/evaluate/explain.py shap_summary + src/broadway/tracking/manifest.py:20 DataManifest + gpu_training/adapters/gluonts_step.py step + gpu_training/adapters/prophet_step.py step + gpu_training/adapters/timesfm_step.py step`
+  [ranked frame (one row per run) + declared metric directions, measured 95% intervals per run (ChampionDecision)] → [one ranked leaderboard figure per metric + <stem>_champion.json, rfe curve, SHAP/permutation/PDP tables, data manifest, GPU adapter step()] · pins: 4
 
 ### 81-object-custody — object-custody
 

@@ -158,6 +158,8 @@ src/broadway/etl/module.py:
 - GATE-ETL-10
 src/broadway/evaluate/contracts.py:
 - GATE-INFRA-162
+src/broadway/evaluate/leaderboard.py:
+- GATE-INFRA-182
 src/broadway/evaluate/metrics.py:
 - GATE-TRAIN-36
 src/broadway/evaluate/module.py:
