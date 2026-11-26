@@ -21,7 +21,20 @@ ENFORCED: tuple[str, ...] = ("fare_prediction", "timeseries")
 # The decision half of the contract, per step (a step publishes a computed
 # verdict). A step joins this set when it builds a StepOutput with a Decision.
 # Never remove.
-DECISION_ENFORCED: tuple[tuple[str, str], ...] = (("fare_prediction", "01_generate_sample"),)
+DECISION_ENFORCED: tuple[tuple[str, str], ...] = (
+    ("fare_prediction", "01_generate_sample"),
+    ("fare_prediction", "02_filtered_profile"),
+    ("fare_prediction", "03_short_trips"),
+    ("fare_prediction", "04_percentile_extremes_audit"),
+    ("fare_prediction", "05_temporal_features"),
+    ("fare_prediction", "06_prepare_model_data"),
+    ("fare_prediction", "07_specification_diagnostics"),
+    ("fare_prediction", "08_lightgbm_baseline"),
+    ("timeseries", "01_series_profile"),
+    ("timeseries", "02_seasonality"),
+    ("timeseries", "03_stationarity_acf"),
+    ("timeseries", "04_forecast_models"),
+)
 
 # Pipeline modules that must publish a decision record (the same contract, one
 # level up from the experiment scripts). Grows as each step is wired; never shrinks.
@@ -33,8 +46,21 @@ PIPELINE_STEPS: tuple[str, ...] = (
     "training",
     "evaluate",
     "baseline",
+    "causal",
+    # tracking has no step module yet; it joins the decision gate with the
+    # serve feed that makes a train-vs-serve drift verdict measurable.
+    "tracking",
 )
-PIPELINE_DECISION_ENFORCED: tuple[str, ...] = ()
+# Steps that now publish a computed Decision/StepOutput. An entry is added
+# once it complies; never removed.
+PIPELINE_DECISION_ENFORCED: tuple[str, ...] = (
+    "etl",
+    "features",
+    "training",
+    "evaluate",
+    "baseline",
+    "causal",
+)
 
 
 @dataclass(frozen=True)

@@ -20,6 +20,8 @@ from broadway.data.splitter import split
 from broadway.lineage.ids import node_id
 from broadway.lineage.models import TransformAudit
 from broadway.lineage.records import enforce_drop_fraction, records_dir, write_record
+from broadway.reports.decision import Decision, DecisionRule, Evidence, SegmentEvidence
+from broadway.reports.step_output import StepOutput
 from broadway.tracking.manifest import write_etl_manifest
 
 logger = logging.getLogger(__name__)
@@ -57,6 +59,100 @@ def _assert_data_source_supported(cfg: PipelineConfig) -> None:
             f"etl cannot run for data_source.loader '{loader}' "
             f"(supported: {', '.join(sorted(_RAW_INGEST_LOADERS))})"
         )
+
+
+class EtlDecision:
+    """Publish the row-drop decision: did the ingest lose more than the contract allows?
+
+    The metric is the UNEXPLAINED drop share (a drop no recorded reason
+    accounts for) — the signal that the source changed under the contract.
+    The explained drops are the evidence slices, not the headline.
+    """
+
+    def __init__(self, cfg: PipelineConfig, audit: TransformAudit) -> None:
+        assert cfg.dataset is not None and cfg.etl is not None
+        self._cfg = cfg
+        self._audit = audit
+
+    def rule(self) -> DecisionRule:
+        assert self._cfg.dataset is not None and self._cfg.etl is not None
+        # A configured zero drop tolerance means "no loss": the floor is a
+        # positive epsilon only because the rule model forbids zero.
+        return DecisionRule(
+            metric="rows_dropped_unexplained_share",
+            direction="max",
+            min_effect=max(self._cfg.etl.max_drop_fraction, 1e-9),
+            min_sample_size=1,
+            action="fix the source before training",
+            owner=self._cfg.dataset.name,
+        )
+
+    def decision(self) -> Decision:
+        audit = self._audit
+        rows_in = max(audit.rows_in, 1)
+        unexplained = audit.rows_dropped_unexplained / rows_in
+        explained = max(audit.rows_dropped_total - audit.rows_dropped_unexplained, 0) / rows_in
+        evidence = Evidence(
+            baseline="contract-clean ingest: every dropped row carries a recorded reason",
+            segments=[
+                SegmentEvidence(
+                    segment="explained_drops", value=explained, sample_size=rows_in
+                ),
+                SegmentEvidence(
+                    segment="unexplained_drops", value=unexplained, sample_size=rows_in
+                ),
+            ],
+            sensitivity={
+                f"total_drop_share_n{rows_in}": audit.rows_dropped_total / rows_in,
+                f"rows_out_n{audit.rows_out}": float(audit.rows_out),
+            },
+            falsifier="the unexplained-share interval clears the configured drop ceiling",
+            provenance={
+                "artifact": "canonical.parquet",
+                "rows_in": str(audit.rows_in),
+                "rows_out": str(audit.rows_out),
+                "reasons": "; ".join(audit.reasons) or "none",
+            },
+        )
+        return Decision.evaluate(
+            rule=self.rule(),
+            value=unexplained,
+            interval=(unexplained, unexplained),
+            sample_size=rows_in,
+            question="Did the ingest lose more rows than the contract explains?",
+            evidence=evidence,
+            unit="share",
+        )
+
+    def publish(self, out_dir: Path) -> Decision:
+        """Write the decision record + row-funnel figure next to the processed data."""
+        decision = self.decision()
+        import matplotlib
+
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+
+        audit = self._audit
+        figure, axis = plt.subplots(figsize=(6, 3.6), constrained_layout=True)
+        stages = ["rows in", "rows out", "unexplained"]
+        values = [audit.rows_in, audit.rows_out, audit.rows_dropped_unexplained]
+        bars = axis.bar(stages, values, color=["#9ecae1", "#08519c", "#d62728"])
+        for bar in bars:
+            axis.text(
+                bar.get_x() + bar.get_width() / 2,
+                bar.get_height(),
+                f"{int(bar.get_height()):,}",
+                ha="center",
+                va="bottom",
+                fontsize=9,
+            )
+        axis.set_ylabel("rows")
+        axis.set_title("ETL row funnel")
+        output = StepOutput(results_dir=out_dir, stem="etl", decision=decision)
+        output.save_figure(figure)
+        plt.close("all")
+        output.write()
+        return decision
 
 
 def run(cfg: PipelineConfig) -> None:
@@ -126,6 +222,13 @@ def run(cfg: PipelineConfig) -> None:
         columns_removed=sorted(set(columns_before) - set(columns_after)),
     )
     enforce_drop_fraction(audit, cfg.etl.max_drop_fraction)
+    decision = EtlDecision(cfg, audit).publish(out_dir)
+    logger.info(
+        "etl decision: %s — unexplained drop share %.4f (ceiling %.4f)",
+        decision.verdict,
+        decision.value,
+        decision.threshold,
+    )
 
     result = StructuralCleanResult(
         audit=audit,

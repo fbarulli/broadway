@@ -21,12 +21,15 @@ from broadway.calibration.conformal import SplitConformal
 from broadway.calibration.contracts import CalibrationConfig, CalibrationSummary
 from broadway.config.schema import PipelineConfig, TaskType
 from broadway.data.splitter import calibration_split, split
-from broadway.evaluate.metrics import compute_metrics
+from broadway.evaluate.contracts import BootstrapConfig
+from broadway.evaluate.metrics import MetricBootstrap, compute_metrics
 from broadway.features.generic import validate_engineered_frame
 from broadway.features.plan import ColumnPlan
 from broadway.lineage.ids import node_id
 from broadway.lineage.records import write_record
 from broadway.observability.profiling import phase
+from broadway.reports.decision import Decision, DecisionRule, Evidence, SegmentEvidence
+from broadway.reports.step_output import StepOutput
 from broadway.tracking.bundle import TrackingBundle
 from broadway.tracking.manifest import MANIFEST_FILENAME
 from broadway.training.contracts import TrainingResult
@@ -95,6 +98,23 @@ def _resolve_params(
         raise ValueError(
             f"hpo produced no valid trial for model '{cfg.experiment.model.type}'"
         )
+    decision = TrainingDecision.measure(
+        cfg,
+        cfg.experiment.model.type,
+        dict(best["best_params"]),
+        cfg.experiment.model.params,
+        X_train,
+        y_train,
+        X_val,
+        y_val,
+    )
+    if decision is not None:
+        published = decision.publish()
+        logger.info(
+            "training decision: %s — improvement over defaults %.4f",
+            published.verdict,
+            published.value,
+        )
     return dict(best["best_params"])
 
 
@@ -149,6 +169,208 @@ def _log_calibration(summary: CalibrationSummary) -> None:
         {"calibration.method": summary.method, "calibration.alpha": summary.alpha}
     )
     log_metrics({"calibration.q": summary.q})
+
+
+class TrainingDecision:
+    """Publish the HPO verdict: does the best trial beat the declared defaults?
+
+    The metric is the relative improvement of the HPO-best params over the
+    experiment's default params on the validation slice. The interval is a
+    paired bootstrap over those rows; the candidate is adopted only when the
+    interval's lower bound clears the evaluate step's promotion threshold (the
+    one shipping bar the config declares).
+    """
+
+    def __init__(
+        self,
+        *,
+        cfg: PipelineConfig,
+        target_metric: str,
+        best_params: dict[str, float | int | str],
+        default_params: dict[str, float | int | str],
+        best_value: float,
+        default_value: float,
+        y_val: np.ndarray,
+        pred_best: np.ndarray,
+        pred_default: np.ndarray,
+        interval: tuple[float, float],
+    ) -> None:
+        assert cfg.dataset is not None and cfg.evaluate is not None
+        if best_value <= 0.0:
+            raise ValueError(
+                f"relative HPO improvement needs a positive default metric, got {best_value}"
+            )
+        self._cfg = cfg
+        self._target_metric = target_metric
+        self._best_params = best_params
+        self._default_params = default_params
+        self._best_value = best_value
+        self._default_value = default_value
+        self._truth = y_val
+        self._pred_best = pred_best
+        self._pred_default = pred_default
+        self._absolute = interval
+
+    @classmethod
+    def measure(
+        cls,
+        cfg: PipelineConfig,
+        model_type: str,
+        best_params: dict[str, float | int | str],
+        default_params: dict[str, float | int | str],
+        X_train: pd.DataFrame,
+        y_train: pd.Series,
+        X_val: pd.DataFrame,
+        y_val: pd.Series,
+    ) -> TrainingDecision | None:
+        """Fit both param sets once and pair-bootstrap the improvement; None when unsupported."""
+        if cfg.evaluate is None or cfg.experiment is None or cfg.experiment.hpo is None:
+            return None
+        target = cfg.experiment.hpo.target_metric
+        if cfg.experiment.hpo.direction != "minimize" or target not in {"rmse", "mae", "mape"}:
+            return None
+        best_pipeline = build_model_pipeline(cfg, model_type, best_params).fit(X_train, y_train)
+        default_pipeline = build_model_pipeline(cfg, model_type, default_params).fit(
+            X_train, y_train
+        )
+        pred_best = np.asarray(best_pipeline.predict(X_val), dtype=float)
+        pred_default = np.asarray(default_pipeline.predict(X_val), dtype=float)
+        truth = y_val.to_numpy(dtype=float)
+        best_value = float(compute_metrics(truth, pred_best, metrics=(target,))[target])
+        default_value = float(
+            compute_metrics(truth, pred_default, metrics=(target,))[target]
+        )
+        bootstrap = MetricBootstrap(
+            BootstrapConfig(
+                iterations=cfg.evaluate.bootstrap.iterations,
+                seed=cfg.evaluate.bootstrap.seed,
+                level=cfg.evaluate.bootstrap.level,
+            )
+        )
+        interval = bootstrap.improvement_interval(
+            truth, pred_best, pred_default, metric=target
+        )
+        return cls(
+            cfg=cfg,
+            target_metric=target,
+            best_params=best_params,
+            default_params=default_params,
+            best_value=best_value,
+            default_value=default_value,
+            y_val=truth,
+            pred_best=pred_best,
+            pred_default=pred_default,
+            interval=(interval.lower, interval.upper),
+        )
+
+    @property
+    def relative_value(self) -> float:
+        return (self._default_value - self._best_value) / self._default_value
+
+    @property
+    def relative_interval(self) -> tuple[float, float]:
+        low, high = self._absolute
+        return low / self._default_value, high / self._default_value
+
+    def decision(self) -> Decision:
+        assert self._cfg.dataset is not None and self._cfg.evaluate is not None
+        low, high = self.relative_interval
+        midpoint = len(self._truth) // 2
+
+        def half_value(half: slice) -> float:
+            best = float(
+                compute_metrics(
+                    self._truth[half], self._pred_best[half], metrics=(self._target_metric,)
+                )[self._target_metric]
+            )
+            default = float(
+                compute_metrics(
+                    self._truth[half], self._pred_default[half], metrics=(self._target_metric,)
+                )[self._target_metric]
+            )
+            return (default - best) / default if default else 0.0
+
+        evidence = Evidence(
+            baseline=(
+                f"experiment defaults {self._default_params} on the validation slice"
+            ),
+            delta=self.relative_value,
+            segments=[
+                SegmentEvidence(
+                    segment="first_half", value=half_value(slice(0, midpoint)), sample_size=midpoint
+                ),
+                SegmentEvidence(
+                    segment="second_half",
+                    value=half_value(slice(midpoint, len(self._truth))),
+                    sample_size=len(self._truth) - midpoint,
+                ),
+            ],
+            sensitivity={
+                f"best_value_n{len(self._truth)}": self._best_value,
+                f"default_value_n{len(self._truth)}": self._default_value,
+            },
+            falsifier=(
+                "the improvement interval's lower bound falls below the evaluate "
+                "step's promotion threshold"
+            ),
+            provenance={
+                "dataset": self._cfg.dataset.name,
+                "best_params": str(self._best_params),
+                "default_params": str(self._default_params),
+                "seed": str(self._cfg.evaluate.bootstrap.seed),
+                "rows": str(len(self._truth)),
+                "resampling": "paired row bootstrap on the validation slice",
+            },
+        )
+        threshold = self._cfg.evaluate.promotion_threshold
+        return Decision.evaluate(
+            rule=DecisionRule(
+                metric=f"improvement_over_default_{self._target_metric}",
+                direction="max",
+                min_effect=threshold,
+                min_sample_size=100,
+                action="adopt the HPO-best params",
+                owner=self._cfg.dataset.name,
+            ),
+            value=self.relative_value,
+            interval=(min(low, self.relative_value), max(high, self.relative_value)),
+            sample_size=len(self._truth),
+            question="Do the HPO-best params beat the declared defaults on validation?",
+            evidence=evidence,
+            unit="relative_improvement",
+        )
+
+    def publish(self) -> Decision:
+        """Write training.md/.png and the decision record beside the training result."""
+        assert self._cfg.train is not None
+        decision = self.decision()
+        import matplotlib
+
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+
+        figure, axis = plt.subplots(figsize=(6, 3.6), constrained_layout=True)
+        labels = ["default params", "HPO best"]
+        values = [self._default_value, self._best_value]
+        bars = axis.bar(labels, values, color=["#9ecae1", "#08519c"])
+        for bar in bars:
+            axis.text(
+                bar.get_x() + bar.get_width() / 2,
+                bar.get_height(),
+                f"{bar.get_height():,.4f}",
+                ha="center",
+                va="bottom",
+                fontsize=9,
+            )
+        axis.set_ylabel(self._target_metric)
+        axis.set_title("HPO best vs declared defaults (validation)")
+        output = StepOutput(
+            results_dir=Path(self._cfg.train.output_dir), stem="training", decision=decision
+        )
+        output.save_figure(figure)
+        plt.close("all")
+        output.write()
+        return decision
 
 
 @dataclass(frozen=True)

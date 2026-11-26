@@ -16,6 +16,8 @@ from broadway.features.schema import build_engineered_schema
 from broadway.lineage.ids import node_id
 from broadway.lineage.models import TransformAudit
 from broadway.lineage.records import enforce_drop_fraction, write_record
+from broadway.reports.decision import Decision, DecisionRule, Evidence, SegmentEvidence
+from broadway.reports.step_output import StepOutput
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +43,120 @@ def _plan_ordered(frame: pd.DataFrame, plan: ColumnPlan) -> pd.DataFrame:
     declared = list(plan.names)
     extras = [name for name in frame.columns if name not in declared]
     return frame.loc[:, declared + extras]
+
+
+class FeaturesDecision:
+    """Publish the feature-surface decision: keep, drop, transform.
+
+    The verdict is about row alignment (the feature step must never change the
+    row count); the keep/drop/transform counts are the evidence behind it, so a
+    reader sees which engineered columns entered the model.
+    """
+
+    def __init__(
+        self,
+        cfg: PipelineConfig,
+        audit: TransformAudit,
+        plan_names: list[str],
+        val_rows_in: int,
+        val_rows_out: int | None,
+    ) -> None:
+        assert cfg.dataset is not None and cfg.features is not None
+        self._cfg = cfg
+        self._audit = audit
+        self._plan_names = plan_names
+        self._val_rows_in = val_rows_in
+        self._val_rows_out = val_rows_out
+
+    def rule(self) -> DecisionRule:
+        assert self._cfg.dataset is not None and self._cfg.features is not None
+        return DecisionRule(
+            metric="row_loss_share",
+            direction="max",
+            min_effect=max(self._cfg.features.max_drop_fraction, 1e-9),
+            min_sample_size=1,
+            action="fix the feature transform before training",
+            owner=self._cfg.dataset.name,
+        )
+
+    def decision(self) -> Decision:
+        assert self._cfg.features is not None
+        audit = self._audit
+        rows_in = max(audit.rows_in, 1)
+        value = audit.rows_dropped_total / rows_in
+        val_loss = (
+            0.0
+            if self._val_rows_out is None or self._val_rows_in == 0
+            else (self._val_rows_in - self._val_rows_out) / self._val_rows_in
+        )
+        evidence = Evidence(
+            baseline="row-preserving transform (every input row survives)",
+            segments=[
+                SegmentEvidence(
+                    segment="train_split", value=value, sample_size=rows_in
+                ),
+                SegmentEvidence(
+                    segment="val_split",
+                    value=val_loss,
+                    sample_size=max(self._val_rows_in, 1),
+                ),
+            ],
+            sensitivity={
+                f"features_added_n{rows_in}": float(len(audit.columns_added)),
+                f"features_removed_n{rows_in}": float(len(audit.columns_removed)),
+                f"plan_columns_n{rows_in}": float(len(self._plan_names)),
+            },
+            falsifier="the row-loss interval clears the configured drop ceiling",
+            provenance={
+                "artifact": self._cfg.features.pipeline_file,
+                "plan_columns": ", ".join(self._plan_names),
+                "columns_added": ", ".join(audit.columns_added) or "none",
+                "columns_removed": ", ".join(audit.columns_removed) or "none",
+            },
+        )
+        return Decision.evaluate(
+            rule=self.rule(),
+            value=value,
+            interval=(value, value),
+            sample_size=rows_in,
+            question="Did the feature step keep every row and the declared feature surface?",
+            evidence=evidence,
+            unit="share",
+        )
+
+    def publish(self, out_dir: Path) -> Decision:
+        """Write the record plus the keep/drop/transform figure."""
+        decision = self.decision()
+        import matplotlib
+
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+
+        audit = self._audit
+        figure, axis = plt.subplots(figsize=(6, 3.6), constrained_layout=True)
+        labels = ["kept", "added", "removed"]
+        values = [
+            len(self._plan_names),
+            len(audit.columns_added),
+            len(audit.columns_removed),
+        ]
+        bars = axis.bar(labels, values, color=["#08519c", "#009E73", "#D55E00"])
+        for bar in bars:
+            axis.text(
+                bar.get_x() + bar.get_width() / 2,
+                bar.get_height(),
+                f"{int(bar.get_height())}",
+                ha="center",
+                va="bottom",
+                fontsize=9,
+            )
+        axis.set_ylabel("columns")
+        axis.set_title("feature surface: keep / drop / transform")
+        output = StepOutput(results_dir=out_dir, stem="features", decision=decision)
+        output.save_figure(figure)
+        plt.close("all")
+        output.write()
+        return decision
 
 
 def run(cfg: PipelineConfig) -> None:
@@ -86,4 +202,19 @@ def run(cfg: PipelineConfig) -> None:
         columns_removed=sorted(set(columns_before) - set(columns_after)),
     )
     enforce_drop_fraction(audit, cfg.features.max_drop_fraction)
+    decision = FeaturesDecision(
+        cfg,
+        audit,
+        plan_names=list(plan.names),
+        val_rows_in=0 if val is None else len(val),
+        val_rows_out=None if val is None else len(val_out),
+    ).publish(out_dir)
+    logger.info(
+        "features decision: %s — row loss %.4f (ceiling %.4f), +%d/-%d columns",
+        decision.verdict,
+        decision.value,
+        decision.threshold,
+        len(audit.columns_added),
+        len(audit.columns_removed),
+    )
     write_record(node_id("features", cfg.dataset.name), "features", str(pipeline_path), [node_id("etl", cfg.dataset.name)], audit=audit)
