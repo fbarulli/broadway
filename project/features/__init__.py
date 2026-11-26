@@ -52,7 +52,7 @@ def taxi(dataset: DatasetContract) -> ColumnPlan:
         _derive("pickup_hour", "datetime_hour", datetime_column, "int32"),
         _derive("pickup_day_of_week", "datetime_dayofweek", datetime_column, "int32"),
         _derive("pickup_month", "datetime_month", datetime_column, "int32"),
-        _source("passenger_count", "int64"),
+        _source("passenger_count", "float64"),
         _source("trip_distance", "float64"),
         _source("pickup_location_id", "int32"),
         _source("dropoff_location_id", "int32"),
