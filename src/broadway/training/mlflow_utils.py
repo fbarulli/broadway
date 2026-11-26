@@ -51,9 +51,18 @@ _CONNECTION_REFUSED_MARKERS = (
 )
 
 
-def setup_mlflow(tracking_uri: str, experiment_name: str) -> None:
-    if "://" not in tracking_uri:
+def _allow_file_store(tracking_uri: str) -> None:
+    """Opt MLflow into its filesystem store for a local tracking URI.
+
+    A bare path and an explicit ``file://`` URI both resolve to the local file
+    store, which MLflow 3.x refuses unless this flag is set.
+    """
+    if "://" not in tracking_uri or tracking_uri.startswith("file:"):
         os.environ[_MLFLOW_FILE_STORE_ENV] = "true"
+
+
+def setup_mlflow(tracking_uri: str, experiment_name: str) -> None:
+    _allow_file_store(tracking_uri)
     try:
         mlflow.set_tracking_uri(tracking_uri)
         mlflow.set_experiment(experiment_name)
@@ -243,8 +252,7 @@ def list_champions(tracking_uri: str, alias: str = "champion") -> list[ChampionA
     promote_candidate). Registration and classification read the same file
     store the training path uses; see classify_champion for the bucket rules.
     """
-    if "://" not in tracking_uri:
-        os.environ[_MLFLOW_FILE_STORE_ENV] = "true"
+    _allow_file_store(tracking_uri)
     mlflow.set_tracking_uri(tracking_uri)
     client = mlflow.tracking.MlflowClient()
     champions: list[ChampionArtifact] = []

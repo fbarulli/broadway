@@ -18,6 +18,7 @@ from pathlib import Path
 import pandas as pd
 
 from broadway.reports.decision import Decision
+from broadway.reports.decision_log import DecisionLog
 
 
 class StepOutput:
@@ -29,10 +30,12 @@ class StepOutput:
         results_dir: Path,
         stem: str,
         decision: Decision,
+        log: DecisionLog | None = None,
     ) -> None:
         self._results_dir = Path(results_dir)
         self._stem = stem
         self._decision = decision
+        self._log = log if log is not None else DecisionLog.from_config()
         self._tables: list[tuple[str, Path]] = []
         self._figure_path = self._results_dir / f"{stem}.png"
         self._report_path = self._results_dir / f"{stem}.md"
@@ -129,5 +132,13 @@ class StepOutput:
         self._report_path.write_text(self._markdown(), encoding="utf-8")
         self._decision_path.write_text(
             self._decision.model_dump_json(indent=2), encoding="utf-8"
+        )
+        self._log.log(
+            stem=self._stem,
+            decision=self._decision,
+            figure=self._figure_path,
+            tables=self._tables,
+            params={},
+            record_path=self._decision_path,
         )
         return self._report_path, self._figure_path, self._decision_path

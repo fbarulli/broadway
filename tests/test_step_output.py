@@ -8,6 +8,7 @@ import pytest
 from pydantic import ValidationError
 
 from broadway.reports.decision import Decision, DecisionRule, Evidence, SegmentEvidence
+from broadway.reports.decision_log import DecisionLog
 from broadway.reports.step_output import StepOutput
 
 
@@ -105,7 +106,9 @@ def test_output_writes_the_decision_record(tmp_path) -> None:
     decision = Decision.evaluate(
         rule=_rule(), value=0.012, interval=(0.011, 0.013), sample_size=10_000, question="q", evidence=_evidence()
     )
-    output = StepOutput(results_dir=tmp_path, stem="01_step", decision=decision)
+    output = StepOutput(
+        results_dir=tmp_path, stem="01_step", decision=decision, log=DecisionLog(tracking_uri="")
+    )
     output.save_figure(_Figure())
     report, figure, decisions = output.write()
 
@@ -124,7 +127,9 @@ def test_output_without_a_figure_is_refused(tmp_path) -> None:
     decision = Decision.evaluate(
         rule=_rule(), value=0.012, interval=(0.011, 0.013), sample_size=10_000, question="q", evidence=_evidence()
     )
-    output = StepOutput(results_dir=tmp_path, stem="02_step", decision=decision)
+    output = StepOutput(
+        results_dir=tmp_path, stem="02_step", decision=decision, log=DecisionLog(tracking_uri="")
+    )
 
     with pytest.raises(FileNotFoundError, match="no figure"):
         output.write()
