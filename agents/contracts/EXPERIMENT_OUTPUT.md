@@ -28,12 +28,18 @@ This contract is enforced by `scripts/check_experiment_outputs.py` (gate
    ```json
    {"question": "...", "metric": "ks_fare_amount", "value": 0.0120,
     "interval_low": 0.0111, "interval_high": 0.0149,
-    "min_effect": 0.01, "null_quantile": 0.95,
-    "threshold": 0.01, "null_threshold": 0.0077,
-    "direction": "max", "verdict": "act",
-    "action": "review the fare-policy exclusion before training",
-    "owner": "fare_prediction", "sample_size": 50000}
+    "threshold": 0.01, "null_threshold": 0.0077, "direction": "max",
+    "verdict": "act", "action": "review the fare-policy exclusion before training",
+    "owner": "fare_prediction", "sample_size": 50000,
+    "evidence": {"baseline": "...", "segments": [{"segment": "...", "value": 0.0, "sample_size": 1}],
+                 "sensitivity": {"half_sample": 0.0}, "falsifier": "...",
+                 "provenance": {"artifact": "...", "seed": "42"}}}
    ```
+
+   Every segment and sensitivity entry carries the n it was measured on; a
+   segment measured on the whole frame while the record's `n` is a draw is the
+   mixed-n defect the gate rejects. A sensitivity entry that equals the value
+   at the same n is not a sensitivity.
 
    **The rule is sample-size calibrated.** An absolute threshold does not
    travel: a KS distance of 0.01 is noise on 1,000 rows and a real signal on

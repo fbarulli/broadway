@@ -380,11 +380,12 @@ def _render_decision(stem: str, focus: str) -> str:
         return ""
     return (
         f'<section class="decision {html.escape(verdict)}">'
-        f"<strong>{html.escape(verdict.upper())}</strong> "
-        f"{html.escape(str(payload.get('metric', '')))} = {value:,.4f} "
-        f"[{low:,.4f}, {high:,.4f}] 95% {direction} {threshold:,.4f} "
-        f"\u00b7 {html.escape(str(payload.get('action', '')))} "
+        f"<strong>{html.escape(verdict.upper())}</strong> · "
+        f"{html.escape(str(payload.get('action', '')))} "
         f"({html.escape(str(payload.get('owner', '')))})"
+        f'<br><span class="metric">{html.escape(str(payload.get("metric", "")))} '
+        f"= {value:,.4f} [{low:,.4f}, {high:,.4f}] 95% · "
+        f"rule: must be {direction} {threshold:,.4f}</span>"
         "</section>"
     )
 
