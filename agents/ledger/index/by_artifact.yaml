@@ -238,6 +238,8 @@ ModelHPOSpec search space via _trial_objective (hpo.py:99):
 - GATE-HPO-80
 ModelHPOSpec.name registry key:
 - GATE-HPO-81
+OPTUNA_STORAGE_URL from the secret store (never a file literal):
+- GATE-INFRA-176
 Objective(params[, trial]) -> float closure; per-trial 'broadway_metrics' user attr:
 - GATE-HPO-81
 PARITY OK (era=… branch=…) | FATAL anchor shape/resolution errors | TAXI DRIFT | FORK | REFUSED (--sync off-era):
@@ -290,6 +292,8 @@ SampleSpec REQUIRED (no canonical leg, unlike GATE-STATS-41):
 - GATE-STATS-49
 SampleSpec definition + source file (.parquet or .csv):
 - GATE-ETL-116
+SampleSpec.columns (declared projection) + SampleSpec.derived (declared derivations):
+- GATE-ETL-116
 ? SampleSpec.schema block from project/config/sample/*.yaml (e.g. project/config/sample/fare_prediction_1m.yaml:29-36 dtype/nullable/checks)
 : - GATE-CFG-79
 SchemaError naming every duplicated label + provenance (raises before merge):
@@ -302,6 +306,8 @@ Suggestion appended as '## Suggested next action' (walkthrough.py:78-83):
 - GATE-SURF-61
 Suggestion from timeline/suggest.suggest_next:
 - GATE-SURF-60
+ThresholdRow per candidate cutoff + the chosen cutoff persisted in the decision report (thresholds.json):
+- GATE-TRAIN-36
 TransformAudit (lineage/models.py:73) from etl/canonicalize accounting:
 - GATE-TLINE-58
 ? TypeError "estimation_table requires a fitted statsmodels regression results object exposing get_robustcov_results…" (:48-53) — the ONLY raising guard in this cluster; coef/HC3_SE/CI_low/CI_high table derived by INTERNAL get_robustcov_results("HC3") re-fit (:54-56) so labels are truthful regardless of how the input was fitted (T-BUG-1 d056164, DECISIONS.md context :72); DiagnosticResult model (diagnostic_models.py:6-11); PNG artifacts via savefig (diagnostics.py:49, :84; time_series.py:21)
@@ -338,6 +344,8 @@ _warn_stale_decisions (walkthrough.py:192-201):
 - GATE-TLINE-51
 absent = sorted size-0 names (:32):
 - GATE-STATS-42
+aggregated worker exit codes; a non-zero worker fails the fan-out loudly:
+- GATE-INFRA-172
 alias default 'champion':
 - GATE-TRAIN-39
 all three report renderers:
@@ -370,7 +378,7 @@ any project/experiments/** script invoked as __main__:
 - GATE-INFRA-129
 api workload metrics:
 - GATE-INFRA-131
-'argv parsed by _build_parser (cli.py:26-102): walkthrough --analysis/--dataset/--sample/--force (cli.py:87-92)':
+'argv parsed by _build_parser (cli.py:26-109): walkthrough --analysis/--dataset/--sample/--force (cli.py:87-92)':
 - GATE-TLINE-59
 argv remote/refspec (default origin sklearn:sklearn :14):
 - GATE-INFRA-96
@@ -400,12 +408,16 @@ audit JSONs (GATE-ETL-13/14/15):
 - GATE-INFRA-131
 banner FAST-GREEN | LOCAL-CI GREEN | LOCAL-CI RED:
 - GATE-INFRA-90
+baseline JSON from gpu_training/memory_probe.py (measured micro-batch + concurrency):
+- GATE-INFRA-172
 bash scripts/run_local_ci.sh (no args ⇒ full tier):
 - GATE-INFRA-99
 ? behavior prefixes src/ tests/ project/ scripts/ .github/ k8s/ + pyproject.toml uv.lock *.sh docker* + configs/*.yaml (:40-43)
 : - GATE-INFRA-98
 between:
 - GATE-STATS-47
+'binary decision path: truth labels + continuous scores + configured cutoff grid':
+- GATE-TRAIN-36
 bounded CSV tables, text previews, image/plot previews, and artifact downloads:
 - GATE-SURF-102
 bp_test/jb_test/durbin_watson wrappers (diagnostics.py:20-31):
@@ -610,6 +622,10 @@ git-diff payload on stdin (files + added lines):
 - GATE-INFRA-98
 ? governance basenames {CONTRACT_TEMPLATE,WORKER_CONTRACT,MAIN_AGENT_CONTRACT,DECISIONS,FIXES}.md + agents/ledger/STATE.md (:34-37)
 : - GATE-INFRA-98
+? gpu_training/config/hpo_kernel.yaml study SSOT (hpo_spec/model/dataset/experiment/storage_env/local_storage_url/micro_batch_param)
+: - GATE-INFRA-176
+gpu_training/config/hpo_run*.yaml layered fan-out profile (kernel_config/objective/gpus/storage policy):
+- GATE-INFRA-172
 group figures PNG (:98-118, savefig :117):
 - GATE-STATS-49
 groups:
@@ -662,7 +678,7 @@ lineage node_id("describe", analysis.name) parents [node_id("etl",…), node_id(
 - GATE-STATS-49
 lineage node_id("stats", analysis.name) parents [node_id("baseline",…), node_id("analysis",…)] (:66-73):
 - GATE-STATS-41
-lineage record node_id("features", dataset) with TransformAudit rows/columns_before/after/added/removed (module.py:57-69):
+lineage record node_id("features", dataset) with TransformAudit rows/columns_before/after/added/removed (module.py:77-89):
 - GATE-FEAT-25
 ? lineage record node_id('ingest') with full _ingest_audit (columns_before/after, added/removed, balanced drop accounting) at :211-217
 : - GATE-ETL-19
@@ -731,12 +747,18 @@ omnibus.json (runners.py:324):
 - GATE-TLINE-56
 ? omnibus/posthoc/conclusion AnalysisStep records; effect-size ramification text; artifacts/timeline/<analysis>/evidence/omnibus.json (runners.py:324) and posthoc.json (runners.py:413); conclusion consumes prior steps' result_summary (runners.py:462-512) rather than recomputing
 : - GATE-TLINE-55
+'one WorkerPlan per worker: exact argv (carries the storage URL) + redacted display':
+- GATE-INFRA-172
+'one launcher-rendered worker argv: --config/--n-trials/--micro-batch/--worker/--seed/--objective/--storage':
+- GATE-INFRA-176
 one pa.Column per contract entry:
 - GATE-CFG-75
 one save-site per key family; size-budget watch; purge as invoked workflow step:
 - GATE-INFRA-143
 ? one validated AnalysisStep record per analysis step; serialized by timeline/module.save_step to artifacts/timeline/<analysis>/steps/<step_id>.json; consumed by suggest.py
 : - GATE-TLINE-50
+? one worker run record JSON {study, model, worker, sampler_seed, n_trials, micro_batch, storage source, dataset identity, best_value, best_params, elapsed_s}
+: - GATE-INFRA-176
 optional HPO block (models/search_space/total_trials/top_k/storage_url):
 - GATE-TRAIN-33
 optional StageLedger param (list[tuple[str,int]]; WIP-pending, see FINDING):
@@ -795,6 +817,8 @@ pd.Series:
 : - GATE-STATS-46
 ? per-order executor dispatch through _STEP_RUNNERS (walkthrough.py:281-288); step JSONs saved (walkthrough.py:384); DECISION REQUIRED console panels (walkthrough.py:138-189); reports regenerated via _write_timeline (walkthrough.py:71-91 -> reports/timeline.md, reports/index.md, reports/results/*); stale-decision warnings (walkthrough.py:192-201)
 : - GATE-TLINE-54
+per-row holdout error ledger (errors.parquet) — decision report (thresholds.json) only when a decision block is declared:
+- GATE-TRAIN-35
 per-sublane classification records owed per resolution:
 - GATE-INFRA-129
 persisted AnalysisDecision list:
@@ -824,6 +848,8 @@ posthoc.json (runners.py:413):
 - GATE-TLINE-55
 pre-merge df.columns:
 - GATE-ETL-12
+project HPO spec hpo block (search space, direction, target metric, budget) + the named project dataset/experiment configs:
+- GATE-INFRA-176
 project-owned plots/results CSVs/verification JSON (self-auditing verify subcommand):
 - GATE-INFRA-122
 project-provided experiment scripts and result artifacts via BROADWAY_EXPERIMENTS_ROOT:
@@ -1072,13 +1098,23 @@ teardown invocation after cluster/image-producing lanes:
 - GATE-INFRA-145
 tests/** (pytest -n 4 --dist worksteal, --cov-fail-under=95):
 - GATE-INFRA-92
+the sample's own ColumnPlan instance (one op per source column + one derive op per declared derivation):
+- GATE-ETL-116
 threshold flags:
 - GATE-TLINE-56
 - GATE-TLINE-57
 tracked *.py corpus via git ls-files (src/project/tests/scripts):
 - GATE-INFRA-147
+tracking --dataset/--environment (cli.py:59-61):
+- GATE-TLINE-59
 tracking URI:
 - GATE-TRAIN-120
+'tracking: artifacts/tracking/baseline_stats.json + optional profile/clean JSON':
+- GATE-SURF-69
+'tracking: reports/tracking/data_card.md (tracked) + artifacts/tracking/baseline_stats.json (ignored machine truth)':
+- GATE-SURF-69
+tracking_run = broadway.tracking.report.run (cli.py:152-155) — pure data-card render, prints the written path:
+- GATE-TLINE-59
 tracking_uri (file store auto-flagged via MLFLOW_ALLOW_FILE_STORE :202-204):
 - GATE-TRAIN-39
 train/val frame:
@@ -1091,6 +1127,8 @@ train_lgbm(**params)/evaluate(tail_quantile) (baseline.py:11-23):
 - GATE-STATS-48
 training_data.parquet via save_processed_data (:132, to_parquet index=False):
 - GATE-ETL-19
+trials persisted into the shared Optuna study (argv URL, else the study config env var, else the local SQLite study):
+- GATE-INFRA-176
 two artifact trees (positional) or --run:
 - GATE-INFRA-97
 typed EnvironmentConfig instance embedded in PipelineConfig (loader.py:135):

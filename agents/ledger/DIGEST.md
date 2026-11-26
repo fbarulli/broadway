@@ -1,6 +1,6 @@
 # DIGEST.md — rendered from agents/ledger/gates.yaml · NEVER HAND-EDIT ·
 
-> 170 gates · rendered 2026-11-25 @ HEAD d3935a9 · load THIS into context;
+> 171 gates · rendered 2026-11-26 @ HEAD d516145 · load THIS into context;
 > gates.yaml is the sole SSOT; the retired GATES.md/gates/*.md markdown world survives in agents/ledger/arbitration/2026-08-24/surface-and-analysis-preservation.md.
 
 | band | phase | gates | findings |
@@ -14,9 +14,9 @@
 | 07-surfaces | surfaces | 13 | 1 |
 | 08-config | config-schema | 17 | 11 |
 | 80-hpo-optuna | hpo-optuna | 10 | 9 |
-| 09-infra | infra-meta | 58 | 17 |
+| 09-infra | infra-meta | 59 | 17 |
 | 81-object-custody | object-custody | 6 | 0 |
-| **total** | | **170** | **84** |
+| **total** | | **171** | **84** |
 
 ### 01-ingest — ingest
 
@@ -61,8 +61,8 @@
   [reason strings produced by _ingest_audit (:168) in the form "<stage>: -<N> rows"; mirrored consumer broadway.etl.module._explained_rows() at src/broadway/etl/module.py:32 parsing etl-step reasons incl. "CI sampling: -N rows"] → [explained row total subtracted from dropped_total → TransformAudit.rows_dropped_unexplained (process.py:183-187; module.py:115)] · pins: 6
 - **GATE-ETL-19** `project/etl/process.py:194 process_data()` ⚠FINDING
   [dataset name → configs/dataset/<name>.yaml via _load_contract (:140), raw yellow_tripdata_*.parquet glob (get_raw_files :28 raises FileNotFoundError when empty), taxi knobs from project/config/project/taxi.yaml via process_config.py (config_path overlay-first)] → [training_data.parquet via save_processed_data (:132, to_parquet index=False), lineage record node_id('ingest') with full _ingest_audit (columns_before/after, added/removed, balanced drop accounting) at :211-217] · pins: 5
-- **GATE-ETL-116** `src/broadway/samples/generate.py:106 generate_sample()`
-  [SampleSpec definition + source file (.parquet or .csv)] → [<name>@<version>.parquet + provenance json {artifact_sha256, definition_sha256, row_count}] · pins: 2
+- **GATE-ETL-116** `src/broadway/samples/generate.py:106 generate_sample() + src/broadway/samples/plan.py:19 SampleColumnPlanFactory.build()`
+  [SampleSpec definition + source file (.parquet or .csv), SampleSpec.columns (declared projection) + SampleSpec.derived (declared derivations)] → [<name>@<version>.parquet + provenance json {artifact_sha256, definition_sha256, row_count}, the sample's own ColumnPlan instance (one op per source column + one derive op per declared derivation)] · pins: 5
 - **GATE-ETL-117** `project/etl/process_config.py:10 _PROJECT_YAML/_ETL_YAML module-load constants (legacy globals raw_dir/processed_dir/processed_file :16-25)`
   [project/config/project/taxi.yaml knobs] → [raw_dir/processed_dir/processed_file for the LEGACY pipeline] · pins: 1
 
@@ -78,8 +78,8 @@
   [ARTIFACT-SPLIT train frame (loaded at src/broadway/features/module.py:25), cfg.dataset.target, cfg.features.encoding_smoothing, cfg.experiment.features.encodings (pipeline ctor arg, module.py:35)] → [fitted encoder state _target_encoders/_freq_encoders (pipeline.py:22-23 reset then append :27-31) persisted later into ARTIFACT-PIPELINE-PICKLE (module.py:52-54)] · pins: 3
 - **GATE-FEAT-24** `src/broadway/features/pipeline.py:34 FeaturePipeline.transform()`
   [train/val frame, cfg.experiment.features (FeatureConfig), target, freq_fill (cfg.features.frequency_fill), builder_kwargs from cfg.features.builder_params (pipeline.py:37-41)] → [engineered frame: input copy + derived cols + <col>_freq_enc float64 + <col>_target_enc float64] · pins: 6
-- **GATE-FEAT-25** `src/broadway/features/module.py:45 run()  # ARTIFACT-TRAIN-PARQUET write` ⚠FINDING
-  [ARTIFACT-SPLIT train parquet (module.py:25), optional val parquet (:27), CFG-FEATURES/DATASET/EXPERIMENT/ETL precondition raise (module.py:32-33), encoding_smoothing/frequency_fill/max_drop_fraction] → [ARTIFACT-TRAIN-PARQUET out_dir/cfg.etl.train_features_file index=False (module.py:45), ARTIFACT-VAL-PARQUET val_features_file (:50), ARTIFACT-PIPELINE-PICKLE pickle.dump (:52-54), lineage record node_id("features", dataset) with TransformAudit rows/columns_before/after/added/removed (module.py:57-69)] · pins: 3
+- **GATE-FEAT-25** `src/broadway/features/module.py:46 run()  # ARTIFACT-TRAIN-PARQUET write` ⚠FINDING
+  [ARTIFACT-SPLIT train parquet (module.py:25), optional val parquet (:27), CFG-FEATURES/DATASET/EXPERIMENT/ETL precondition raise (module.py:47-48), encoding_smoothing/frequency_fill/max_drop_fraction] → [ARTIFACT-TRAIN-PARQUET out_dir/cfg.etl.train_features_file index=False (module.py:63), ARTIFACT-VAL-PARQUET val_features_file (:70), ARTIFACT-PIPELINE-PICKLE pickle.dump (:72-74), lineage record node_id("features", dataset) with TransformAudit rows/columns_before/after/added/removed (module.py:77-89)] · pins: 3
 - **GATE-FEAT-26** `src/broadway/features/generic.py:14 build_generic_feature_specs()`
   [DatasetContract.columns (declared dtypes/null_count), CFG-FEATURES include/derived/encodings, builder_dtype→_BUILDER_DTYPES (builders.py:94-95)] → [ordered FeatureSpec registry — SSOT for both write-side (GATE-FEAT-25 :40-41) and read-side (GATE-FEAT-27 engineered_schema_for :49) schemas] · pins: 3
 - **GATE-FEAT-27** `src/broadway/features/generic.py:122 validate_engineered_frame()  # the contract's 'validate_engineered_schema'` ⚠FINDING
@@ -101,10 +101,10 @@
   [CFG-STEP-TRAIN.model.params, optional HPO block (models/search_space/total_trials/top_k/storage_url), X/y train+val from GATE-TRAIN-31] → [final model param dict fed to GATE-TRAIN-34] · pins: 8
 - **GATE-TRAIN-34** `src/broadway/training/trainer.py:17 build_model_pipeline()` ⚠FINDING
   [PipelineConfig with experiment block, model_type registry key, params dict (bare + pre__ prefixed)] → [fitted sklearn Pipeline + TrainingResult{train_time_seconds} (via train() :52-69)] · pins: 6
-- **GATE-TRAIN-35** `src/broadway/evaluate/module.py:174 run()` ⚠FINDING
-  [CFG-STEP-EVALUATE, CFG-DATASET-CONTRACT, val_features_file parquet (REQUIRED), train_features_file parquet, ARTIFACT-TRAINING-RESULT, champion via models:/<dataset>@champion] → [ARTIFACT-EVALUATION-RESULT, lineage node evaluation:<dataset> (:269-270), conditional champion promotion (:289)] · pins: 7
-- **GATE-TRAIN-36** `src/broadway/evaluate/metrics.py:23 compute_metrics()` ⚠FINDING
-  [y_true/y_pred arrays from holdout predict, CV folds via cross_validate (src/broadway/evaluate/validation.py:42)] → [rounded metric dicts persisted in ARTIFACT-EVALUATION-RESULT / ARTIFACT-MLFLOW-RUN] · pins: 9
+- **GATE-TRAIN-35** `src/broadway/evaluate/module.py:309 run()` ⚠FINDING
+  [CFG-STEP-EVALUATE, CFG-STEP-EVALUATE error_analysis + decision blocks (ledger/threshold file names, segment columns, decision grid), CFG-DATASET-CONTRACT, val_features_file parquet (REQUIRED), train_features_file parquet, ARTIFACT-TRAINING-RESULT, champion via models:/<dataset>@champion] → [ARTIFACT-EVALUATION-RESULT, per-row holdout error ledger (errors.parquet) — decision report (thresholds.json) only when a decision block is declared, lineage node evaluation:<dataset> (:269-270), conditional champion promotion (:289)] · pins: 9
+- **GATE-TRAIN-36** `src/broadway/evaluate/metrics.py:131 compute_metrics() + :91 confusion_at() + :103 tune_threshold()` ⚠FINDING
+  [y_true/y_pred arrays from holdout predict, binary decision path: truth labels + continuous scores + configured cutoff grid, CV folds via cross_validate (src/broadway/evaluate/validation.py:42)] → [rounded metric dicts persisted in ARTIFACT-EVALUATION-RESULT / ARTIFACT-MLFLOW-RUN, ThresholdRow per candidate cutoff + the chosen cutoff persisted in the decision report (thresholds.json)] · pins: 11
 - **GATE-TRAIN-37** `src/broadway/evaluate/promotion.py:6 should_promote()` ⚠FINDING
   [candidate_metrics[target_metric], champion_score (None when no champion), CFG-STEP-EVALUATE.promotion_threshold (configs/step/evaluate.yaml:2 → 0.05)] → [(promote: bool, reason: str) recorded in ARTIFACT-EVALUATION-RESULT; champion alias move on promote] · pins: 6
 - **GATE-TRAIN-38** `src/broadway/stats/robust.py:34 estimation_table()` ⚠FINDING
@@ -163,8 +163,8 @@
   [configs/flow/hypothesis_walkthrough.yaml (step ids/orders/questions/kind/action), configs/step/walkthrough.yaml (skew/kurtosis/shapiro/imbalance/significance thresholds, max_qq_groups, decisions.{omnibus,posthoc}.{methods,parents})] → [WalkthroughSequence (sequence.py:22) and WalkthroughConfig (sequence.py:35) pydantic models; the single source of gate order, gate questions, threshold flags, and the decision allowlists/parent sets used by GATE-TLINE-52/-54/-55] · pins: 3
 - **GATE-TLINE-58** `src/broadway/lineage/records.py:19 write_record()` ⚠FINDING
   [node_id strings from lineage/ids.py:1 node_id() (f"{kind}:{name}", no character validation), TransformAudit (lineage/models.py:73) from etl/canonicalize accounting, sample_name/sample_role, parents list, BROADWAY_LINEAGE_DIR env (records.py:8, default artifacts/lineage)] → [artifacts/lineage/records/<sanitized_node_id>.json LineageRecords; consumed only by graph.build_graph (graph.py:105-123) -> LineageGraph -> reports/lineage/graph.json + graph.md (lineage/module.py:27/:38) and mermaid rendering (mermaid.py:6); enforce_drop_fraction (records.py:43) raises before any record is written when unexplained row loss exceeds max_drop_fraction] · pins: 4
-- **GATE-TLINE-59** `src/broadway/cli.py:105 main()` ⚠FINDING
-  [argv parsed by _build_parser (cli.py:26-102): walkthrough --analysis/--dataset/--sample/--force (cli.py:87-92), decide --analysis/--method/--reason/--kind choices={omnibus,posthoc} (cli.py:94-100), lineage --analysis/--dataset (cli.py:40-42), report (cli.py:44-46), stats run|describe --sample (cli.py:80-84); console-script entry ds-pipeline = broadway.cli:main (pyproject.toml:53-54)] → [dispatch into timeline.walkthrough.run (cli.py:166-173), decide_module.record + timeline_module.save_decision (cli.py:174-189), lineage.module.run (cli.py:118-121), report path re-rendering results from persisted steps/decisions with 'run the walkthrough first' short-circuit (cli.py:122-134)] · pins: 5
+- **GATE-TLINE-59** `src/broadway/cli.py:112 main()` ⚠FINDING
+  [argv parsed by _build_parser (cli.py:26-109): walkthrough --analysis/--dataset/--sample/--force (cli.py:87-92), decide --analysis/--method/--reason/--kind choices={omnibus,posthoc} (cli.py:94-100), lineage --analysis/--dataset (cli.py:40-42), report (cli.py:44-46), tracking --dataset/--environment (cli.py:59-61), stats run|describe --sample (cli.py:80-84); console-script entry ds-pipeline = broadway.cli:main (pyproject.toml:53-54)] → [dispatch into timeline.walkthrough.run (cli.py:166-173), decide_module.record + timeline_module.save_decision (cli.py:174-189), lineage.module.run (cli.py:118-121), report path re-rendering results from persisted steps/decisions with 'run the walkthrough first' short-circuit (cli.py:122-134), tracking_run = broadway.tracking.report.run (cli.py:152-155) — pure data-card render, prints the written path] · pins: 5
 - **GATE-TLINE-114** `src/broadway/lineage/state.py:5 LINEAGE_STEPS + src/broadway/baseline/module.py:87-91 parents` ⚠FINDING
   [flow step sequence] → [loud graph incompleteness when a declared parent kind never ran] · pins: none direct
 
@@ -188,8 +188,8 @@
   [git ls-files reports/ '*.md' (tracked surface inventory, :26-38), markdown link regex :23, size caps HTML_CAP_BYTES=5MiB :20 / PNG_CAP_BYTES=2MiB :21] → [] · pins: 3
 - **GATE-SURF-68** `.gitignore:17-19  # project/experiments/results tracking convention (negation triad), pinned-sample negations :21-22`
   [experiment script outputs written ad hoc under project/experiments/, project/experiments/mlflow/_common.py RESULTS convention] → [project/experiments/results/**/*.csv (tracked), project/experiments/results/univariate/fare_amount_trip_distance/ratecode1_sample.parquet|.json (pinned, tracked)] · pins: 1
-- **GATE-SURF-69** `src/broadway/reports/__init__.py  # renderer-purity contract over the package (markdown.py, results.py, timeline.py, index.py, audit.py, registry.py)`
-  [persisted typed evidence JSON artifacts, persisted AnalysisStep/AnalysisDecision models, QqOverview/DatasetProfile/JoinAuditReport/LookupValueAuditReport/StructuralCleanResult models] → [(cross-cutting) all reports/**/*.md listed in GATE-SURF-60..64] · pins: 3
+- **GATE-SURF-69** `src/broadway/reports/__init__.py  # renderer-purity contract over the package (markdown.py, results.py, timeline.py, index.py, audit.py, registry.py) + src/broadway/tracking/bundle.py:44 TrackingBundle + src/broadway/tracking/report.py:17 run()`
+  [persisted typed evidence JSON artifacts, persisted AnalysisStep/AnalysisDecision models, QqOverview/DatasetProfile/JoinAuditReport/LookupValueAuditReport/StructuralCleanResult models, tracking: artifacts/tracking/baseline_stats.json + optional profile/clean JSON] → [(cross-cutting) all reports/**/*.md listed in GATE-SURF-60..64, tracking: reports/tracking/data_card.md (tracked) + artifacts/tracking/baseline_stats.json (ignored machine truth)] · pins: 5
 - **GATE-SURF-100** `src/broadway/inference/api.py:1 FastAPI app stub (module docstring only — NO app symbol at HEAD; gate demands its creation) + k8s/api-deployment.yaml:18 uvicorn command` ⚠FINDING
   [uvicorn ASGI target import (inference.api:app), models:/taxi@champion via MLflow registry] → [HTTP GET /health POST /predict GET /metrics bound 0.0.0.0:8000 — or loud CrashLoopBackOff with named cause on every replica] · pins: none direct
 - **GATE-SURF-101** `src/broadway/discover/columns.py:10 run()`
@@ -355,16 +355,18 @@
   [] → [] · pins: none direct
 - **GATE-INFRA-170** `src/broadway/config/schema.py:296 EvaluateStep`
   [CFG-STEP-EVALUATE] → [] · pins: 2
-- **GATE-INFRA-171** `gpu_training/memory_probe.py:259 main()`
+- **GATE-INFRA-171** `gpu_training/memory_probe.py:266 main()`
   [] → [] · pins: 3
-- **GATE-INFRA-172** `gpu_training/run_hpo.py:135 main()`
-  [] → [] · pins: 4
+- **GATE-INFRA-172** `gpu_training/run_hpo.py:215 main()`
+  [baseline JSON from gpu_training/memory_probe.py (measured micro-batch + concurrency), gpu_training/config/hpo_run*.yaml layered fan-out profile (kernel_config/objective/gpus/storage policy)] → [one WorkerPlan per worker: exact argv (carries the storage URL) + redacted display, aggregated worker exit codes; a non-zero worker fails the fan-out loudly] · pins: 7
 - **GATE-INFRA-173** `gpu_training/config/memory_probe.yaml:1 memory-sweep SSOT`
   [] → [] · pins: 1
 - **GATE-INFRA-174** `gpu_training/config/hpo_run.yaml:1 HPO fan-out SSOT`
+  [] → [] · pins: 2
+- **GATE-INFRA-175** `gpu_training/adapters/cpu_smoke.py:18 step()`
   [] → [] · pins: 1
-- **GATE-INFRA-175** `gpu_training/adapters/cpu_smoke.py:22 step()`
-  [] → [] · pins: 1
+- **GATE-INFRA-176** `gpu_training/hpo_kernel.py:44 WorkerInvocation + gpu_training/hpo_study.py:63 HpoStudyConfig + gpu_training/lane_contract.py:17 resolve_callable + gpu_training/adapters/taxi.py:77 build() + gpu_training/config/hpo_kernel.yaml:1 study SSOT`
+  [one launcher-rendered worker argv: --config/--n-trials/--micro-batch/--worker/--seed/--objective/--storage, gpu_training/config/hpo_kernel.yaml study SSOT (hpo_spec/model/dataset/experiment/storage_env/local_storage_url/micro_batch_param), project HPO spec hpo block (search space, direction, target metric, budget) + the named project dataset/experiment configs, OPTUNA_STORAGE_URL from the secret store (never a file literal)] → [one worker run record JSON {study, model, worker, sampler_seed, n_trials, micro_batch, storage source, dataset identity, best_value, best_params, elapsed_s}, trials persisted into the shared Optuna study (argv URL, else the study config env var, else the local SQLite study)] · pins: 4
 - **GATE-INFRA-177** `src/broadway/pipeline.py:16 run()`
   [] → [] · pins: 1
 - **GATE-INFRA-178** `configs/step/train.yaml:1 training step config`

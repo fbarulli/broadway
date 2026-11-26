@@ -30,6 +30,8 @@ gpu_training/config/hpo_run.yaml:
 - GATE-INFRA-174
 gpu_training/config/memory_probe.yaml:
 - GATE-INFRA-173
+gpu_training/hpo_kernel.py:
+- GATE-INFRA-176
 gpu_training/memory_probe.py:
 - GATE-INFRA-171
 gpu_training/run_hpo.py:

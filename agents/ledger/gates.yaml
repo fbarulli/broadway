@@ -9,10 +9,13 @@ retired:
 - owners: ['project/etl/process.py', 'project/etl/process_config.py']
   date: '2026-09-19'
   successor: 'src/broadway/etl/module.py + src/broadway/data/loader.py (CONTRACT pipeline)'
-  history_rows_retained: ['GATE-INGEST-01', 'GATE-INGEST-04', 'GATE-ETL-17', 'GATE-ETL-18', 'GATE-ETL-19', 'GATE-ETL-116', 'GATE-ETL-117']
+  # GATE-ETL-116 was listed here with the legacy twin, but its row owns the LIVE
+  # src/broadway/samples/generate.py generate_sample() surface — un-retired
+  # 2026-11-26 so the sample-generation gate is probed again.
+  history_rows_retained: ['GATE-INGEST-01', 'GATE-INGEST-04', 'GATE-ETL-17', 'GATE-ETL-18', 'GATE-ETL-19', 'GATE-ETL-117']
 meta:
-  head: 'd3935a9'
-  assembled: '2026-11-25'
+  head: 'd516145'
+  assembled: '2026-11-26'
   source_fragments:
   - agents/ledger/gates/01-ingest.md
   - agents/ledger/gates/02-etl-lookup.md
@@ -25,7 +28,7 @@ meta:
   - agents/ledger/gates/09-infra.md
   - agents/ledger/gates/80-hpo-optuna.md
   counts:
-    total: 170
+    total: 171
     gates_with_findings: 84
     finding_strings: 109
     by_band:
@@ -66,7 +69,7 @@ meta:
         flagged: 9
         finding_strings: 13
       09-infra:
-        gates: 58
+        gates: 59
         flagged: 17
         finding_strings: 25
       81-object-custody:
@@ -684,24 +687,36 @@ gates:
 - id: GATE-ETL-116
   phase: etl-lookup
   order: 20
-  owner: 'src/broadway/samples/generate.py:106 generate_sample()'
+  owner: 'src/broadway/samples/generate.py:106 generate_sample() + src/broadway/samples/plan.py:19 SampleColumnPlanFactory.build()'
   inputs:
   - 'SampleSpec definition + source file (.parquet or .csv)'
+  - 'SampleSpec.columns (declared projection) + SampleSpec.derived (declared derivations)'
   outputs:
   - '<name>@<version>.parquet + provenance json {artifact_sha256, definition_sha256, row_count}'
+  - 'the sample''s own ColumnPlan instance (one op per source column + one derive op per declared derivation)'
   transforms:
   - 'immutable-artifact producer with provenance sha256 pair: "definition_sha256": _canonical_spec_sha256(spec) (:144, canonical model-dump digest :32-39) + "artifact_sha256": _file_sha256(artifact) (:145)'
   - 'source-format gate: _read_source permits .parquet or .csv and rejects every other suffix loudly (:50-57)'
   - 'symbol repair per packet F #25: producer is generate_sample SINGULAR (:106) — no generate_samples exists; slate owner string corrected'
+  - 'samples execute through their OWN ColumnPlan (commit 3920863): SampleColumnPlanFactory.build materialises the spec as ColumnPlan ops and ColumnPlan.apply is the single select/derive/add/drop point — no parallel column algebra (samples/plan.py:23-38)'
+  - 'declared columns are sources in declaration order, declared derivations follow in declaration order; an undeclared projection selects every source column; a declared column the source lacks fails loud naming the sample (samples/plan.py:40-49)'
+  - 'unknown derived formula → ValueError listing the BUILDERS registry before any frame is touched (samples/plan.py:56-66)'
   touched_by:
   - pandas
   - pydantic
+  - broadway.features.builders(BUILDERS, builder_dtype)
+  - broadway.features.plan(ColumnOp, ColumnPlan)
+  - broadway.lineage.models(DerivedSpec, SampleSpec)
   validated_by:
   - tests/test_sample.py::test_load_sample_round_trip
   - tests/test_samples.py::test_generate_from_csv_source
+  - tests/test_samples.py::test_derived_column_computed_and_recorded
+  - tests/test_samples.py::test_unknown_derived_formula_rejected
+  - tests/test_samples.py::test_derived_column_may_not_overwrite_a_source_column
   if_changed:
   - provenance json schema consumed at sample load time
   - supported named-sample source suffixes
+  - sample projection order + derived-formula registry (tests/test_samples.py goldens)
   findings: []
 - id: GATE-ETL-117
   phase: etl-lookup
@@ -880,20 +895,22 @@ gates:
 - id: GATE-FEAT-25
   phase: features
   order: 27
-  owner: 'src/broadway/features/module.py:45 run()  # ARTIFACT-TRAIN-PARQUET write'
+  owner: 'src/broadway/features/module.py:46 run()  # ARTIFACT-TRAIN-PARQUET write'
   inputs:
   - ARTIFACT-SPLIT train parquet (module.py:25)
   - optional val parquet (:27)
-  - CFG-FEATURES/DATASET/EXPERIMENT/ETL precondition raise (module.py:32-33)
+  - CFG-FEATURES/DATASET/EXPERIMENT/ETL precondition raise (module.py:47-48)
   - encoding_smoothing/frequency_fill/max_drop_fraction
   outputs:
-  - ARTIFACT-TRAIN-PARQUET out_dir/cfg.etl.train_features_file index=False (module.py:45)
-  - ARTIFACT-VAL-PARQUET val_features_file (:50)
-  - ARTIFACT-PIPELINE-PICKLE pickle.dump (:52-54)
-  - lineage record node_id("features", dataset) with TransformAudit rows/columns_before/after/added/removed (module.py:57-69)
+  - ARTIFACT-TRAIN-PARQUET out_dir/cfg.etl.train_features_file index=False (module.py:63)
+  - ARTIFACT-VAL-PARQUET val_features_file (:70)
+  - ARTIFACT-PIPELINE-PICKLE pickle.dump (:72-74)
+  - lineage record node_id("features", dataset) with TransformAudit rows/columns_before/after/added/removed (module.py:77-89)
   transforms:
-  - 'step chain: pipeline.fit(train, target, smoothing) (:36) → pipeline.transform(train,...) (:39) → build_generic_feature_specs (:40) → build_engineered_schema(specs).validate(train_out) (:41) → WRITE (:45); val branch repeats transform+validate+write (:48-50)'
-  - 'audit: dropped_total=rows_in−rows_out; rows_dropped_unexplained=max(0,dropped_total) (:60-61); enforce_drop_fraction(audit, max_drop_fraction) (:68)'
+  - 'step chain: pipeline.fit(train, target, smoothing) (:52) → pipeline.transform(train,...) (:55-57) → build_generic_feature_specs (:58) → build_engineered_schema(specs).validate(train_out) (:59) → plan-order write (:63); val branch repeats transform+validate+write (:66-70)'
+  - 'WRITE ORDER (commit d516145): _plan_ordered puts the plan''s declared columns FIRST in plan order and keeps extras (target, joined columns) after (:32-43) — FeaturePipeline.transform appends derived/encoded columns to the joined frame, while the ordered read contract (GATE-FEAT-27) requires the model surface in plan order or a real train/evaluate read fails loud'
+  - 'both writes pass through _plan_ordered BEFORE build_engineered_schema(...).validate, so the persisted ARTIFACT-TRAIN-PARQUET / ARTIFACT-VAL-PARQUET carry the read contract''s order'
+  - 'audit: dropped_total=rows_in−rows_out; rows_dropped_unexplained=max(0,dropped_total) (:77-82); enforce_drop_fraction(audit, max_drop_fraction) (:88)'
   touched_by:
   - logging
   - pickle
@@ -1229,9 +1246,10 @@ gates:
 - id: GATE-TRAIN-35
   phase: training-eval
   order: 37
-  owner: src/broadway/evaluate/module.py:174 run()
+  owner: src/broadway/evaluate/module.py:309 run()
   inputs:
   - CFG-STEP-EVALUATE
+  - CFG-STEP-EVALUATE error_analysis + decision blocks (ledger/threshold file names, segment columns, decision grid)
   - CFG-DATASET-CONTRACT
   - val_features_file parquet (REQUIRED)
   - train_features_file parquet
@@ -1239,6 +1257,7 @@ gates:
   - champion via models:/<dataset>@champion
   outputs:
   - ARTIFACT-EVALUATION-RESULT
+  - per-row holdout error ledger (errors.parquet) — decision report (thresholds.json) only when a decision block is declared
   - lineage node evaluation:<dataset> (:269-270)
   - conditional champion promotion (:289)
   transforms:
@@ -1248,9 +1267,13 @@ gates:
   - 'champion optional-by-design: get_champion None → warning appended to result.warnings, comparison deltas become None (:110-114, :132-133; compare_models zero-champion division guarded to None src/broadway/evaluate/comparison.py:19)'
   - 'calibration evaluation: only when the training result carries a CalibrationSummary — SplitConformal().interval(pred, q) on the untouched holdout → coverage/mean_width plus per-ISO-week periods (min_period_rows from GATE-INFRA-170, 1 when unset); a tolerance miss appends a warning and calibrated=False (:98-141, :190-197)'
   - 'calibration.json is written beside metrics.json and coverage/mean_width are logged to MLflow (:154-171, :267-268)'
+  - 'error analysis (commit 78590b4): HoldoutErrorAnalysis.from_config(cfg).write(eval_dir, X_val, y_true, y_pred) after the metrics/CV stages writes the per-row holdout ledger — y_true/y_pred/residual (prediction−truth)/abs_error plus the plan''s segment columns, joined so a colliding segment name raises instead of overwriting measured values (:187-300, call site :404-405)'
+  - 'thresholds.json is written ONLY for a configured decision block: the truth labels are threshold-binarised, the model cutoffs come from the config grid, and tune_threshold picks the objective optimum — no cutoff is invented without the declaration (:287-300)'
+  - 'loud boundary checks: a decision.column that is not the scored target → ValueError (:205-208); segment columns outside the experiment ColumnPlan → ValueError (:252-260)'
   touched_by:
   - mlflow@3.15.1
   - pandas@2.3.3
+  - broadway.evaluate.metrics(confusion_at, tune_threshold)
   validated_by:
   - tests/test_evaluate_contracts.py::test_module_run_writes_evaluation_result
   - tests/test_evaluate_contracts.py::test_module_run_writes_baseline_comparison
@@ -1259,6 +1282,8 @@ gates:
   - tests/test_pyfunc_inference.py::test_wrong_dtype_fails_loud
   - tests/test_calibration.py::test_calibration_payload_reaches_holdout_evaluation
   - tests/test_calibration.py::test_calibration_flags_a_tolerance_miss
+  - tests/test_evaluate.py::test_evaluate_writes_error_ledger_without_inventing_threshold
+  - tests/test_evaluate.py::test_evaluate_writes_threshold_report_only_when_decision_declared
   if_changed:
   - GATE-TRAIN-37 ordering guarantees (this function owns the terminal block)
   - EvaluationResult schema consumers (tests/test_evaluate_contracts.py round-trips)
@@ -1266,26 +1291,35 @@ gates:
   - GATE-INFRA-158 calibration evaluation shape
   - GATE-INFRA-160 coverage metrics
   - GATE-INFRA-170 EvaluateStep tolerance/min_period_rows
+  - GATE-TRAIN-36 confusion/tuning algebra
+  - configs/step/evaluate.yaml error_analysis/decision blocks
   - tests/test_calibration.py
+  - tests/test_evaluate.py
   findings:
   - asymmetric loader hardening — _load_train_features (:55-61) lacks the missing-file guard its val twin has (:45-48); a deleted train parquet surfaces as a raw pyarrow FileNotFoundError from pd.read_parquet (:58) instead of the named loud failure pattern the module promises in its docstring (:3-5). No test covers the train-file-missing branch.
 - id: GATE-TRAIN-36
   phase: training-eval
   order: 38
-  owner: src/broadway/evaluate/metrics.py:23 compute_metrics()
+  owner: 'src/broadway/evaluate/metrics.py:131 compute_metrics() + :91 confusion_at() + :103 tune_threshold()'
   inputs:
   - y_true/y_pred arrays from holdout predict
+  - 'binary decision path: truth labels + continuous scores + configured cutoff grid'
   - CV folds via cross_validate (src/broadway/evaluate/validation.py:42)
   outputs:
   - rounded metric dicts persisted in ARTIFACT-EVALUATION-RESULT / ARTIFACT-MLFLOW-RUN
+  - 'ThresholdRow per candidate cutoff + the chosen cutoff persisted in the decision report (thresholds.json)'
   transforms:
   - 'input finiteness gates: NaN/inf in y_true OR y_pred → ValueError BEFORE scoring (:28-31; CV twin checks X and y pre-fold validation.py:51-54)'
   - fixed 7-key regression vocabulary mae/rmse/r2/mape/max_error/median_ae/explained_var rounded to METRIC_DECIMALS=4 SSOT (:20, :32-42; CV scorer vocabulary mirrors it validation.py:12-20 incl. unprefixed-but-negated max_error :22-29)
   - 'cv_kind dispatch: TimeSeriesSplit deterministic (random_state intentionally unused :33-36), KFold shuffle+seeded (:37-38), unknown kind → ValueError (:39)'
   - 'fold aggregation: negation flip for _NEGATED_METRICS, per-fold round THEN mean THEN round (validation.py:69-80 — unweighted across unequal folds by construction)'
+  - 'BINARY DECISION grammar (commit 78590b4): confusion_at/tune_threshold validate the pair ONCE via _validated_binary_pair — equal shapes, 1-D, finite labels/scores, labels strictly 0/1 or bool, so a regression target must be binarised at the declared truth threshold instead of being silently cast (:30-58)'
+  - 'counts at scores >= threshold with precision/recall/f1/accuracy rounded to METRIC_DECIMALS and every zero division guarded to 0.0 (:61-88)'
+  - 'tune_threshold requires a declared objective from TuningObjective, a non-empty finite grid, and keeps the EARLIEST cutoff on ties so the choice is deterministic in the config-sampled order (:103-127)'
   touched_by:
   - numpy@2.5.2
   - scikit-learn@1.7.2
+  - broadway.evaluate.contracts(ThresholdRow, TuningObjective)
   validated_by:
   - tests/test_metrics_extended.py::test_compute_metrics_nan_raises
   - tests/test_metrics_extended.py::test_compute_metrics_inf_raises
@@ -1296,10 +1330,14 @@ gates:
   - tests/test_cross_validate.py::test_mean_metrics_sign_and_rounding
   - tests/test_cross_validate.py::test_metric_vocabulary_parity_holdout_vs_cv
   - tests/test_evaluate_contracts.py::test_residual_summary
+  - tests/test_evaluate_metrics.py::test_confusion_at_counts_and_rates
+  - tests/test_evaluate_metrics.py::test_tune_threshold_picks_configured_objective_optimum
   if_changed:
   - promotion decision input values (GATE-TRAIN-37 reads target_metric from this dict)
   - MLflow-logged metrics keys
   - CV-vs-holdout parity tripwire
+  - GATE-TRAIN-35 decision report (chosen cutoff + per-cutoff rows)
+  - tuning objective vocabulary (TuningObjective)
   findings:
   - OUTPUT finiteness is never gated — y_true containing exact zeros makes sklearn mean_absolute_percentage_error return inf, which round() keeps and flows silently into the metrics dict, MLflow, and the persisted JSON (:28-31 check inputs only; mape at :36). No test pins a zero-target MAPE case.
   - 'residual_summary mislabels signed semantics — ''mean_residual'' actually computes np.mean(np.abs(residuals)) (validation.py:63) and the test PINS the absolute-value behavior under the signed name (test_evaluate_contracts.py:160-167 asserts +1.0 for residuals [+1,-1,+1,-1], where signed mean is 0.0): consumers reading ''mean_residual'' as bias get |bias| instead, locked in by the pin.'
@@ -2118,21 +2156,24 @@ gates:
 - id: GATE-TLINE-59
   phase: timeline-lineage
   order: 65
-  owner: src/broadway/cli.py:105 main()
+  owner: src/broadway/cli.py:112 main()
   inputs:
-  - 'argv parsed by _build_parser (cli.py:26-102): walkthrough --analysis/--dataset/--sample/--force (cli.py:87-92)'
+  - 'argv parsed by _build_parser (cli.py:26-109): walkthrough --analysis/--dataset/--sample/--force (cli.py:87-92)'
   - decide --analysis/--method/--reason/--kind choices={omnibus,posthoc} (cli.py:94-100)
   - lineage --analysis/--dataset (cli.py:40-42)
   - report (cli.py:44-46)
+  - tracking --dataset/--environment (cli.py:59-61)
   - stats run|describe --sample (cli.py:80-84); console-script entry ds-pipeline = broadway.cli:main (pyproject.toml:53-54)
   outputs:
   - dispatch into timeline.walkthrough.run (cli.py:166-173)
   - decide_module.record + timeline_module.save_decision (cli.py:174-189)
   - lineage.module.run (cli.py:118-121)
   - report path re-rendering results from persisted steps/decisions with 'run the walkthrough first' short-circuit (cli.py:122-134)
+  - tracking_run = broadway.tracking.report.run (cli.py:152-155) — pure data-card render, prints the written path
   transforms:
   - 'argparse-level validation only at the CLI boundary: --kind choices gate the fork vocabulary once, everything else (method spelling, dataset/analysis existence, sample config) deferred to downstream ValueErrors/FileNotFoundError raised by decide.record / load_sample / load_config'
   - lazy imports per subcommand keep unrelated heavy deps unloaded
+  - 'tracking is a report-only subcommand (commit 78590b4): it loads the train config, refuses a config without a tracking section, and delegates to the tracking bundle — it never re-runs etl/features/train'
   touched_by:
   - uv run ds-pipeline (installed entry point)
   - python -m broadway.cli equivalent
@@ -2414,25 +2455,35 @@ gates:
 - id: GATE-SURF-69
   phase: surfaces
   order: 76
-  owner: 'src/broadway/reports/__init__.py  # renderer-purity contract over the package (markdown.py, results.py, timeline.py, index.py, audit.py, registry.py)'
+  owner: 'src/broadway/reports/__init__.py  # renderer-purity contract over the package (markdown.py, results.py, timeline.py, index.py, audit.py, registry.py) + src/broadway/tracking/bundle.py:44 TrackingBundle + src/broadway/tracking/report.py:17 run()'
   inputs:
   - persisted typed evidence JSON artifacts
   - persisted AnalysisStep/AnalysisDecision models
   - QqOverview/DatasetProfile/JoinAuditReport/LookupValueAuditReport/StructuralCleanResult models
+  - 'tracking: artifacts/tracking/baseline_stats.json + optional profile/clean JSON'
   outputs:
   - (cross-cutting) all reports/**/*.md listed in GATE-SURF-60..64
+  - 'tracking: reports/tracking/data_card.md (tracked) + artifacts/tracking/baseline_stats.json (ignored machine truth)'
   transforms:
   - 'formatting only: humanize_float/humanize_pvalue (formatting.py) via shared helpers results.py:27-77'
   - display-status derivation
   - NO statistical recomputation permitted in a renderer — violations flagged as findings
+  - 'tracking data card (commit 78590b4): TrackingBundle.publish_data_card pure-renders data_card.md from the persisted baseline_stats.json plus optional DatasetProfile/StructuralCleanResult — never re-runs etl/features/train and never reads parquet (tracking/bundle.py:112-136); ds-pipeline tracking only loads the train config and prints the written path (tracking/report.py:17-29)'
+  - 'baseline truth is WRITTEN by the train step, never by the renderer: record_training_truth delegates to build_baseline_stats/write_baseline_stats (tracking/bundle.py:93-110)'
+  - 'drift is a report INPUT, never a gate: compare_serve/compare_configured_serve fit the train baseline and return a DriftReport carrying no decision threshold; an absent serve frame skips the read (tracking/bundle.py:138-157)'
   touched_by:
   - 'every command that renders: walkthrough, report, audit, lineage'
+  - tracking(build_baseline_stats, fit_baseline, check_drift, render_data_card)
   validated_by:
   - tests/test_results.py::test_humanize_helpers_live_in_shared_module
   - tests/test_results.py::test_rendered_output_plain_text_no_glyphs_or_literals
   - tests/test_audit_render.py::test_join_counts_raises_on_divergent_row_counts
+  - tests/test_tracking_baseline.py::test_tracking_bundle_writes_baseline_and_renders_card
+  - tests/test_trust_drift.py::test_tracking_bundle_scores_train_vs_serve
   if_changed:
   - violations = FINDINGS F-SURF-1/1b/2 below; refusal condition if a second live writer ever lands on one artifact path
+  - GATE-INFRA-178 tracking config block (machine_dir/reports_dir/baseline/data_card/drift)
+  - 'data-card inputs (baseline/profile/clean JSON)'
   findings: []
 - id: GATE-SURF-100
   phase: surfaces
@@ -3598,10 +3649,13 @@ gates:
   - 'cancel-in-progress × D25 push-always (DECISIONS.md:320-333): rapid successive pushes cancel the in-flight run, so a superseded tip''s CI verdict is structurally unobservable — D25 formally supersedes the "last CI-on-tip green" push conjunct; compensation (ship.sh local GREEN + monitored post-push run + fix-forward/revert recorded in FIXES.md) is procedural, not technical.'
   - no test reads or validates ci.yml itself — delegation, action-pinned SHAs, and job wiring are entirely unguarded by the suite.
 # --- SENIOR ARBITRATION CYCLE #2 LANDING (2026-08-24) --------------------
-# Appended region: ids continue the global dense order at 100..180 (slate §0).
-# Numeric ids are unique across prefixes: INFRA 154..180 sit ABOVE the BAND 81
-# CUST 147..153 block (153/176 stay burned). Future mints append >=181.
-# Burned ids NEVER reused: 121, 130, 132, 134, 135, 136, 140, 153, 176. Not landed
+# Appended region: ids continue the global dense order at 100..181 (slate §0).
+# Numeric ids are unique across prefixes: INFRA 154..181 sit ABOVE the BAND 81
+# CUST 147..153 block (153 stays burned). Future mints append >=182.
+# Burned ids NEVER reused: 121, 130, 132, 134, 135, 136, 140, 153. 176 was a
+# reserved (never-rowed) deferral slot — the tier_gate rider mint moved to >=181
+# — and is minted 2026-11-26 as GATE-INFRA-176 (GPU HPO worker lane), closing the
+# 175->177 gap without inventing a surface. Not landed
 # as standalone gates either: 106 MERGE-WITH-CFG-75 · 109 demoted to rider on
 # GATE-INGEST-03 (packet F #18) · 110 OVERRULE→NOT-GATE (packet F #19) ·
 # 115 OVERRULE→dead-code-DELETE-referral, executed this commit (packet G D5).
@@ -4332,7 +4386,7 @@ gates:
 - id: GATE-INFRA-171
   phase: infra-meta
   order: 155
-  owner: 'gpu_training/memory_probe.py:259 main()'
+  owner: 'gpu_training/memory_probe.py:266 main()'
   inputs: []
   outputs: []
   transforms:
@@ -4341,6 +4395,7 @@ gates:
   - 'after the first OOM the remaining (monotonic) batches are recorded as skipped, never re-attempted (:131-145)'
   - 'baseline = largest batch whose peak fits under headroom × total, its per-trial footprint, and floor(free × headroom / footprint) concurrent trials on cuda; every value comes from the config (:213-236)'
   - 'writes <output> as model_dump_json(indent=2) (a relative path resolves next to this script) and prints the baseline JSON; torch is a lazy import resolved from the GPU/ER venv, not a broadway dependency (:187-206, :250-285)'
+  - 'step resolution routes through the SHARED lane boundary lane_contract.resolve_callable (:254-255) — the probe --step and the HPO kernel --objective resolve module:function the same way (commit 1b1c69f)'
   touched_by:
   - pydantic@2.11.7
   - pyyaml@6.0.2
@@ -4357,26 +4412,37 @@ gates:
 - id: GATE-INFRA-172
   phase: infra-meta
   order: 156
-  owner: 'gpu_training/run_hpo.py:135 main()'
-  inputs: []
-  outputs: []
+  owner: 'gpu_training/run_hpo.py:215 main()'
+  inputs:
+  - 'baseline JSON from gpu_training/memory_probe.py (measured micro-batch + concurrency)'
+  - 'gpu_training/config/hpo_run*.yaml layered fan-out profile (kernel_config/objective/gpus/storage policy)'
+  outputs:
+  - 'one WorkerPlan per worker: exact argv (carries the storage URL) + redacted display'
+  - 'aggregated worker exit codes; a non-zero worker fails the fan-out loudly'
   transforms:
-  - 'chooses worker count = config.workers or baseline.concurrent_trials, capped at len(gpus) × mps_slots_per_gpu, and splits n_trials floor+remainder so the budget is exact (no overshoot) (:73-80)'
-  - 'assigns gpu = gpus[worker % len(gpus)] and renders the config command template with {study}/{storage}/{storage_env}/{n_trials}/{micro_batch}/{worker}/{gpu}; micro_batch comes from the baseline (:82-106)'
-  - 'a baseline whose max_batch is null (every micro-batch failed) → ValueError naming the dead baseline (:67-69)'
-  - 'dry-run is the default posture; --execute starts every worker with Popen before collecting exit codes, pins CUDA_VISIBLE_DEVICES and OMP_NUM_THREADS=1, and refuses to start when the storage env var is unset (:108-129)'
-  - 'printed commands redact the storage URL; only the child argv carries the real value (or the template consumes {storage_env}) (:25, :55-63, :102, :114)'
+  - 'HpoRunConfig is the boundary-validated fan-out profile (frozen/extra=forbid): command template, kernel_config, seed, objective (module:function), storage_env, gpus, mps_slots_per_gpu, workers, n_trials override, storage_required; an `extends` layer merges base-then-profile and resolves a relative kernel_config against the file that declares it (:38-97)'
+  - 'chooses worker count = config.workers or the measured concurrency (concurrent_trials_per_gpu × device_count, else concurrent_trials), capped at len(gpus) × mps_slots_per_gpu, and splits the budget floor+remainder so no trial is lost or doubled (:113-136)'
+  - 'assigns gpu = gpus[worker % len(gpus)] and renders the config command template with {kernel_config}/{study}/{storage}/{storage_env}/{n_trials}/{micro_batch}/{worker}/{gpu}/{seed}/{objective}; micro_batch comes from the measured baseline (:138-175)'
+  - 'a baseline whose max_batch is null (every micro-batch failed) → ValueError naming the dead baseline (:136-139)'
+  - 'PREFLIGHT before either mode: HpoStudyConfig.from_yaml(config.kernel_config).identity() parses the project dataset/experiment configs and proves the declared parquet + columns exist — the lane never runs on absent data (:228-232)'
+  - 'dry-run is the default posture; --execute starts every worker with Popen before collecting exit codes, pins CUDA_VISIBLE_DEVICES and OMP_NUM_THREADS=1, refuses to start when a storage_required profile has no URL, and terminates already-started workers on a failed start (:177-208)'
+  - 'printed commands redact the storage URL (ABSENT_STORAGE "" when unset); only the child argv carries the real value (:161-171, :222-252)'
+  - 'a traceback is printed as-is for launcher-level errors but the rendered display is the only render that can be logged (:234-252)'
   touched_by:
   - pydantic@2.11.7
   - pyyaml@6.0.2
   validated_by: 
   - tests/test_gpu_training.py::test_plan_splits_the_trial_budget_over_measured_concurrency
+  - tests/test_gpu_training.py::test_plan_multiplies_per_gpu_concurrency_by_device_count
   - tests/test_gpu_training.py::test_plan_requires_a_fitting_batch
   - tests/test_gpu_training.py::test_dry_run_plan_redacts_the_storage_secret
   - tests/test_gpu_training.py::test_execute_starts_every_worker_before_collecting
+  - tests/test_gpu_training.py::test_kaggle_profile_plans_one_worker_per_t4_and_redacts_the_url
+  - tests/test_gpu_training.py::test_preflight_requires_the_declared_dataset
   if_changed:
   - GATE-INFRA-171
   - GATE-INFRA-174
+  - GATE-INFRA-176 worker invocation contract (kernel_config/seed/objective/storage handoff)
   findings: []
 - id: GATE-INFRA-173
   phase: infra-meta
@@ -4402,19 +4468,22 @@ gates:
   inputs: []
   outputs: []
   transforms:
-  - 'declares the per-worker command template with placeholders {study}/{storage}/{n_trials}/{micro_batch}/{worker}/{gpu}, n_trials 10, study taxi_demand, gpus [0], mps_slots_per_gpu 2, and workers null (= use the baseline concurrency)'
+  - 'declares the per-worker command template (kernel entry + {config}/{n_trials}/{micro_batch}/{worker}/{seed}/{objective}/{storage}), kernel_config hpo_kernel.yaml, seed 1729, objective adapters.taxi:build, gpus [0], mps_slots_per_gpu 2, and workers null (= use the measured concurrency); the study budget comes from the project HPO spec, never from this file (commit 1b1c69f)'
   - 'the shared Optuna URL is named only as storage_env OPTUNA_STORAGE_URL; the value comes from the secret store and never from this file'
+  - 'gpu_training/config/hpo_run_kaggle.yaml EXTENDS this profile with hardware deltas only (gpus [0,1], mps_slots_per_gpu 1, storage_required false = the workers share the kernel''s local SQLite study) — command, seed, objective and storage policy stay declared once here (:1-12)'
   touched_by:
   - pyyaml@6.0.2
   validated_by: 
   - tests/test_gpu_training.py::test_plan_splits_the_trial_budget_over_measured_concurrency
+  - tests/test_gpu_training.py::test_kaggle_profile_plans_one_worker_per_t4_and_redacts_the_url
   if_changed:
   - GATE-INFRA-172
+  - GATE-INFRA-176 study/kernel handoff
   findings: []
 - id: GATE-INFRA-175
   phase: infra-meta
   order: 159
-  owner: 'gpu_training/adapters/cpu_smoke.py:22 step()'
+  owner: 'gpu_training/adapters/cpu_smoke.py:18 step()'
   inputs: []
   outputs: []
   transforms:
@@ -4428,9 +4497,48 @@ gates:
   - GATE-INFRA-171
   - GATE-INFRA-173
   findings: []
-- id: GATE-INFRA-177
+- id: GATE-INFRA-176
   phase: infra-meta
   order: 160
+  owner: 'gpu_training/hpo_kernel.py:44 WorkerInvocation + gpu_training/hpo_study.py:63 HpoStudyConfig + gpu_training/lane_contract.py:17 resolve_callable + gpu_training/adapters/taxi.py:77 build() + gpu_training/config/hpo_kernel.yaml:1 study SSOT'
+  inputs:
+  - 'one launcher-rendered worker argv: --config/--n-trials/--micro-batch/--worker/--seed/--objective/--storage'
+  - 'gpu_training/config/hpo_kernel.yaml study SSOT (hpo_spec/model/dataset/experiment/storage_env/local_storage_url/micro_batch_param)'
+  - 'project HPO spec hpo block (search space, direction, target metric, budget) + the named project dataset/experiment configs'
+  - 'OPTUNA_STORAGE_URL from the secret store (never a file literal)'
+  outputs:
+  - 'one worker run record JSON {study, model, worker, sampler_seed, n_trials, micro_batch, storage source, dataset identity, best_value, best_params, elapsed_s}'
+  - 'trials persisted into the shared Optuna study (argv URL, else the study config env var, else the local SQLite study)'
+  transforms:
+  - 'LANE CONTRACT (one row, five co-tenant files; commit 1b1c69f): hpo_kernel runs ONE canonical worker, hpo_study owns the study definition, lane_contract owns module:function resolution, adapters/taxi owns the taxi objective, hpo_kernel.yaml owns the study SSOT — no vendor/model code and no sampler loop lives in the lane'
+  - 'WorkerInvocation is the boundary: frozen/extra=forbid, objective must be module:function, n_trials/micro_batch > 0, worker >= 0 (:44-70)'
+  - 'PER-WORKER SEED: sampler_seed = seed + worker (:65-67) — two workers inheriting one seed draw the same TPE cold-start sequence and burn half the budget on duplicate trials (the 2xT4 regression this fixes)'
+  - 'storage fallback order argv → study storage_env → local SQLite (:81-88); a missing local SQLite parent directory is created first (:91-102)'
+  - 'the storage URL is a SECRET: only the child argv carries it; HpoWorker output and a traceback are scrubbed to <redacted> before stderr (:105-107, :205-213)'
+  - 'HpoStudyConfig is the boundary-validated study definition (frozen/extra=forbid) that resolves hpo_spec + local sqlite at the repo root, reads the project HPO spec for space/direction/budget, and PREFLIGHTS the declared parquet + columns via DatasetIdentity before any trial (:63-90, :120-163)'
+  - 'HpoWorker.build resolves the objective factory through resolve_callable (loud on a non-module:function reference, a missing attribute or a non-callable) and runs the study through broadway.training.hpo.run_model_study (:19-29, :143-166)'
+  - 'adapters/taxi.py build(study) composes the canonical make_objective over the project configs and the canonical splitter; every dial comes from project/config (:77-87)'
+  touched_by:
+  - optuna@4.4.0
+  - pydantic@2.11.7
+  - pyyaml@6.0.2
+  - sqlalchemy@2.0.40
+  - pandas@2.3.3
+  - broadway.training.hpo(run_model_study, make_objective)
+  - broadway.data.splitter(split)
+  validated_by:
+  - tests/test_gpu_training.py::test_kernel_boundary_accepts_the_launcher_rendered_command
+  - tests/test_gpu_training.py::test_per_worker_seeds_never_share_a_cold_start
+  - tests/test_gpu_training.py::test_preflight_requires_the_declared_dataset
+  - tests/test_gpu_training.py::test_kaggle_profile_plans_one_worker_per_t4_and_redacts_the_url
+  if_changed:
+  - GATE-INFRA-172 child command template + storage handoff
+  - GATE-INFRA-174 fan-out profile kernel_config/objective references
+  - GATE-HPO-80 run_model_study contract
+  findings: []
+- id: GATE-INFRA-177
+  phase: infra-meta
+  order: 161
   owner: 'src/broadway/pipeline.py:16 run()'
   inputs: []
   outputs: []
@@ -4449,39 +4557,44 @@ gates:
   findings: []
 - id: GATE-INFRA-178
   phase: infra-meta
-  order: 161
+  order: 162
   owner: 'configs/step/train.yaml:1 training step config'
   inputs: []
   outputs: []
   transforms:
   - 'declares the training knobs: random_state 42, n_jobs -1, cv_folds 5, cv_kind kfold, model_file model.pkl, n_estimators 500, learning_rate 0.05, num_leaves 63, subsample/colsample_bytree 0.8, quantile_tail 0.9, output artifacts/training + training_result.json'
   - 'consumed as TrainStep through the GATE-TRAIN-30 orchestration (CFG-STEP-TRAIN); no value is repeated in code'
+  - 'declares the data-tracking bundle (commit 78590b4): machine_dir artifacts/tracking, reports_dir reports/tracking, profile_file, baseline {output_file baseline_stats.json, n_bins 10, top_k 10, smoothing 0.0}, data_card {output_file data_card.md, missing_flag_rate 0.05, biases [], generated_at null}, drift {bins 10, epsilon 0.0001, serve_frame null}; every tracking path/file name comes from this block, never from code'
+  - 'drift carries NO decision threshold: serve_frame is the only input, null by default, so drift stays a report input and gates nothing'
   touched_by:
   - pyyaml@6.0.2
   validated_by: []
   if_changed:
   - GATE-TRAIN-30
   - CFG-STEP-TRAIN consumers
+  - GATE-SURF-69 data-card renderer (tracking block consumers)
   findings: []
 - id: GATE-INFRA-179
   phase: infra-meta
-  order: 162
+  order: 163
   owner: 'configs/step/evaluate.yaml:1 evaluation policy config'
   inputs: []
   outputs: []
   transforms:
   - 'declares target_metric rmse, promotion_threshold 0.05, coverage_tolerance 0.05, min_period_rows 100 (partial terminal weeks excluded), output artifacts/evaluation + metrics.json'
   - 'consumed as EvaluateStep by GATE-TRAIN-35 (CFG-STEP-EVALUATE); the tolerance and min-period knobs feed the calibration checks of GATE-INFRA-170'
+  - 'declares the error-analysis blocks (commit 78590b4): error_analysis {ledger_file errors.parquet, thresholds_file thresholds.json, segment_columns [] = carry the whole experiment ColumnPlan}, decision {threshold 15.0 = the truth event, objective f1, grid min 5.0/max 60.0/steps 12}; deleting the decision block keeps the ledger and stops thresholds.json — no cutoff is ever invented in code'
   touched_by:
   - pyyaml@6.0.2
   validated_by: []
   if_changed:
   - GATE-TRAIN-35
   - GATE-INFRA-170
+  - GATE-TRAIN-36 tuning objective + cutoff grid
   findings: []
 - id: GATE-INFRA-180
   phase: infra-meta
-  order: 163
+  order: 164
   owner: 'project/config/experiment/taxi.yaml:1 calibration opt-in overlay (split_conformal)'
   inputs: []
   outputs: []
@@ -4499,7 +4612,7 @@ gates:
 # --- BAND 81-OBJECT-CUSTODY (minted per slate §0; header law above) ------
 - id: GATE-INFRA-181
   phase: infra-meta
-  order: 164
+  order: 165
   owner: 'project/features/__init__.py:48 taxi()  # package plan callable resolved by ExperimentConfig.feature_plan'
   inputs:
   - DatasetContract (target/datetime/columns) via project.features.load_contract
@@ -4507,6 +4620,7 @@ gates:
   - ColumnPlan keep-set (14 ops) consumed by the project ML pipeline projection and project/config/experiment/taxi.yaml feature_plan
   transforms:
   - 'single keep-set in project.ml_pipeline write order: pickup_hour/dayofweek/month, passenger_count/trip_distance/pickup_location_id/dropoff_location_id, is_weekend/rush_hour/is_night/log_distance/same_borough, route_avg_duration (target) + route_frequency (frequency)'
+  - 'dtype truth (commit 3debc6d): passenger_count is declared float64 because the dataset contract and every persisted frame carry float64 — the earlier int64 claim made features/train/evaluate fail loud on a real taxi read'
   - 'builder_params group_col=Borough lookup_col=Borough_lookup feed same_group; module-level PLAN = taxi(CONTRACT) is the resolved project plan instance'
   touched_by:
   - broadway.features.plan(ColumnPlan, ColumnOp)
@@ -4521,7 +4635,7 @@ gates:
   findings: []
 - id: GATE-CUST-147
   phase: object-custody
-  order: 165
+  order: 166
   owner: 'src/broadway/training/mlflow_utils.py:162 promote_candidate()'
   inputs:
   - 'model_uri + alias="champion"'
@@ -4540,7 +4654,7 @@ gates:
   findings: []
 - id: GATE-CUST-148
   phase: object-custody
-  order: 166
+  order: 167
   owner: 'src/broadway/training/mlflow_utils.py:163 register_model call sites'
   inputs:
   - candidate model_uri + dataset name
@@ -4556,7 +4670,7 @@ gates:
   findings: []
 - id: GATE-CUST-149
   phase: object-custody
-  order: 167
+  order: 168
   owner: 'project/experiments/mlflow/03_optuna_worker.py:111 set_tag trio (model/study/seed) + hpo callback tags + battle writers'
   inputs:
   - every mlflow.set_tag call across the independent writer sites
@@ -4573,7 +4687,7 @@ gates:
   findings: []
 - id: GATE-CUST-150
   phase: object-custody
-  order: 168
+  order: 169
   owner: 'src/broadway/training/mlflow_utils.py:59 set_experiment auto-create chokepoint (inside setup_mlflow :54-63)'
   inputs:
   - experiment_name argument at setup time
@@ -4588,7 +4702,7 @@ gates:
   findings: []
 - id: GATE-CUST-151
   phase: object-custody
-  order: 169
+  order: 170
   owner: 'k8s/optuna/lifecycle.sh:149 dump_state() snapshot generations (keep-N cap) + training-plane registry-prune policy (non-champion versions)'
   inputs:
   - registry versions + $BACKUP_DIR snapshot generations
@@ -4605,7 +4719,7 @@ gates:
   findings: []
 - id: GATE-CUST-152
   phase: object-custody
-  order: 170
+  order: 171
   owner: 'project/experiments/mlflow/03_optuna_worker.py:106 optuna_{model} run-name convention (+ {study} trial {n}, battle names)'
   inputs:
   - every run-name emission across optuna/battle/callback writers

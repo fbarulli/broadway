@@ -122,6 +122,14 @@ broadway.data.lookup_value_audit:
 - GATE-ETL-11
 broadway.data.splitter:
 - GATE-ETL-10
+broadway.data.splitter(split):
+- GATE-INFRA-176
+broadway.evaluate.contracts(ThresholdRow, TuningObjective):
+- GATE-TRAIN-36
+broadway.evaluate.metrics(confusion_at, tune_threshold):
+- GATE-TRAIN-35
+broadway.features.builders(BUILDERS, builder_dtype):
+- GATE-ETL-116
 broadway.features.builders(build_derived, load_custom_builders):
 - GATE-FEAT-23
 - GATE-FEAT-24
@@ -136,6 +144,8 @@ broadway.features.generic(build_generic_feature_specs):
 - GATE-FEAT-25
 broadway.features.pipeline(FeaturePipeline):
 - GATE-FEAT-25
+broadway.features.plan(ColumnOp, ColumnPlan):
+- GATE-ETL-116
 broadway.features.plan(ColumnPlan):
 - GATE-FEAT-29
 broadway.features.plan(ColumnPlan, ColumnOp):
@@ -158,6 +168,8 @@ broadway.lineage.ids.node_id:
 - GATE-STATS-41
 broadway.lineage.models:
 - GATE-ETL-10
+broadway.lineage.models(DerivedSpec, SampleSpec):
+- GATE-ETL-116
 broadway.lineage.models(TransformAudit):
 - GATE-FEAT-25
 broadway.lineage.models.TransformAudit:
@@ -215,6 +227,8 @@ broadway.timeline.runners.run_omnibus (:315-319):
 - GATE-STATS-45
 broadway.timeline.runners.run_posthoc (:396):
 - GATE-STATS-47
+broadway.training.hpo(run_model_study, make_objective):
+- GATE-INFRA-176
 broadway.viz.palette_colors (:112 — indirect viz.yaml disk read, see GATE-STATS-48 FINDING):
 - GATE-STATS-49
 broadway.viz.palette_colors — INDIRECT CONFIG READ (see FINDING):
@@ -351,6 +365,7 @@ optuna:
 - GATE-HPO-83
 - GATE-HPO-86
 - GATE-HPO-88
+- GATE-INFRA-176
 orchestration entrypoints dispatching flows:
 - GATE-CFG-78
 os:
@@ -390,6 +405,7 @@ pandas:
 - GATE-HPO-84
 - GATE-INFRA-160
 - GATE-INFRA-161
+- GATE-INFRA-176
 pandas (df ops):
 - GATE-ETL-17
 pandas (via df.to_parquet at call site):
@@ -472,6 +488,7 @@ pydantic:
 - GATE-INFRA-170
 - GATE-INFRA-171
 - GATE-INFRA-172
+- GATE-INFRA-176
 pydantic (extra=forbid models :25-45):
 - GATE-STATS-49
 python -m broadway.cli equivalent:
@@ -495,6 +512,7 @@ pyyaml:
 - GATE-INFRA-172
 - GATE-INFRA-173
 - GATE-INFRA-174
+- GATE-INFRA-176
 - GATE-INFRA-178
 - GATE-INFRA-179
 - GATE-INFRA-180
@@ -549,6 +567,7 @@ sklearn.metrics:
 sqlalchemy:
 - GATE-HPO-80
 - GATE-HPO-86
+- GATE-INFRA-176
 src/broadway/cli.py:127-128 (report subcommand reads):
 - GATE-TLINE-53
 src/broadway/cli.py:132 (report path):
@@ -642,6 +661,8 @@ tests/test_walkthrough.py:
 torch:
 - GATE-INFRA-171
 - GATE-INFRA-175
+tracking(build_baseline_stats, fit_baseline, check_drift, render_data_card):
+- GATE-SURF-69
 training HPO engine:
 - GATE-CFG-76
 typing(Any):
