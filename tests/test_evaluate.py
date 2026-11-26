@@ -25,7 +25,12 @@ from broadway.config.schema import (
     TrainStep,
 )
 from broadway.evaluate import module as evaluate_module
-from broadway.evaluate.contracts import DecisionConfig, DecisionReport, ThresholdGrid
+from broadway.evaluate.contracts import (
+    DecisionConfig,
+    DecisionReport,
+    EvaluationResult,
+    ThresholdGrid,
+)
 from broadway.features.plan import resolve_plan
 from broadway.lineage import records
 from broadway.training import module as training_module
@@ -176,3 +181,81 @@ def test_evaluate_writes_threshold_report_only_when_decision_declared(
     assert report.rows[0].threshold == pytest.approx(decision.grid.min)
     assert report.rows[-1].threshold == pytest.approx(decision.grid.max)
     assert any(report.chosen_threshold == pytest.approx(row.threshold) for row in report.rows)
+
+
+def test_evaluate_uses_the_configured_quantile_interval_source(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    cfg = _make_config(tmp_path)
+    assert cfg.evaluate is not None and cfg.experiment is not None
+    cfg.evaluate.interval_source = "quantile"
+    monkeypatch.setattr(records, "LINEAGE_DIR", Path(cfg.environment.data_dir) / "lineage")
+    out_dir = Path(cfg.environment.data_dir) / cfg.environment.processed_subdir
+    out_dir.mkdir(parents=True, exist_ok=True)
+    df = pd.DataFrame(
+        {
+            "rooms": np.arange(1, 41),
+            "area": np.arange(40, 80),
+            "price": np.arange(1, 41) * 100.0,
+        }
+    )
+    df.to_parquet(out_dir / cfg.etl.train_features_file, index=False)
+    df.tail(10).to_parquet(out_dir / cfg.etl.val_features_file, index=False)
+    training_module.run(cfg)
+    # The interval level is the model's own alpha (95%), read from the config.
+    cfg.experiment.model = ModelConfig(type="lgbm_quantile", params={"alpha": 0.05})
+
+    class _QuantileCandidate:
+        def predict(self, features: pd.DataFrame) -> np.ndarray:
+            return np.full(len(features), 2000.0)
+
+        def predict_interval(
+            self, features: pd.DataFrame
+        ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+            size = len(features)
+            return (
+                np.full(size, 1500.0),
+                np.full(size, 2000.0),
+                np.full(size, 2500.0),
+            )
+
+    monkeypatch.setattr(
+        evaluate_module, "_load_candidate", lambda result: _QuantileCandidate()
+    )
+    evaluate_module.run(cfg)
+
+    evaluation = EvaluationResult.model_validate_json(
+        (Path(cfg.evaluate.output_dir) / cfg.evaluate.output_file).read_text(encoding="utf-8")
+    )
+    calibration = evaluation.calibration
+    assert calibration is not None
+    assert calibration.method == "quantile"
+    assert calibration.q is None
+    assert calibration.alpha == pytest.approx(0.05)
+    assert calibration.nominal_coverage == pytest.approx(0.95)
+    assert calibration.mean_width == pytest.approx(1000.0)
+
+
+def test_evaluate_quantile_source_requires_a_quantile_candidate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    cfg = _make_config(tmp_path)
+    assert cfg.evaluate is not None and cfg.experiment is not None
+    cfg.evaluate.interval_source = "quantile"
+    monkeypatch.setattr(records, "LINEAGE_DIR", Path(cfg.environment.data_dir) / "lineage")
+    out_dir = Path(cfg.environment.data_dir) / cfg.environment.processed_subdir
+    out_dir.mkdir(parents=True, exist_ok=True)
+    df = pd.DataFrame(
+        {
+            "rooms": np.arange(1, 41),
+            "area": np.arange(40, 80),
+            "price": np.arange(1, 41) * 100.0,
+        }
+    )
+    df.to_parquet(out_dir / cfg.etl.train_features_file, index=False)
+    df.tail(10).to_parquet(out_dir / cfg.etl.val_features_file, index=False)
+    training_module.run(cfg)
+    cfg.experiment.model = ModelConfig(type="lgbm_quantile", params={"alpha": 0.05})
+
+    with pytest.raises(ValueError, match="predict_interval"):
+        evaluate_module.run(cfg)

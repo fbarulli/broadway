@@ -11,6 +11,7 @@ from __future__ import annotations
 from typing import Any
 
 from broadway.training.models.lightgbm import create as create_lgbm
+from broadway.training.models.lightgbm import create_quantile as create_lgbm_quantile
 from broadway.training.models.linear import create as create_linear
 from broadway.training.models.random_forest import create as create_rf
 from broadway.training.models.xgboost import create as create_xgb
@@ -18,9 +19,20 @@ from broadway.training.models.xgboost import create as create_xgb
 _REGISTRY = {
     "linear": create_linear,
     "lgbm": create_lgbm,
+    "lgbm_quantile": create_lgbm_quantile,
     "rf": create_rf,
     "xgb": create_xgb,
 }
+
+# LightGBM's native params. ``objective``/``alpha`` let HPO tune a single
+# quantile model (``objective="quantile"``); the ``lgbm_quantile`` key below
+# owns its objective internally and reads ``alpha`` as the interval miscoverage.
+_LGBM_PARAMS = frozenset({
+    "n_estimators", "learning_rate", "num_leaves", "max_depth",
+    "subsample", "colsample_bytree", "min_child_samples",
+    "reg_alpha", "reg_lambda", "random_state", "n_jobs",
+    "objective", "alpha",
+})
 
 MODEL_META: dict[str, dict] = {
     "linear": {
@@ -30,12 +42,22 @@ MODEL_META: dict[str, dict] = {
     },
     "lgbm": {
         "display": "lgbm",
-        "allowed_params": frozenset({
-            "n_estimators", "learning_rate", "num_leaves", "max_depth",
-            "subsample", "colsample_bytree", "min_child_samples",
-            "reg_alpha", "reg_lambda", "random_state", "n_jobs",
-        }),
+        "allowed_params": _LGBM_PARAMS,
         "default_params": {
+            "n_estimators": 100,
+            "learning_rate": 0.1,
+            "max_depth": 5,
+            "verbosity": -1,
+        },
+    },
+    "lgbm_quantile": {
+        "display": "lgbm_quantile",
+        # The bundle owns objective="quantile"; ``alpha`` is the interval
+        # miscoverage (0.05 -> 2.5/50/97.5% quantiles), so a caller cannot
+        # silently reassign either.
+        "allowed_params": _LGBM_PARAMS - {"objective"},
+        "default_params": {
+            "alpha": 0.05,
             "n_estimators": 100,
             "learning_rate": 0.1,
             "max_depth": 5,

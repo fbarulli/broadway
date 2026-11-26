@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import mlflow
 import numpy as np
@@ -26,6 +26,7 @@ from broadway.calibration.contracts import (
     PeriodCoverage,
 )
 from broadway.calibration.metrics import coverage, coverage_by_period, mean_width
+from broadway.calibration.quantile import QuantileInterval
 from broadway.config.schema import PipelineConfig
 from broadway.evaluate.comparison import compare_models
 from broadway.evaluate.contracts import (
@@ -126,24 +127,60 @@ def _period_coverage(
     )
 
 
+def _quantile_bounds(
+    candidate: Any, X_val: pd.DataFrame
+) -> tuple[np.ndarray, np.ndarray]:
+    """Read the candidate's native quantile pair, or fail loud naming the contract."""
+    predict_interval = getattr(candidate, "predict_interval", None)
+    if predict_interval is None:
+        raise ValueError(
+            "evaluate.interval_source='quantile' requires a candidate artifact that "
+            "exposes predict_interval(features) -> (lower, mid, upper); the loaded "
+            "pyfunc exposes predict only"
+        )
+    lower, mid, upper = predict_interval(X_val)
+    return QuantileInterval().interval(lower, mid, upper)
+
+
+def _quantile_alpha(params: dict[str, float | int | str]) -> float:
+    """The interval miscoverage the quantile candidate was built at."""
+    # PipelineConfig refuses a quantile interval source without this param.
+    assert "alpha" in params
+    return float(params["alpha"])
+
+
 def _calibration_evaluation(
     cfg: PipelineConfig,
-    summary: CalibrationSummary,
+    summary: CalibrationSummary | None,
+    candidate: Any,
+    X_val: pd.DataFrame,
     val_df: pd.DataFrame,
     y_true: np.ndarray,
     y_pred: np.ndarray,
 ) -> CalibrationEvaluation:
-    """Evaluate the calibrated interval on the untouched holdout."""
+    """Evaluate the configured interval source on the untouched holdout."""
     assert cfg.evaluate is not None
-    lower, upper = SplitConformal().interval(y_pred, summary.q)
+    method: Literal["split_conformal", "quantile"]
+    if cfg.evaluate.interval_source == "conformal":
+        assert summary is not None
+        lower, upper = SplitConformal().interval(y_pred, summary.q)
+        method, alpha, q = summary.method, summary.alpha, summary.q
+    else:
+        assert cfg.experiment is not None
+        lower, upper = _quantile_bounds(candidate, X_val)
+        method, alpha, q = (
+            "quantile",
+            _quantile_alpha(cfg.experiment.model.params),
+            None,
+        )
     observed = coverage(y_true, lower, upper)
-    nominal = 1.0 - summary.alpha
+    nominal = 1.0 - alpha
     tolerance = cfg.evaluate.coverage_tolerance
     calibrated = None if tolerance is None else abs(observed - nominal) <= tolerance
     return CalibrationEvaluation(
-        method=summary.method,
-        alpha=summary.alpha,
-        q=summary.q,
+        method=method,
+        alpha=alpha,
+        q=q,
         nominal_coverage=nominal,
         coverage=observed,
         mean_width=mean_width(lower, upper),
@@ -323,9 +360,16 @@ def run(cfg: PipelineConfig) -> None:
     candidate_metrics = compute_metrics(y_true, y_pred)
 
     calibration_evaluation: CalibrationEvaluation | None = None
-    if result.calibration is not None:
+    assert cfg.evaluate is not None
+    if result.calibration is not None or cfg.evaluate.interval_source == "quantile":
         calibration_evaluation = _calibration_evaluation(
-            cfg, result.calibration, val_df, y_true, y_pred
+            cfg,
+            result.calibration,
+            candidate,
+            X_val,
+            val_df,
+            y_true,
+            y_pred,
         )
         if calibration_evaluation.calibrated is False:
             warnings.append(_calibration_warning(calibration_evaluation))

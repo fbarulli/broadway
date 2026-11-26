@@ -6,27 +6,47 @@ every model forecasts them in one shot and never sees them in training.
 
 Models: persistence (t-1), seasonal-naive-24h (t-24), train mean, Prophet
 (daily + weekly seasonality), GluonTS torch DeepAR, GluonTS torch WaveNet (the
-CNN stand-in for MQCNN, which GluonTS >= 0.16 no longer ships in torch), and
-zero-shot TimesFM.
+CNN stand-in for MQCNN, which GluonTS >= 0.16 no longer ships in torch),
+zero-shot TimesFM, statsmodels SARIMAX, statsforecast AutoARIMA, and a
+quantile-LightGBM model. The ARIMA and quantile-LightGBM rows also carry a 95%
+interval; coverage and width are validated with the platform calibration
+metrics on the same holdout.
+
 Stochastic models (DeepAR, WaveNet) are retrained on REPEATS seeds; the rest
 are deterministic single runs. Metrics are reported per seed and as mean ± std.
+Models whose optional forecast package is absent are skipped with the reason
+recorded in the report instead of aborting the whole comparison.
 
 Outputs (all under results/timeseries/):
 - 04_forecast_models_metrics.csv: per-run long form model, seed, metric, value
 - 04_forecast_models_aggregate.csv: model, metric, runs, mean, std
-- 04_forecast_models.md: holdout window, ranking, verdict, method notes
+- 04_forecast_models_intervals.csv: model, alpha, nominal, coverage, mean width
+- 04_forecast_models.md: holdout window, ranking, interval validation, verdict
 - 04_forecast_models.png: actual vs each model (seed mean), last 7 holdout days
 """
 
 import importlib
 import importlib.metadata
 import tempfile
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+
+from broadway.calibration.metrics import coverage, mean_width
+from broadway.calibration.quantile import QuantileInterval
+from broadway.stats.forecast import (
+    ArimaOrder,
+    AutoArimaForecaster,
+    ForecastResult,
+    SarimaxForecaster,
+    SeasonalOrder,
+)
+from broadway.training.models.lightgbm import QuantileLGBMRegressor
+from broadway.training.models.registry import get_model
 
 RESULTS = Path(__file__).resolve().parent.parent / "results" / "timeseries"
 HOURLY_CSV = RESULTS / "01_series_profile_hourly_counts.csv"
@@ -43,6 +63,12 @@ TIMESFM_MAX_CONTEXT = 1024
 TIMESFM_MAX_HORIZON = 384  # >= HOLDOUT_HOURS and a multiple of the 128-point output patch
 INSTALL_HINT = "bash scripts/uv.sh sync --extra forecast"
 
+INTERVAL_ALPHA = 0.05
+SARIMA_ORDER = ArimaOrder(p=1, d=0, q=1)
+SARIMA_SEASONAL_ORDER = SeasonalOrder(p=0, d=1, q=1, s=24)
+AUTO_ARIMA_SEASON_LENGTH = 24
+WEEKEND_DAYS = (5, 6)  # pandas dayofweek: Monday=0 .. Sunday=6
+
 
 def _import_module(module: str, package: str) -> Any:
     try:
@@ -51,6 +77,16 @@ def _import_module(module: str, package: str) -> Any:
         raise ImportError(
             f"step 04 needs {package}; install the forecast extra:\n  {INSTALL_HINT}"
         ) from exc
+
+
+def _collect(skipped: list[str], label: str, build: Callable[[], Any]) -> Any | None:
+    """Build an optional model, recording the reason when its package is absent."""
+    try:
+        return build()
+    except ImportError as exc:
+        skipped.append(f"`{label}` skipped — {exc}")
+        print(f"skip {label}: {exc}")
+        return None
 
 
 def _load_series() -> pd.Series:
@@ -99,6 +135,47 @@ def _forecast_timesfm(train: pd.Series, horizon: pd.DatetimeIndex) -> pd.Series:
     context = np.asarray(train.to_numpy(), dtype=np.float32)
     point, _ = model.forecast(horizon=len(horizon), inputs=[context])
     return pd.Series(point[0][: len(horizon)], index=horizon)
+
+
+def _forecast_sarima(train: pd.Series, horizon: pd.DatetimeIndex) -> ForecastResult:
+    return SarimaxForecaster(
+        order=SARIMA_ORDER,
+        seasonal_order=SARIMA_SEASONAL_ORDER,
+        alpha=INTERVAL_ALPHA,
+    ).forecast(train.to_numpy(), len(horizon))
+
+
+def _forecast_auto_arima(train: pd.Series, horizon: pd.DatetimeIndex) -> ForecastResult:
+    return AutoArimaForecaster(
+        alpha=INTERVAL_ALPHA, season_length=AUTO_ARIMA_SEASON_LENGTH
+    ).forecast(train.to_numpy(), len(horizon))
+
+
+def _calendar_features(index: pd.DatetimeIndex) -> pd.DataFrame:
+    """Calendar covariates available for the whole forecast horizon."""
+    return pd.DataFrame(
+        {
+            "hour": index.hour,
+            "day_of_week": index.dayofweek,
+            "is_weekend": index.dayofweek.isin(WEEKEND_DAYS).astype(int),
+        },
+        index=index,
+    )
+
+
+def _forecast_lgbm_quantile(
+    train: pd.Series, horizon: pd.DatetimeIndex
+) -> ForecastResult:
+    model: QuantileLGBMRegressor = get_model("lgbm_quantile", alpha=INTERVAL_ALPHA)
+    model.fit(_calendar_features(train.index), train.to_numpy())
+    lower, mid, upper = model.predict_interval(_calendar_features(horizon))
+    ordered_lower, ordered_upper = QuantileInterval().interval(lower, mid, upper)
+    return ForecastResult(
+        alpha=INTERVAL_ALPHA,
+        point=mid.tolist(),
+        lower=ordered_lower.tolist(),
+        upper=ordered_upper.tolist(),
+    )
 
 
 def _fit_gluonts(
@@ -151,12 +228,32 @@ def _gluonts_forecasts(
 
 
 def _deterministic_forecasts(
-    train: pd.Series, series: pd.Series, horizon: pd.DatetimeIndex
-) -> dict[str, list[tuple[int, pd.Series]]]:
+    train: pd.Series,
+    series: pd.Series,
+    horizon: pd.DatetimeIndex,
+    skipped: list[str],
+) -> tuple[dict[str, list[tuple[int, pd.Series]]], dict[str, ForecastResult]]:
+    """Point paths for every deterministic model, plus the interval rows."""
     forecasts = _baseline_forecasts(train, series, horizon)
-    forecasts["prophet"] = _forecast_prophet(train, horizon)
-    forecasts["timesfm"] = _forecast_timesfm(train, horizon)
-    return {model: [(DETERMINISTIC_SEED, predicted)] for model, predicted in forecasts.items()}
+    intervals: dict[str, ForecastResult] = {}
+    optional: dict[str, Callable[[], Any]] = {
+        "prophet": lambda: _forecast_prophet(train, horizon),
+        "timesfm": lambda: _forecast_timesfm(train, horizon),
+        "sarima": lambda: _forecast_sarima(train, horizon),
+        "auto_arima": lambda: _forecast_auto_arima(train, horizon),
+        "lgbm_quantile": lambda: _forecast_lgbm_quantile(train, horizon),
+    }
+    for name, build in optional.items():
+        predicted = _collect(skipped, name, build)
+        if predicted is None:
+            continue
+        if isinstance(predicted, ForecastResult):
+            intervals[name] = predicted
+            forecasts[name] = pd.Series(predicted.point, index=horizon)
+        else:
+            forecasts[name] = predicted
+    runs = {name: [(DETERMINISTIC_SEED, path)] for name, path in forecasts.items()}
+    return runs, intervals
 
 
 def _metrics(actual: pd.Series, predicted: pd.Series) -> dict[str, float]:
@@ -188,6 +285,28 @@ def _aggregate_frame(metrics: pd.DataFrame) -> pd.DataFrame:
     )
     aggregate[["mean", "std"]] = aggregate[["mean", "std"]].round(4)
     return aggregate[["model", "metric", "runs", "mean", "std"]]
+
+
+def _interval_frame(actual: pd.Series, intervals: dict[str, ForecastResult]) -> pd.DataFrame:
+    """Holdout coverage and width of every 95% interval, via the platform metrics."""
+    rows = [
+        {
+            "model": model,
+            "alpha": result.alpha,
+            "nominal_coverage": 1.0 - result.alpha,
+            "coverage": round(
+                coverage(actual.to_numpy(), np.asarray(result.lower), np.asarray(result.upper)),
+                4,
+            ),
+            "mean_width": round(
+                mean_width(np.asarray(result.lower), np.asarray(result.upper)), 4
+            ),
+        }
+        for model, result in intervals.items()
+    ]
+    return pd.DataFrame(
+        rows, columns=["model", "alpha", "nominal_coverage", "coverage", "mean_width"]
+    )
 
 
 def _mean_paths(runs: dict[str, list[tuple[int, pd.Series]]]) -> dict[str, pd.Series]:
@@ -238,7 +357,29 @@ def _report_table(wide: pd.DataFrame, spread: pd.DataFrame, runs: pd.Series) -> 
     return rows
 
 
-def _write_report(stem: str, train: pd.Series, actual: pd.Series, aggregate: pd.DataFrame) -> None:
+def _interval_section(intervals: pd.DataFrame) -> list[str]:
+    if intervals.empty:
+        return []
+    rows = [
+        f"| {row.model} | {row.nominal_coverage:.2f} | {row.coverage:.3f} | {row.mean_width:.1f} |"
+        for row in intervals.itertuples()
+    ]
+    return [
+        "",
+        "| interval model | nominal | holdout coverage | mean width (trips) |",
+        "|---|---|---|---|",
+        *rows,
+    ]
+
+
+def _write_report(
+    stem: str,
+    train: pd.Series,
+    actual: pd.Series,
+    aggregate: pd.DataFrame,
+    intervals: pd.DataFrame,
+    skipped: list[str],
+) -> None:
     wide = aggregate.pivot(index="model", columns="metric", values="mean").sort_values("MAE")
     spread = aggregate.pivot(index="model", columns="metric", values="std")
     runs = aggregate.groupby("model")["runs"].max()
@@ -259,14 +400,19 @@ def _write_report(stem: str, train: pd.Series, actual: pd.Series, aggregate: pd.
         ),
         (
             f"- repeatability: DeepAR and WaveNet are stochastic and retrained on seeds {SEEDS}; "
-            "std is across seeds. Persistence, seasonal-naive, train-mean, Prophet and "
-            "zero-shot TimesFM are deterministic single runs, so their std is blank."
+            "std is across seeds. Every other model is a deterministic single run."
+        ),
+        (
+            "- intervals: SARIMAX (`get_forecast(...).conf_int`), AutoARIMA (statsforecast "
+            f"native level) and quantile LightGBM (2.5/50/97.5%) report a {100 * (1 - INTERVAL_ALPHA):.0f}% "
+            "holdout interval; coverage/width come from the platform calibration metrics."
         ),
         f"- verdict: {best} wins on mean MAE: {gain:+.1f} trips versus persistence.",
         "",
         "| model | repeats | MAE | RMSE | MAPE % |",
         "|---|---|---|---|---|",
         *_report_table(wide, spread, runs),
+        *_interval_section(intervals),
         "",
         (
             "- context: 02 found the hour-of-day/weekday shape and 03 the 24h/168h ACF dominance "
@@ -277,21 +423,24 @@ def _write_report(stem: str, train: pd.Series, actual: pd.Series, aggregate: pd.
             f"- TimesFM: zero-shot `{TIMESFM_CHECKPOINT}`, package "
             f"`timesfm=={importlib.metadata.version('timesfm')}` (3.0's torch API ships in the "
             "separate unpublished `timesfm3` package, so 2.5 is the latest loadable checkpoint)."
+            if "timesfm" in wide.index
+            else "- TimesFM: not run in this environment (see the skipped line)."
         ),
         (
             "- GluonTS: `gluonts_mqcnn` is unavailable in GluonTS >= 0.16 (MQCNN removed with "
             "the MXNet API); `gluonts_wavenet` is the torch CNN used as the second model."
         ),
         "- plot: stochastic models are drawn as their seed-mean path.",
+        *(("", "- skipped: " + "; ".join(skipped)) if skipped else ()),
         "",
         (
-            f"Artifacts: {stem}_metrics.csv, {stem}_aggregate.csv, {stem}.md, "
-            f"{stem}.png (this directory)."
+            f"Artifacts: {stem}_metrics.csv, {stem}_aggregate.csv, {stem}_intervals.csv, "
+            f"{stem}.md, {stem}.png (this directory)."
         ),
     ]
     (RESULTS / f"{stem}.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
     print("\n".join(lines[4:]))
-    print(f"wrote {stem}_metrics.csv, {stem}_aggregate.csv, {stem}.md, {stem}.png")
+    print(f"wrote {stem}_metrics.csv, {stem}_aggregate.csv, {stem}_intervals.csv, {stem}.md, {stem}.png")
 
 
 def main() -> None:
@@ -301,16 +450,22 @@ def main() -> None:
     train, actual = series.iloc[:-HOLDOUT_HOURS], series.iloc[-HOLDOUT_HOURS:]
     print(f"train {len(train)}h -> holdout {len(actual)}h {actual.index[0]} .. {actual.index[-1]}")
 
-    runs = _deterministic_forecasts(train, series, actual.index)
-    runs.update(_gluonts_forecasts(train, actual.index))
+    skipped: list[str] = []
+    runs, intervals = _deterministic_forecasts(train, series, actual.index, skipped)
+    gluonts = _collect(skipped, "gluonts", lambda: _gluonts_forecasts(train, actual.index))
+    if gluonts is not None:
+        runs.update(gluonts)
 
     metrics = _metrics_frame(actual, runs)
     aggregate = _aggregate_frame(metrics)
+    interval_frame = _interval_frame(actual, intervals)
     metrics.to_csv(RESULTS / f"{stem}_metrics.csv", index=False)
     aggregate.to_csv(RESULTS / f"{stem}_aggregate.csv", index=False)
+    interval_frame.to_csv(RESULTS / f"{stem}_intervals.csv", index=False)
     _plot_holdout(stem, actual, _mean_paths(runs))
-    _write_report(stem, train, actual, aggregate)
+    _write_report(stem, train, actual, aggregate, interval_frame, skipped)
     print(aggregate[aggregate["metric"] == "MAE"].sort_values("mean").to_string(index=False))
+    print(interval_frame.to_string(index=False))
 
 
 if __name__ == "__main__":

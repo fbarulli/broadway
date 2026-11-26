@@ -43,11 +43,13 @@ class PeriodCoverage(BaseModel):
 
 
 class CalibrationEvaluation(BaseModel):
-    """Holdout evaluation of the calibrated interval against nominal coverage."""
+    """Holdout evaluation of the configured interval against nominal coverage."""
 
-    method: Literal["split_conformal"]
+    method: Literal["split_conformal", "quantile"]
     alpha: float
-    q: float
+    # None for a quantile interval: no split-conformal residual quantile stands
+    # behind a model-native quantile pair.
+    q: float | None
     nominal_coverage: float
     coverage: float
     mean_width: float

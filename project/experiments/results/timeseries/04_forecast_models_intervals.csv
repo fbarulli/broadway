@@ -1,0 +1,4 @@
+model,alpha,nominal_coverage,coverage,mean_width
+sarima,0.05,0.95,0.9613,4070.8193
+auto_arima,0.05,0.95,1.0,8094.7797
+lgbm_quantile,0.05,0.95,0.9702,1965.8726

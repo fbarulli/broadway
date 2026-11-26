@@ -1,6 +1,10 @@
 target_metric: rmse
 promotion_threshold: 0.05
 coverage_tolerance: 0.05
+# Where the holdout interval comes from: `conformal` uses the split-conformal
+# q fitted at training time; `quantile` reads the candidate artifact's own
+# lower/mid/upper predictions (experiment.model.params.alpha is the level).
+interval_source: conformal
 # Weekly coverage periods with fewer rows are excluded: a partial terminal
 # week must never be read as a coverage collapse (complete-bucket rule).
 min_period_rows: 100

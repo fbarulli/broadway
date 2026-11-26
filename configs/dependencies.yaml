@@ -301,6 +301,13 @@ dependencies:
     adapter: ""
     license: Apache-2.0
     registered: 2026-11-25
+  - name: statsforecast
+    owner: platform
+    scope: optional
+    purpose: AutoARIMA seasonal forecast baseline behind the forecast extra.
+    adapter: broadway.stats.forecast
+    license: Apache-2.0
+    registered: 2026-11-26
   - name: tsfresh
     owner: platform
     scope: optional

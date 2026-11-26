@@ -50,7 +50,7 @@ def test_display_name_linear_is_ols() -> None:
 
 
 def test_model_keys_match_meta_keys() -> None:
-    assert set(model_keys()) == {"linear", "lgbm", "rf", "xgb"}
+    assert set(model_keys()) == {"linear", "lgbm", "lgbm_quantile", "rf", "xgb"}
     assert set(model_keys()) == set(MODEL_META)
 
 
@@ -83,4 +83,21 @@ def test_schema_rejects_search_space_outside_allowed_params() -> None:
 def test_allowed_params_unknown_key_empty() -> None:
     # Schema treats an unknown model's search space as invalid (empty allowlist).
     assert allowed_params("ghost") == frozenset()
+
+
+def test_registry_accepts_quantile_params_and_config_rejects_unknown_ones() -> None:
+    tuned = get_model("lgbm", objective="quantile", alpha=0.05)
+    assert tuned.objective == "quantile"
+    assert tuned.alpha == pytest.approx(0.05)
+    assert get_model("lgbm_quantile", alpha=0.1).alpha == pytest.approx(0.1)
+
+    with pytest.raises(ValidationError, match="invalid model.params"):
+        ExperimentConfig(
+            data_source=DataSourceRef(loader="canonical", schema_contract="raw"),
+            feature_plan="broadway.features.plans:contract_features",
+            model=ModelConfig(type="lgbm", params={"not_a_registry_param": 1.0}),
+            split=SplitConfig(type="random", validation_size=0.2),
+            random_state=42,
+            target_metric="rmse",
+        )
 

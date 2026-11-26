@@ -285,6 +285,18 @@ class ExperimentConfig(BaseModel):
         return self
 
     @model_validator(mode="after")
+    def _validate_model_params(self) -> ExperimentConfig:
+        """Refuse model params the registry does not own (fail at parse)."""
+        valid_params = allowed_params(self.model.type)
+        invalid_params = set(self.model.params) - valid_params
+        if invalid_params:
+            raise ValueError(
+                f"invalid model.params for model '{self.model.type}': "
+                f"{sorted(invalid_params)}. valid params: {sorted(valid_params)}"
+            )
+        return self
+
+    @model_validator(mode="after")
     def _validate_hpo_search_space(self) -> ExperimentConfig:
         if self.hpo is None:
             return self
@@ -589,6 +601,10 @@ class EvaluateStep(BaseModel):
     output_file: str
     coverage_tolerance: float | None = Field(default=None, ge=0.0, le=1.0)
     min_period_rows: int | None = Field(default=None, ge=1)
+    # Where the holdout interval comes from: the split-conformal q fitted at
+    # training time, or the candidate's own lower/mid/upper quantile
+    # predictions (its `alpha` is the miscoverage level).
+    interval_source: Literal["conformal", "quantile"] = "conformal"
     error_analysis: ErrorAnalysisConfig = Field(default_factory=ErrorAnalysisConfig)
     decision: DecisionConfig | None = None
 
@@ -632,3 +648,16 @@ class PipelineConfig(BaseModel):
     train: TrainStep | None = None
     evaluate: EvaluateStep | None = None
     full: FullStep | None = None
+
+    @model_validator(mode="after")
+    def _validate_interval_source_level(self) -> PipelineConfig:
+        """A quantile interval source reads its level from the model's alpha."""
+        if self.evaluate is None or self.evaluate.interval_source != "quantile":
+            return self
+        if self.experiment is None or "alpha" not in self.experiment.model.params:
+            raise ValueError(
+                "evaluate.interval_source='quantile' requires "
+                "experiment.model.params.alpha (the interval miscoverage, "
+                "e.g. 0.05 for a 95% interval)"
+            )
+        return self
