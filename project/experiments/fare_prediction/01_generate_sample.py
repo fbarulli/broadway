@@ -15,7 +15,7 @@ def _provenance(artifact: Path) -> dict:
 
 
 def _profile(artifact: Path, provenance: dict) -> str:
-    """Render the sample's actual output: shape, dtypes, head rows, numeric summary."""
+    """Render the sample's output as aggregates: shape, dtypes, numeric summary."""
     frame = pd.read_parquet(artifact)
     lines = [
         f"# 01 — {provenance['name']} ({provenance['version']})",
@@ -36,9 +36,10 @@ def _profile(artifact: Path, provenance: dict) -> str:
         count = int(missing[column])
         share = 100.0 * count / len(frame) if len(frame) else 0.0
         lines.append(f"| {column} | {frame[column].dtype} | {count:,} | {share:.2f}% |")
-    lines += ["", "## head", "", frame.head(5).to_markdown(index=False), ""]
+
     numeric = frame.select_dtypes("number")
     if not numeric.empty:
+        lines.append("")
         summary = numeric.describe().T[["mean", "std", "min", "50%", "max"]]
         lines += ["## numeric summary", "", summary.to_markdown(floatfmt=".4f"), ""]
     if provenance.get("derived"):
