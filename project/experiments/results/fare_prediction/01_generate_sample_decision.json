@@ -13,7 +13,7 @@
   "action": "review the fare-policy exclusion before training",
   "owner": "fare_prediction",
   "sample_size": 50000,
-  "unit": null,
+  "unit": "ks_distance",
   "min_sample_size": 1000,
   "evidence": {
     "baseline": "no-effect permutation (sample labels shuffled at this n)",

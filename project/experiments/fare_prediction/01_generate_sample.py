@@ -184,6 +184,7 @@ def main() -> None:
         null_values=null,
         evidence=evidence,
         question="Did sampling plus the fare policy preserve the source population?",
+        unit="ks_distance",
     )
     output = StepOutput(results_dir=RESULTS, stem=STEM, decision=decision)
     output.add_table("columns", _columns_table(frame))
