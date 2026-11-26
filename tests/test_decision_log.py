@@ -55,24 +55,22 @@ def _output(results: Path, log: DecisionLog) -> StepOutput:
     return output
 
 
-def _stamped(record: Path) -> str:
-    payload = json.loads(record.read_text(encoding="utf-8"))
-    run_id: str = payload["evidence"]["provenance"]["mlflow_run_id"]
-    return run_id
-
-
 def test_disabled_without_a_uri_is_a_noop_with_a_recorded_reason(tmp_path: Path) -> None:
     log = DecisionLog(tracking_uri="")
 
     _, figure, record = _output(tmp_path, log).write()
+    before = record.read_bytes()
 
     assert log.enabled() is False
     assert log.reason is not None
     assert "mlflow_tracking_uri" in log.reason
-    assert (
-        "mlflow_run_id"
-        not in json.loads(record.read_text(encoding="utf-8"))["evidence"]["provenance"]
-    )
+    assert record.read_bytes() == before
+    assert sorted(path.name for path in tmp_path.iterdir()) == [
+        "01_step.md",
+        "01_step.png",
+        "01_step_decision.json",
+        "01_step_funnel.csv",
+    ]
     assert (
         log.log(
             stem="01_step",
@@ -90,27 +88,45 @@ def test_disabled_without_a_uri_is_a_noop_with_a_recorded_reason(tmp_path: Path)
     assert "missing-environment" in (unreadable.reason or "")
 
 
-def test_enabled_projects_the_run_and_stamps_the_record(
+def test_enabled_projects_the_run_and_leaves_the_record_byte_identical(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setenv("BROADWAY_RUN_ID", "a" * 32)
+    results = tmp_path / "results"
     log = DecisionLog(tracking_uri=(tmp_path / "mlruns").as_uri())
 
-    _, figure, record = _output(tmp_path / "results", log).write()
-    run_id = _stamped(record)
-    # Re-projecting the same step inside one invocation reuses its run.
-    _output(tmp_path / "results", log).write()
+    _, _, record = _output(results, log).write()
+    record_bytes = record.read_bytes()
+    _output(results, log).write()
 
-    assert _stamped(record) == run_id
-    assert log.reason is None
+    # A rerun never rewrites the record and adds no local projection state.
+    assert record.read_bytes() == record_bytes
+    assert (
+        "mlflow_run_id"
+        not in json.loads(record.read_text(encoding="utf-8"))["evidence"]["provenance"]
+    )
+    assert not list(results.glob("*.mlflow.json"))
     client = mlflow.tracking.MlflowClient()
-    run = client.get_run(run_id)
+    experiment = client.get_experiment_by_name(EXPERIMENT)
+    assert experiment is not None
+    assert len(mlflow.search_runs(experiment_ids=[experiment.experiment_id])) == 2
+
+    # One invocation projecting the same step twice reuses its run.
+    monkeypatch.setenv("BROADWAY_RUN_ID", "a" * 32)
+    _output(results, log).write()
+    _output(results, log).write()
+
+    runs = mlflow.search_runs(
+        experiment_ids=[experiment.experiment_id],
+        filter_string="tags.broadway_run_id = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'",
+        output_format="list",
+    )
+    assert len(runs) == 1
+    run = client.get_run(runs[0].info.run_id)
     assert run.data.tags["step"] == "01_step"
     assert run.data.tags["verdict"] == "act"
     assert run.data.tags["owner"] == "fare_prediction"
     assert run.data.tags["action"] == "review the policy"
     assert run.data.tags["direction"] == "max"
-    assert run.data.tags["broadway_run_id"] == "a" * 32
     assert run.data.params["metric"] == "ks_fare_amount"
     assert run.data.params["threshold"] == "0.01"
     assert run.data.params["sample_size"] == "10000"
@@ -118,14 +134,11 @@ def test_enabled_projects_the_run_and_stamps_the_record(
     assert run.data.metrics["value"] == pytest.approx(0.012)
     assert run.data.metrics["interval_low"] == pytest.approx(0.011)
     assert run.data.metrics["interval_high"] == pytest.approx(0.013)
+    assert run.data.metrics["threshold"] == pytest.approx(0.01)
     assert run.data.metrics["delta"] == pytest.approx(0.002)
-    artifacts = {Path(item.path).name for item in client.list_artifacts(run_id)}
+    artifacts = {Path(item.path).name for item in client.list_artifacts(run.info.run_id)}
     assert {"01_step.png", "01_step_funnel.csv", "01_step_decision.json"} <= artifacts
-    experiment = client.get_experiment_by_name(EXPERIMENT)
-    assert experiment is not None
-    assert len(mlflow.search_runs(experiment_ids=[experiment.experiment_id])) == 1
-    assert figure == tmp_path / "results" / "01_step.png"
-    assert figure.exists()
+    assert record.read_bytes() == record_bytes
 
 
 def test_unreachable_server_does_not_raise(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -142,3 +155,4 @@ def test_unreachable_server_does_not_raise(tmp_path: Path, monkeypatch: pytest.M
     assert log.reason is not None
     assert "unreachable" in log.reason
     assert all(path.exists() for path in (report, figure, record))
+    assert not list(tmp_path.glob("*.mlflow.json"))

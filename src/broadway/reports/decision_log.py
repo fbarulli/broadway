@@ -1,10 +1,13 @@
 """MLflow projection of decision records — a view of the record, never a truth.
 
-The decision record (``<stem>_decision.json``) is the source of truth; MLflow
-only *shows* it: one run per (invocation, step) carrying the record's tags,
-params and metrics plus the evidence artifacts. Projection is a fail-soft
-side channel — a missing tracking URI or an unreachable server records why and
-never fails the step. The tracking URI is read from the environment config
+The decision record (``<stem>_decision.json``) is the source of truth and stays
+byte-identical across reruns; MLflow only *shows* it: one run per (invocation,
+step) carrying the record's tags, params and metrics plus the evidence
+artifacts. The projection writes no local state of its own (no run id, no
+tracking URI on disk) — run correlation lives in the run's tags, and the record
+next to the figure is what a reader opens. Projection is a fail-soft side
+channel: a missing tracking URI or an unreachable server records why and never
+fails the step. The tracking URI is read from the environment config
 (``EnvironmentConfig.mlflow_tracking_uri``, SSOT); an empty value is the
 opt-out, so no second MLflow config exists here.
 """
@@ -34,7 +37,6 @@ ENVIRONMENT_ENV = "BROADWAY_ENVIRONMENT"
 
 STEP_TAG = "step"
 RUN_ID_TAG = "broadway_run_id"
-RUN_ID_PROVENANCE_KEY = "mlflow_run_id"
 
 # Provenance keys that are projection parameters when the step recorded them.
 PROVENANCE_PARAM_KEYS: tuple[str, ...] = ("seed", "dataset", "config", "commit")
@@ -119,7 +121,6 @@ class DecisionLog:
             run_id = run.info.run_id
             log_params(self._params(decision, params))
             log_metrics(self._metrics(decision))
-            self._stamp_record(record_path, decision, run_id)
             self._log_artifacts(figure, tables, record_path)
         logger.info(
             "mlflow projection — step %s -> run %s at %s",
@@ -197,20 +198,6 @@ class DecisionLog:
         if decision.delta is not None:
             metrics["delta"] = decision.delta
         return metrics
-
-    @staticmethod
-    def _stamp_record(record_path: Path, decision: Decision, run_id: str) -> None:
-        """Write the run id into the record's provenance (the record stays the truth)."""
-        evidence = decision.evidence.model_copy(
-            update={
-                "provenance": {
-                    **decision.evidence.provenance,
-                    RUN_ID_PROVENANCE_KEY: run_id,
-                }
-            }
-        )
-        projected = decision.model_copy(update={"evidence": evidence})
-        record_path.write_text(projected.model_dump_json(indent=2), encoding="utf-8")
 
     @staticmethod
     def _log_artifacts(figure: Path, tables: Sequence[tuple[str, Path]], record_path: Path) -> None:
