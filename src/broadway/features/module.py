@@ -29,6 +29,20 @@ def _load_split(cfg: PipelineConfig) -> tuple[pd.DataFrame, pd.DataFrame | None]
     return train, val
 
 
+def _plan_ordered(frame: pd.DataFrame, plan: ColumnPlan) -> pd.DataFrame:
+    """Put the plan's columns first, in plan order; keep extra columns after.
+
+    The read contract (``engineered_schema_for``) is ordered: the persisted
+    feature file must carry the model surface in plan order or a real
+    train/evaluate read fails loud. ``FeaturePipeline.transform`` appends
+    derived/encoded columns to the joined frame, so the write reorders here —
+    extras (the target, joined columns) are tolerated and follow.
+    """
+    declared = list(plan.names)
+    extras = [name for name in frame.columns if name not in declared]
+    return frame.loc[:, declared + extras]
+
+
 def run(cfg: PipelineConfig) -> None:
     if not cfg.dataset or not cfg.experiment or not cfg.features or not cfg.etl:
         raise ValueError("features step requires dataset, experiment, features, and etl config")
@@ -38,7 +52,9 @@ def run(cfg: PipelineConfig) -> None:
     pipeline.fit(train, plan, cfg.dataset.target)
     rows_in = len(train)
     columns_before = list(train.columns)
-    train_out = pipeline.transform(train, plan, cfg.dataset.target, cfg.features.frequency_fill)
+    train_out = _plan_ordered(
+        pipeline.transform(train, plan, cfg.dataset.target, cfg.features.frequency_fill), plan
+    )
     specs = build_generic_feature_specs(cfg.dataset, plan)
     build_engineered_schema(specs).validate(train_out)
     rows_out = len(train_out)
@@ -47,7 +63,9 @@ def run(cfg: PipelineConfig) -> None:
     train_out.to_parquet(out_dir / cfg.etl.train_features_file, index=False)
     logger.info(f"train features written ({len(train_out)} rows)")
     if val is not None:
-        val_out = pipeline.transform(val, plan, cfg.dataset.target, cfg.features.frequency_fill)
+        val_out = _plan_ordered(
+            pipeline.transform(val, plan, cfg.dataset.target, cfg.features.frequency_fill), plan
+        )
         build_engineered_schema(specs).validate(val_out)
         val_out.to_parquet(out_dir / cfg.etl.val_features_file, index=False)
         logger.info(f"val features written ({len(val_out)} rows)")
