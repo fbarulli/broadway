@@ -357,7 +357,10 @@ def _render_artifacts(stem: str, focus: str, selected: str = "") -> str:
     selected_path = next((path for path in files if path.name == selected), None)
     if selected_path is None:
         selected_path = next(
-            (path for path in files if path.suffix.lower() in _IMAGE_SUFFIXES), files[0]
+            (path for path in files if path.suffix.lower() == ".md"),
+            next(
+                (path for path in files if path.suffix.lower() in _IMAGE_SUFFIXES), files[0]
+            ),
         )
     options = "".join(
         f'<option value="{html.escape(path.name)}"'
@@ -686,6 +689,8 @@ def _render_experiment_page(
 {_render_code(stem, focus)}
 <h2>artifacts</h2>
 {_render_artifacts(stem, focus, artifact)}
+<h2>evidence</h2>
+{_render_evidence(stem, focus)}
 <h2>observations</h2>
 {_render_observations_form(stem, load_observations(stem), focus)}
 </body>
