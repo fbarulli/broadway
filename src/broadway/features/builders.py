@@ -1,16 +1,17 @@
 """Feature derivation — compute derived columns from source data.
 
 ``BUILDERS`` is the shared registry of pure column transforms. Both the
-column plan (``ColumnPlan`` derive ops) and the named-sample pipeline
-(``SampleSpec.derived[].formula`` in sample configs) resolve their functions
-here. It is an *implementation* registry only — which features exist, their
-names, and their dtypes are declared by the plan (or by a sample config's own
-derived columns).
+column plan (``ColumnPlan`` derive ops) and the named-sample pipeline (a
+sample's own ``ColumnPlan``, built from ``SampleSpec.derived[].formula``)
+resolve their functions here. It is an *implementation* registry only — which
+features exist, their names, and their dtypes are declared by the plan (or by
+a sample config's own derived columns).
 """
 
 from __future__ import annotations
 
 import importlib
+from collections.abc import Mapping
 
 import numpy as np
 import pandas as pd
@@ -98,7 +99,8 @@ def build_derived(df: pd.DataFrame, features: list[DerivedFeature], target: str,
                   extra_builders: dict | None = None,
                   group_col: str = "group",
                   lookup_col: str = "group_lookup",
-                  hour_window: list[int] | None = None) -> pd.DataFrame:
+                  hour_window: list[int] | None = None,
+                  columns: Mapping[str, str] | None = None) -> pd.DataFrame:
     """Append ``features`` as new columns on a copy of ``df``.
 
     Collision contract (loud fail): every ``feat.name`` must declare a NEW
@@ -108,9 +110,18 @@ def build_derived(df: pd.DataFrame, features: list[DerivedFeature], target: str,
     offending name. Chaining stays allowed: a later feature may consume an
     *earlier* derived column as its ``source``, because sources resolve
     against the accumulating result frame, not the raw input.
+
+    An empty ``feat.source`` declares no positional input: the builder
+    resolves its own inputs, reading multi-input roles from ``columns`` and
+    falling back to its own defaults.
     """
     _window = hour_window if hour_window is not None else [7, 8, 9, 17, 18, 19]
-    builder_kwargs = {"group_col": group_col, "lookup_col": lookup_col, "hour_window": _window}
+    builder_kwargs = {
+        "group_col": group_col,
+        "lookup_col": lookup_col,
+        "hour_window": _window,
+        "columns": dict(columns or {}),
+    }
     registry = dict(BUILDERS)
     if extra_builders:
         registry.update(extra_builders)
@@ -139,7 +150,7 @@ def build_derived(df: pd.DataFrame, features: list[DerivedFeature], target: str,
             raise ValueError(f"unknown builder function '{feat.func}' for derived feature '{feat.name}'")
         # Sources resolve against the accumulating result frame: consuming an
         # EARLIER derived feature's output is legitimate chaining and allowed.
-        if feat.source not in result.columns:
+        if feat.source and feat.source not in result.columns:
             raise ValueError(f"derived feature '{feat.name}' references missing source column '{feat.source}'")
-        result[feat.name] = registry[feat.func](result, feat.source, **builder_kwargs)
+        result[feat.name] = registry[feat.func](result, feat.source or None, **builder_kwargs)
     return result

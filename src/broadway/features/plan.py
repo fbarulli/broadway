@@ -54,8 +54,8 @@ class ColumnOp(BaseModel):
 
     @model_validator(mode="after")
     def _validate_shape(self) -> ColumnOp:
-        if self.op == "derive" and (self.func is None or len(self.sources) != 1):
-            raise ValueError(f"derived column '{self.name}' requires one func and one source")
+        if self.op == "derive" and self.func is None:
+            raise ValueError(f"derived column '{self.name}' requires a func")
         if self.op == "encode" and (self.encoder is None or not self.sources):
             raise ValueError(f"encoded column '{self.name}' requires one encoder and inputs")
         return self
@@ -237,9 +237,21 @@ class ColumnPlan(BaseModel):
             available.add(op.name)
 
     def _derive(self, frame: pd.DataFrame, op: ColumnOp) -> pd.DataFrame:
-        """Compute one missing derived column through the shared builder registry."""
-        feature = DerivedFeature(name=op.name, func=op.func or "", source=op.sources[0])
-        builder_kwargs: dict[str, Any] = dict(self.builder_params)
+        """Compute one missing derived column through the shared builder registry.
+
+        ``op.sources`` declares every input column (empty when the builder
+        resolves its own inputs); ``op.params["columns"]`` carries the role
+        mapping multi-input builders read.
+        """
+        feature = DerivedFeature(
+            name=op.name,
+            func=op.func or "",
+            source=op.sources[0] if op.sources else "",
+        )
+        builder_kwargs: dict[str, Any] = {
+            **self.builder_params,
+            "columns": dict(op.params.get("columns") or {}),
+        }
         built = build_derived(
             frame,
             [feature],

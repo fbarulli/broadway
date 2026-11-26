@@ -15,7 +15,6 @@ import pytest
 import yaml
 from pandera.errors import SchemaErrors
 
-import broadway.samples.generate as generate_module
 from broadway.config import loader
 from broadway.lineage.sample import load_sample
 from broadway.samples import generate_sample, read_named_sample
@@ -338,23 +337,32 @@ def test_unknown_derived_formula_rejected(
         generate_sample("badformula", samples_dir=tmp_path / "samples")
 
 
-def test_derived_formula_not_in_registry_raises(
+def test_derived_column_may_not_overwrite_a_source_column(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The generate-time guard fires when the registry lacks a declared formula."""
-    src = _exclude_source(tmp_path)
+    """A sample's derived name colliding with a selected column fails loud.
+
+    The sample path shares ``ColumnPlan``'s collision contract: the old
+    parallel mechanism silently overwrote the source column instead.
+    """
+    src = tmp_path / "src.parquet"
+    pd.DataFrame({
+        "distance": [1.0, 2.0],
+        "duration_minutes": [60.0, 60.0],
+    }).to_parquet(src, index=False)
     _write_config(
-        tmp_path, "noguard", src,
-        size=12,
-        columns=EXCLUDE_COLS,
-        derived=[{"name": "rate", "formula": "rate_per_hour"}],
+        tmp_path, "collide", src,
+        size=2,
+        columns=["distance", "duration_minutes"],
+        derived=[{"name": "distance", "formula": "rate_per_hour"}],
         filters=None,
         schema=None,
     )
     monkeypatch.setattr(loader, "CONFIGS_DIR", tmp_path / "configs")
-    monkeypatch.setattr(generate_module, "BUILDERS", {})
-    with pytest.raises(ValueError, match="unknown derived formula"):
-        generate_sample("noguard", samples_dir=tmp_path / "samples")
+
+    with pytest.raises(ValueError, match="duplicate names"):
+        generate_sample("collide", samples_dir=tmp_path / "samples")
+    assert not (tmp_path / "samples" / "collide@v1.parquet").exists()
 
 
 def test_existing_config_still_parses(

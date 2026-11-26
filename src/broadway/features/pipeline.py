@@ -20,7 +20,9 @@ from broadway.features.transformers import FrequencyEncoding, TargetEncoding
 
 
 def _derived_feature(op: ColumnOp) -> DerivedFeature:
-    return DerivedFeature(name=op.name, func=op.func or "", source=op.sources[0])
+    return DerivedFeature(
+        name=op.name, func=op.func or "", source=op.sources[0] if op.sources else ""
+    )
 
 
 @dataclass
@@ -61,10 +63,14 @@ class FeaturePipeline:
         self, df: pd.DataFrame, plan: ColumnPlan, target: str, freq_fill: float
     ) -> pd.DataFrame:
         result = df.copy()
-        builder_kwargs: dict[str, Any] = dict(plan.builder_params)
+        plan_kwargs: dict[str, Any] = dict(plan.builder_params)
         for op in plan.columns:
             if op.op != "derive":
                 continue
+            builder_kwargs: dict[str, Any] = {
+                **plan_kwargs,
+                "columns": dict(op.params.get("columns") or {}),
+            }
             result = build_derived(
                 result,
                 [_derived_feature(op)],

@@ -13,9 +13,9 @@ from pathlib import Path
 import pandas as pd
 
 from broadway.config.loader import CONFIGS_DIR
-from broadway.features.builders import BUILDERS
-from broadway.lineage.models import DerivedSpec, FilterSpec, SampleSpec
+from broadway.lineage.models import FilterSpec, SampleSpec
 from broadway.lineage.sample import load_sample
+from broadway.samples.plan import SampleColumnPlanFactory
 
 SAMPLES_DIR = Path(CONFIGS_DIR).parent / "data" / "samples"
 
@@ -65,25 +65,6 @@ def _apply_filters(df: pd.DataFrame, filters: list[FilterSpec]) -> pd.DataFrame:
     return df[mask]
 
 
-def _apply_derived(df: pd.DataFrame, derived: list[DerivedSpec]) -> pd.DataFrame:
-    """Compute shared-registry derived columns; unknown formulas raise.
-
-    Formulas resolve against the shared transform registry
-    (``broadway.features.builders.BUILDERS``) — the same implementation
-    functions the feature pipeline uses. Dataset configs declare which
-    columns feed each formula role via ``DerivedSpec.columns``.
-    """
-    for spec in derived:
-        func = BUILDERS.get(spec.formula)
-        if func is None:
-            raise ValueError(
-                f"unknown derived formula '{spec.formula}' "
-                f"(registry: {sorted(BUILDERS)})"
-            )
-        df = df.assign(**{spec.name: func(df, None, columns=spec.columns)})
-    return df
-
-
 def _apply_exclude_any(
     df: pd.DataFrame, groups: list[list[FilterSpec]]
 ) -> pd.DataFrame:
@@ -105,9 +86,10 @@ def _apply_exclude_any(
 def generate_sample(name: str, samples_dir: Path | None = None) -> Path:
     """Generate the immutable artifact for ``name``; raises if it already exists.
 
-    Reads the source declared in the sample definition, applies column
-    selection, deterministic sampling, derived columns, filters, and
-    OR-of-AND exclusions once, then writes the artifact + provenance sidecar.
+    Reads the source declared in the sample definition, takes the
+    deterministic sample, applies the sample's own ``ColumnPlan`` (column
+    selection and derived columns), then its filters and OR-of-AND
+    exclusions once, then writes the artifact + provenance sidecar.
     """
     spec = load_sample(name)
     if spec.source is None or spec.seed is None or spec.size is None:
@@ -124,11 +106,9 @@ def generate_sample(name: str, samples_dir: Path | None = None) -> Path:
 
     source_path = (Path(CONFIGS_DIR).parent / spec.source.path).resolve()
     df = _read_source(source_path)
-    if spec.columns is not None:
-        df = df[spec.columns]
     df = df.sample(n=spec.size, random_state=spec.seed)
-    if spec.derived:
-        df = _apply_derived(df, spec.derived)
+    plan = SampleColumnPlanFactory.build(spec, df)
+    df, _ = plan.apply(df)
     if spec.filters:
         df = _apply_filters(df, spec.filters)
     if spec.exclude_any:
