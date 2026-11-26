@@ -2,6 +2,12 @@
 
 ---
 
+# read.md — artifact guide (as produced, not as imagined)
+
+Nothing below is a promise that a file exists. A row is real only when the step
+that produces it has run; the serve bundle in particular is **not produced** by
+this repo (no serving/latency/fallback writers exist today).
+
 ### 1. The MLE Bundle (Serving & Infrastructure)
 The MLE doesn't care about your AUC or feature importance charts. They need a deterministic, containerizable package that won't crash the API.
 
@@ -13,7 +19,10 @@ The MLE doesn't care about your AUC or feature importance charts. They need a de
 | **Performance Profile** | `latency_report.json` | P50, P95, P99 inference latency (in ms) and memory footprint (in MB). The MLE needs this to configure auto-scaling and Kubernetes limits. |
 | **Fallback / Default Rules** | `fallback.json` | What the API should return if the model times out or throws an error (e.g., `{"default_prediction": 0.5}`). |
 
-**Where it lives:** `artifacts/serving/`
+**Where it lives:** not produced. There is no serving writer in the repo; the
+train step logs the model artifact to MLflow (a model bundle plus signature),
+but no `artifacts/serving/` bundle, latency report, or fallback rule is
+generated. Treat this table as the target contract, not current output.
 
 ---
 

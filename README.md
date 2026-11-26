@@ -791,3 +791,63 @@ Branch model and parity workflow live in `agents/contracts/MAIN_AGENT_CONTRACT.m
 | `taxi` | pass-along mirror of sklearn | fast-forward copy of sklearn |
 
 | `main` | public platform | platform only — generic synthetic demo and `configs/sample/demo.yaml`; no `project/`, taxi config, or committed experiment output |
+---
+
+## 8. Decisions, EDA, and the GPU lane
+
+### Decision records — one measurement, one verdict
+
+Every step that a human reads publishes a computed record beside its report
+(`agents/contracts/EXPERIMENT_OUTPUT.md`):
+
+- `project/experiments/results/<series>/<stem>_decision.json` for experiment
+  steps, `artifacts/<step>/…_decision.json` for pipeline steps.
+- One metric, its **95% interval at the same `n`**, the config-declared
+  threshold/direction, a real no-effect null where one exists, the computed
+  verdict (`act`/`investigate`/`no_action`/`insufficient`), the owner's action,
+  and the evidence (baseline, delta, semantic segments inside the draw,
+  sensitivity with its own `n`, falsifier, provenance).
+- `src/broadway/reports/measurement.py::MeasurementEstimator` is the single
+  measurement owner: ONE seeded draw, day-blocked bootstrap, and
+  `block_shuffle` null — value, interval, and null can never drift apart.
+- `src/broadway/reports/step_output.py::StepOutput` writes the record, refuses
+  to write without a figure, and (when given `source=Path(__file__)`) refuses
+  to republish a record that predates its script.
+- Experiment rules live in `project/config/experiments/*.yaml` under
+  `decisions.<step>`; an undeclared step raises a named `DecisionRuleError`.
+
+`fare_prediction/01–08` and `timeseries/01–04` publish records; the pipeline
+steps `etl`, `features`, `training` (HPO runs), `baseline`, `evaluate`, and
+`causal` publish theirs and are enforced in
+`scripts/check_experiment_outputs.py` (`PIPELINE_DECISION_ENFORCED`).
+
+Promotion is interval-based: `artifacts/evaluation/promotion_decision.json`
+holds the paired-bootstrap improvement versus the champion, and the candidate
+ships only when the interval's lower bound clears the configured threshold.
+
+### EDA — per-feature decisions
+
+`src/broadway/eda/` profiles the frame, runs the assumption tests, and emits one
+decision per feature (`code`, q-value, effect size, outlier share) plus the
+report and figures. Its verdicts use the same `Decision` rule and the same
+`configs/step/eda.yaml` thresholds; the `eda` step is advisory in the pipeline
+decision gate until its record is wired end to end.
+
+### GPU lane — `gpu_training/`
+
+The GPU lane runs the canonical HPO study on real hardware without a second
+search-space definition:
+
+1. `python -m gpu_training.memory_probe` measures the micro-batch and
+   concurrency a host fits (written to `artifacts/gpu_training/`).
+2. `python gpu_training/run_hpo.py --config config/hpo_run.yaml` renders the
+   worker fan-out from the measured baseline (dry-run by default; `--execute`
+   starts them).
+3. Each worker runs `gpu_training/hpo_kernel.py`, which resolves a
+   `module:function` objective adapter and calls
+   `broadway.training.hpo.run_model_study` — the same seeded TPE study the
+   in-process bandit uses.
+
+The study/search-space/budget SSOT is `project/config/experiments/mlflow.yaml`
+(via `gpu_training/config/hpo_kernel.yaml`); secrets (the shared storage URL)
+come from the environment and are redacted from every printed command.

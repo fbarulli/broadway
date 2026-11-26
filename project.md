@@ -1,204 +1,121 @@
-## broadway/ — Complete Structure
+# project.md — the live structure map
+
+This is a map of what exists at HEAD, not an aspiration. Anything not listed
+here is either untracked scratch or lives in `agents/` (ledger/contracts).
+
+## 1. Platform (`src/broadway/`)
 
 ```
-broadway/
-│
-├── configs/
-│   ├── dataset/
-│   │   # Auto-generated per CSV — not committed
-│   ├── experiment/
-│   │   ├── baseline.yaml                # Minimal features + linear model
-│   │   ├── engineered.yaml              # Derived features + target encoding + LGBM
-│   │   └── hyperopt.yaml                # Optuna sweep over XGB params
-│   ├── environment/
-│   │   ├── development.yaml             # Local: verbose logging, small samples, local paths
-│   │   ├── staging.yaml                 # CI: sample size caps, remote MLflow URI
-│   │   └── production.yaml              # Full data, production URIs, quiet logging
-│   └── step/
-│       ├── discover.yaml                # Step knobs: csv path, target prompt
-│       ├── etl.yaml                     # Step knobs: CI sample size
-│       ├── contracts.yaml               # Step knobs: null threshold, range tolerance
-│       ├── eda.yaml                     # Step knobs: sample size, plot format, output dir
-│       ├── features.yaml                # Step knobs: encoding smoothing, frequency fill
-│       ├── stats.yaml                   # Step knobs: group column, group values, sample fraction
-│       ├── causal.yaml                  # Step knobs: treatment col, outcome col, power, alpha
-│       ├── train.yaml                   # Step knobs: random state, n_jobs, cv folds
-│       ├── evaluate.yaml                # Step knobs: metric, promotion threshold
-│       └── full.yaml                    # Steps list: [discover, etl, contracts, eda, ...]
-│
-├── src/
-│   ├── cli.py                           # argparse entry point — resolves step → config → module.run()
-│   ├── pipeline.py                      # Orchestrator: iterates cfg.steps, imports module, runs
-│   ├── utils.py                         # deep_merge dicts, set up logging, timer decorator
-│   │
-│   ├── config/
-│   │   ├── schema.py                    # Pydantic: DatasetContract, ExperimentConfig, StepConfig, EnvironmentConfig
-│   │   ├── loader.py                    # YAML composition (dataset + env + step [+ experiment]) → Pydantic validation
-│   │   └── resolver.py                  # Resolve ${paths}, interpolate env vars, expand globs
-│   │
-│   ├── discover/
-│   │   └── module.py                    # Read CSV → infer dtypes/null counts/cardinality → write configs/dataset/<name>.yaml
-│   │
-│   ├── data/
-│   │   ├── loader.py                    # Detect format (csv/parquet/excel) → load → optional lookup join
-│   │   ├── cleaner.py                   # Filter invalid rows, derive target, drop duplicates, rename columns
-│   │   ├── splitter.py                  # Time-based or stratified random train/test/val split
-│   │   ├── download.py                  # Fetch raw files from URLs defined in dataset config
-│   │   └── db.py                        # Postgres training view, COPY bulk loading
-│   │
-│   ├── etl/
-│   │   └── module.py                    # Orchestrates data layer: download → load → clean → split → save parquet
-│   │
-│   ├── contracts/
-│   │   ├── module.py                    # Validate DataFrame against DatasetContract (columns, dtypes, nulls, ranges)
-│   │   └── checks.py                    # Null rate, cardinality, value range, duplicate row checks against thresholds
-│   │
-│   ├── eda/
-│   │   ├── module.py                    # Orchestrates all EDA submodules → produces artifacts/reports/eda.html
-│   │   ├── summary.py                   # Distributions, skew, kurtosis, cardinality, memory usage
-│   │   ├── visualize.py                 # Histograms, boxplots, scatter matrix, correlation heatmap (Plotly)
-│   │   ├── quality.py                   # Outliers (IQR/Z-score), class imbalance, constant columns, duplicate rows
-│   │   ├── missing.py                   # Missingness analysis: counts, patterns, Little's MCAR test
-│   │   ├── imputation.py                # Strategy-based imputation: mean, median, mode, KNN, MICE
-│   │   ├── compare.py                   # Before/after ETL side-by-side comparison (distributions, counts)
-│   │   └── report.py                    # Compose self-contained HTML report from all submodule outputs
-│   │
-│   ├── features/
-│   │   ├── module.py                    # Learn stats from train (fit) → apply to train + test (transform) → save pipeline
-│   │   ├── builders.py                  # Registry: @register_builder("datetime"), @register_builder("lookup_join"), etc.
-│   │   ├── encodings.py                 # Smoothed target encoding, frequency encoding — pure functions
-│   │   └── pipeline.py                  # FeaturePipeline dataclass: fit(train) learns, transform(df) applies
-│   │
-│   ├── stats/
-│   │   ├── module.py                    # Orchestrates all stats submodules → produces artifacts/reports/statistical_analysis.html
-│   │   ├── base.py                      # StatsContext: Spark session lifecycle, stratified sampling, load + join lookups
-│   │   ├── anova.py                     # One-way ANOVA, Welch's ANOVA, Kruskal-Wallis on any group column
-│   │   ├── assumptions.py               # Levene's test (equal variance), Shapiro-Wilk + skew/kurtosis (normality)
-│   │   ├── post_hoc.py                  # Games-Howell pairwise, Tukey HSD — effect sizes (Hedges' g)
-│   │   ├── regression.py                # OLS: baseline, log-target, interaction terms, HC3 robust SEs
-│   │   ├── diagnostics.py               # Breusch-Pagan, Jarque-Bera, Q-Q plot, residual vs fitted plot
-│   │   ├── time_series.py               # Durbin-Watson, ACF plot, ADF stationarity test
-│   │   └── baseline.py                  # LGBM/XGB quick baseline with time-based split → benchmark metrics
-│   │
-│   ├── causal/
-│   │   ├── module.py                    # Orchestrates causal submodules → design + analyze experiments
-│   │   ├── design.py                    # Power analysis, minimum detectable effect, sample size calculation
-│   │   ├── assignment.py                # Randomization, stratification, blocking schemes
-│   │   ├── analysis.py                  # T-test, chi-square, difference-in-differences for experimental data
-│   │   ├── multiple.py                  # Multiple testing correction: Bonferroni, Benjamini-Hochberg, FWER
-│   │   ├── sequential.py                # Sequential monitoring, early stopping rules, alpha spending
-│   │   └── hte.py                       # Heterogeneous treatment effects, CATE, uplift modeling
-│   │
-│   ├── training/
-│   │   ├── module.py                    # Load data → build features → train model → log to MLflow → register
-│   │   ├── trainer.py                   # Instantiate model from registry, fit, return model + training time
-│   │   ├── mlflow_utils.py              # setup_mlflow, log_metrics, log_model, register_candidate, promote_candidate
-│   │   ├── optuna.py                    # HPO: define objective, run study, return best params + model
-│   │   └── models/
-│   │       ├── base.py                  # ABC: fit, predict, feature_importance, get_params, set_params
-│   │       ├── linear.py                # sklearn LinearRegression wrapper
-│   │       ├── random_forest.py         # sklearn RandomForestRegressor/Classifier wrapper
-│   │       ├── xgboost.py               # XGBRegressor/XGBClassifier wrapper
-│   │       ├── lightgbm.py              # LGBMRegressor/LGBMClassifier wrapper
-│   │       ├── registry.py              # get_model(name, **params) → model dict lookup
-│   │       └── pyfunc_wrapper.py        # MLflow PyFunc: bundles FeaturePipeline + model for inference
-│   │
-│   ├── evaluate/
-│   │   ├── module.py                    # Load trained model → evaluate on holdout → log metrics → check promotion
-│   │   ├── metrics.py                   # Regression: MAE, RMSE, R², MAPE | Classification: precision, recall, F1, AUC
-│   │   ├── comparison.py                # Candidate vs champion side-by-side metrics + residual plots
-│   │   ├── validation.py                # Holdout scoring, cross-validation, calibration curve, residual analysis
-│   │   └── promotion.py                 # should_promote(candidate, champion, metric) → bool + report
-│   │
-│   ├── trust/
-│   │   ├── module.py                    # Orchestrates trust submodules (future: run post-train or on schedule)
-│   │   ├── drift.py                     # PSI, KS test, KL divergence — train vs serve distribution comparison
-│   │   ├── leakage.py                   # Target leakage detection: correlation with timestamps, ID-based checks
-│   │   ├── sensitivity.py               # Perturbation analysis: how do predictions change under input noise?
-│   │   ├── fairness.py                  # Subgroup disparity, equal opportunity, demographic parity
-│   │   ├── interpretability.py          # SHAP summary/dependence plots, permutation importance
-│   │   └── uncertainty.py               # Prediction intervals (bootstrap), conformal prediction
-│   │
-│   ├── monitoring/
-│   │   ├── module.py                    # Orchestrates runtime monitoring (future: cron job or daemon)
-│   │   ├── drift_alert.py               # Scheduled distribution drift checks, alert on threshold breach
-│   │   ├── performance.py               # Prediction accuracy decay over time, rolling window metrics
-│   │   ├── latency.py                   # Inference latency p50/p95/p99, throughput tracking
-│   │   └── data_quality.py              # Production data quality vs training baseline regression
-│   │
-│   ├── selection/
-│   │   ├── module.py                    # Orchestrates model selection submodules (future)
-│   │   ├── nested_cv.py                 # Nested cross-validation: outer loop for evaluation, inner for HPO
-│   │   ├── information.py               # AIC, BIC for model comparison (linear models)
-│   │   └── learning_curves.py           # Learning curves, bias-variance decomposition
-│   │
-│   ├── unsupervised/
-│   │   ├── module.py                    # Orchestrates unsupervised submodules (future)
-│   │   ├── pca.py                       # PCA, explained variance ratio, scree plot, biplot
-│   │   ├── clustering.py                # K-means, DBSCAN, HDBSCAN, silhouette scores
-│   │   └── anomaly.py                   # Isolation forest, LOF, elliptic envelope outlier detection
-│   │
-│   └── inference/
-│       └── api.py                       # FastAPI app: /health, /predict, /metrics — loads model from MLflow registry
-│
-├── artifacts/
-│   ├── evaluation/
-│   │   ├── metrics.json                 # Serialized metrics dict from evaluate step
-│   │   ├── confusion_matrix.png         # Classification: confusion matrix heatmap
-│   │   ├── calibration.png              # Calibration curve (reliability diagram)
-│   │   └── comparison.html              # Candidate vs champion visual comparison report
-│   └── reports/
-│       ├── eda.html                     # Self-contained EDA report (embedded Plotly charts)
-│       ├── statistical_analysis.html    # ANOVA, assumptions, diagnostics, baseline results
-│       └── model_evaluation.html        # Holdout metrics, feature importance, residual analysis
-│
-├── scripts/
-│   └── ds_pipeline.py                   # Thin wrapper: from broadway.cli import main; main()
-│
-├── tests/
-│   ├── test_config.py                   # Pydantic schema validation, loader round-trip
-│   ├── test_discover.py                 # CSV → schema inference → YAML output verification
-│   ├── test_data.py                     # Loader, cleaner, splitter with synthetic DataFrames
-│   ├── test_contracts.py                # Schema enforcement: missing cols, extra cols, nulls, wrong dtypes
-│   ├── test_eda.py                      # Summary stats, missingness, quality checks on known inputs
-│   ├── test_features.py                 # Builders, encodings, pipeline fit/transform
-│   ├── test_stats.py                    # ANOVA, assumptions, post-hoc, regression with synthetic data
-│   ├── test_causal.py                   # Power analysis, randomization, HTE with synthetic data
-│   ├── test_training.py                 # Model training, mlflow_utils, optuna with CI-safe small run
-│   ├── test_evaluate.py                 # Metrics, comparison, validation, promotion logic
-│   └── test_pipeline.py                 # Integration: full pipeline on 100-row synthetic dataset
-│
-├── notebooks/
-│   └── exploratory.ipynb                # Quick-start notebook: load data → EDA → train baseline
-│
-├── Dockerfile                           # Production image: python:3.12-slim + uv sync + copy src
-│
-├── docker/
-│   ├── mlflow/
-│   │   └── Dockerfile                   # Minimal MLflow tracking server image
-│   └── postgres/
-│       └── init.sql                     # Postgres bootstrap (intentionally empty)
-│
-├── k8s/
-│   ├── mlflow-deployment.yaml           # MLflow tracking server Deployment + Service
-│   ├── postgres-deployment.yaml         # Postgres StatefulSet + Service + PVC
-│   ├── train-job.yaml                   # Kubernetes Job: runs ds-pipeline train
-│   ├── api-deployment.yaml              # FastAPI inference Deployment + Service + HPA
-│   └── monitoring-cronjob.yaml          # CronJob: runs ds-pipeline monitoring.drift_alert
-│
-├── .github/
-│   └── workflows/
-│       ├── ci.yaml                      # On push: lint → test → discover --validate → etl (sample) → train (sample)
-│       └── cd.yaml                      # On release: docker build → push → kubectl apply
-│
-├── data/
-│   ├── raw/                             # Raw CSVs, parquets, lookup tables (gitignored)
-│   └── processed/                       # ETL output parquets (gitignored)
-│
-├── docker-compose.yml                   # Local infra only: mlflow + postgres services
-├── .env.example                         # MLFLOW_TRACKING_URI, DATABASE_URL, LOG_LEVEL
-├── .gitignore                           # .env, data/, artifacts/, mlruns/, __pycache__, .venv/
-├── pyproject.toml                       # Dependencies, [project.scripts], build-system
-├── uv.lock                              # Deterministic dependency lockfile
-└── README.md                            # Quick-start: install, discover, run pipeline, view reports
+src/broadway/
+├── cli.py                     # argparse entry: step → config → module.run()
+├── pipeline.py                # flow orchestrator (configs/flow/*.yaml)
+├── config/                    # pydantic schema + layered YAML loader
+├── data/                      # loaders, cleaner, splitter, join/lookup audits
+├── etl/module.py              # ingest → canonical → validate → split  (+ etl decision)
+├── contracts/                 # pandera raw/joined/engineered schemas
+├── cleaning/                  # structural coercion audit
+├── eda/                       # profile, quality, outliers, correlation, figures,
+│                              #   tests, correction, artifacts + per-feature decisions
+├── stats/                     # agnostic stats library (API.md owns the contract)
+│   ├── time_series.py         #   ACF/PACF/CCF/ADF, forecasting metrics
+│   ├── forecast.py            #   SARIMAX / AutoARIMA wrappers
+│   └── ...                    #   anova, assumptions, diagnostics, effect sizes, …
+├── features/
+│   ├── transformers.py        # the single preprocessing owner: FrequencyEncoding,
+│   │                          #   imputer, scaler, winsorizer, target transforms
+│   ├── recipe.py              # composes sklearn Pipelines from the recipe steps
+│   ├── pipeline.py            # ColumnPlan executor (derive + frequency encode)
+│   ├── plan.py / plans.py     # code-owned keep-sets (single source per experiment)
+│   └── module.py              # fit/transform persistence (+ features decision)
+├── baseline/
+│   ├── prediction.py          # naive mean/median baseline
+│   ├── hypothesis.py, causal.py
+│   └── module.py              # persists the baseline (+ mean-vs-median decision)
+├── training/
+│   ├── module.py              # train → optional HPO → MLflow (+ HPO decision)
+│   ├── hpo.py                 # two-round bandit HPO (canonical study runner)
+│   ├── learning_curve.py
+│   └── models/                # registry: linear, RF, XGB, LGBM, lgbm_quantile
+├── evaluate/
+│   ├── metrics.py             # metric vocabulary + MAPE SSOT (fraction × 100)
+│   ├── validation.py          # holdout scoring, CV (expanding/rolling)
+│   ├── leaderboard.py         # per-metric ranked figures + ChampionDecision
+│   ├── promotion.py           # point-estimate helper
+│   ├── feature_selection.py   # BH-gated selection
+│   ├── explain.py             # SHAP/permutation explanations
+│   └── module.py              # holdout eval, intervals, interval promotion
+│                              #   (+ promotion_decision.json)
+├── causal/
+│   ├── design.py              # power / MDE / sample size
+│   ├── analysis.py, hte.py, multiple.py, sequential.py
+│   └── module.py              # design persistence (+ achieved-power decision)
+├── tracking/                  # manifest, baseline stats, data card, bundle
+├── calibration/               # split-conformal + quantile coverage metrics
+├── lineage/                   # decision records, artifact graph, Mermaid
+├── reports/
+│   ├── decision.py            # DecisionRuleSet, DecisionRule, Decision, Evidence
+│   ├── measurement.py         # MeasurementEstimator: value+interval+null at ONE n
+│   ├── step_output.py         # StepOutput: decision + figure + tables + JSON
+│   ├── decision_log.py        # MLflow projection (view; the JSON is the truth)
+│   ├── experiments_dashboard.py
+│   └── markdown.py, results.py, timeline.py, index.py, audit.py, registry.py
+├── onboarding/  discover/  selection/  unsupervised/  samples/
+└── inference/api.py           # FastAPI surface (no serving bundle is produced)
 ```
+
+`trust/`, `monitoring/`, `notebooks/`, `scripts/ds_pipeline.py` and
+`reports/model_evaluation.html` do **not** exist; they were removed or never
+shipped. Do not write against them.
+
+## 2. Project (the taxi development layer)
+
+```
+project/
+├── config/                    # the project config tree (overlay-selected)
+│   ├── dataset/  analysis/  slice/
+│   ├── sample/                # named-sample definitions (immutable artifacts)
+│   ├── experiments/           # fare_prediction.yaml, timeseries.yaml, mlflow.yaml, …
+│   └── layout.yaml            # every project path, resolved once
+├── features/__init__.py       # the taxi ColumnPlan (raw ids + route_frequency)
+├── ml_pipeline.py             # the dataset-specific FeaturePipeline (golden-pinned)
+├── experiments/
+│   ├── fare_prediction/       # 01…08, each publishing <stem>_decision.json
+│   ├── timeseries/            # 01…04, same contract
+│   ├── more_modeling/  multivariate/  univariate/  mlflow/  …
+│   └── results/               # committed figures, reports, tables, decisions
+├── scripts/                   # numbered teaching scripts (record-free by D32)
+└── data.py                    # project constants (config-driven)
+```
+
+## 3. GPU lane (`gpu_training/`)
+
+```
+gpu_training/
+├── memory_probe.py            # measured micro-batch / concurrency baseline
+├── run_hpo.py                 # fan-out launcher (dry-run by default)
+├── hpo_kernel.py              # one Optuna worker → broadway.training.hpo
+├── hpo_study.py               # study config (search space, data, storage)
+├── lane_contract.py           # module:function boundary resolution
+├── adapters/                  # gluonts_step, prophet_step, timesfm_step, taxi, cpu_smoke
+└── config/                    # memory_probe.yaml, hpo_kernel.yaml, hpo_run*.yaml
+```
+
+The lane is config-driven: the kernel carries no vendor code, and the study
+targets the same `project/config/experiments/mlflow.yaml` HPO spec as the
+in-process bandit.
+
+## 4. Artifacts a run produces
+
+| Artifact | Path | Contract |
+|---|---|---|
+| Step report | `project/experiments/results/<series>/<stem>.md` | `agents/contracts/EXPERIMENT_OUTPUT.md` |
+| Step figure | `…/<stem>.png` | one figure answering the step question |
+| Evidence tables | `…/<stem>_<name>.csv` | aggregates only |
+| Decision record | `…/<stem>_decision.json` | `reports/decision.py`, never hand-written |
+| Pipeline decisions | `artifacts/{etl,features,training,baseline,evaluation}/…` | `StepOutput` + figure |
+| Promotion record | `artifacts/evaluation/promotion_decision.json` | interval vs threshold |
+| Champion record | `…/<stem>_champion.json` | best run + 95% interval |
+
+`MeasurementEstimator` is the one measurement owner: value, interval and null
+are computed on ONE seeded draw, block-resampled by day, so a published `n`
+always matches the numbers beside it.
