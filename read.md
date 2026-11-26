@@ -17,13 +17,13 @@ The MLE doesn't care about your AUC or feature importance charts. They need a de
 
 ---
 
-### 2. The Data Tracking Bundle (Lineage & Drift Baselines)
-You cannot monitor production drift if you don't save the "truth" of what the model was trained on. You need a snapshot of the training data's exact state.
+### 2. The Data Tracking Bundle (Lineage & Baselines)
+Save the "truth" of what the model was trained on: you need a snapshot of the training data's exact state.
 
 | Artifact | Format | Purpose |
 |---|---|---|
 | **Data Manifest** | `data_manifest.json` | Cryptographic hash of the training parquet, exact row count, min/max timestamps, and schema version. |
-| **Drift Baselines** | `baseline_stats.json` | The exact mean, std, and distribution (PSI/CSI bins) of every feature at training time. **This is what your production monitoring compares against.** |
+| **Baseline Stats** | `baseline_stats.json` | The exact mean, std, and distribution bins of every feature at training time. |
 | **Lineage Graph** | `graph.json` + `graph.md` | Mermaid diagram and JSON mapping of: Raw Data → Cleaned Data → Features → Model. |
 | **Data Card / Fact Sheet** | `data_card.md` | High-level summary: Date range, known biases, exclusions, and missingness rates. |
 

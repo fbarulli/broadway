@@ -14,7 +14,7 @@ retired:
   # 2026-11-26 so the sample-generation gate is probed again.
   history_rows_retained: ['GATE-INGEST-01', 'GATE-INGEST-04', 'GATE-ETL-17', 'GATE-ETL-18', 'GATE-ETL-19', 'GATE-ETL-117']
 meta:
-  head: 'eee03d3'
+  head: 'ff9d9ab'
   assembled: '2026-11-26'
   source_fragments:
   - agents/ledger/gates/01-ingest.md
@@ -2574,10 +2574,9 @@ gates:
   - 'StepOutput refuses to write without a saved figure (FileNotFoundError naming EXPERIMENT_OUTPUT.md), then writes <stem>.md and <stem>_decision.json beside it; tables are aggregate evidence only (reports/step_output.py:53-68, :121-133)'
   - 'tracking data card (commit 78590b4): TrackingBundle.publish_data_card pure-renders data_card.md from the persisted baseline_stats.json plus optional DatasetProfile/StructuralCleanResult — never re-runs etl/features/train and never reads parquet (tracking/bundle.py:112-136); ds-pipeline tracking only loads the train config and prints the written path (tracking/report.py:17-29)'
   - 'baseline truth is WRITTEN by the train step, never by the renderer: record_training_truth delegates to build_baseline_stats/write_baseline_stats (tracking/bundle.py:93-110)'
-  - 'drift is a report INPUT, never a gate: compare_serve/compare_configured_serve fit the train baseline and return a DriftReport carrying no decision threshold; an absent serve frame skips the read (tracking/bundle.py:138-157)'
   touched_by:
   - 'every command that renders: walkthrough, report, audit, lineage'
-  - tracking(build_baseline_stats, fit_baseline, check_drift, render_data_card)
+  - tracking(build_baseline_stats, render_data_card)
   - 'broadway.reports.decision(Decision, DecisionRule, Evidence, SegmentEvidence)'
   - 'pydantic@2.11.7'
   - numpy
@@ -2595,12 +2594,11 @@ gates:
   - tests/test_step_output.py::test_output_without_a_figure_is_refused
   - tests/test_step_output.py::test_evidence_bundle_cannot_be_empty
   - tests/test_tracking_baseline.py::test_tracking_bundle_writes_baseline_and_renders_card
-  - tests/test_trust_drift.py::test_tracking_bundle_scores_train_vs_serve
   - tests/test_tracking_report.py::test_tracking_report_renders_the_card_from_persisted_baseline
   - tests/test_tracking_report.py::test_publish_data_card_without_a_baseline_fails_loud
   if_changed:
   - violations = FINDINGS F-SURF-1/1b/2 below; refusal condition if a second live writer ever lands on one artifact path
-  - GATE-INFRA-178 tracking config block (machine_dir/reports_dir/baseline/data_card/drift)
+  - GATE-INFRA-178 tracking config block (machine_dir/reports_dir/baseline/data_card)
   - 'data-card inputs (baseline/profile/clean JSON)'
   - 'agents/contracts/EXPERIMENT_OUTPUT.md — the writer/verdict contract this row implements'
   - 'scripts/check_experiment_outputs.py DECISION_ENFORCED + PIPELINE_DECISION_ENFORCED ratchet'
@@ -4726,8 +4724,7 @@ gates:
   transforms:
   - 'declares the training knobs: random_state 42, n_jobs -1, cv_folds 5, cv_kind kfold, model_file model.pkl, n_estimators 500, learning_rate 0.05, num_leaves 63, subsample/colsample_bytree 0.8, quantile_tail 0.9, output artifacts/training + training_result.json'
   - 'consumed as TrainStep through the GATE-TRAIN-30 orchestration (CFG-STEP-TRAIN); no value is repeated in code'
-  - 'declares the data-tracking bundle (commit 78590b4): machine_dir artifacts/tracking, reports_dir reports/tracking, profile_file, baseline {output_file baseline_stats.json, n_bins 10, top_k 10, smoothing 0.0}, data_card {output_file data_card.md, missing_flag_rate 0.05, biases [], generated_at null}, drift {bins 10, epsilon 0.0001, serve_frame null}; every tracking path/file name comes from this block, never from code'
-  - 'drift carries NO decision threshold: serve_frame is the only input, null by default, so drift stays a report input and gates nothing'
+  - 'declares the data-tracking bundle (commit 78590b4): machine_dir artifacts/tracking, reports_dir reports/tracking, profile_file, baseline {output_file baseline_stats.json, n_bins 10, top_k 10, smoothing 0.0}, data_card {output_file data_card.md, missing_flag_rate 0.05, biases [], generated_at null}; every tracking path/file name comes from this block, never from code'
   touched_by:
   - pyyaml@6.0.2
   validated_by: []

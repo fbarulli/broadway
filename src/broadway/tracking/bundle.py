@@ -1,14 +1,10 @@
-"""The train-side Data Tracking bundle: baseline truth, data card, drift input.
+"""The train-side Data Tracking bundle: baseline truth and data card.
 
-Owns the production wiring for the two README-promised machine-truth writers
+Owns the production wiring for the machine-truth writer
 (``baseline_stats.json`` from the training frame) and the pure-render published
-surface (``data_card.md`` from persisted JSON). One class owns all three so the
+surface (``data_card.md`` from persisted JSON). One class owns both so the
 train step and the ``ds-pipeline tracking`` report command share the same
 resolution of paths and knobs — no second copy of the bundle contract.
-
-Drift is a report input here, never a gate: ``compare_serve`` passes no
-thresholds, so :class:`~broadway.trust.drift.DriftReport` carries scores and
-``drifted=None``. The train hook only logs the result.
 """
 
 from __future__ import annotations
@@ -32,13 +28,8 @@ from broadway.tracking.baseline import (
     write_baseline_stats,
     write_data_card,
 )
-from broadway.trust.drift import DriftReport, check_drift, fit_baseline
 
 logger = logging.getLogger(__name__)
-
-
-def _read_frame(path: Path) -> pd.DataFrame:
-    return pd.read_parquet(path) if path.suffix == ".parquet" else pd.read_csv(path)
 
 
 class TrackingBundle:
@@ -133,29 +124,6 @@ class TrackingBundle:
         path = write_data_card(markdown, self.data_card_path)
         logger.info("tracking: wrote data card for %s to %s", self._dataset, path)
         return path
-
-    def compare_serve(self, train_df: pd.DataFrame, serve_df: pd.DataFrame) -> DriftReport:
-        """Score a serve frame against a freshly fitted train baseline (no decision)."""
-        features = [
-            str(column)
-            for column in train_df.columns
-            if pd.api.types.is_numeric_dtype(train_df[column])
-        ]
-        if not features:
-            raise ValueError("drift comparison requires at least one numeric feature")
-        baseline = fit_baseline(train_df, features, bins=self._config.drift.bins)
-        return check_drift(baseline, serve_df, epsilon=self._config.drift.epsilon)
-
-    def compare_configured_serve(self, train_df: pd.DataFrame) -> DriftReport | None:
-        """Compare against the configured serve frame; ``None`` when it is absent."""
-        serve_frame = self._config.drift.serve_frame
-        if serve_frame is None:
-            return None
-        path = Path(serve_frame)
-        if not path.exists():
-            logger.info("tracking: serve frame not found at %s — drift read skipped", path)
-            return None
-        return self.compare_serve(train_df, _read_frame(path))
 
     def _load_profile(self) -> DatasetProfile | None:
         """Profile evidence for date range + missingness; a foreign profile is ignored."""

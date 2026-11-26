@@ -1,14 +1,12 @@
-"""Drift baseline stats writer + data-card renderer (STATE-20260921-002).
+"""Baseline stats writer + data-card renderer (STATE-20260921-002).
 
 Consumes the training-truth snapshot — the canonical parquet frame (or an
 in-memory frame already read from it) plus :class:`DatasetProfile` and
 :class:`TransformAudit` evidence — and produces the two README-promised
 ``artifacts/tracking/`` files this lane owns:
 
-- ``baseline_stats.json`` — per-feature moments plus distribution bins for
-  future PSI/CSI comparison. The bins stored here are the *expected*
-  (training-time) distribution; a future production frame recomputes the
-  same binning and compares against these counts.
+- ``baseline_stats.json`` — per-feature moments plus distribution bins. The
+  bins stored here are the *expected* (training-time) distribution.
 - ``data_card.md`` — date range, biases, exclusions, and missingness rates.
 
 Data-agnostic: no dataset or column names appear below. All numeric tuning
@@ -80,7 +78,7 @@ class FeatureBaseline(BaseModel):
 
 
 class BaselineStats(BaseModel):
-    """Per-feature training truth for future PSI/CSI drift comparison."""
+    """Per-feature training truth and distribution bins."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -380,7 +378,7 @@ def write_data_card(markdown: str, path: str | Path) -> Path:
 
 
 def load_baseline_stats(path: str | Path) -> BaselineStats:
-    """Reload a persisted ``baseline_stats.json`` (drift-compare entry point)."""
+    """Reload a persisted ``baseline_stats.json``."""
     return BaselineStats.model_validate_json(Path(path).read_text(encoding="utf-8"))
 
 

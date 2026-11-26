@@ -698,7 +698,7 @@ tests/test_walkthrough.py:
 torch:
 - GATE-INFRA-171
 - GATE-INFRA-175
-tracking(build_baseline_stats, fit_baseline, check_drift, render_data_card):
+tracking(build_baseline_stats, render_data_card):
 - GATE-SURF-69
 training HPO engine:
 - GATE-CFG-76

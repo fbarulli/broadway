@@ -129,39 +129,3 @@ def test_tracking_report_requires_a_tracking_config(
 
     with pytest.raises(ValueError, match="tracking section"):
         tracking_report.run(dataset="test", environment="development")
-
-
-def test_compare_configured_serve_reads_a_csv_serve_frame(tmp_path: Path) -> None:
-    serve = tmp_path / "serve.csv"
-    _frame().assign(num=lambda frame: frame["num"] + 100.0).to_csv(serve, index=False)
-    config = _config()
-    config = config.model_copy(
-        update={"drift": config.drift.model_copy(update={"serve_frame": str(serve)})}
-    )
-
-    report = _bundle(tmp_path, config=config).compare_configured_serve(_frame())
-
-    assert report is not None
-    assert set(report.results) == {"num"}
-    assert report.results["num"].drifted is None
-
-
-def test_compare_configured_serve_returns_none_when_absent(tmp_path: Path) -> None:
-    unset = _config()
-    assert _bundle(tmp_path, config=unset).compare_configured_serve(_frame()) is None
-
-    missing = unset.model_copy(
-        update={
-            "drift": unset.drift.model_copy(
-                update={"serve_frame": str(tmp_path / "absent.parquet")}
-            )
-        }
-    )
-    assert _bundle(tmp_path, config=missing).compare_configured_serve(_frame()) is None
-
-
-def test_compare_serve_requires_a_numeric_feature(tmp_path: Path) -> None:
-    bundle = _bundle(tmp_path)
-
-    with pytest.raises(ValueError, match="at least one numeric feature"):
-        bundle.compare_serve(pd.DataFrame({"cat": ["a"]}), pd.DataFrame({"cat": ["a"]}))

@@ -1,6 +1,6 @@
 Artifact Bundles
 
-Broadway produces three audience-specific bundles: MLE (serving & infrastructure), Data Tracking (lineage & drift), and DS (story & logic).
+Broadway produces three audience-specific bundles: MLE (serving & infrastructure), Data Tracking (lineage), and DS (story & logic).
 
 1. The MLE Bundle (Serving & Infrastructure)
 
@@ -44,9 +44,9 @@ What the API should return if the model times out or throws an error (e.g., {"de
 
 Where it lives: artifacts/serving/
 
-2. The Data Tracking Bundle (Lineage & Drift Baselines)
+2. The Data Tracking Bundle (Lineage & Baselines)
 
-You cannot monitor production drift if you don't save the "truth" of what the model was trained on. You need a snapshot of the training data's exact state.
+Save the "truth" of what the model was trained on: you need a snapshot of the training data's exact state.
 
 Artifact
 
@@ -60,11 +60,11 @@ data_manifest.json
 
 Cryptographic hash of the training parquet, exact row count, min/max timestamps, and schema version.
 
-Drift Baselines
+Baseline Stats
 
 baseline_stats.json
 
-The exact mean, std, and distribution (PSI/CSI bins) of every feature at training time. This is what your production monitoring compares against.
+The exact mean, std, and distribution bins of every feature at training time.
 
 Lineage Graph
 

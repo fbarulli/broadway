@@ -557,20 +557,6 @@ class TrackingDataCardConfig(BaseModel):
     generated_at: str | None = None
 
 
-class TrackingDriftConfig(BaseModel):
-    """Train-vs-serve drift input.
-
-    No score threshold lives here: thresholds are caller parameters and the
-    train hook passes none, so drift is a report input, never a gate.
-    """
-
-    model_config = ConfigDict(extra="forbid")
-
-    bins: int = Field(ge=1)
-    epsilon: float = Field(gt=0.0)
-    serve_frame: str | None = None
-
-
 class TrackingConfig(BaseModel):
     """The data-tracking bundle: ignored machine truth + tracked report surface."""
 
@@ -581,7 +567,6 @@ class TrackingConfig(BaseModel):
     profile_file: str
     baseline: TrackingBaselineConfig
     data_card: TrackingDataCardConfig
-    drift: TrackingDriftConfig
 
 
 class TrainStep(BaseModel):

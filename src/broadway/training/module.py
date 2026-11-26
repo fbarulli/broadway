@@ -194,38 +194,13 @@ def _tracking_bundle(cfg: PipelineConfig) -> TrackingBundle | None:
 
 
 def _record_tracking(cfg: PipelineConfig, train_df: pd.DataFrame) -> TrackingBundle | None:
-    """Write the training baseline, then read drift without gating the run.
-
-    Drift is data, and data is never checked: a failed or absent serve-frame
-    comparison is logged (full traceback) and training continues.
-    """
+    """Write the training baseline; the returned bundle feeds artifact logging."""
     assert cfg.train is not None
     bundle = _tracking_bundle(cfg)
     if bundle is None:
         return None
     with phase("tracking_baseline"):
         bundle.record_training_truth(train_df)
-    # Drift compares what the model actually sees, so fit on the plan-projected
-    # feature matrix (not the target or raw lookup columns), only when a serve
-    # frame is configured.
-    drift_train = train_df
-    if cfg.train.tracking is not None and cfg.train.tracking.drift.serve_frame is not None:
-        drift_train, _ = _xy(cfg, train_df)
-    try:
-        with phase("tracking_drift"):
-            report = bundle.compare_configured_serve(drift_train)
-    except Exception:
-        logger.exception("tracking: drift comparison failed — training continues")
-    else:
-        if report is not None:
-            for name, result in report.results.items():
-                logger.info(
-                    "tracking: drift %s psi=%.4f ks=%.4f kl=%.4f",
-                    name,
-                    result.psi,
-                    result.ks,
-                    result.kl,
-                )
     return bundle
 
 

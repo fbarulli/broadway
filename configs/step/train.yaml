@@ -48,7 +48,6 @@ learning_curve:
 # Data Tracking bundle: the train step writes the ignored baseline truth
 # (artifacts/tracking/baseline_stats.json); `ds-pipeline tracking` pure-renders
 # the tracked reports/tracking/data_card.md from the persisted JSON.
-# Drift is a report input: no thresholds are configured, so nothing gates.
 tracking:
   machine_dir: artifacts/tracking
   reports_dir: reports/tracking
@@ -63,8 +62,3 @@ tracking:
     missing_flag_rate: 0.05
     biases: []
     generated_at: null
-  drift:
-    bins: 10
-    epsilon: 0.0001
-    # Optional serve frame (parquet/csv) for a train-vs-serve drift read.
-    serve_frame: null
