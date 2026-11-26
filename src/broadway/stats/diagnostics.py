@@ -10,11 +10,26 @@ import matplotlib.pyplot as plt
 import numpy as np
 import statsmodels.api as sm
 from statsmodels.stats.diagnostic import het_breuschpagan
-from statsmodels.stats.stattools import durbin_watson as _durbin_watson
 from statsmodels.stats.stattools import jarque_bera
 
 from broadway import viz
 from broadway.stats.diagnostic_models import DiagnosticResult
+from broadway.stats.time_series import durbin_watson
+
+__all__ = [
+    "bp_test",
+    "constant_variance_diagnostic",
+    "durbin_watson",
+    "influence_diagnostic",
+    "jb_test",
+    "mean_specification_diagnostic",
+    "plot_cooks_distance",
+    "plot_residuals",
+    "plot_residuals_histogram",
+    "plot_residuals_qq",
+    "plot_residuals_vs_fitted",
+    "residual_distribution_diagnostic",
+]
 
 
 def bp_test(resid: np.ndarray, exog: np.ndarray) -> tuple[float, float]:
@@ -25,10 +40,6 @@ def bp_test(resid: np.ndarray, exog: np.ndarray) -> tuple[float, float]:
 def jb_test(resid: np.ndarray) -> tuple[float, float, float, float]:
     statistic, p_value, skew, kurtosis = jarque_bera(resid)
     return float(statistic), float(p_value), float(skew), float(kurtosis)
-
-
-def durbin_watson(resid: np.ndarray) -> float:
-    return float(_durbin_watson(resid))
 
 
 def _plot_residuals_vs_fitted(ax, model) -> None:

@@ -269,6 +269,16 @@ class FeaturesStep(BaseModel):
 
 
 class StatsStep(BaseModel):
+    """Descriptive/time-series knobs; every numeric is validated at the boundary.
+
+    ``decompose_model`` mirrors ``broadway.stats.decompose.DecomposeModel`` as a
+    Literal on purpose: importing the stats module here would pull statsmodels
+    onto the CLI's config-load path. The canonical cast happens at the caller
+    (``DecomposeModel(config.decompose_model)``), so a drift fails loudly.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
     sample_fraction: float
     output_dir: str
     output_file: str
@@ -277,7 +287,12 @@ class StatsStep(BaseModel):
     time_slice_start: str
     time_slice_end: str
     time_split_cutoff: str
-    acf_lags: int
+    acf_lags: int = Field(ge=0)
+    decompose_period: int = Field(ge=2)
+    decompose_model: Literal["additive", "multiplicative"]
+    decompose_lowess_frac: float = Field(gt=0.0, le=1.0)
+    changepoint_threshold: float = Field(gt=0.0)
+    changepoint_min_size: int = Field(ge=1)
     sample_size_dev: int
     sample_size_live: int
     time_slice_start_dev: str

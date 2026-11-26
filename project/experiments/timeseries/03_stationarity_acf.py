@@ -26,7 +26,8 @@ from typing import Any
 import matplotlib.pyplot as plt
 import pandas as pd
 from _common import DATETIME_COL, RESULTS, load_canonical
-from statsmodels.tsa.stattools import acf, adfuller, ccf, pacf
+
+from broadway.stats.time_series import ADFResult, acf, adf, cross_correlation, pacf
 
 HOURLY_CSV = RESULTS / "01_series_profile_hourly_counts.csv"
 DAILY_CSV = RESULTS / "01_series_profile_daily_counts.csv"
@@ -36,14 +37,19 @@ MAX_DAILY_LAG = 30
 MAX_CCF_LAG = 24 * 7
 
 
+def _is_stationary(result: ADFResult) -> bool:
+    """ADF rejects the unit root when the statistic falls below the 5% critical value."""
+    return result.statistic < result.critical_values["5%"]
+
+
 def _adf_row(name: str, values: pd.Series) -> dict[str, object]:
-    stat, p_value, *_ = adfuller(values)
+    result = adf(values)
     return {
         "series": name,
         "n": len(values),
-        "adf_stat": round(float(stat), 3),
-        "p_value": f"{float(p_value):.3g}",
-        "stationary_at_5pct": bool(float(p_value) < 0.05),
+        "adf_stat": round(result.statistic, 3),
+        "p_value": f"{result.p_value:.3g}",
+        "stationary_at_5pct": _is_stationary(result),
     }
 
 
@@ -79,10 +85,10 @@ def _ccf_frame(hourly: pd.DataFrame) -> tuple[pd.DataFrame, float]:
     aligned = pd.concat([demand, duration], axis=1, join="inner").dropna()
     if aligned.empty:
         raise ValueError("CCF alignment is empty: no overlapping demand/duration hours")
-    forward = ccf(aligned[DURATION_COL], aligned["trips"], adjusted=False)[: MAX_CCF_LAG + 1]
-    backward = ccf(aligned["trips"], aligned[DURATION_COL], adjusted=False)[1 : MAX_CCF_LAG + 1]
+    forward = cross_correlation(aligned[DURATION_COL], aligned["trips"], MAX_CCF_LAG)
+    backward = cross_correlation(aligned["trips"], aligned[DURATION_COL], MAX_CCF_LAG)
     lags = list(range(-MAX_CCF_LAG, 0)) + list(range(MAX_CCF_LAG + 1))
-    values = list(backward[::-1]) + list(forward)
+    values = list(backward[1:][::-1]) + list(forward)
     return pd.DataFrame({"lag": lags, "ccf": values}), 1.96 / (len(aligned) ** 0.5)
 
 
@@ -134,10 +140,10 @@ def main() -> None:
     )
     adf.to_csv(RESULTS / f"{stem}_adf.csv", index=False)
 
-    hourly_acf = acf(hourly["trips"], nlags=MAX_HOURLY_LAG, fft=True)
-    daily_acf = acf(daily["trips"], nlags=MAX_DAILY_LAG, fft=True)
-    hourly_pacf = pacf(hourly["trips"], nlags=MAX_HOURLY_LAG, method="ywm")
-    daily_pacf = pacf(daily["trips"], nlags=MAX_DAILY_LAG, method="ywm")
+    hourly_acf = acf(hourly["trips"], MAX_HOURLY_LAG)
+    daily_acf = acf(daily["trips"], MAX_DAILY_LAG)
+    hourly_pacf = pacf(hourly["trips"], MAX_HOURLY_LAG)
+    daily_pacf = pacf(daily["trips"], MAX_DAILY_LAG)
     for name, column, values in (
         ("acf_hourly", "acf", hourly_acf),
         ("acf_daily", "acf", daily_acf),
