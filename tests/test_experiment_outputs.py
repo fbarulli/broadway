@@ -41,3 +41,12 @@ def test_audit_flags_a_step_without_a_figure(tmp_path: Path) -> None:
     audit = _audit_module().ExperimentOutputAudit(tmp_path, enforced=("demo",))
 
     assert [step.stem for step in audit.violations()] == ["01_question_only"]
+
+
+def test_pipeline_audit_reports_missing_decisions(tmp_path: Path) -> None:
+    module = tmp_path / "eda"
+    module.mkdir()
+    (module / "module.py").write_text("def run(cfg):\n    return cfg\n", encoding="utf-8")
+    audit = _audit_module().PipelineDecisionAudit(tmp_path)
+
+    assert audit.status() == {"eda": False}

@@ -23,6 +23,19 @@ ENFORCED: tuple[str, ...] = ("fare_prediction", "timeseries")
 # Never remove.
 DECISION_ENFORCED: tuple[tuple[str, str], ...] = (("fare_prediction", "01_generate_sample"),)
 
+# Pipeline modules that must publish a decision record (the same contract, one
+# level up from the experiment scripts). Grows as each step is wired; never shrinks.
+PIPELINE_STEPS: tuple[str, ...] = (
+    "etl",
+    "eda",
+    "stats",
+    "features",
+    "training",
+    "evaluate",
+    "baseline",
+)
+PIPELINE_DECISION_ENFORCED: tuple[str, ...] = ()
+
 
 @dataclass(frozen=True)
 class StepAudit:
@@ -126,6 +139,34 @@ class ExperimentOutputAudit:
         ]
 
 
+class PipelineDecisionAudit:
+    """Which pipeline step modules build a Decision/StepOutput today."""
+
+    def __init__(self, root: Path = ROOT / "src" / "broadway") -> None:
+        self._root = root
+
+    def status(self) -> dict[str, bool]:
+        status = {}
+        for step in PIPELINE_STEPS:
+            module = self._root / step / "module.py"
+            if not module.is_file():
+                continue
+            tree = ast.parse(module.read_text(encoding="utf-8"))
+            status[step] = any(
+                isinstance(node, ast.Call)
+                and (
+                    getattr(node.func, "id", None) == "StepOutput"
+                    or getattr(node.func, "attr", None) == "StepOutput"
+                    or (
+                        getattr(node.func, "attr", None) == "evaluate"
+                        and getattr(getattr(node.func, "value", None), "id", None) == "Decision"
+                    )
+                )
+                for node in ast.walk(tree)
+            )
+        return status
+
+
 def main() -> int:
     audit = ExperimentOutputAudit()
     violations = audit.violations()
@@ -134,7 +175,16 @@ def main() -> int:
         print(f"FAIL {step.series}/{step.stem}.py: {step.reason()}")
     for step in advisory:
         print(f"note {step.series}/{step.stem}.py: {step.reason()} (not yet enforced)")
-    if violations:
+    pipeline = PipelineDecisionAudit().status()
+    for step, publishes in sorted(pipeline.items()):
+        if not publishes:
+            enforced = step in PIPELINE_DECISION_ENFORCED
+            print(
+                f"{'FAIL' if enforced else 'note'} pipeline/{step}: "
+                f"{'missing' if enforced else 'no'} decision record"
+                + ("" if enforced else " (not yet enforced)")
+            )
+    if violations or any(step in PIPELINE_DECISION_ENFORCED for step in pipeline if not pipeline[step]):
         print(
             "EXPERIMENT OUTPUTS RED — every enforced step needs a question (docstring) "
             "and a figure answering it (savefig). See agents/contracts/EXPERIMENT_OUTPUT.md"

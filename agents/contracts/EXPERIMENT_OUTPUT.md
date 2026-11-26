@@ -52,6 +52,24 @@ The dashboard opens on the figure and renders `<stem>*.csv` as evidence tables
 `<stem>_decision.json` next to the report. The dashboard renders the record as
 a coloured verdict badge on the step page.
 
+## Where decisions must exist
+
+The contract is not only for experiment scripts; every pipeline step that a
+human reads must publish a decision record. This is the coverage matrix the
+ratchet grows into (`PIPELINE_DECISION_ENFORCED`):
+
+| Step | Decision to publish |
+|---|---|
+| `etl` | rows dropped / contract violations vs threshold → proceed or fix the source |
+| `eda` | per-feature correlation and test (effect size + q-value) → keep/drop; outlier share → winsorize/act |
+| `stats` | assumption tests → parametric vs non-parametric method |
+| `features` | keep/drop/transform per feature (importance, effect, stability) |
+| `baseline` | model vs naive baseline delta with CI vs threshold → is the model worth it |
+| `training` | HPO best vs default with CI → adopt or keep default |
+| `evaluate` | coverage vs nominal and promotion delta vs threshold → ship or hold |
+| `tracking` | train-vs-serve drift (PSI/KS) vs threshold → retrain or monitor |
+| `anomaly` | flagged share vs expected contamination → tune or act |
+
 ## The ratchet
 
 `ENFORCED` in `scripts/check_experiment_outputs.py` lists the series that must
