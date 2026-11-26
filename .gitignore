@@ -24,11 +24,16 @@ artifacts/
 project/experiments/results/**
 !project/experiments/results/**/
 !project/experiments/results/**/*.csv
+# The dashboard's answer surface is committed: the decision record, its report,
+# and the figure a human reads (EXPERIMENT_OUTPUT.md).
+!project/experiments/results/**/*_decision.json
+!project/experiments/results/**/*.md
 # Pinned sample + evidence (single source of truth — committed on purpose)
 !project/experiments/results/univariate/sample_evidence/sample_evidence.parquet
 !project/experiments/results/univariate/sample_evidence/sample_evidence.json
 *.png
 !reports/figures/*.png
+!project/experiments/results/**/*.png
 graphify-out/
 .mplconfig/
 diagnostics_experiment/

@@ -323,11 +323,13 @@ Every step except `discover` takes the same three flags.
 
 | baseline | `ds-pipeline baseline --dataset <d> --analysis <a>` | `BaselineResult` → `artifacts/baseline/` | works |
 
-| train | `ds-pipeline train --dataset <d> --analysis <a>` | `TrainingResult` → MLflow model/artifacts | works |
+| train | `ds-pipeline train --dataset <d> --analysis <a> --experiment <e>` | `TrainingResult` → MLflow model/artifacts | works |
 
-| evaluate | `ds-pipeline evaluate --dataset <d> --analysis <a>` | `EvaluationResult` + promotion decision | works |
+| evaluate | `ds-pipeline evaluate --dataset <d> --analysis <a> --experiment <e>` | `EvaluationResult` + promotion decision | works |
+| eda | `ds-pipeline eda --dataset <d> [--experiment <e>]` | `artifacts/reports/eda.html` + effect/correlation/outlier evidence | works |
+| tracking | `ds-pipeline tracking --dataset <d>` | renders `reports/tracking/data_card.md` from the persisted baseline | works (train writes the baseline first) |
 
-| full | `ds-pipeline full …` | dispatches to the mode flow (prediction/hypothesis/causal) based on `--analysis` | works |
+| full | `ds-pipeline full --dataset <d> --analysis <a> --experiment <e>` | dispatches to the mode flow (prediction/hypothesis/causal) based on `--analysis` | works |
 
 | lineage | `ds-pipeline lineage --analysis <a> --dataset <d>` | `reports/lineage/graph.json` + `graph.md` + run-state summary | works (reporting, not a pipeline step) |
 
@@ -339,11 +341,9 @@ Every step except `discover` takes the same three flags.
 
 | audit | `ds-pipeline audit --dataset <d> [--analysis <a>]` | `reports/audit/*.md` (human-readable data readiness) | works (reporting, not a pipeline step) |
 
-`causal` is a separate analysis mode, run on its own — it is not part of
-
-`full`. `full` is a thin dispatcher that reads `AnalysisContract.mode` and
-
-resolves one of `configs/flow/{prediction,hypothesis,causal}.yaml`.
+`full` is a thin dispatcher that reads `AnalysisContract.mode` and resolves one
+of `configs/flow/{prediction,hypothesis,causal}.yaml`; the causal flow is one of
+the resolvable modes (not a separate command).
 
 `baseline` is guidance (a naive result to beat), not a hard gate — it is part
 
