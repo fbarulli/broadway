@@ -302,7 +302,7 @@ def test_experiment_page_renders_the_step_source(monkeypatch, tmp_path) -> None:
     _seed_dashboard(monkeypatch, tmp_path)
     body = ui.experiment_page("01_ingest", "alpha").body.decode("utf-8")
 
-    assert "<h2>code</h2>" in body
+    assert "<summary>code</summary>" in body
     assert '<details class="code-block"><summary>show code — 01_ingest.py' in body
     assert "Load the source data." in body
     assert "raw .py" in body

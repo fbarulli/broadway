@@ -332,6 +332,32 @@ def _render_artifact_preview(path: Path, focus: str) -> str:
 
 
 
+
+def _render_figure(stem: str, focus: str) -> str:
+    """The step's figure, inline — the answer's evidence at a glance."""
+    png = next((path for path in _result_files(stem, focus) if path.suffix.lower() == ".png"), None)
+    if png is None:
+        return '<p class="preview-note">No figure yet.</p>'
+    url = html.escape(_artifact_url(png, focus))
+    return f'<figure><img src="{url}" alt="{html.escape(png.name)}"></figure>'
+
+
+def _render_data_used(stem: str, focus: str) -> str:
+    """One compact line: what data the step ran on (from the decision provenance)."""
+    path = _results_dir(focus) / f"{stem}_decision.json"
+    if not path.is_file():
+        return ""
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        provenance = payload.get("evidence", {}).get("provenance", {})
+    except (OSError, ValueError, AttributeError, json.JSONDecodeError):
+        return ""
+    if not provenance:
+        return ""
+    parts = [f"{key}: {value}" for key, value in provenance.items()]
+    return f'<p class="data-used">{html.escape(" \u00b7 ".join(parts))}</p>'
+
+
 def _render_decision(stem: str, focus: str) -> str:
     """Render the step's decision record (metric + 95% interval vs the rule)."""
     path = _results_dir(focus) / f"{stem}_decision.json"
@@ -697,6 +723,10 @@ def _render_experiment_page(
   .artifact-preview {{ border: 1px solid #ddd; border-radius: 6px; padding: 1rem; background: #fafafa; }}
   .artifact-preview figure {{ margin: 0; }}
   .artifact-preview figcaption, .preview-note {{ color: #666; font-size: 0.85rem; margin-top: 0.5rem; }}
+  .question {{ font-size: 1.15rem; margin: 0.2rem 0 0.6rem; }}
+  .data-used {{ color: #555; font-size: 0.8rem; margin: 0.2rem 0 0.9rem; }}
+  details.panel {{ margin: 0.6rem 0; }}
+  details.panel > summary {{ cursor: pointer; font-weight: 600; padding: 0.3rem 0; }}
   .decision {{ margin: 0.9rem 0; padding: 0.6rem 0.9rem; border-left: 6px solid #999; background: #f4f4f4; font-size: 0.95rem; }}
   .decision.act {{ border-color: #c0362c; background: #fde7e5; }}
   .decision.investigate {{ border-color: #d08c00; background: #fff4dc; }}
@@ -710,20 +740,26 @@ def _render_experiment_page(
 </head>
 <body>
 <h1>{html.escape(stem)}</h1>
-<p>{html.escape(question)}</p>
+<p class="question">{html.escape(question)}</p>
 {_render_decision(stem, focus)}
+{_render_data_used(stem, focus)}
+{_render_figure(stem, focus)}
 {_series_selector(series, focus)}
+<details class="panel"><summary>steps taken in the pipeline</summary>
 {strip}
 {nav}
 {_graph_html(stem, profiles, focus)}
-<h2>code</h2>
-{_render_code(stem, focus)}
-<h2>artifacts</h2>
+</details>
+<details class="panel"><summary>tables and raw artifacts</summary>
 {_render_artifacts(stem, focus, artifact)}
-<h2>evidence</h2>
 {_render_evidence(stem, focus)}
-<h2>observations</h2>
+</details>
+<details class="panel"><summary>code</summary>
+{_render_code(stem, focus)}
+</details>
+<details class="panel"><summary>observations</summary>
 {_render_observations_form(stem, load_observations(stem), focus)}
+</details>
 </body>
 </html>
 """
