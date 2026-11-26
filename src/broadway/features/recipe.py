@@ -2,85 +2,38 @@
 
 Each ``PreprocessingStepConfig`` maps to one transformer (or ``passthrough``)
 in config order; an absent ``preprocessing`` block yields an identity
-passthrough Pipeline (behavior identical to a bare model). Step columns are
-name-driven and enforced against the schema module named by
+passthrough Pipeline (behavior identical to a bare model). Step construction
+and param validation are owned by ``broadway.features.transformers`` — this
+module only composes the Pipeline and cross-checks declarations. Step columns
+are name-driven and enforced against the schema module named by
 ``data_source.schema_contract`` at config-load (Decision 6).
+
+Target transforms (``difference``/``boxcox``) are declared separately under
+``experiment.target_transforms`` and built as an invertible
+``TargetTransformChain``; they are never sklearn Pipeline steps because
+differencing changes the row count.
 """
 
 from __future__ import annotations
 
-from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import OneHotEncoder
 
-from broadway.config.schema import PipelineConfig, PreprocessingStepConfig
-from broadway.features.transformers import FrequencyEncoding, TargetEncoding
+from broadway.config.schema import (
+    TARGET_TRANSFORM_STEP_TYPES,
+    PipelineConfig,
+    PreprocessingStepConfig,
+)
+from broadway.features.transformers import PreprocessingFactory, TargetTransformChain
 from broadway.schemas import schema_columns
-
-# one_hot and passthrough take ZERO recipe params BY DESIGN: _build_step
-# hardcodes OneHotEncoder(handle_unknown="ignore") internally (single-use, no
-# config surface) and passthrough is the identity step — the empty tuples are
-# intentional, not unimplemented.
-_STEP_PARAM_SPEC: dict[str, tuple[frozenset[str], frozenset[str]]] = {
-    #                       required                    optional
-    "target_encoding":    (frozenset({"smoothing"}),   frozenset()),
-    "frequency_encoding": (frozenset(),                frozenset({"normalize"})),
-    "one_hot":            (frozenset(),                frozenset()),
-    "passthrough":        (frozenset(),                frozenset()),
-}
-
-
-def _validate_step_params(step: PreprocessingStepConfig) -> None:
-    required, optional = _STEP_PARAM_SPEC[step.type]
-    allowed = required | optional
-    invalid = sorted(set(step.params) - allowed)
-    if invalid:
-        raise ValueError(
-            f"invalid params for preprocessing step '{step.type}': {invalid}. "
-            f"valid params: {sorted(allowed)}"
-        )
-    missing = sorted(required - set(step.params))
-    if missing:
-        raise ValueError(
-            f"preprocessing step '{step.type}' requires param(s) {missing}"
-        )
-
-
-def _coerce_bool_param(value: object, step: str, param: str) -> bool:
-    """Accept real bools and case-insensitive 'true'/'false'; fail loud otherwise."""
-    if isinstance(value, bool):
-        return value
-    if isinstance(value, str) and value.lower() in {"true", "false"}:
-        return value.lower() == "true"
-    raise ValueError(
-        f"preprocessing step '{step}' param '{param}' must be a bool or "
-        f"'true'/'false' (case-insensitive), got {value!r}"
-    )
 
 
 def _build_step(step: PreprocessingStepConfig) -> object:
-    _validate_step_params(step)
-    if step.type == "target_encoding":
-        # literal param name is safe: _validate_step_params guarantees presence
-        return TargetEncoding(
-            columns=step.columns,
-            smoothing=float(step.params["smoothing"]),
-        )
-    if step.type == "frequency_encoding":
-        if "normalize" in step.params:
-            return FrequencyEncoding(
-                columns=step.columns,
-                normalize=_coerce_bool_param(step.params["normalize"], step.type, "normalize"),
-            )
-        return FrequencyEncoding(columns=step.columns)
-    if step.type == "one_hot":
-        return ColumnTransformer(
-            [("one_hot", OneHotEncoder(handle_unknown="ignore"), step.columns)],
-            remainder="passthrough",
-        )
-    if step.type == "passthrough":
-        return "passthrough"
-    raise ValueError(f"unknown preprocessing step type '{step.type}'")
+    """Build one X-transformer step through the single preprocessing owner.
+
+    Kept as a module seam: the HPO leakage guard patches it to prove the
+    composed Pipeline refits preprocessing on every trial.
+    """
+    return PreprocessingFactory.build(step)
 
 
 def build_pipeline(cfg: PipelineConfig) -> Pipeline:
@@ -99,6 +52,28 @@ def build_pipeline(cfg: PipelineConfig) -> Pipeline:
     )
 
 
+def build_target_transforms(cfg: PipelineConfig) -> TargetTransformChain:
+    """Build the experiment's invertible target-transform chain.
+
+    The chain is fitted on the train target only; ``transform`` returns the
+    transformed target (differencing drops its boundary rows) and
+    ``inverse_transform`` restores target units for scoring.
+    """
+    if cfg.experiment is None:
+        raise ValueError("recipe requires an experiment config")
+    if not cfg.experiment.target_transforms:
+        raise ValueError(
+            "experiment declares no target_transforms — nothing to build "
+            "(difference/boxcox belong under experiment.target_transforms)"
+        )
+    return TargetTransformChain(
+        [
+            PreprocessingFactory.build_target_transform(step)
+            for step in cfg.experiment.target_transforms
+        ]
+    )
+
+
 def validate_preprocessing_columns(cfg: PipelineConfig) -> None:
     """Cross-check recipe columns against the bound schema module (Decision 6).
 
@@ -107,9 +82,14 @@ def validate_preprocessing_columns(cfg: PipelineConfig) -> None:
     the offending step and columns and fails config-load. ``one_hot`` must be
     the SOLE preprocessing step: its ColumnTransformer emits an ndarray that
     breaks chained encoders, and its remainder passthrough leaks raw
-    categorical columns into the model.
+    categorical columns into the model. Target transforms must name exactly the
+    dataset's target column.
     """
-    if cfg.experiment is None or not cfg.experiment.preprocessing:
+    if cfg.experiment is None:
+        return
+    if cfg.experiment.target_transforms:
+        _validate_target_columns(cfg, cfg.experiment.target_transforms)
+    if not cfg.experiment.preprocessing:
         return
     if cfg.dataset is None:
         raise ValueError(
@@ -138,4 +118,23 @@ def validate_preprocessing_columns(cfg: PipelineConfig) -> None:
                 f"preprocessing step '{step.type}' references column(s) {missing} not in "
                 f"schema_contract '{cfg.experiment.data_source.schema_contract}' "
                 f"(available: {sorted(bound)})"
+            )
+
+
+def _validate_target_columns(
+    cfg: PipelineConfig, steps: list[PreprocessingStepConfig]
+) -> None:
+    """Every target transform must name exactly the dataset's target column."""
+    if cfg.dataset is None:
+        raise ValueError("cannot cross-check target_transforms: experiment has no dataset")
+    for step in steps:
+        if step.type not in TARGET_TRANSFORM_STEP_TYPES:
+            raise ValueError(
+                f"preprocessing step '{step.type}' is not a target transform "
+                f"(valid: {sorted(t.value for t in TARGET_TRANSFORM_STEP_TYPES)})"
+            )
+        if step.columns != [cfg.dataset.target]:
+            raise ValueError(
+                f"target transform '{step.type}' must name exactly the dataset target "
+                f"'{cfg.dataset.target}', got {step.columns}"
             )

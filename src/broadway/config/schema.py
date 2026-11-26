@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from enum import Enum
+from enum import Enum, StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
@@ -155,17 +155,59 @@ class DataSourceRef(BaseModel):
         return self
 
 
+class StepType(StrEnum):
+    """Preprocessing step vocabulary — the single source every layer reads.
+
+    ``preprocessing`` carries the X-transformer steps; ``target_transforms``
+    carries the target steps (``difference``/``boxcox``) whose inverse is owned
+    by ``broadway.features.transformers``.
+    """
+
+    TARGET_ENCODING = "target_encoding"
+    FREQUENCY_ENCODING = "frequency_encoding"
+    ONE_HOT = "one_hot"
+    PASSTHROUGH = "passthrough"
+    IMPUTATION = "imputation"
+    SCALING = "scaling"
+    DIFFERENCE = "difference"
+    BOXCOX = "boxcox"
+
+
+class ImputationStrategy(StrEnum):
+    """Fitted imputation strategies (the owner lives in features.transformers)."""
+
+    MEDIAN = "median"
+    MEAN = "mean"
+    MODE = "mode"
+    KNN = "knn"
+
+
+class ScalingStrategy(StrEnum):
+    """Column-wise scaling strategies (the owner lives in features.transformers)."""
+
+    STANDARD = "standard"
+    MINMAX = "minmax"
+    ROBUST = "robust"
+
+
+# Step placement: differencing/BoxCox change the target, everything else
+# transforms the feature frame. Declaring one in the wrong list fails at parse.
+TARGET_TRANSFORM_STEP_TYPES: frozenset[StepType] = frozenset(
+    {StepType.DIFFERENCE, StepType.BOXCOX}
+)
+
+
 class PreprocessingStepConfig(BaseModel):
     """One ordered preprocessing step of an experiment's pipeline recipe.
 
-    ``type`` names the builder-registered step kind (``target_encoding``,
-    ``frequency_encoding``, ``one_hot``, ``passthrough``); ``columns`` is the
-    name-driven column list enforced against the bound schema contract;
-    ``params`` carries step-specific tuning values (e.g. ``smoothing``).
+    ``type`` names a step kind from the ``StepType`` vocabulary; ``columns`` is
+    the name-driven column list enforced against the bound schema contract;
+    ``params`` carries the step's typed tuning values (e.g. ``smoothing``),
+    validated by the owner in ``broadway.features.transformers``.
     """
 
     model_config = ConfigDict(extra="forbid")
-    type: Literal["target_encoding", "frequency_encoding", "one_hot", "passthrough"]
+    type: StepType
     columns: list[str]
     params: dict[str, float | int | str | bool] = {}
 
@@ -185,6 +227,7 @@ class ExperimentConfig(BaseModel):
     target_metric: str
     hpo: HPOConfig | None = None
     preprocessing: list[PreprocessingStepConfig] = []
+    target_transforms: list[PreprocessingStepConfig] = []
     calibration: CalibrationConfig | None = None
 
     # Resolved by the loader from ``feature_plan`` + the dataset contract.
@@ -214,6 +257,31 @@ class ExperimentConfig(BaseModel):
     def bind_plan(self, plan: ColumnPlan) -> ExperimentConfig:
         """Attach the plan resolved from this experiment's code reference."""
         self._plan = plan
+        return self
+
+    @model_validator(mode="after")
+    def _validate_step_placement(self) -> ExperimentConfig:
+        """Refuse target steps in the X recipe and vice versa (loud, at parse)."""
+        misplaced = [
+            step.type.value
+            for step in self.preprocessing
+            if step.type in TARGET_TRANSFORM_STEP_TYPES
+        ]
+        if misplaced:
+            raise ValueError(
+                f"target transform step(s) {misplaced} belong in 'target_transforms', "
+                "not 'preprocessing': they change the target, not the feature frame"
+            )
+        misplaced = [
+            step.type.value
+            for step in self.target_transforms
+            if step.type not in TARGET_TRANSFORM_STEP_TYPES
+        ]
+        if misplaced:
+            raise ValueError(
+                f"feature step(s) {misplaced} belong in 'preprocessing', not "
+                "'target_transforms': only difference/boxcox change the target"
+            )
         return self
 
     @model_validator(mode="after")
@@ -287,11 +355,64 @@ class EdaStep(BaseModel):
         return Path(self.output_dir) / self.output_file
 
 
+class MissingInjectionConfig(BaseModel):
+    """Train-only MCAR missingness injection for the imputation impact study.
+
+    A churn rate the study applies to the named columns of the TRAIN split; the
+    validation split stays clean so every strategy is scored on the same rows.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    rate: float = Field(gt=0.0, lt=1.0)
+    columns: list[str] = Field(min_length=1)
+
+
+class ImputationStudyConfig(BaseModel):
+    """Measured imputation/scaling impact study — reporting, never a gate.
+
+    ``strategies`` are imputed per fit on the train split; ``complete_case`` is
+    always the per-scaling baseline (rows with any missing feature are dropped).
+    ``sample_size`` of 0 means every row; a bounded sample keeps the KNN
+    strategy's pairwise-distance cost finite.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    strategies: list[ImputationStrategy] = Field(min_length=1)
+    scalings: list[ScalingStrategy | Literal["none"]] = Field(min_length=1)
+    metric_direction: Literal["minimize", "maximize"]
+    sample_size: int = Field(ge=0)
+    knn_neighbors: int = Field(ge=1)
+    missing_injection: MissingInjectionConfig
+    output_dir: str
+    output_file: str
+
+    @field_validator("strategies")
+    @classmethod
+    def _unique_strategies(
+        cls, strategies: list[ImputationStrategy]
+    ) -> list[ImputationStrategy]:
+        if len(set(strategies)) != len(strategies):
+            raise ValueError(f"imputation strategy list has duplicates: {strategies}")
+        return strategies
+
+    @property
+    def output_path(self) -> Path:
+        """Delta-table path (``output_dir/output_file``)."""
+        return Path(self.output_dir) / self.output_file
+
+
 class FeaturesStep(BaseModel):
+    """Features-step knobs; the optional impact study writes its own table."""
+
+    model_config = ConfigDict(extra="forbid")
+
     encoding_smoothing: int
     frequency_fill: float
     pipeline_file: str
     max_drop_fraction: float = Field(ge=0.0, le=1.0)
+    imputation_study: ImputationStudyConfig | None = None
 
 
 class StatsStep(BaseModel):

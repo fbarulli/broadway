@@ -10,8 +10,13 @@ Engine adapters (one class per library, same tiny interface):
 ``sktime`` (series transformer), ``darts`` (series transformer — documented as
 a transformer, not a feature extractor).
 
-The libraries are optional dependencies, imported lazily inside each adapter so
-the core ``broadway`` import stays light. Every knob comes from the plan
+Imputation, winsorizing, and the scaler vocabulary are NOT re-implemented here:
+the tabular adapter delegates to the canonical estimators in
+``broadway.features.transformers`` (fit on the frame it is handed, exactly as
+the feature-engine pipeline it replaces), and the darts scaler resolves its
+sklearn class through that owner's single strategy map. The libraries are
+optional dependencies, imported lazily inside each adapter so the core
+``broadway`` import stays light. Every knob comes from the plan
 (``FeatureEngineeringConfig``), resolved by default through the platform config
 tree with the project overlay winning when one is configured; this module knows
 no dataset or column names.
@@ -29,9 +34,15 @@ from typing import Annotated, Any, ClassVar, Literal
 import pandas as pd
 import yaml
 from pandas.api.types import is_numeric_dtype
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from broadway.config.schema import ImputationStrategy
 from broadway.features.plan import ColumnPlan
+from broadway.features.transformers import (
+    SCALER_BY_CLASS_NAME,
+    FeatureImputer,
+    Winsorizer,
+)
 from broadway.observability.profiling import phase, timed
 
 logger = logging.getLogger(__name__)
@@ -52,9 +63,11 @@ __all__ = [
     "FeatureEngineeringConfig",
     "FeatureEngineeringResult",
     "FeatureManifestEntry",
+    "MeanMedianImputerParams",
     "SktimeEngineConfig",
     "SktimeTransformer",
     "TsfreshEngineConfig",
+    "WinsorizerParams",
 ]
 
 
@@ -79,11 +92,50 @@ class TsfreshEngineConfig(_FrozenModel):
     n_jobs: int = Field(ge=1)
 
 
+class MeanMedianImputerParams(_FrozenModel):
+    """The MeanMedianImputer knobs the canonical ``FeatureImputer`` covers."""
+
+    imputation_method: ImputationStrategy
+
+
+class WinsorizerParams(_FrozenModel):
+    """The quantile Winsorizer knobs the canonical ``Winsorizer`` covers."""
+
+    capping_method: Literal["quantiles"] = "quantiles"
+    tail: Literal["both", "right", "left"] = "both"
+    fold: float = Field(gt=0.0, lt=0.5)
+
+
 class FeatureEngineTransformerConfig(_FrozenModel):
-    """One feature-engine transformer step: allowlisted class + its params."""
+    """One declared tabular step: the engine vocabulary + typed params.
+
+    The params are validated at the config boundary against the canonical
+    estimator's surface, and ``build`` translates the vocabulary into that
+    estimator — so an unsupported knob fails at config load, never silently.
+    """
 
     kind: Literal["Winsorizer", "MeanMedianImputer"]
     params: dict[str, Any]
+
+    _PARAM_MODELS: ClassVar[dict[str, type[_FrozenModel]]] = {
+        "MeanMedianImputer": MeanMedianImputerParams,
+        "Winsorizer": WinsorizerParams,
+    }
+
+    @model_validator(mode="after")
+    def _validate_params(self) -> FeatureEngineTransformerConfig:
+        self._PARAM_MODELS[self.kind].model_validate(self.params)
+        return self
+
+    def build(self, columns: list[str]) -> FeatureImputer | Winsorizer:
+        """Translate this step into the canonical owner's estimator."""
+        params = self._PARAM_MODELS[self.kind].model_validate(self.params)
+        if isinstance(params, MeanMedianImputerParams):
+            return FeatureImputer(columns=columns, strategy=params.imputation_method)
+        assert isinstance(params, WinsorizerParams)
+        lower = None if params.tail == "right" else params.fold
+        upper = None if params.tail == "left" else 1.0 - params.fold
+        return Winsorizer(columns=columns, lower_quantile=lower, upper_quantile=upper)
 
 
 class FeatureEngineTabularConfig(_FrozenModel):
@@ -311,14 +363,15 @@ class TsfreshAdapter(FeatureEngineAdapter):
 # feature-engine — tabular transformers
 # --------------------------------------------------------------------------- #
 class FeatureEngineTabularAdapter(FeatureEngineAdapter):
-    """Apply an ordered feature-engine transformer pipeline to tabular columns."""
+    """Apply an ordered tabular transformer pipeline to tabular columns.
+
+    The YAML vocabulary stays feature_engine's (``MeanMedianImputer``,
+    ``Winsorizer``) so existing plans keep working; each step's typed params
+    validate at config load and ``build`` translates it into the canonical
+    ``FeatureImputer``/``Winsorizer`` in ``broadway.features.transformers``.
+    """
 
     kind = "feature_engine"
-
-    _TRANSFORMERS: ClassVar[dict[str, str]] = {
-        "Winsorizer": "feature_engine.outliers",
-        "MeanMedianImputer": "feature_engine.imputation",
-    }
 
     def __init__(
         self, config: FeatureEngineeringConfig, engine: FeatureEngineTabularConfig
@@ -326,23 +379,14 @@ class FeatureEngineTabularAdapter(FeatureEngineAdapter):
         super().__init__(config, engine)
         self._spec = engine
 
-    def _build_transformer(
-        self, step: FeatureEngineTransformerConfig
-    ) -> Any:
-        from importlib import import_module
-
-        module = import_module(self._TRANSFORMERS[step.kind])
-        transformer_class = getattr(module, step.kind)
-        return transformer_class(**step.params)
-
     def transform(self, frame: pd.DataFrame, plan: ColumnPlan) -> EngineOutput:
         used_columns = self._value_columns(frame, plan)
 
         work = frame.copy()
+        work[used_columns] = work[used_columns].astype(float)
         for step in self._spec.transformers:
-            transformer = self._build_transformer(step)
-            transformed = transformer.fit_transform(work[used_columns])
-            work[used_columns] = transformed.to_numpy()
+            block = work[used_columns]
+            work[used_columns] = step.build(used_columns).fit(block).transform(block)
 
         id_columns = self._config.id_columns
         output_columns = _ordered_unique(
@@ -418,10 +462,6 @@ class DartsAdapter(FeatureEngineAdapter):
 
     kind = "darts"
 
-    _SCALERS: ClassVar[frozenset[str]] = frozenset(
-        {"MinMaxScaler", "StandardScaler", "RobustScaler"}
-    )
-
     def __init__(self, config: FeatureEngineeringConfig, engine: DartsEngineConfig) -> None:
         super().__init__(config, engine)
         self._spec = engine
@@ -431,12 +471,15 @@ class DartsAdapter(FeatureEngineAdapter):
 
         params = dict(self._spec.params)
         if self._spec.transformer == "Scaler":
-            from sklearn import preprocessing
-
             scaler_name = str(params.pop("scaler"))
-            if scaler_name not in self._SCALERS:
-                raise ValueError(f"darts: unsupported scaler {scaler_name!r}")
-            scaler_class = getattr(preprocessing, scaler_name)
+            # Single strategy vocabulary: broadway.features.transformers owns
+            # which sklearn scalers exist; this adapter only needs the class.
+            scaler_class = SCALER_BY_CLASS_NAME.get(scaler_name)
+            if scaler_class is None:
+                raise ValueError(
+                    f"darts: unsupported scaler {scaler_name!r} "
+                    f"(valid: {sorted(SCALER_BY_CLASS_NAME)})"
+                )
             return Scaler(scaler=scaler_class(), **params)
         if self._spec.transformer == "BoxCox":
             return BoxCox(**params)
