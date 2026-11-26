@@ -2,6 +2,11 @@
 
 from pathlib import Path
 
+import matplotlib
+
+matplotlib.use("Agg")
+
+import matplotlib.pyplot as plt
 import pandas as pd
 from _common import (
     RESULTS,
@@ -73,6 +78,22 @@ def _write_evidence(
     print(f"wrote {md_out}")
 
 
+def plot_temporal(df: pd.DataFrame, out_path: Path) -> None:
+    """Plot the temporal story a human reads: mean fare by hour and weekday."""
+    hourly = df.groupby("pickup_hour")["fare_amount"].mean()
+    weekday = df.groupby("pickup_day_of_week")["fare_amount"].mean()
+    figure, axes = plt.subplots(1, 2, figsize=(12, 4), constrained_layout=True)
+    hourly.plot(ax=axes[0], marker="o", color="#4c78a8")
+    axes[0].set_title("mean fare by pickup hour")
+    axes[0].set_xlabel("hour")
+    axes[0].set_ylabel("mean fare")
+    weekday.plot(ax=axes[1], marker="o", color="#e45756")
+    axes[1].set_title("mean fare by weekday")
+    axes[1].set_xlabel("weekday (0=Mon)")
+    figure.savefig(out_path, dpi=150)
+    plt.close(figure)
+
+
 def main() -> None:
     RESULTS.mkdir(parents=True, exist_ok=True)
     sample = read_named_sample(SAMPLE_NAME)
@@ -84,6 +105,9 @@ def main() -> None:
     print("Cyclical features describe:")
     print(cyclical_desc)
     _write_evidence(DESCRIBE_CSV, SUMMARY_MD, df, cyclical_desc)
+    figure = RESULTS / "05_temporal_features.png"
+    plot_temporal(df, figure)
+    print(f"plot: {figure}")
 
 
 if __name__ == "__main__":

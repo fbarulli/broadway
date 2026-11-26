@@ -7,6 +7,13 @@ shrinkage (ROUTE_SMOOTHING=50) than single zones (LOCATION_SMOOTHING=20).
 Unseen ids fall back to the train global mean.
 """
 
+from pathlib import Path
+
+import matplotlib
+
+matplotlib.use("Agg")
+
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from _common import DATETIME_SRC, RESULTS, SAMPLE_NAME, build_temporal_features
@@ -120,6 +127,26 @@ def _evidence_rows(splits: dict[str, pd.DataFrame]) -> list[dict[str, object]]:
     ]
 
 
+def plot_split(
+    splits: dict[str, pd.DataFrame], out_path: Path
+) -> None:
+    """Plot the chronological split on a time axis (the human view of the protocol)."""
+    colours = {"train": "#4c78a8", "val": "#f58518", "test": "#e45756"}
+    figure, axis = plt.subplots(figsize=(10, 2.8), constrained_layout=True)
+    for row, (name, part) in enumerate(splits.items()):
+        start = part[DATETIME_SRC].min()
+        end = part[DATETIME_SRC].max()
+        hours = (end - start).total_seconds() / 3600
+        axis.barh(row, hours, left=start, height=0.5, color=colours.get(name, "#888"))
+        axis.text(start, row + 0.34, f"{name}: {len(part):,} rows", fontsize=9)
+    axis.set_yticks(range(len(splits)), list(splits))
+    axis.invert_yaxis()
+    axis.set_xlabel("time")
+    axis.set_title("chronological train/val/test split")
+    figure.savefig(out_path, dpi=150)
+    plt.close(figure)
+
+
 def main() -> None:
     RESULTS.mkdir(parents=True, exist_ok=True)
     PREPARED_DIR.mkdir(parents=True, exist_ok=True)
@@ -141,6 +168,9 @@ def main() -> None:
     evidence.to_csv(SPLIT_CSV, index=False)
     print(f"wrote {SPLIT_CSV}")
     print(evidence.to_string(index=False))
+    figure = RESULTS / "06_prepare_model_data.png"
+    plot_split({"train": train, "val": val, "test": test}, figure)
+    print(f"plot: {figure}")
 
 
 if __name__ == "__main__":
