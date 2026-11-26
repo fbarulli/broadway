@@ -341,7 +341,9 @@ def _render_code(stem: str, focus: str) -> str:
     except (OSError, UnicodeDecodeError):
         return "<p>Could not read this step's source.</p>"
     numbered = "\n".join(f"{number:4d}  {line}" for number, line in enumerate(lines, 1))
+    raw = html.escape(_h(f"/experiments/{stem}/source", focus))
     return (
+        f'<p><a href="{raw}">open the raw .py</a></p>'
         f'<details class="code-block" open><summary>{html.escape(script.name)}'
         f" ({len(lines)} lines)</summary>"
         f'<pre class="text-preview">{html.escape(numbered)}</pre></details>'
@@ -892,6 +894,17 @@ def index(focus: str = Query(default=DEFAULT_SERIES)) -> HTMLResponse | PlainTex
     if focus not in list_series():
         return PlainTextResponse("unknown series", status_code=404)
     return HTMLResponse(_render_dashboard_page(census_rows(focus), focus, list_series()))
+
+
+@app.get("/experiments/{name}/source", response_model=None)
+def experiment_source(
+    name: str, focus: str = Query(default=DEFAULT_SERIES)
+) -> PlainTextResponse:
+    """Serve the step's actual ``.py`` file as plain text."""
+    script = _script_for(name, focus)
+    if script is None:
+        return PlainTextResponse("unknown step", status_code=404)
+    return PlainTextResponse(script.read_text(encoding="utf-8"))
 
 
 @app.get("/experiments/{name}", response_model=None)

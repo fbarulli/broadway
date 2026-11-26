@@ -1,2 +1,0 @@
-artifact,rows,columns,version,definition_sha256,artifact_sha256
-data/samples/fare_prediction_1m@v3.parquet,988077,7,v3,f1b120e0e55a87bbec7457f2da7e6e1f86c6361aba1dc3a167583156cc0eda6d,158940b0d905b77d53f94cb849fffdff068958db642a7bbd19074a742a8aed67

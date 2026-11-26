@@ -305,3 +305,9 @@ def test_experiment_page_renders_the_step_source(monkeypatch, tmp_path) -> None:
     assert "<details class=\"code-block\" open>" in body
     assert "01_ingest.py" in body
     assert "Load the source data." in body
+    assert "open the raw .py" in body
+
+    source = ui.experiment_source("01_ingest", "alpha")
+    assert source.status_code == 200
+    assert "Load the source data." in source.body.decode()
+    assert ui.experiment_source("missing", "alpha").status_code == 404
