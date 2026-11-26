@@ -6,7 +6,7 @@ Did sampling plus the fare policy preserve the source population?
 
 ## decision — act
 
-- metric: ks_fare_amount = 0.0136 [0.0121, 0.0164] 95% (n=50,000)
+- metric: ks_fare_amount = 0.0136 [0.0121, 0.0164] 95% (n=50,000, unit=ks_distance)
 - rule: max 0.0100 (permutation null 0.0075)
 - action (fare_prediction): review the fare-policy exclusion before training
 
