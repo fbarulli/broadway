@@ -14,7 +14,7 @@ retired:
   # 2026-11-26 so the sample-generation gate is probed again.
   history_rows_retained: ['GATE-INGEST-01', 'GATE-INGEST-04', 'GATE-ETL-17', 'GATE-ETL-18', 'GATE-ETL-19', 'GATE-ETL-117']
 meta:
-  head: 'd516145'
+  head: 'eee03d3'
   assembled: '2026-11-26'
   source_fragments:
   - agents/ledger/gates/01-ingest.md
@@ -829,35 +829,64 @@ gates:
 - id: GATE-FEAT-23
   phase: features
   order: 25
-  owner: src/broadway/features/pipeline.py:21 FeaturePipeline.fit()
+  owner: src/broadway/features/pipeline.py:34 FeaturePipeline.fit() + src/broadway/features/transformers.py:620 PreprocessingFactory + src/broadway/selection/imputation.py:154 ImputationImpactStudy
   inputs:
   - ARTIFACT-SPLIT train frame (loaded at src/broadway/features/module.py:25)
   - cfg.dataset.target
   - cfg.features.encoding_smoothing
   - cfg.experiment.features.encodings (pipeline ctor arg, module.py:35)
+  - 'configs/step/features.yaml imputation_study block (strategies/scalings/metric_direction/sample_size/knn_neighbors/missing_injection/output path)'
+  - 'experiment.preprocessing steps + experiment.target_transforms declarations (typed PreprocessingStepConfig)'
+  - 'persisted train/val feature splits (etl.train_features_file / val_features_file) for the impact study'
   outputs:
   - fitted encoder state _target_encoders/_freq_encoders (pipeline.py:22-23 reset then append :27-31) persisted later into ARTIFACT-PIPELINE-PICKLE (module.py:52-54)
+  - 'one fitted transformer per declared preprocessing step inside the sklearn Pipeline (recipe.build_pipeline :39-53) + the fitted TargetTransformChain (recipe.build_target_transforms :55+)'
+  - 'artifacts/features/imputation_impact.json — ImpactTable (one row per strategy x scaling with value, delta vs complete_case and rows kept/dropped per split) (selection/imputation.py:212-226)'
   transforms:
   - 'fit order = encodings config order; per column: type==''target'' → TargetEncoding(columns=[col], smoothing).fit(df, df[target]) (pipeline.py:26-28); type==''frequency'' → FrequencyEncoding(columns=[col]).fit(df) (pipeline.py:29-31)'
-  - target series reaches the encoder via the estimator y argument, never read out of X (transformers.py:30-32)
+  - target series reaches the encoder via the estimator y argument, never read out of X (transformers.py:75-79)
+  - 'PREPROCESSING OWNER (commit 47f4a40): transformers.py is the single step registry — STEP_PARAMS maps each StepType to its typed StepParams model, PreprocessingFactory.parse validates params against that model and build/build_target_transform construct the estimator, so recipe.py composes ONLY through this factory (:492-651)'
+  - 'FeatureImputer fits category/value statistics on TRAIN and fills the val frame including unseen categories (:152-239); FeatureScaler standard/minmax statistics come from train only and inverse_transform restores units (:241-284); Winsorizer clips at per-column train quantiles (:286-338)'
+  - 'invertible target transforms are declared under experiment.target_transforms, never sklearn steps (differencing changes the row count): TargetDifference keeps the dropped boundary values, TargetBoxCox fits a Box-Cox lambda, TargetTransformChain composes them and inverse-transforms predictions back to target units (:340-490)'
+  - 'IMPACT STUDY (report only, never a gate): ImputationImpactStudy measures every configured (strategy, scaling) variant plus the complete_case baseline, injecting MCAR missingness into the TRAIN split only so every variant scores the same clean holdout rows, and writes the typed ImpactTable delta JSON to the config path (selection/imputation.py:1-20, :176-226)'
+  - 'the study refuses an absent dataset/experiment/features/etl config, an absent imputation_study block, an injection column outside the model surface, a metric compute_metrics does not produce, and a variant that leaves no rows to fit/score (selection/imputation.py:157-174, :275-329)'
   touched_by:
   - dataclasses(field)
   - typing(Any)
   - pandas
-  - broadway.config.schema(EncodingConfig, FeatureConfig)
-  - broadway.features.builders(build_derived, load_custom_builders)
-  - broadway.features.transformers(TargetEncoding, FrequencyEncoding)
+  - scikit-learn
+  - pydantic
+  - 'broadway.config.schema(EncodingConfig, FeatureConfig, ImputationStrategy, ImputationStudyConfig)'
+  - 'broadway.features.builders(build_derived, load_custom_builders)'
+  - 'broadway.features.transformers(TargetEncoding, FrequencyEncoding, FeatureImputer, FeatureScaler, Winsorizer, TargetDifference, TargetBoxCox, TargetTransformChain, PreprocessingFactory)'
+  - 'broadway.features.recipe(build_pipeline, build_target_transforms)'
+  - 'broadway.training.models.registry(get_model)'
   validated_by:
   - tests/test_transformers.py::test_pipeline_reexpression_output_identical
   - tests/test_boundary_contracts.py::test_split_to_features_boundary_rejects_dtype_mutation
   - tests/test_engineered_order_parity.py::test_specs_order_matches_producer_write_order
+  - tests/test_imputation.py::test_imputer_fits_on_train_and_fills_val_including_unseen_categories
+  - tests/test_imputation.py::test_scaler_uses_train_statistics_only
+  - tests/test_imputation.py::test_difference_round_trips_through_the_recipe
+  - tests/test_imputation.py::test_boxcox_round_trips_through_the_recipe
+  - tests/test_imputation.py::test_impact_table_orders_complete_case_first_then_best_delta
+  - tests/test_imputation_study.py::test_study_measures_every_variant_against_complete_case
+  - tests/test_imputation_study.py::test_study_run_requires_the_persisted_feature_splits
+  - tests/test_imputation_study.py::test_study_rejects_injection_columns_outside_the_model_surface
+  - tests/test_imputation_study.py::test_study_fails_loud_when_complete_case_leaves_no_rows
+  - tests/test_imputation_study.py::test_study_rejects_a_metric_compute_metrics_does_not_produce
+  - tests/test_imputation_study.py::test_study_constructor_requires_its_config_sections
+  - tests/test_imputation_study.py::test_impact_table_requires_rows_and_a_baseline_row
   if_changed:
   - ARTIFACT-PIPELINE-PICKLE schema
   - GATE-FEAT-24 ordering
   - training read path (src/broadway/training/module.py:95-103)
   - tests/test_transformers.py golden values
+  - 'configs/step/features.yaml imputation_study block + experiment.preprocessing/target_transforms vocabulary'
+  - 'GATE-TRAIN-34 composition (recipe.build_pipeline feeds build_model_pipeline)'
+  - 'artifacts/features/imputation_impact.json consumers (report only)'
   findings:
-  - TargetEncoding.fit y-is-None raise (src/broadway/features/transformers.py:52-55) is an UNPINNED raise site — no test node id exercises it (grep tests/ for 'requires y' → 0 hits).
+  - TargetEncoding.fit y-is-None raise (src/broadway/features/transformers.py:75-79) is an UNPINNED raise site — no test node id exercises it (grep tests/ for 'requires y' → 0 hits).
 - id: GATE-FEAT-24
   phase: features
   order: 26
@@ -1212,13 +1241,15 @@ gates:
 - id: GATE-TRAIN-34
   phase: training-eval
   order: 36
-  owner: src/broadway/training/trainer.py:17 build_model_pipeline()
+  owner: src/broadway/training/trainer.py:17 build_model_pipeline() + src/broadway/training/models/lightgbm.py:25 QuantileLGBMRegressor + src/broadway/training/models/registry.py:22 lgbm_quantile
   inputs:
   - PipelineConfig with experiment block
   - model_type registry key
   - params dict (bare + pre__ prefixed)
+  - 'model params incl. alpha (interval miscoverage) for the lgbm_quantile key'
   outputs:
   - fitted sklearn Pipeline + TrainingResult{train_time_seconds} (via train() :52-69)
+  - 'QuantileLGBMRegressor artifact exposing predict + predict_interval (persisted candidate read by evaluate.interval_source=quantile)'
   transforms:
   - experiment-required guard → ValueError (:31-32; twin in train() :59-60)
   - 'param partition: bare params vs pre__<step>__<param> applied post-composition via set_params (:33-35, :44-48)'
@@ -1226,9 +1257,13 @@ gates:
   - single composition shared by trainer AND HPO objective so preprocessing cannot drift between fit and search (docstring :26-28; consumed hpo.py:54)
   - unknown registry key → get_model ValueError listing valid keys (registry.py:73-74)
   - 'train_time_seconds now comes from the GATE-INFRA-156 seam clock (timed() over perf_counter) instead of time.time(); phase("model_fit") is inert unless profiling is enabled (:60-73)'
+  - 'QUANTILE MODEL key (commit 2a6b541): the registry carries lgbm_quantile → create_quantile, a three-model bundle fitted at alpha/2, 0.5, 1-alpha (alpha=0.05 -> 2.5/50/97.5%); the registry OWNS objective/alpha so a caller param cannot silently override the key contract (models/registry.py:14-22, :53-60; lightgbm.py:9-14, :25-48)'
+  - 'QuantileLGBMRegressor.predict returns the median; predict_interval returns the ordered (lower, mid, upper) triple consumed by the quantile interval owner (GATE-INFRA-159); alpha must be in (0,1) and a call before fit fails loud (lightgbm.py:57-94)'
+  - 'the bundle is sklearn-shaped (get_params/set_params/fit/predict) so it enters the SAME train/HPO composition through get_model as every other registry key, and the pre__ param prefix still applies (registry.py:93-118)'
   touched_by:
   - pandas@2.3.3
   - scikit-learn@1.7.2
+  - 'broadway.training.models.lightgbm(create, create_quantile, QuantileLGBMRegressor)'
   validated_by:
   - tests/test_training_contracts.py::test_trainer_returns_training_result
   - tests/test_training_contracts.py::test_build_model_pipeline_applies_pre_params
@@ -1236,11 +1271,16 @@ gates:
   - tests/test_registry.py::test_get_model_unknown_key_raises
   - tests/test_hpo.py::test_pre_params_reach_pipeline_params
   - tests/test_hpo.py::test_hpo_trial_refits_preprocessing_each_trial
+  - tests/test_quantile.py::test_quantile_lgbm_regressor_orders_its_three_quantiles
+  - tests/test_quantile.py::test_quantile_lgbm_regressor_requires_a_valid_level_and_a_fit
   if_changed:
   - the exact fitted artifact logged by GATE-TRAIN-39 log_model
   - CV model re-composition in evaluate (evaluate/module.py:135-139 reuses this builder)
   - signature inference at module.py:138-144
   - GATE-INFRA-156 profiling seam
+  - 'registry model_type vocabulary + allowed_params (models/registry.py)'
+  - 'evaluate.interval_source=quantile candidate contract (GATE-INFRA-170 / GATE-INFRA-159)'
+  - 'ARTIFACT-MLFLOW-RUN pyfunc loading of the bundle (non-standalone sklearn estimator)'
   findings:
   - both experiment-required raises (:31-32, :59-60) are unpinned — grep 'requires an experiment config' / 'model pipeline requires' in tests/ returns nothing (only the unrelated baseline 'requires an experiment binding' in test_structural_cleaning.py:434).
 - id: GATE-TRAIN-35
@@ -1745,7 +1785,7 @@ gates:
 - id: GATE-STATS-48
   phase: stats
   order: 53
-  owner: src/broadway/stats/robust.py:47 estimation_table() (regression/diagnostics/time_series/baseline cluster)
+  owner: src/broadway/stats/robust.py:47 estimation_table() (regression/diagnostics/time_series/baseline cluster) + src/broadway/stats/time_series.py:55 as_series + src/broadway/stats/decompose.py:51 decompose + src/broadway/stats/changepoint.py:53 cusum_changepoints + src/broadway/selection/information.py:45 compare_aic_bic
   inputs:
   - fitted statsmodels results object exposing get_robustcov_results
   - 'alpha default 0.05 (:34); siblings: outlier_mask(threshold) :17'
@@ -1753,16 +1793,23 @@ gates:
   - modified_zscore MAD-guard :12-13
   - fit_ols/formula + fit_robust(cov_type="HC3") (regression.py:11-16)
   - bp_test/jb_test/durbin_watson wrappers (diagnostics.py:20-31)
-  - durbin_watson_test/plot_acf(lags) (time_series.py:13-21)
+  - durbin_watson_test/plot_acf(lags) (time_series.py:166-182)
   - train_lgbm(**params)/evaluate(tail_quantile) (baseline.py:11-23)
+  - 'time-series numerics: one 1-D series (finite only) + lags/order/period/frac/threshold/min_size/penalty from config (configs/step/stats.yaml acf_lags/decompose_period/decompose_model/decompose_lowess_frac/changepoint_threshold/changepoint_min_size)'
+  - 'model selection: a name -> fitted result mapping where each result exposes .aic/.bic (the statsmodels convention)'
   outputs:
-  - TypeError "estimation_table requires a fitted statsmodels regression results object exposing get_robustcov_results…" (:48-53) — the ONLY raising guard in this cluster; coef/HC3_SE/CI_low/CI_high table derived by INTERNAL get_robustcov_results("HC3") re-fit (:54-56) so labels are truthful regardless of how the input was fitted (T-BUG-1 d056164, DECISIONS.md context :72); DiagnosticResult model (diagnostic_models.py:6-11); PNG artifacts via savefig (diagnostics.py:49, :84; time_series.py:21)
+  - TypeError "estimation_table requires a fitted statsmodels regression results object exposing get_robustcov_results…" (:48-53) — the ONLY raising guard in this cluster; coef/HC3_SE/CI_low/CI_high table derived by INTERNAL get_robustcov_results("HC3") re-fit (:54-56) so labels are truthful regardless of how the input was fitted (T-BUG-1 d056164, DECISIONS.md context :72); DiagnosticResult model (diagnostic_models.py:6-11); PNG artifacts via savefig (diagnostics.py:49, :84; time_series.py:182)
+  - 'typed series results: ADFResult (statistic/p_value/used_lag/n_obs/critical_values) and LjungBoxResult (statistic/p_value/lags) (time_series.py:35-53); DecomposeResult (trend/seasonal/resid + trend_strength/seasonal_strength) and TrendResult (decompose.py:30-49); ChangePointResult (0-based change_indices + n/min_size/threshold|penalty) (changepoint.py:41-51); InformationTable ranked by AIC with deltas + Akaike/BIC weights (selection/information.py:36-78)'
   transforms:
   - HC3 covariance re-derived inside the function (:54) — idempotent for already-HC3 fits (bitwise pin)
   - modified z-score returns all-zeros when MAD == 0 (robust.py:12-13)
   - winsorize clips at per-column quantile on a copy (:25-31)
   - diagnostics wrappers are pure float casts over statsmodels het_breuschpagan/jarque_bera/durbin_watson
   - matplotlib.use('Agg') runs at IMPORT time (diagnostics.py:7, describe.py:8) — process-global backend mutation as an import side effect of pure-library modules
+  - 'SERIES NUMERICS (commit c6ee69b): time_series.py is the single numeric owner — as_series rejects empty/2-D/non-finite input BEFORE any statistic, acf/pacf (Yule-Walker PACF) /cross_correlation (positive lag = y leads x) return exactly lags+1 values, ljung_box is computed from the FFT ACF rather than statsmodels acorr_ljungbox (that helper is O(n^2) on multi-million-row residual ledgers), adf wraps adfuller, difference/first_values/inverse_difference round-trip exactly, durbin_watson is the legacy-named canonical entry (time_series.py:55-182)'
+  - 'DECOMPOSITION (STL): decompose fits statsmodels STL at the config period for additive, or the same fit on log(series) raised back for multiplicative (STL has no multiplicative mode and classical seasonal_decompose leaves trend edge artefacts); strengths are 1 - var(resid)/var(resid+component) floored at 0, multiplicative refuses non-positive observations, and lowess_trend is the LOESS sibling (decompose.py:51-109)'
+  - 'CHANGE POINTS: cusum_changepoints is a documented library-first EXCEPTION (statsmodels ships no index-returning CUSUM) — a vectorized two-sided CUSUM whose threshold is in standard deviations with a half-sigma allowance; pelt_changepoints defers the ruptures import and fails loud with the install command (changepoint.py:1-20, :53-110)'
+  - 'MODEL SELECTION: compare_aic_bic ranks already-fitted candidates by AIC ascending, adds delta_aic/delta_bic and Akaike/BIC weights; it refuses an empty mapping or non-finite scores and decides nothing itself — candidates must share response and observations (selection/information.py:45-83)'
   touched_by:
   - statsmodels
   - matplotlib (Agg)
@@ -1770,7 +1817,11 @@ gates:
   - sklearn.metrics
   - numpy
   - pandas
+  - scipy.stats(chi2)
   - broadway.stats.diagnostic_models
+  - 'broadway.stats.time_series(as_series, acf, pacf, cross_correlation, ljung_box, adf, difference, first_values, inverse_difference, durbin_watson, plot_acf)'
+  - 'broadway.stats.decompose(decompose, lowess_trend)'
+  - 'broadway.stats.changepoint(cusum_changepoints, pelt_changepoints)'
   - broadway.viz.palette_colors — INDIRECT CONFIG READ (see FINDING)
   validated_by:
   - tests/test_stats_robust.py::test_estimation_table_returns_four_columns
@@ -1781,11 +1832,28 @@ gates:
   - tests/test_regression.py::test_fit_robust_returns_hc3_covariance
   - tests/test_regression.py::test_bp_jb_returns_six_keys
   - tests/test_diagnostics.py::test_mean_specification_diagnostic_returns_typed_result
+  - tests/test_time_series.py::test_acf_and_pacf_return_one_value_per_lag
+  - tests/test_time_series.py::test_cross_correlation_peaks_at_the_lead_lag
+  - tests/test_time_series.py::test_ljung_box_returns_pvalue_for_autocorrelated_series
+  - tests/test_time_series.py::test_adf_reports_used_lag_and_observations
+  - tests/test_time_series.py::test_difference_inverse_round_trip_is_exact
+  - tests/test_time_series.py::test_durbin_watson_near_two_for_white_noise
   - tests/test_time_series.py::test_plot_acf_saves_png
+  - tests/test_decompose.py::test_stl_decompose_returns_full_length_components_and_a_constant_residual
+  - tests/test_decompose.py::test_multiplicative_decompose_returns_ratio_components
+  - tests/test_decompose.py::test_lowess_trend_returns_one_smoothed_value_per_observation
+  - tests/test_changepoint.py::test_cusum_finds_a_synthetic_mean_shift
+  - tests/test_stats_branches.py::test_cusum_validates_its_parameters
+  - tests/test_stats_branches.py::test_pelt_fails_loud_with_the_install_hint_when_ruptures_is_absent
+  - tests/test_selection_information.py::test_compare_aic_bic_ranks_by_aic_with_deltas_and_weights
+  - tests/test_stats_branches.py::test_compare_aic_bic_single_candidate_holds_all_weight
   - tests/test_effect_size.py::test_cohens_d_empty_array_returns_zero
   if_changed:
   - TypeError message (match="get_robustcov_results")
   - '"HC3" cov_type literal'
+  - 'series-result field sets (ADFResult/LjungBoxResult/DecomposeResult/TrendResult/ChangePointResult/InformationTable) consumed by project/experiments/timeseries and evaluate residual diagnostics'
+  - 'configs/step/stats.yaml acf_lags/decompose_period/decompose_model/decompose_lowess_frac/changepoint_threshold/changepoint_min_size'
+  - 'GATE-FEAT-23 target-difference round trip (difference/first_values/inverse_difference)'
   - Agg backend setup
   - DiagnosticResult field set
   findings:
@@ -2380,32 +2448,59 @@ gates:
 - id: GATE-SURF-66
   phase: surfaces
   order: 73
-  owner: 'src/broadway/discover/module.py:74 _write_qq_overview() -> src/broadway/discover/qq.py:566 plot_numeric_qq()  # savefig sites qq.py:297/:356/:514/:562; called from module.py:78 (run() :105 and profile() :127)'
+  owner: 'src/broadway/discover/module.py:74 _write_qq_overview() -> src/broadway/discover/qq.py:566 plot_numeric_qq()  # savefig sites qq.py:297/:356/:514/:562; called from module.py:78 (run() :105 and profile() :127) + src/broadway/eda/module.py:27 EdaRunner + src/broadway/eda/report.py:39 EdaReportBuilder + src/broadway/eda/visualize.py:38 FigureRenderer'
   inputs:
   - raw CSV/parquet frame
   - configs/step/viz.yaml knobs (qq_figure :14, qq_log_figure :15, dist_figure :15, diagnostics.figure :31, dpi, chunk sizes, zones/markers toggles)
   - contract exclude_from_profiling list
+  - 'EDA: ETL split parquets <process_dir>/<etl.train_file> (+ optional val_file) — the step reads the persisted split, never re-runs etl (eda/module.py:98-121)'
+  - 'EDA: pre-split canonical parquet via canonical_path (optional; absent → the compare panel records a skip_reason) (eda/module.py:123-132)'
+  - 'EDA: configs/step/eda.yaml knobs (sample_size/plot_format/output_dir/output_file/max_categories/max_plots/iqr_multiplier/z_threshold/imbalance_min_share)'
+  - 'EDA: DatasetContract columns/roles/task/target + exclude_from_profiling; sampling seed = cfg.experiment.random_state else cfg.etl.random_state'
   outputs:
   - reports/figures/numeric_qq_{n}.png
   - reports/figures/numeric_dist_{n}.png
   - reports/figures/numeric_qq_log_{n}.png
   - reports/figures/numeric_diagnostics.png
   - artifacts/discover/qq_overview.json (figure-name registry consumed by reports/audit)
+  - 'EDA: artifacts/reports/eda.html — one self-contained HTML report (figures embedded as base64) written atomically via <name>.tmp then replace (eda/module.py:179-186)'
+  - 'EDA: EdaResult model (SummaryResult + MissingResult + QualityResult + CompareResult + EmbeddedFigure list) rendered by EdaReportBuilder (eda/models.py:182)'
   transforms:
   - compute skew/kurtosis/zero_rate/QQ points while plotting (evidence producer, by design)
   - chunk features per figure by NAME not position (qq.py:718-746)
   - zone/marker overlays behind viz.yaml enabled flags (config/viz.py:11-38); NOTE no toggle suppresses emitting a figure — FINDING F-SURF-5
+  - 'EDA step (commit 5d45f3e): EdaRunner orchestrates load → sample → analyze → figures → report under the profiling phases; an absent dataset/eda/etl config or a missing split file fails loud (eda/module.py:30-32, :134-138, :189-195)'
+  - 'the after-ETL frame combines the profiled train + val split samples (val absent → train-only with a recorded note); the pre-split canonical frame is profiled ONLY for the compare panel (eda/module.py:98-132)'
+  - 'analyzers: SummaryAnalyzer classifies numeric/categorical/temporal with quantiles/frequencies/temporal range (eda/summary.py:20-130); MissingnessAnalyzer reports per-column rates + top co-missing patterns capped at max_categories (eda/missing.py:16-76); QualityAnalyzer flags constant columns, duplicate rows, IQR/z outliers and classification imbalance against the declared thresholds (eda/quality.py:22-141); EtlComparator records the before/after row delta, per-column shifts and the skip reason (eda/compare.py:10-105)'
+  - 'FigureRenderer draws missingness/numeric/correlation/categorical/outlier panels under plot_format with max_plots/max_categories caps and embeds each as EmbeddedFigure (eda/visualize.py:38-207); EdaReportBuilder renders the single deterministic HTML report from the typed result — no recomputation inside the renderer (eda/report.py:39-329)'
+  - 'the step is dispatch-reachable: STEP_MODULES["eda"] → broadway.eda.module and the EdaStep schema own every knob (GATE-CFG-103 / config/schema.py:349), so no EDA threshold is a code literal'
   touched_by:
   - ds-pipeline discover
   - ds-pipeline profile
+  - ds-pipeline walkthrough (eda step)
+  - pandas
+  - matplotlib
+  - 'broadway.eda(SummaryAnalyzer, MissingnessAnalyzer, QualityAnalyzer, EtlComparator, FigureRenderer, EdaReportBuilder)'
+  - 'broadway.observability.profiling(phase, timed)'
   validated_by:
   - tests/test_qq.py::test_plot_numeric_qq_excludes_and_splits
   - tests/test_qq.py::test_plot_numeric_qq_log_figure_generated
   - tests/test_qq.py::test_plot_numeric_qq_discrete_feature
   - tests/test_viz.py::test_viz_config_loads_values
+  - tests/test_eda.py::test_summary_and_missingness_count_a_frame
+  - tests/test_eda.py::test_quality_flags_constants_outliers_and_imbalance
+  - tests/test_eda.py::test_etl_compare_records_skip_reason_and_row_delta
+  - tests/test_eda.py::test_eda_run_writes_self_contained_html_report
+  - tests/test_eda_paths.py::test_eda_profiles_the_train_split_when_val_and_canonical_are_absent
+  - tests/test_eda_paths.py::test_eda_report_renders_without_figures_and_with_an_etl_comparison
+  - tests/test_eda_paths.py::test_eda_fails_loud_when_the_train_split_is_missing
+  - tests/test_eda_paths.py::test_eda_requires_dataset_eda_and_etl_config
   if_changed:
   - rerun tests/test_qq.py + tests/test_viz.py
   - regenerate figures then rerun ds-pipeline audit so ../figures links match renamed files
+  - 'configs/step/eda.yaml knobs (read through EdaStep; dispatch through GATE-CFG-103)'
+  - 'artifacts/reports/eda.html consumers + the etl.train_file/val_file split names the step reads'
+  - 'the compare panel contract (available flag + skip_reason grammar) rendered by EdaReportBuilder'
   findings: []
 - id: GATE-SURF-67
   phase: surfaces
@@ -2455,35 +2550,62 @@ gates:
 - id: GATE-SURF-69
   phase: surfaces
   order: 76
-  owner: 'src/broadway/reports/__init__.py  # renderer-purity contract over the package (markdown.py, results.py, timeline.py, index.py, audit.py, registry.py) + src/broadway/tracking/bundle.py:44 TrackingBundle + src/broadway/tracking/report.py:17 run()'
+  owner: 'src/broadway/reports/__init__.py  # renderer-purity contract over the package (markdown.py, results.py, timeline.py, index.py, audit.py, registry.py) + src/broadway/reports/decision.py:55 DecisionRule + src/broadway/reports/step_output.py:23 StepOutput + src/broadway/tracking/bundle.py:44 TrackingBundle + src/broadway/tracking/report.py:17 run()'
   inputs:
   - persisted typed evidence JSON artifacts
   - persisted AnalysisStep/AnalysisDecision models
   - QqOverview/DatasetProfile/JoinAuditReport/LookupValueAuditReport/StructuralCleanResult models
   - 'tracking: artifacts/tracking/baseline_stats.json + optional profile/clean JSON'
+  - 'decision rule from project/config/experiments/<series>.yaml decisions.<step> (metric/direction/min_effect/null_quantile/min_sample_size/action/owner)'
+  - 'required Evidence bundle carried by the decision (baseline/segments/sensitivity/falsifier/provenance)'
   outputs:
   - (cross-cutting) all reports/**/*.md listed in GATE-SURF-60..64
   - 'tracking: reports/tracking/data_card.md (tracked) + artifacts/tracking/baseline_stats.json (ignored machine truth)'
+  - 'per-step output triple: <stem>.md report + <stem>.png figure + <stem>_decision.json Decision record (metric/interval/threshold/verdict + evidence) under the experiment results dir'
+  - 'evidence tables <stem>_<name>.csv rendered below the figure by the dashboard'
   transforms:
   - 'formatting only: humanize_float/humanize_pvalue (formatting.py) via shared helpers results.py:27-77'
   - display-status derivation
   - NO statistical recomputation permitted in a renderer — violations flagged as findings
+  - 'decision/output surface (commits 6039f62, 50dd0af): reports/decision.py owns the typed record + the verdict rule, reports/step_output.py is the ONE writer — the reports package carries this decision engine BESIDE the renderers, so the purity rule above binds the renderers only (decision.py computes a verdict, it never formats prose)'
+  - 'the verdict is COMPUTED, never typed: Decision.evaluate derives act|investigate|no_action|insufficient from the interval against the rule threshold — whole interval clears -> act, straddles -> investigate, inside -> no_action, n below min_sample_size -> insufficient with a collect-N-rows action (reports/decision.py:118-145)'
+  - 'SAMPLE-SIZE CALIBRATION (commit 3d57229): the effective threshold is max(min_effect, null_quantile of the no-effect permutation null) for direction=max (mirrored for min), so an absolute distance cannot travel unexamined from 1k to 8.5M rows; absent null_values only the declared min_effect applies (reports/decision.py:119-126)'
+  - 'Evidence is REQUIRED by construction (commit 50dd0af), not optional prose: baseline + at least one segment re-measurement + sensitivity + falsifier + provenance, frozen/extra=forbid; Decision additionally refuses an unordered interval or a value outside it (reports/decision.py:26-96)'
+  - 'StepOutput refuses to write without a saved figure (FileNotFoundError naming EXPERIMENT_OUTPUT.md), then writes <stem>.md and <stem>_decision.json beside it; tables are aggregate evidence only (reports/step_output.py:53-68, :121-133)'
   - 'tracking data card (commit 78590b4): TrackingBundle.publish_data_card pure-renders data_card.md from the persisted baseline_stats.json plus optional DatasetProfile/StructuralCleanResult — never re-runs etl/features/train and never reads parquet (tracking/bundle.py:112-136); ds-pipeline tracking only loads the train config and prints the written path (tracking/report.py:17-29)'
   - 'baseline truth is WRITTEN by the train step, never by the renderer: record_training_truth delegates to build_baseline_stats/write_baseline_stats (tracking/bundle.py:93-110)'
   - 'drift is a report INPUT, never a gate: compare_serve/compare_configured_serve fit the train baseline and return a DriftReport carrying no decision threshold; an absent serve frame skips the read (tracking/bundle.py:138-157)'
   touched_by:
   - 'every command that renders: walkthrough, report, audit, lineage'
   - tracking(build_baseline_stats, fit_baseline, check_drift, render_data_card)
+  - 'broadway.reports.decision(Decision, DecisionRule, Evidence, SegmentEvidence)'
+  - 'pydantic@2.11.7'
+  - numpy
+  - pandas
   validated_by:
   - tests/test_results.py::test_humanize_helpers_live_in_shared_module
   - tests/test_results.py::test_rendered_output_plain_text_no_glyphs_or_literals
   - tests/test_audit_render.py::test_join_counts_raises_on_divergent_row_counts
+  - tests/test_step_output.py::test_verdict_act_when_the_interval_clears_the_threshold
+  - tests/test_step_output.py::test_verdict_investigate_when_the_interval_straddles_the_threshold
+  - tests/test_step_output.py::test_verdict_no_action_when_the_interval_is_inside_the_rule
+  - tests/test_step_output.py::test_small_samples_get_an_insufficient_verdict
+  - tests/test_step_output.py::test_the_null_band_raises_the_threshold_at_small_n
+  - tests/test_step_output.py::test_output_writes_the_decision_record
+  - tests/test_step_output.py::test_output_without_a_figure_is_refused
+  - tests/test_step_output.py::test_evidence_bundle_cannot_be_empty
   - tests/test_tracking_baseline.py::test_tracking_bundle_writes_baseline_and_renders_card
   - tests/test_trust_drift.py::test_tracking_bundle_scores_train_vs_serve
+  - tests/test_tracking_report.py::test_tracking_report_renders_the_card_from_persisted_baseline
+  - tests/test_tracking_report.py::test_publish_data_card_without_a_baseline_fails_loud
   if_changed:
   - violations = FINDINGS F-SURF-1/1b/2 below; refusal condition if a second live writer ever lands on one artifact path
   - GATE-INFRA-178 tracking config block (machine_dir/reports_dir/baseline/data_card/drift)
   - 'data-card inputs (baseline/profile/clean JSON)'
+  - 'agents/contracts/EXPERIMENT_OUTPUT.md — the writer/verdict contract this row implements'
+  - 'scripts/check_experiment_outputs.py DECISION_ENFORCED + PIPELINE_DECISION_ENFORCED ratchet'
+  - 'project/config/experiments/<series>.yaml decisions.<step> rule values'
+  - 'reports/experiments_dashboard.py verdict badge consumer'
   findings: []
 - id: GATE-SURF-100
   phase: surfaces
@@ -2893,6 +3015,7 @@ gates:
   transforms:
   - 'dispatch-map custody — THE registry deciding which module each step name may load (STEP_MODULES dict literal at :50)'
   - 'PRECISE-SPLIT vs GATE-CFG-78 (packet F #12): CFG-78 keeps resolve_full_steps() merge/orchestration law (:155); 103 owns the dispatch map itself — distinct symbols, split is real'
+  - 'the EDA step joins the map as "eda": "broadway.eda.module" (loader.py:57) with EdaStep (config/schema.py:349) + configs/step/eda.yaml as its declaration SSOT and ("environment","dataset","etl") as its prerequisite tuple (loader.py:77) — no EDA knob is read from anywhere else'
   touched_by:
   - load_config→_build_config dispatch (loader.py:132-138)
   validated_by:
@@ -2900,6 +3023,7 @@ gates:
   if_changed:
   - STEP_MODULES membership
   - unknown-step error grammar consumed by GATE-CFG-78
+  - 'configs/step/eda.yaml consumer (EdaRunner knobs) + the eda prerequisite tuple'
   findings:
   - 'lands WITH the same-commit flip of the former UNOWNED-surface tripwire (was test_has_step_modules_stays_a_drift_proof_miss @ tests/test_gate_registry.py:689-695 pinning arbitration PROPOSE-GH1-01) — rewritten into an ownership assertion so CI stays green (packet F #12 mandatory correction b: teeth live TRACKED in this batch, no self-attestation).'
 - id: GATE-CFG-104
@@ -3394,11 +3518,15 @@ gates:
   - src/broadway project scripts via Vulture --min-confidence 95 (vulture)
   - tests/** (pytest -n 4 --dist worksteal, --cov-fail-under=95)
   - 'project/tests/** (project-tests: full tier only, -q --dist worksteal, NO coverage flags)'
+  - 'scripts/check_experiment_outputs.py + agents/contracts/EXPERIMENT_OUTPUT.md via the experiment-outputs gate (run_bg :246)'
   outputs:
-  - PASS/FAIL ruff|mypy|pyright-advisory|vulture|configs|shell-scripts|docker-paths|deps|consolidation|logging|pytest|project-tests banners + 40-line tails
+  - PASS/FAIL ruff|mypy|pyright-advisory|vulture|configs|shell-scripts|docker-paths|deps|consolidation|logging|experiment-outputs|pytest|project-tests banners + 40-line tails
   - cov floor breach ⇒ FAIL pytest
+  - 'experiment-outputs verdict: EXPERIMENT OUTPUTS OK (enforced-step count + advisory gap count) or OUTPUTS RED naming each violating step (scripts/check_experiment_outputs.py:174-197)'
   transforms:
   - ruff/mypy/pyright-advisory/Vulture/configs/shell-scripts/docker-paths/deps/consolidation/logging run in EVERY tier incl. fast/static
+  - 'experiment-outputs gate (commit 9b42d27): scripts/uv.sh run --extra dev python scripts/check_experiment_outputs.py joins the parallel static phase (:246-247) in EVERY tier incl. fast; the checker IS the ratchet — ENFORCED series must publish a question (module docstring) + a figure (savefig), DECISION_ENFORCED (series, step) pairs must build a StepOutput decision record, PIPELINE_STEPS are reported with PIPELINE_DECISION_ENFORCED as the grow-only enforcement set (:19-37, :121-130)'
+  - 'advisory vs teeth: a non-compliant step OUTSIDE ENFORCED prints a note and never fails the gate, while every ENFORCED violation returns 1 — the ratchet can only grow, never shrink (the docstring says Never remove)'
   - 'shell-scripts widened to BOTH glob dirs (:93) — sh -n + shellcheck over k8s/optuna/*.sh AND scripts/*.sh, command-identical to ci.yml ''Shell scripts'' step (gate-divergence law comment :91)'
   - 'Vulture is fail-closed at 95% confidence through the direct scripts/uv.sh invocation: a finding is printed and exits non-zero; no allowlist or wrapper exists'
   - 'factory/SSOT gates: deps (dependency registry + import boundary) and consolidation (cross-file duplicates, ADVISORY exit 0 until its baseline is clean) plus the logging handler-construction census join the parallel static phase (:234-240); each Python gate is invoked as python <script> through scripts/uv.sh --extra dev'
@@ -3408,14 +3536,19 @@ gates:
   - coverage floor value 95 owned here; docs must quote it identically
   - configs gate asserts non-empty glob then loads every experiment config
   - project-paths fails if a runtime surface or file restores retired root experiment/taxi config paths, or the project layout is incomplete
+  - 'the contract is a doc, the teeth are the checker: agents/contracts/EXPERIMENT_OUTPUT.md declares the question/compare/aggregates/determinism/one-figure/decision rules and the pipeline coverage matrix, while the Python ratchet never parses the markdown — the pin lives in tests/test_experiment_outputs.py'
   touched_by:
   - agents/ledger/DECISIONS.md D26 (senior adoption makes gate-list edits executable)
   - tests/test_governance_probes.py:287 probe_coverage_floor (floor-quote SSOT check)
+  - 'agents/contracts/EXPERIMENT_OUTPUT.md (the gate contract)'
   validated_by:
   - tests/test_governance_probes.py::test_probe_d_live_floor_quotes_match_gate_script
   - tests/test_governance_probes.py::test_probe_d_red_stale_floor_quote
   - tests/test_ci_control_plane.py::test_vulture_finding_makes_static_ci_red
   - tests/test_project_paths.py::test_path_checker_detects_a_retired_taxi_config
+  - tests/test_experiment_outputs.py::test_enforced_series_steps_publish_a_question_and_a_figure
+  - tests/test_experiment_outputs.py::test_audit_flags_a_step_without_a_figure
+  - tests/test_experiment_outputs.py::test_pipeline_audit_reports_missing_decisions
   if_changed:
   - src/
   - tests/
@@ -3430,6 +3563,9 @@ gates:
   - configs/experiment/
   - configs/dataset/test.yaml
   - scripts/
+  - scripts/check_experiment_outputs.py ENFORCED/DECISION_ENFORCED/PIPELINE_STEPS membership
+  - agents/contracts/EXPERIMENT_OUTPUT.md rules
+  - GATE-SURF-69 decision-record contract (writer + verdict rule)
   - tests/test_ci_control_plane.py
   findings:
   - mypy covers src/broadway ONLY; ruff covers just two project/ files — project/etl/process.py etc. lint/type-check in NO tier.
@@ -4140,23 +4276,43 @@ gates:
 - id: GATE-INFRA-159
   phase: infra-meta
   order: 143
-  owner: 'src/broadway/calibration/conformal.py:10 SplitConformal'
-  inputs: []
-  outputs: []
+  owner: 'src/broadway/calibration/conformal.py:10 SplitConformal + src/broadway/calibration/quantile.py:17 QuantileInterval + src/broadway/stats/forecast.py:93 SarimaxForecaster + src/broadway/stats/forecast.py:128 AutoArimaForecaster'
+  inputs:
+  - 'miscoverage level alpha + ARIMA/seasonal orders + trend for the forecast owners (stats/forecast.py:32-59)'
+  - 'the training-time conformal q, or the candidate model native quantile predictions (lower/mid/upper)'
+  outputs:
+  - 'ForecastResult (point + lower/upper at alpha) (stats/forecast.py:61-90)'
+  - '(lower, upper) interval pair consumed by the calibration evaluation'
   transforms:
   - 'quantile: sort absolute residuals ascending, rank = ceil((n+1)(1-alpha)) clamped to [1,n]; zero residuals → ValueError (:22-31)'
   - 'interval: symmetric (pred-q, pred+q) (:33-36)'
   - 'finite-sample split-conformal guarantee of at least 1-alpha coverage under exchangeability is declared in the class docstring (:10-20)'
+  - 'INTERVAL SOURCE grammar (commit 2a6b541): the calibration evaluation swaps the source without changing the (lower, upper) pair shape — SplitConformal yields the symmetric pair from the training-time q, QuantileInterval reads the model native lower/mid/upper predictions, and both feed the same coverage/mean_width evaluation (evaluate/module.py:157-195)'
+  - 'QuantileInterval REFUSES a crossed quantile (lower > mid or mid > upper) instead of sorting it away — a sort would report an interval the model never predicted — and rejects ragged/multi-dimensional/empty/non-finite predictions before returning (calibration/quantile.py:1-17, :18-49)'
+  - 'FORECAST interval owners: SarimaxForecaster fits statsmodels SARIMAX from explicit orders/seasonal orders/trend and returns ForecastResult(alpha, point, lower, upper) from get_forecast().conf_int(alpha) — the caller passes the miscoverage level, never a hardcoded one (stats/forecast.py:93-127); AutoArimaForecaster maps the statsforecast native lo/hi columns at the same level through an optional import that fails loud with the forecast-extra install hint (:128-163)'
+  - 'ForecastResult orders its own bounds: a crossed (lower > point or point > upper) or ragged triple raises instead of shipping an invalid interval (stats/forecast.py:61-90)'
   touched_by:
   - numpy@2.5.2
+  - 'statsmodels(SARIMAX)'
+  - 'broadway.stats.forecast(SarimaxForecaster, AutoArimaForecaster, ForecastResult)'
   validated_by:
   - tests/test_calibration.py::test_split_conformal_holdout_coverage_matches_nominal
   - tests/test_calibration.py::test_split_conformal_quantile_is_deterministic
   - tests/test_calibration.py::test_split_conformal_quantile_grows_as_alpha_decreases
+  - tests/test_quantile.py::test_quantile_interval_returns_the_ordered_pair_and_covers_nominal
+  - tests/test_quantile.py::test_quantile_interval_rejects_crossed_or_invalid_quantiles
+  - tests/test_forecast.py::test_sarimax_forecast_returns_an_ordered_conf_int
+  - tests/test_forecast.py::test_auto_arima_guard_names_the_install_hint
+  - tests/test_forecast.py::test_auto_arima_maps_the_native_interval
+  - tests/test_forecast.py::test_forecast_rejects_an_invalid_level_or_horizon
+  - tests/test_forecast.py::test_forecast_result_rejects_unordered_or_ragged_bounds
   if_changed:
   - GATE-TRAIN-30 calibration_fit
   - GATE-TRAIN-35 interval evaluation
   - tests/test_calibration.py quantile pins
+  - 'evaluate.interval_source={conformal,quantile} switch (GATE-INFRA-170)'
+  - 'GATE-TRAIN-34 lgbm_quantile alpha param (the quantile candidate level)'
+  - 'project/experiments/timeseries/04_forecast_models_intervals.csv coverage report'
   findings: []
 - id: GATE-INFRA-160
   phase: infra-meta
@@ -4366,13 +4522,16 @@ gates:
 - id: GATE-INFRA-170
   phase: infra-meta
   order: 154
-  owner: 'src/broadway/config/schema.py:296 EvaluateStep'
+  owner: 'src/broadway/config/schema.py:296 EvaluateStep + src/broadway/evaluate/module.py:135 _quantile_bounds()'
   inputs:
   - CFG-STEP-EVALUATE
   outputs: []
   transforms:
   - 'EvaluateStep gained optional coverage_tolerance and min_period_rows (:296-303); the evaluate consumer defaults min_period_rows to 1 when unset (evaluate/module.py:107)'
   - 'coverage_tolerance drives the calibrated flag and the tolerance-miss warning; a miss is reported as a warning, never promoted and never gated (GATE-TRAIN-35)'
+  - 'interval_source (commit 2a6b541) is a CLOSED vocabulary {conformal, quantile} defaulting to conformal; the pipeline validator refuses interval_source=quantile when experiment.model.params carries no alpha, so the candidate level can never be invented (:618, :670-680)'
+  - 'the evaluate consumer dispatches on the declaration: conformal reads the training-time q through SplitConformal, quantile reads the candidate own predict_interval and fails loud when the loaded pyfunc exposes predict only; both produce one CalibrationEvaluation (evaluate/module.py:135-195)'
+  - 'a quantile calibration is evaluated even when training fitted no conformal summary — the interval source, not the presence of a summary, decides whether calibration runs (:380)'
   touched_by:
   - pydantic@2.11.7
   validated_by:
@@ -4382,6 +4541,9 @@ gates:
   - GATE-TRAIN-35
   - configs/step/evaluate.yaml
   - GATE-CFG-76
+  - 'interval_source vocabulary + the model-params alpha precondition'
+  - 'GATE-INFRA-159 interval sources (conformal / quantile / forecast)'
+  - 'GATE-TRAIN-34 lgbm_quantile candidate (predict_interval)'
   findings: []
 - id: GATE-INFRA-171
   phase: infra-meta

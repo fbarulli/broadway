@@ -13,6 +13,8 @@
 - GATE-ETL-11
 ? (dict[str, np.ndarray] containing EVERY declared value in declared order, sorted absent list); a value with no matching rows OR all-NaN target maps to size-0 array (:28-31)
 : - GATE-STATS-42
+(lower, upper) interval pair consumed by the calibration evaluation:
+- GATE-INFRA-159
 --force flag:
 - GATE-TLINE-54
 ? '24-entry SHARED surface: src/ tests/ demo/ configs/dataset/test.yaml configs/experiment/{baseline,engineered,hyperopt}.yaml configs/analysis/{test,test_hypothesis,test_causal}.yaml configs/step/{causal,etl}.yaml configs/environment/ configs/flow/ k8s/ docker/ .github/workflows/ pyproject.toml Dockerfile docker-compose.yml .gitignore .dockerignore README.md scripts/'
@@ -195,6 +197,18 @@ DatasetContract.path (csv/parquet/xlsx via READERS dict keyed on suffix):
 - GATE-ETL-11
 DerivedFeature(name,func,source):
 - GATE-FEAT-20
+? 'EDA: DatasetContract columns/roles/task/target + exclude_from_profiling; sampling seed = cfg.experiment.random_state else cfg.etl.random_state'
+: - GATE-SURF-66
+? 'EDA: ETL split parquets <process_dir>/<etl.train_file> (+ optional val_file) — the step reads the persisted split, never re-runs etl (eda/module.py:98-121)'
+: - GATE-SURF-66
+? 'EDA: EdaResult model (SummaryResult + MissingResult + QualityResult + CompareResult + EmbeddedFigure list) rendered by EdaReportBuilder (eda/models.py:182)'
+: - GATE-SURF-66
+? 'EDA: artifacts/reports/eda.html — one self-contained HTML report (figures embedded as base64) written atomically via <name>.tmp then replace (eda/module.py:179-186)'
+: - GATE-SURF-66
+? 'EDA: configs/step/eda.yaml knobs (sample_size/plot_format/output_dir/output_file/max_categories/max_plots/iqr_multiplier/z_threshold/imbalance_min_share)'
+: - GATE-SURF-66
+? 'EDA: pre-split canonical parquet via canonical_path (optional; absent → the compare panel records a skip_reason) (eda/module.py:123-132)'
+: - GATE-SURF-66
 'FAIL parity (F1b): origin/sklearn unavailable | legacy pre-D16 checker on track ref':
 - GATE-INFRA-91
 'FILE law: build contexts resolve, volumes declared (:3/:16/:26)':
@@ -209,6 +223,8 @@ FileNotFoundError "sample dataset not found" (:127-129):
 - GATE-STATS-49
 'FileNotFoundError "sample dataset not found: …" (:37-38)':
 - GATE-STATS-41
+ForecastResult (point + lower/upper at alpha) (stats/forecast.py:61-90):
+- GATE-INFRA-159
 FrozenTrial states/values/user attrs from the optimize callbacks hook:
 - GATE-HPO-83
 GITHUB_REF_NAME else `git rev-parse --abbrev-ref HEAD` (:187):
@@ -250,7 +266,7 @@ PARITY_ALLOWLIST=() prefix skips (:168-177):
 - GATE-INFRA-95
 PARITY_MAIN_ANCHOR=18607091ddbb2602ad4475341ad377bafee5ec4b (:114):
 - GATE-INFRA-95
-? PASS/FAIL ruff|mypy|pyright-advisory|vulture|configs|shell-scripts|docker-paths|deps|consolidation|logging|pytest|project-tests banners + 40-line tails
+? PASS/FAIL ruff|mypy|pyright-advisory|vulture|configs|shell-scripts|docker-paths|deps|consolidation|logging|experiment-outputs|pytest|project-tests banners + 40-line tails
 : - GATE-INFRA-92
 PipelineConfig (cfg.dataset + cfg.etl + cfg.experiment):
 - GATE-ETL-10
@@ -280,6 +296,8 @@ PipelineConfig.experiment.preprocessing claims (utils.py:32):
 - GATE-FEAT-28
 QqOverview/DatasetProfile/JoinAuditReport/LookupValueAuditReport/StructuralCleanResult models:
 - GATE-SURF-69
+? QuantileLGBMRegressor artifact exposing predict + predict_interval (persisted candidate read by evaluate.interval_source=quantile)
+: - GATE-TRAIN-34
 'ROGUE MAIN WRITE: frozen main changed since anchor … (adds/deletes/mods)':
 - GATE-INFRA-95
 'ROGUE MAIN WRITE: novel blob(s) absent from track universe (head -10)':
@@ -310,7 +328,7 @@ ThresholdRow per candidate cutoff + the chosen cutoff persisted in the decision 
 - GATE-TRAIN-36
 TransformAudit (lineage/models.py:73) from etl/canonicalize accounting:
 - GATE-TLINE-58
-? TypeError "estimation_table requires a fitted statsmodels regression results object exposing get_robustcov_results…" (:48-53) — the ONLY raising guard in this cluster; coef/HC3_SE/CI_low/CI_high table derived by INTERNAL get_robustcov_results("HC3") re-fit (:54-56) so labels are truthful regardless of how the input was fitted (T-BUG-1 d056164, DECISIONS.md context :72); DiagnosticResult model (diagnostic_models.py:6-11); PNG artifacts via savefig (diagnostics.py:49, :84; time_series.py:21)
+? TypeError "estimation_table requires a fitted statsmodels regression results object exposing get_robustcov_results…" (:48-53) — the ONLY raising guard in this cluster; coef/HC3_SE/CI_low/CI_high table derived by INTERNAL get_robustcov_results("HC3") re-fit (:54-56) so labels are truthful regardless of how the input was fitted (T-BUG-1 d056164, DECISIONS.md context :72); DiagnosticResult model (diagnostic_models.py:6-11); PNG artifacts via savefig (diagnostics.py:49, :84; time_series.py:182)
 : - GATE-STATS-48
 ValueError "group column '<g>' not found in data" (:43-44):
 - GATE-STATS-41
@@ -394,6 +412,8 @@ artifacts/discover/qq_overview.json (QqOverview):
 - GATE-SURF-63
 artifacts/discover/qq_overview.json (figure-name registry consumed by reports/audit):
 - GATE-SURF-66
+? artifacts/features/imputation_impact.json — ImpactTable (one row per strategy x scaling with value, delta vs complete_case and rows kept/dropped per split) (selection/imputation.py:212-226)
+: - GATE-FEAT-23
 artifacts/lineage records + decisions (lineage/records.py LINEAGE_DIR):
 - GATE-SURF-64
 ? artifacts/lineage/records/<sanitized_node_id>.json LineageRecords; consumed only by graph.build_graph (graph.py:105-123) -> LineageGraph -> reports/lineage/graph.json + graph.md (lineage/module.py:27/:38) and mermaid rendering (mermaid.py:6); enforce_drop_fraction (records.py:43) raises before any record is written when unexplained row loss exceeds max_drop_fraction
@@ -490,6 +510,8 @@ configs/flow/<name>.yaml (FlowConfig steps list, schema.py:319-320):
 - GATE-CFG-78
 configs/flow/hypothesis_walkthrough.yaml (step ids/orders/questions/kind/action):
 - GATE-TLINE-57
+? configs/step/features.yaml imputation_study block (strategies/scalings/metric_direction/sample_size/knn_neighbors/missing_injection/output path)
+: - GATE-FEAT-23
 ? configs/step/viz.yaml knobs (qq_figure :14, qq_log_figure :15, dist_figure :15, diagnostics.figure :31, dpi, chunk sizes, zones/markers toggles)
 : - GATE-SURF-66
 ? configs/step/walkthrough.yaml (skew/kurtosis/shapiro/imbalance/significance thresholds, max_qq_groups, decisions.{omnibus,posthoc}.{methods,parents})
@@ -524,6 +546,8 @@ decide_module.record + timeline_module.save_decision (cli.py:174-189):
 - GATE-TLINE-59
 decided_at ISO stamp:
 - GATE-TLINE-51
+? decision rule from project/config/experiments/<series>.yaml decisions.<step> (metric/direction/min_effect/null_quantile/min_sample_size/action/owner)
+: - GATE-SURF-69
 decision.method from the resolved AnalysisDecision:
 - GATE-TLINE-55
 declared dtypes via _BUILDER_DTYPES (builders.py:62-73):
@@ -558,7 +582,7 @@ dropna'd:
 - GATE-ETL-17
 'durable-state workload custody (kind: StatefulSet :2)':
 - GATE-INFRA-133
-durbin_watson_test/plot_acf(lags) (time_series.py:13-21):
+durbin_watson_test/plot_acf(lags) (time_series.py:166-182):
 - GATE-STATS-48
 dv:
 - GATE-STATS-47
@@ -576,6 +600,8 @@ every run-name emission across optuna/battle/callback writers:
 - GATE-CUST-152
 every string scalar in the merged config dict:
 - GATE-CFG-71
+evidence tables <stem>_<name>.csv rendered below the figure by the dashboard:
+- GATE-SURF-69
 exit 0 green / 1 red / 2 usage:
 - GATE-INFRA-90
 ? 'experiment created/reopened ONLY within lawful namespaces: ratecode1_model_battle family ∪ dataset-name experiments; orphans refused loudly'
@@ -584,6 +610,10 @@ experiment script outputs written ad hoc under project/experiments/:
 - GATE-SURF-68
 experiment+etl config sections:
 - GATE-TRAIN-30
+? 'experiment-outputs verdict: EXPERIMENT OUTPUTS OK (enforced-step count + advisory gap count) or OUTPUTS RED naming each violating step (scripts/check_experiment_outputs.py:174-197)'
+: - GATE-INFRA-92
+experiment.preprocessing steps + experiment.target_transforms declarations (typed PreprocessingStepConfig):
+- GATE-FEAT-23
 experiment_name argument at setup time:
 - GATE-CUST-150
 ? explained row total subtracted from dropped_total → TransformAudit.rows_dropped_unexplained (process.py:183-187; module.py:115)
@@ -715,8 +745,14 @@ method:
 - GATE-TLINE-52
 method string from configs/step/walkthrough.yaml decisions.<kind>.methods:
 - GATE-TLINE-51
+miscoverage level alpha + ARIMA/seasonal orders + trend for the forecast owners (stats/forecast.py:32-59):
+- GATE-INFRA-159
 ? mlflow server command (:8 block) over built contexts ./docker/mlflow (:3) + ./docker/postgres (:16) with named volumes (:26)
 : - GATE-INFRA-128
+model params incl. alpha (interval miscoverage) for the lgbm_quantile key:
+- GATE-TRAIN-34
+'model selection: a name -> fitted result mapping where each result exposes .aic/.bic (the statsmodels convention)':
+- GATE-STATS-48
 model-input matrix X = declared surface ∩ frame − target:
 - GATE-FEAT-28
 model_type registry key:
@@ -749,6 +785,8 @@ omnibus.json (runners.py:324):
 : - GATE-TLINE-55
 'one WorkerPlan per worker: exact argv (carries the storage URL) + redacted display':
 - GATE-INFRA-172
+? one fitted transformer per declared preprocessing step inside the sklearn Pipeline (recipe.build_pipeline :39-53) + the fitted TargetTransformChain (recipe.build_target_transforms :55+)
+: - GATE-FEAT-23
 'one launcher-rendered worker argv: --config/--n-trials/--micro-batch/--worker/--seed/--objective/--storage':
 - GATE-INFRA-176
 one pa.Column per contract entry:
@@ -819,6 +857,8 @@ pd.Series:
 : - GATE-TLINE-54
 per-row holdout error ledger (errors.parquet) — decision report (thresholds.json) only when a decision block is declared:
 - GATE-TRAIN-35
+? 'per-step output triple: <stem>.md report + <stem>.png figure + <stem>_decision.json Decision record (metric/interval/threshold/verdict + evidence) under the experiment results dir'
+: - GATE-SURF-69
 per-sublane classification records owed per resolution:
 - GATE-INFRA-129
 persisted AnalysisDecision list:
@@ -832,6 +872,8 @@ persisted AnalysisStep/AnalysisDecision models:
 - GATE-SURF-69
 persisted steps/decisions:
 - GATE-TLINE-54
+persisted train/val feature splits (etl.train_features_file / val_features_file) for the impact study:
+- GATE-FEAT-23
 persisted typed evidence JSON artifacts:
 - GATE-SURF-69
 pingouin pairwise_gameshowell frame augmented with cohens_d / hedges_g / effect_size_note columns (:29-31):
@@ -992,6 +1034,8 @@ reports/timeline.py:16 render_timeline():
 - GATE-TLINE-50
 require_mode HYPOTHESIS (:124):
 - GATE-STATS-49
+required Evidence bundle carried by the decision (baseline/segments/sensitivity/falsifier/provenance):
+- GATE-SURF-69
 'result dict {''models'': {name: {best_params, best_value, n_trials}}, ''best_model'', ''best_params'', ''best_value''}':
 - GATE-HPO-84
 retention as INVOKED operations with logged outcomes (no accidental append-only):
@@ -1015,6 +1059,8 @@ scripts/check_dependencies.py + configs/dependencies.yaml via scripts/uv.sh (dep
 scripts/check_docker_paths.sh (docker-paths):
 - GATE-INFRA-92
 scripts/check_duplication.py + configs/duplication.yaml via scripts/uv.sh (consolidation):
+- GATE-INFRA-92
+scripts/check_experiment_outputs.py + agents/contracts/EXPERIMENT_OUTPUT.md via the experiment-outputs gate (run_bg :246):
 - GATE-INFRA-92
 selected series id via focus query parameter and selected artifact filename via artifact query parameter:
 - GATE-SURF-102
@@ -1100,9 +1146,13 @@ tests/** (pytest -n 4 --dist worksteal, --cov-fail-under=95):
 - GATE-INFRA-92
 the sample's own ColumnPlan instance (one op per source column + one derive op per declared derivation):
 - GATE-ETL-116
+the training-time conformal q, or the candidate model native quantile predictions (lower/mid/upper):
+- GATE-INFRA-159
 threshold flags:
 - GATE-TLINE-56
 - GATE-TLINE-57
+? 'time-series numerics: one 1-D series (finite only) + lags/order/period/frac/threshold/min_size/penalty from config (configs/step/stats.yaml acf_lags/decompose_period/decompose_model/decompose_lowess_frac/changepoint_threshold/changepoint_min_size)'
+: - GATE-STATS-48
 tracked *.py corpus via git ls-files (src/project/tests/scripts):
 - GATE-INFRA-147
 tracking --dataset/--environment (cli.py:59-61):
@@ -1137,6 +1187,8 @@ typed EnvironmentConfig instance embedded in PipelineConfig (loader.py:135):
 : - GATE-HPO-89
 typed float threshold or named parse error:
 - GATE-CFG-108
+? 'typed series results: ADFResult (statistic/p_value/used_lag/n_obs/critical_values) and LjungBoxResult (statistic/p_value/lags) (time_series.py:35-53); DecomposeResult (trend/seasonal/resid + trend_strength/seasonal_strength) and TrendResult (decompose.py:30-49); ChangePointResult (0-based change_indices + n/min_size/threshold|penalty) (changepoint.py:41-51); InformationTable ranked by AIC with deltas + Akaike/BIC weights (selection/information.py:36-78)'
+: - GATE-STATS-48
 uv editable-install discovery behavior:
 - GATE-INFRA-139
 uv sync --all-extras --frozen (:40):
