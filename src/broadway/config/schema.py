@@ -171,7 +171,6 @@ class StepType(StrEnum):
     by ``broadway.features.transformers``.
     """
 
-    TARGET_ENCODING = "target_encoding"
     FREQUENCY_ENCODING = "frequency_encoding"
     ONE_HOT = "one_hot"
     PASSTHROUGH = "passthrough"
@@ -465,7 +464,6 @@ class FeaturesStep(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    encoding_smoothing: int
     frequency_fill: float
     pipeline_file: str
     max_drop_fraction: float = Field(ge=0.0, le=1.0)

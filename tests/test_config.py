@@ -306,19 +306,19 @@ def test_experiment_preprocessing_steps_parse() -> None:
         data_source=DataSourceRef(loader="canonical", schema_contract="raw"),
         preprocessing=[
             {
-                "type": "target_encoding",
+                "type": "frequency_encoding",
                 "columns": ["rooms"],
-                "params": {"smoothing": 20},
+                "params": {"normalize": False},
             },
             {"type": "passthrough", "columns": ["area"]},
         ],
         **_experiment_kwargs(),
     )
     assert [step.type for step in config.preprocessing] == [
-        "target_encoding",
+        "frequency_encoding",
         "passthrough",
     ]
-    assert config.preprocessing[0].params == {"smoothing": 20}
+    assert config.preprocessing[0].params == {"normalize": False}
 
 
 def test_preprocessing_step_unknown_type_rejected() -> None:

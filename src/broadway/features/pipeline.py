@@ -16,7 +16,7 @@ import pandas as pd
 from broadway.config.schema import DerivedFeature
 from broadway.features.builders import build_derived, load_custom_builders
 from broadway.features.plan import ColumnOp, ColumnPlan
-from broadway.features.transformers import FrequencyEncoding, TargetEncoding
+from broadway.features.transformers import FrequencyEncoding
 
 
 def _derived_feature(op: ColumnOp) -> DerivedFeature:
@@ -27,36 +27,24 @@ def _derived_feature(op: ColumnOp) -> DerivedFeature:
 
 @dataclass
 class FeaturePipeline:
-    _encoders: list[tuple[str, str, TargetEncoding | FrequencyEncoding]] = field(
-        default_factory=list
-    )
+    _encoders: list[tuple[str, FrequencyEncoding]] = field(default_factory=list)
 
     def fit(self, df: pd.DataFrame, plan: ColumnPlan, target: str) -> FeaturePipeline:
         self._encoders = []
         for op in plan.columns:
             if op.op != "encode":
                 continue
-            if op.encoder == "target":
-                smoothing = op.params.get("smoothing")
-                if smoothing is None:
-                    raise ValueError(
-                        f"column plan: target encoding '{op.name}' requires a smoothing param"
-                    )
-                encoder = TargetEncoding(
-                    columns=list(op.sources),
-                    smoothing=float(smoothing),
-                    feature_name=op.name,
+            if op.encoder != "frequency":
+                raise ValueError(
+                    f"column plan: unknown encoder {op.encoder!r} for '{op.name}' "
+                    "(supported: frequency)"
                 )
-                self._encoders.append(
-                    (op.name, "target", encoder.fit(df, df[target]))
-                )
-            elif op.encoder == "frequency":
-                encoder = FrequencyEncoding(
-                    columns=list(op.sources),
-                    feature_name=op.name,
-                    normalize=bool(op.params.get("normalize", True)),
-                )
-                self._encoders.append((op.name, "frequency", encoder.fit(df)))
+            encoder = FrequencyEncoding(
+                columns=list(op.sources),
+                feature_name=op.name,
+                normalize=bool(op.params.get("normalize", True)),
+            )
+            self._encoders.append((op.name, encoder.fit(df)))
         return self
 
     def transform(
@@ -79,11 +67,8 @@ class FeaturePipeline:
                 **builder_kwargs,
             )
             result[op.name] = result[op.name].astype(op.dtype)
-        for name, _encoding_type, encoder in self._encoders:
-            if isinstance(encoder, FrequencyEncoding):
-                result = encoder.transform(result, fill=freq_fill)
-            else:
-                result = encoder.transform(result)
+        for name, encoder in self._encoders:
+            result = encoder.transform(result, fill=freq_fill)
             declared = next(column for column in plan.columns if column.name == name)
             if str(result[name].dtype) != declared.dtype:
                 result[name] = result[name].astype(declared.dtype)

@@ -166,6 +166,6 @@ fails validation.
 
 Search spaces may also tune preprocessing when the experiment declares a
 `preprocessing:` recipe: keys prefixed `pre__<step>__<param>` (e.g.
-`pre__target_encoding_0__smoothing`) are applied to the Pipeline, not the
+`pre__imputation_0__knn_neighbors`) are applied to the Pipeline, not the
 model. Registry validation (`allowed_params`) covers the model segment only;
 unknown `pre__` keys fail loud at trial time via `set_params`.

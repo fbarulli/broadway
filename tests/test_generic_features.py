@@ -102,16 +102,15 @@ def test_build_generic_feature_specs() -> None:
         encodings=[
             ColumnOp(
                 op="encode",
-                name="hood_target_enc",
+                name="hood_freq_enc",
                 dtype="float64",
                 sources=("hood",),
-                encoder="target",
-                params={"smoothing": 20},
+                encoder="frequency",
             )
         ],
     )
     specs = build_generic_feature_specs(contract, plan)
-    assert set(specs) == {"rooms", "ts_hour", "hood_target_enc"}
+    assert set(specs) == {"rooms", "ts_hour", "hood_freq_enc"}
     assert specs["ts_hour"].dtype == "int64"
 
 

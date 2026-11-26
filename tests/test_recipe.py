@@ -111,12 +111,12 @@ def test_empty_preprocessing_is_passthrough_identity() -> None:
 def test_yaml_to_pipeline_round_trip(lookup_dataset: DatasetContract) -> None:
     steps = yaml.safe_load(
         """
-        - type: target_encoding
+        - type: frequency_encoding
           columns: [pickup_location_id]
-          params: {smoothing: 20}
+          params: {normalize: false}
         - type: frequency_encoding
           columns: [dropoff_location_id]
-          params: {normalize: false}
+          params: {normalize: true}
         - type: passthrough
           columns: [fare]
         """
@@ -124,13 +124,13 @@ def test_yaml_to_pipeline_round_trip(lookup_dataset: DatasetContract) -> None:
     cfg = _recipe_cfg(steps, lookup_dataset, "joined")
     pipeline = build_pipeline(cfg)
     assert [name for name, _ in pipeline.steps] == [
-        "target_encoding_0",
+        "frequency_encoding_0",
         "frequency_encoding_1",
         "passthrough_2",
     ]
     params = pipeline.get_params()
-    assert params["target_encoding_0__smoothing"] == 20
-    assert params["frequency_encoding_1__normalize"] is False
+    assert params["frequency_encoding_0__normalize"] is False
+    assert params["frequency_encoding_1__normalize"] is True
 
 
 def test_one_hot_sole_step_builds(lookup_dataset: DatasetContract) -> None:
@@ -149,7 +149,7 @@ def test_invalid_step_param_fails_loud(lookup_dataset: DatasetContract) -> None:
     cfg = _recipe_cfg(
         [
             {
-                "type": "target_encoding",
+                "type": "frequency_encoding",
                 "columns": ["pickup_location_id"],
                 "params": {"bogus": 1},
             }
@@ -158,16 +158,6 @@ def test_invalid_step_param_fails_loud(lookup_dataset: DatasetContract) -> None:
         "joined",
     )
     with pytest.raises(ValueError, match="bogus"):
-        build_pipeline(cfg)
-
-
-def test_target_encoding_requires_smoothing(lookup_dataset: DatasetContract) -> None:
-    cfg = _recipe_cfg(
-        [{"type": "target_encoding", "columns": ["pickup_location_id"]}],
-        lookup_dataset,
-        "joined",
-    )
-    with pytest.raises(ValueError, match="requires param"):
         build_pipeline(cfg)
 
 

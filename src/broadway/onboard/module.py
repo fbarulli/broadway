@@ -120,7 +120,7 @@ def _scaffold_defaults() -> dict[str, Any]:
     """Onboard defaults from configs/onboard.yaml — no literals in code."""
     path = CONFIGS_DIR / "onboard.yaml"
     config = yaml.safe_load(path.read_text(encoding="utf-8"))
-    require_keys(config, ["default_random_state", "encoding_smoothing"], path.name)
+    require_keys(config, ["default_random_state"], path.name)
     return config
 
 
@@ -158,14 +158,7 @@ def _feature_choices(
     ]
     encodings: list[tuple[str, list[str], int | None]] = []
     if categorical_cols:
-        encodings = [
-            (
-                "target",
-                categorical_cols,
-                int(_scaffold_defaults()["encoding_smoothing"]),
-            ),
-            ("frequency", categorical_cols, None),
-        ]
+        encodings = [("frequency", categorical_cols, None)]
     return include, derived, encodings
 
 

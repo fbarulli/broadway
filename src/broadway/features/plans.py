@@ -31,7 +31,7 @@ def baseline(dataset: DatasetContract) -> ColumnPlan:
 
 
 def engineered(dataset: DatasetContract) -> ColumnPlan:
-    """Demo engineered: source copy plus a target encoding."""
+    """Demo engineered: source copy plus a frequency encoding."""
     return ColumnPlan.from_declaration(
         dataset,
         include=["feature_1", "feature_2"],
@@ -41,18 +41,18 @@ def engineered(dataset: DatasetContract) -> ColumnPlan:
             )
         ],
         encodings=[
-            _encoded("feature_3_target_enc", ("feature_3",), "target", smoothing=20)
+            _encoded("feature_3_freq_enc", ("feature_3",), "frequency")
         ],
     )
 
 
 def hyperopt(dataset: DatasetContract) -> ColumnPlan:
-    """Demo HPO surface: the placeholders plus a smooth target encoding."""
+    """Demo HPO surface: the placeholders plus a frequency encoding."""
     return ColumnPlan.from_declaration(
         dataset,
         include=["feature_1", "feature_2"],
         encodings=[
-            _encoded("feature_3_target_enc", ("feature_3",), "target", smoothing=20)
+            _encoded("feature_3_freq_enc", ("feature_3",), "frequency")
         ],
     )
 

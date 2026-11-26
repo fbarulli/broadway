@@ -135,7 +135,7 @@ def test_recipe_explicit_column_bypasses_assertion() -> None:
     cfg = _cfg(
         include=["feature_1", "feature_2", "feature_3"],
         preprocessing=[
-            {"type": "target_encoding", "columns": ["feature_3"], "params": {"smoothing": 20}}
+            {"type": "frequency_encoding", "columns": ["feature_3"], "params": {}}
         ],
     )
     eligible = eligible_feature_columns(df, cfg)

@@ -61,7 +61,6 @@ def taxi(dataset: DatasetContract) -> ColumnPlan:
         _derive("is_night", "is_night", datetime_column, "int8"),
         _derive("log_distance", "log_distance", "trip_distance", "float64"),
         _derive("same_borough", "same_group", "pickup_location_id", "int8"),
-        _encode("route_avg_duration", ROUTE_KEYS, "target", "float64", smoothing=20),
         _encode(
             "route_frequency",
             ROUTE_KEYS,

@@ -3,4 +3,3 @@
 # Consumed by broadway.onboard.module.build_experiment_config via require_keys;
 # no seed literal lives in code (determinism ledger item b).
 default_random_state: 42
-encoding_smoothing: 20

@@ -350,7 +350,7 @@ def test_hpo_trial_refits_preprocessing_each_trial(
     shared = {"fits": 0}
 
     class _CountingTransformer(BaseEstimator):
-        """Target-encoding stand-in: counts refits and maps categories to numbers."""
+        """Encoding stand-in: counts refits and maps categories to numbers."""
 
         def __init__(self, state: dict) -> None:
             self._state = state
@@ -366,7 +366,7 @@ def test_hpo_trial_refits_preprocessing_each_trial(
             return X.assign(cat=X["cat"].map(self.mapping_))
 
     def counting_build_step(step):
-        if step.type == "target_encoding":
+        if step.type == "frequency_encoding":
             return _CountingTransformer(shared)
         raise AssertionError(f"unexpected step type in leakage test: {step.type}")
 
@@ -374,7 +374,7 @@ def test_hpo_trial_refits_preprocessing_each_trial(
     cfg = _pipeline_config(
         [
             PreprocessingStepConfig(
-                type="target_encoding", columns=["cat"], params={"smoothing": 20}
+                type="frequency_encoding", columns=["cat"], params={}
             )
         ]
     )
@@ -412,13 +412,13 @@ def test_pre_params_reach_pipeline_params() -> None:
     cfg = _pipeline_config(
         [
             PreprocessingStepConfig(
-                type="target_encoding", columns=["cat"], params={"smoothing": 20}
+                type="imputation", columns=["num"], params={"strategy": "median"}
             )
         ]
     )
     pipeline = build_model_pipeline(
-        cfg, "lgbm", {"n_estimators": 10, "pre__target_encoding_0__smoothing": 35}
+        cfg, "lgbm", {"n_estimators": 10, "pre__imputation_0__knn_neighbors": 35}
     )
     params = pipeline.get_params()
-    assert params["pre__target_encoding_0__smoothing"] == 35
+    assert params["pre__imputation_0__knn_neighbors"] == 35
     assert params["model__n_estimators"] == 10

@@ -69,7 +69,6 @@ TIME_SPLIT_CUTOFF = _stats.time_split_cutoff
 ACF_LAGS = _stats.acf_lags
 
 FEATURE_LOOKUP_PATH = str((REPO_ROOT / _project.lookup_path).resolve())
-FEATURE_ENCODING_SMOOTHING = _features.encoding_smoothing
 FEATURE_FREQUENCY_FILL = _features.frequency_fill
 FEATURE_RUSH_HOUR_MORNING_START = _project.rush_hour_morning_start
 FEATURE_RUSH_HOUR_MORNING_END = _project.rush_hour_morning_end

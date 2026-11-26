@@ -25,7 +25,6 @@ def load_and_split() -> tuple[pd.DataFrame, pd.DataFrame, np.ndarray, np.ndarray
 
     pipeline = FeaturePipeline(
         lookup_path=data.FEATURE_LOOKUP_PATH,
-        encoding_smoothing=data.FEATURE_ENCODING_SMOOTHING,
         frequency_fill=data.FEATURE_FREQUENCY_FILL,
         rush_hour_morning_start=data.FEATURE_RUSH_HOUR_MORNING_START,
         rush_hour_morning_end=data.FEATURE_RUSH_HOUR_MORNING_END,

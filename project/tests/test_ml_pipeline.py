@@ -41,7 +41,6 @@ GOLDEN_COLUMNS = [
     "is_night",
     "log_distance",
     "same_borough",
-    "route_avg_duration",
     "route_frequency",
 ]
 
@@ -58,14 +57,11 @@ GOLDEN_DTYPES = {
     "is_night": "int8",
     "log_distance": "float64",
     "same_borough": "int8",
-    "route_avg_duration": "float64",
     "route_frequency": "int32",
 }
 
-# route (pickup, dropoff) = (1, 2) seen twice -> smoothed 42.27272727272727;
-# (1, 3) and (4, 4) seen once -> 44.285714285714285 / 45.714285714285715;
-# (8, 8) unseen at fit -> global mean 45.0 and frequency fill -1.
-GOLDEN_ROUTE_AVG_DURATION = [42.27272727272727, 45.0, 44.285714285714285, 45.714285714285715]
+# route (pickup, dropoff) = (1, 2) seen twice; (1, 3) and (4, 4) seen once;
+# (8, 8) unseen at fit -> frequency fill -1.
 GOLDEN_ROUTE_FREQUENCY = [2, -1, 1, 1]
 
 GOLDEN_ROWS = [
@@ -75,7 +71,7 @@ GOLDEN_ROWS = [
         "pickup_location_id": 1, "dropoff_location_id": 2,
         "is_weekend": 0, "rush_hour": 0, "is_night": 0,
         "log_distance": 0.6931471805599453, "same_borough": 0,
-        "route_avg_duration": 42.27272727272727, "route_frequency": 2,
+        "route_frequency": 2,
     },
     {
         "pickup_hour": 11, "pickup_day_of_week": 4, "pickup_month": 1,
@@ -83,7 +79,7 @@ GOLDEN_ROWS = [
         "pickup_location_id": 8, "dropoff_location_id": 8,
         "is_weekend": 0, "rush_hour": 0, "is_night": 0,
         "log_distance": 1.0986122886681096, "same_borough": 0,
-        "route_avg_duration": 45.0, "route_frequency": -1,
+        "route_frequency": -1,
     },
     {
         "pickup_hour": 12, "pickup_day_of_week": 4, "pickup_month": 1,
@@ -91,7 +87,7 @@ GOLDEN_ROWS = [
         "pickup_location_id": 1, "dropoff_location_id": 3,
         "is_weekend": 0, "rush_hour": 0, "is_night": 0,
         "log_distance": 0.9162907318741551, "same_borough": 0,
-        "route_avg_duration": 44.285714285714285, "route_frequency": 1,
+        "route_frequency": 1,
     },
     {
         "pickup_hour": 13, "pickup_day_of_week": 4, "pickup_month": 1,
@@ -99,7 +95,7 @@ GOLDEN_ROWS = [
         "pickup_location_id": 4, "dropoff_location_id": 4,
         "is_weekend": 0, "rush_hour": 0, "is_night": 0,
         "log_distance": 1.252762968495368, "same_borough": 1,
-        "route_avg_duration": 45.714285714285715, "route_frequency": 1,
+        "route_frequency": 1,
     },
 ]
 
@@ -152,7 +148,6 @@ def _write_zones(path) -> None:
 def _make_pipeline(lookup_path: str) -> FeaturePipeline:
     return FeaturePipeline(
         lookup_path=lookup_path,
-        encoding_smoothing=20,
         frequency_fill=-1.0,
         rush_hour_morning_start=7,
         rush_hour_morning_end=9,
@@ -202,7 +197,6 @@ def test_transform_matches_pre_change_golden(tmp_path) -> None:
 
     assert out.columns.tolist() == GOLDEN_COLUMNS
     assert {col: str(dtype) for col, dtype in out.dtypes.items()} == GOLDEN_DTYPES
-    assert _list_close(out["route_avg_duration"].tolist(), GOLDEN_ROUTE_AVG_DURATION)
     assert out["route_frequency"].tolist() == GOLDEN_ROUTE_FREQUENCY
     assert _records_match(out, GOLDEN_ROWS)
 
@@ -221,9 +215,9 @@ def test_row_count_guard_stays_armed(tmp_path) -> None:
     pipeline = _make_pipeline(str(zones_path)).fit(_train_frame())
     with (
         mock.patch.object(
-            pipeline._route_target_encoder,
+            pipeline._route_frequency_encoder,
             "transform",
-            side_effect=lambda df: df.iloc[:-1],
+            side_effect=lambda df, **kwargs: df.iloc[:-1],
         ),
         pytest.raises(RuntimeError, match="changed row count"),
     ):

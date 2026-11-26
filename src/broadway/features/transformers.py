@@ -2,11 +2,11 @@
 
 Two layers live here, both fit on the train split only:
 
-* **Estimators** (sklearn ``fit``/``transform``): the smoothed target and
-  frequency encoders, missing-value imputation (median/mean/mode/KNN), column
-  scaling (standard/minmax/robust, delegating the arithmetic to sklearn's
-  canonical scalers), winsorization, and the target transforms
-  (order-``k`` differencing and BoxCox) that carry an exact inverse.
+* **Estimators** (sklearn ``fit``/``transform``): the frequency encoder,
+  missing-value imputation (median/mean/mode/KNN), column scaling
+  (standard/minmax/robust, delegating the arithmetic to sklearn's canonical
+  scalers), winsorization, and the target transforms (order-``k``
+  differencing and BoxCox) that carry an exact inverse.
 * **The step vocabulary** (``STEP_PARAMS``) + ``PreprocessingFactory``: the one
   place a ``PreprocessingStepConfig`` is validated and turned into an
   estimator. ``broadway.features.recipe`` composes pipelines through it;
@@ -44,58 +44,6 @@ def _key_series(frame: pd.DataFrame, columns: list[str]) -> pd.Series:
     if len(columns) == 1:
         return frame[columns[0]]
     return pd.Series(list(zip(*[frame[col] for col in columns])), index=frame.index)
-
-
-class TargetEncoding(BaseEstimator, TransformerMixin):
-    """Smoothed target encoding keyed by one categorical column or a composite.
-
-    Fit computes ``(count * mean + smoothing * global_mean) / (count + smoothing)``
-    per key with ``global_mean = y.mean()`` — identical to the legacy
-    ``fit_target_encoding``. The target series arrives via the standard
-    estimator ``fit(X, y)`` argument (sklearn convention), never by reading a
-    target column out of ``X``. pandas ``groupby`` drops NaN keys at fit, so
-    NaN categories resolve to the global-mean fallback at transform (the legacy
-    ``__unknown__`` sentinel equivalent). The output column is named
-    ``feature_name`` when provided (verbatim), else ``<joined_cols>_target_enc``.
-    """
-
-    def __init__(
-        self,
-        columns: list[str],
-        smoothing: float,
-        feature_name: str | None = None,
-    ) -> None:
-        self.columns = list(columns)
-        self.smoothing = smoothing
-        self.feature_name = feature_name
-
-    def __sklearn_clone__(self) -> TargetEncoding:
-        return type(self)(**self.get_params(deep=False))
-
-    def fit(self, X: pd.DataFrame, y=None) -> TargetEncoding:
-        if y is None:
-            raise ValueError(
-                "TargetEncoding.fit requires y — the target series comes from the fit argument"
-            )
-        target = y if isinstance(y, pd.Series) else pd.Series(np.asarray(y), index=X.index)
-        stats = target.groupby(_key_series(X, self.columns)).agg(["mean", "count"])
-        encoded = (stats["count"] * stats["mean"] + self.smoothing * float(target.mean())) / (
-            stats["count"] + self.smoothing
-        )
-        self.mapping_ = encoded.to_dict()
-        self.global_mean_ = float(target.mean())
-        self.column_name_ = (
-            self.feature_name
-            if self.feature_name is not None
-            else f"{'_'.join(self.columns)}_target_enc"
-        )
-        return self
-
-    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
-        values = _key_series(X, self.columns).map(self.mapping_).fillna(self.global_mean_)
-        result = X.copy()
-        result[self.column_name_] = values
-        return result
 
 
 class FrequencyEncoding(BaseEstimator, TransformerMixin):
@@ -516,14 +464,6 @@ class StepParams(BaseModel):
         )
 
 
-class TargetEncodingParams(StepParams):
-    step_type: ClassVar[StepType] = StepType.TARGET_ENCODING
-    smoothing: float
-
-    def build_feature_step(self, columns: list[str]) -> object:
-        return TargetEncoding(columns=columns, smoothing=self.smoothing)
-
-
 class FrequencyEncodingParams(StepParams):
     step_type: ClassVar[StepType] = StepType.FREQUENCY_ENCODING
     normalize: bool = True
@@ -603,7 +543,6 @@ class BoxCoxParams(StepParams):
 # type -> typed params model. The recipe builds through this; no caller keeps
 # its own allowlist.
 STEP_PARAM_MODELS: tuple[type[StepParams], ...] = (
-    TargetEncodingParams,
     FrequencyEncodingParams,
     OneHotParams,
     PassthroughParams,

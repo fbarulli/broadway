@@ -4,7 +4,7 @@ import pandas as pd
 
 from broadway.features.generic import build_generic_feature_specs
 from broadway.features.schema import build_engineered_schema
-from broadway.features.transformers import FrequencyEncoding, TargetEncoding
+from broadway.features.transformers import FrequencyEncoding
 from project.basic import add_basic_features
 from project.boroughs import add_borough_features, load_zones
 from project.features import CONTRACT, PLAN, ROUTE_KEYS
@@ -16,7 +16,6 @@ class FeaturePipeline:
     def __init__(
         self,
         lookup_path: str,
-        encoding_smoothing: int,
         frequency_fill: float,
         rush_hour_morning_start: int,
         rush_hour_morning_end: int,
@@ -26,7 +25,6 @@ class FeaturePipeline:
         night_end: int,
     ) -> None:
         self.lookup_path = lookup_path
-        self.encoding_smoothing = encoding_smoothing
         self.frequency_fill = frequency_fill
         self.rush_hour_morning_start = rush_hour_morning_start
         self.rush_hour_morning_end = rush_hour_morning_end
@@ -35,7 +33,6 @@ class FeaturePipeline:
         self.night_start = night_start
         self.night_end = night_end
         self.zones: pd.DataFrame | None = None
-        self._route_target_encoder: TargetEncoding | None = None
         self._route_frequency_encoder: FrequencyEncoding | None = None
         self.fitted: bool = False
 
@@ -43,12 +40,6 @@ class FeaturePipeline:
         self.zones = load_zones(self.lookup_path)
 
         engineered = self._add_deterministic_features(train_df)
-
-        self._route_target_encoder = TargetEncoding(
-            columns=list(ROUTE_KEYS),
-            smoothing=self.encoding_smoothing,
-            feature_name="route_avg_duration",
-        ).fit(engineered, engineered[PLAN.target])
 
         self._route_frequency_encoder = FrequencyEncoding(
             columns=list(ROUTE_KEYS),
@@ -61,14 +52,21 @@ class FeaturePipeline:
         return self
 
     def _apply_encodings(self, df: pd.DataFrame) -> pd.DataFrame:
-        target_encoder = self._route_target_encoder
         frequency_encoder = self._route_frequency_encoder
-        if target_encoder is None or frequency_encoder is None:
+        if frequency_encoder is None:
             raise RuntimeError("FeaturePipeline must be fit() before transform().")
-        df = target_encoder.transform(df)
-        df = frequency_encoder.transform(df, fill=self.frequency_fill)
-        df["route_frequency"] = df["route_frequency"].astype("int32")
-        return df
+        encoded = frequency_encoder.transform(df, fill=self.frequency_fill)
+        if len(encoded) != len(df):
+            raise RuntimeError(
+                "FeaturePipeline.transform() changed row count from "
+                f"{len(df)} to {len(encoded)}. This usually means a "
+                "merge inside the pipeline matched a key more than once "
+                "(duplicate rows in zones or lookup tables). "
+                "Row-to-row alignment with the input dataframe can no "
+                "longer be trusted."
+            )
+        encoded["route_frequency"] = encoded["route_frequency"].astype("int32")
+        return encoded
 
     def transform(self, df: pd.DataFrame) -> pd.DataFrame:
         if not self.fitted:
