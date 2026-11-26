@@ -331,6 +331,23 @@ def _render_artifact_preview(path: Path, focus: str) -> str:
     return f'<p>No inline preview for {html.escape(mime or suffix or "this file type")}.</p>'
 
 
+def _render_code(stem: str, focus: str) -> str:
+    """Render the step's source with line numbers (the code the step runs)."""
+    script = _script_for(stem, focus)
+    if script is None:
+        return "<p>No script for this step.</p>"
+    try:
+        lines = script.read_text(encoding="utf-8").splitlines()
+    except (OSError, UnicodeDecodeError):
+        return "<p>Could not read this step's source.</p>"
+    numbered = "\n".join(f"{number:4d}  {line}" for number, line in enumerate(lines, 1))
+    return (
+        f'<details class="code-block" open><summary>{html.escape(script.name)}'
+        f" ({len(lines)} lines)</summary>"
+        f'<pre class="text-preview">{html.escape(numbered)}</pre></details>'
+    )
+
+
 def _render_artifacts(stem: str, focus: str, selected: str = "") -> str:
     """Render a selectable, notebook-like result artifact viewer."""
     files = _result_files(stem, focus)
@@ -666,6 +683,8 @@ def _render_experiment_page(
 {strip}
 {nav}
 {_graph_html(stem, profiles, focus)}
+<h2>code</h2>
+{_render_code(stem, focus)}
 <h2>artifacts</h2>
 {_render_artifacts(stem, focus, artifact)}
 <h2>observations</h2>

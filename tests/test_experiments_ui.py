@@ -294,3 +294,14 @@ def test_canvas_page_and_save_validate(monkeypatch, tmp_path) -> None:
     stored = _json.loads((tmp_path / "blast_radius.tldr").read_text(encoding="utf-8"))
     assert stored["records"] == {"b:2": {"id": "b:2"}}
     assert stored["schema"] == {"schemaVersion": 2}
+
+
+def test_experiment_page_renders_the_step_source(monkeypatch, tmp_path) -> None:
+    """The step page shows the code the step runs, above its artifacts."""
+    _seed_dashboard(monkeypatch, tmp_path)
+    body = ui.experiment_page("01_ingest", "alpha").body.decode("utf-8")
+
+    assert "<h2>code</h2>" in body
+    assert "<details class=\"code-block\" open>" in body
+    assert "01_ingest.py" in body
+    assert "Load the source data." in body
