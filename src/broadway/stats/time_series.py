@@ -14,8 +14,8 @@ from collections.abc import Sequence
 import matplotlib.pyplot as plt
 import numpy as np
 from pydantic import BaseModel, ConfigDict
+from scipy.stats import chi2
 from statsmodels.graphics.tsaplots import plot_acf as _plot_acf
-from statsmodels.stats.diagnostic import acorr_ljungbox
 from statsmodels.stats.stattools import durbin_watson as _durbin_watson
 from statsmodels.tsa.stattools import acf as _acf
 from statsmodels.tsa.stattools import adfuller as _adfuller
@@ -93,13 +93,26 @@ def cross_correlation(x: ArrayLike, y: ArrayLike, lags: int) -> np.ndarray:
 
 
 def ljung_box(series: ArrayLike, lags: int) -> LjungBoxResult:
-    """Ljung-Box statistic and p-value at one lag cut-off."""
+    """Ljung-Box statistic and p-value at one lag cut-off.
+
+    Computed from this module's FFT autocorrelation rather than
+    ``statsmodels.stats.diagnostic.acorr_ljungbox``: that helper calls
+    ``acf(..., fft=False)``, whose direct correlation is O(n^2) and minutes
+    slow on the multi-million-row residual ledgers the evaluate step reads.
+    The statistic is the same Ljung-Box form
+    ``n (n + 2) sum(r_k^2 / (n - k))`` with a chi-square tail.
+    """
     values = as_series(series)
     _require_lags(lags, values.size)
-    frame = acorr_ljungbox(values, lags=[lags], return_df=True)
+    autocorrelation = acf(values, lags)
+    n = values.size
+    lag_index = np.arange(1, lags + 1)
+    statistic = float(
+        n * (n + 2) * np.sum(autocorrelation[1:] ** 2 / (n - lag_index))
+    )
     return LjungBoxResult(
-        statistic=float(frame["lb_stat"].iloc[-1]),
-        p_value=float(frame["lb_pvalue"].iloc[-1]),
+        statistic=statistic,
+        p_value=float(chi2.sf(statistic, lags)),
         lags=lags,
     )
 

@@ -33,6 +33,7 @@ from broadway.evaluate.contracts import (
 )
 from broadway.features.plan import resolve_plan
 from broadway.lineage import records
+from broadway.reports.decision import DecisionRule
 from broadway.training import module as training_module
 
 
@@ -259,3 +260,32 @@ def test_evaluate_quantile_source_requires_a_quantile_candidate(
 
     with pytest.raises(ValueError, match="predict_interval"):
         evaluate_module.run(cfg)
+
+
+def test_evaluate_publishes_time_series_cv_and_decision(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    cfg = _make_config(tmp_path)
+    assert cfg.train is not None and cfg.evaluate is not None
+    cfg.train.cv_kind = "expanding"
+    cfg.train.cv_gap = 1
+    cfg.train.cv_folds = 2
+    cfg.evaluate.cv_decision = DecisionRule(
+        metric="rmse",
+        direction="max",
+        min_effect=0.01,
+        min_sample_size=5,
+        action="ship the candidate",
+        owner="test-owner",
+    )
+    _run(cfg, monkeypatch)
+
+    evaluation = EvaluationResult.model_validate_json(
+        (Path(cfg.evaluate.output_dir) / cfg.evaluate.output_file).read_text(encoding="utf-8")
+    )
+    assert evaluation.cv_detail is not None
+    assert evaluation.cv_detail.kind == "expanding"
+    assert evaluation.cv_detail.time_indexed is False
+    assert evaluation.cv_metrics == evaluation.cv_detail.metrics
+    assert evaluation.cv_decision is not None
+    assert evaluation.cv_decision.owner == "test-owner"

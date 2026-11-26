@@ -323,6 +323,7 @@ all = [
     { name = "mypy" },
     { name = "prophet" },
     { name = "psycopg", extra = ["binary"] },
+    { name = "pyod" },
     { name = "pyspark" },
     { name = "pytest-cov" },
     { name = "ruff" },
@@ -333,6 +334,9 @@ all = [
     { name = "torch" },
     { name = "tsfresh" },
     { name = "vulture" },
+]
+anomaly = [
+    { name = "pyod" },
 ]
 db = [
     { name = "psycopg", extra = ["binary"] },
@@ -368,7 +372,7 @@ spark = [
 
 [package.metadata]
 requires-dist = [
-    { name = "broadway", extras = ["spark", "db", "k8s", "dev", "forecast", "feature-engineering"], marker = "extra == 'all'" },
+    { name = "broadway", extras = ["spark", "db", "k8s", "dev", "forecast", "feature-engineering", "anomaly"], marker = "extra == 'all'" },
     { name = "darts", marker = "extra == 'feature-engineering'", specifier = ">=0.48" },
     { name = "fastapi", specifier = ">=0.141.1" },
     { name = "feature-engine", marker = "extra == 'feature-engineering'", specifier = ">=1.9" },
@@ -395,6 +399,7 @@ requires-dist = [
     { name = "psycopg2-binary", specifier = ">=2.9" },
     { name = "pyarrow", specifier = ">=19" },
     { name = "pydantic", specifier = ">=2.11.0" },
+    { name = "pyod", marker = "extra == 'anomaly'", specifier = ">=3.6.9" },
     { name = "pyspark", marker = "extra == 'spark'", specifier = ">=4.0.0" },
     { name = "pytest", specifier = ">=8.4.0" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=6.0.0" },
@@ -420,7 +425,7 @@ requires-dist = [
     { name = "vulture", marker = "extra == 'dev'", specifier = ">=2.16" },
     { name = "xgboost", specifier = ">=3.4.0" },
 ]
-provides-extras = ["dev", "spark", "db", "k8s", "forecast", "feature-engineering", "all"]
+provides-extras = ["dev", "spark", "db", "k8s", "forecast", "feature-engineering", "anomaly", "all"]
 
 [[package]]
 name = "cachetools"

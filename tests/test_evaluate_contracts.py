@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 import pytest
 from pandera.errors import SchemaError
+from pydantic import ValidationError
 from sklearn.linear_model import LinearRegression
 
 from broadway.analysis.contracts import AnalysisContract, AnalysisMode
@@ -62,7 +63,11 @@ def test_evaluation_result_json_round_trip() -> None:
         "promote": True,
         "reason": "improvement over champion",
         "cv_metrics": {"mae": 0.6, "rmse": 0.9, "r2": 0.88},
+        "cv_detail": None,
+        "cv_decision": None,
         "residuals": {"mean_residual": 0.1, "std_residual": 0.2, "max_abs_residual": 0.5},
+        "residual_diagnostics": None,
+        "metric_intervals": None,
         "comparison": {
             "metrics": {
                 "mae": {
@@ -87,13 +92,21 @@ def test_evaluation_result_optional_fields_default_to_none() -> None:
         reason="no champion",
     )
     assert result.cv_metrics is None
+    assert result.cv_detail is None
+    assert result.cv_decision is None
     assert result.residuals is None
+    assert result.residual_diagnostics is None
+    assert result.metric_intervals is None
     assert result.comparison is None
     assert result.baseline is None
     assert result.warnings == []
     loaded = EvaluationResult.model_validate_json(result.model_dump_json())
     assert loaded.cv_metrics is None
+    assert loaded.cv_detail is None
+    assert loaded.cv_decision is None
     assert loaded.residuals is None
+    assert loaded.residual_diagnostics is None
+    assert loaded.metric_intervals is None
     assert loaded.comparison is None
     assert loaded.warnings == []
 
@@ -157,15 +170,53 @@ def test_cross_validate_returns_finite_metrics() -> None:
     assert all(np.isfinite(value) for value in metrics.values())
 
 
-def test_residual_summary() -> None:
-    y_true = np.zeros(4)
-    y_pred = np.array([1.0, -1.0, 1.0, -1.0])
+def test_residual_summary_signed_mean_and_relative_bias() -> None:
+    y_true = np.full(4, 10.0)
+    y_pred = np.array([11.0, 9.0, 11.0, 11.0])
     summary = residual_summary(y_true, y_pred)
     assert summary == {
-        "mean_residual": pytest.approx(1.0),
-        "std_residual": pytest.approx(1.0),
+        "mean_residual": pytest.approx(0.5),
+        "mean_abs_residual": pytest.approx(1.0),
+        "signed_bias": pytest.approx(0.05),
+        "std_residual": pytest.approx(0.8660254037844386),
         "max_abs_residual": pytest.approx(1.0),
     }
+    with pytest.raises(ValueError, match="same shape"):
+        residual_summary(y_true, y_pred[:3])
+    with pytest.raises(ValueError, match="mean absolute truth level"):
+        residual_summary(np.zeros(4), y_pred)
+
+
+def test_time_split_refuses_shuffled_kfold_cv(tmp_path: Path) -> None:
+    payload = _make_config(tmp_path).model_dump()
+    payload["experiment"]["split"] = {"type": "time", "validation_size": 0.2}
+    payload["train"]["cv_kind"] = "kfold"
+    with pytest.raises(ValidationError, match="cannot use train.cv_kind='kfold'"):
+        PipelineConfig.model_validate(payload)
+    payload["train"]["cv_kind"] = "expanding"
+    payload["train"]["cv_gap"] = 2
+    cfg = PipelineConfig.model_validate(payload)
+    assert cfg.train is not None
+    assert cfg.train.cv_kind == "expanding"
+    assert cfg.train.cv_gap == 2
+
+
+def test_cv_decision_requires_time_aware_cv(tmp_path: Path) -> None:
+    payload = _make_config(tmp_path).model_dump()
+    payload["evaluate"]["cv_decision"] = {
+        "metric": "rmse",
+        "direction": "max",
+        "min_effect": 0.1,
+        "min_sample_size": 100,
+        "action": "ship",
+        "owner": "test",
+    }
+    with pytest.raises(ValidationError, match="cv_decision"):
+        PipelineConfig.model_validate(payload)
+    payload["train"]["cv_kind"] = "expanding"
+    payload["train"]["cv_gap"] = 1
+    cfg = PipelineConfig.model_validate(payload)
+    assert cfg.evaluate is not None and cfg.evaluate.cv_decision is not None
 
 
 def _make_config(tmp_path: Path) -> PipelineConfig:

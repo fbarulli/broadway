@@ -4,7 +4,19 @@
 random_state: 42
 n_jobs: -1
 cv_folds: 5
-cv_kind: kfold
+# Forward-chaining CV: the training window expands chronologically and each
+# validation block follows it. Shuffled KFold would train on rows after the
+# rows it scores (leakage on the time-ordered taxi data), so the config and
+# the PipelineConfig validator both refuse kfold for a time split.
+cv_kind: expanding
+# Rows dropped between a training prefix and its validation block.
+cv_gap: 1
+# Time-series CV geometry (this dataset is trip-level rows, so the multi-step
+# knobs stay at their 1-step / no-season defaults). For a regular series:
+#   cv_kind: rolling          # fixed-length window instead of expanding
+#   cv_train_size: 168        # rows (7 whole 24-step days)
+#   cv_seasonal_period: 24    # fold boundaries on whole cycles
+#   cv_horizon: 24            # multi-step origins; requires cv_gap >= 24
 model_file: model.pkl
 n_estimators: 500
 learning_rate: 0.05

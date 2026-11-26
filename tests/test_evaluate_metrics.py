@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from broadway.evaluate.metrics import confusion_at, tune_threshold
+from broadway.evaluate.metrics import compute_metrics, confusion_at, tune_threshold
 
 
 def test_confusion_at_counts_and_rates() -> None:
@@ -36,3 +36,19 @@ def test_tune_threshold_picks_configured_objective_optimum() -> None:
 
     chosen_precision, _ = tune_threshold(y_true, y_pred, thresholds, "precision")
     assert chosen_precision == pytest.approx(0.85)
+
+
+def test_mape_is_a_fraction_and_fails_loud_on_zero_truth() -> None:
+    metrics = compute_metrics(np.array([10.0, 20.0]), np.array([11.0, 18.0]))
+    assert metrics["mape"] == pytest.approx(0.1)  # 10% reported as a fraction
+    with pytest.raises(ValueError, match="zero"):
+        compute_metrics(np.array([0.0, 20.0]), np.array([1.0, 18.0]))
+
+
+def test_metric_subset_selects_only_requested_metrics() -> None:
+    truth = np.array([10.0, 20.0])
+    prediction = np.array([11.0, 18.0])
+    subset = compute_metrics(truth, prediction, metrics=("rmse", "mae"))
+    assert set(subset) == {"rmse", "mae"}
+    with pytest.raises(ValueError, match="unknown metric"):
+        compute_metrics(truth, prediction, metrics=("bogus",))

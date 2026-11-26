@@ -15,7 +15,15 @@ from pydantic import (
 
 from broadway.analysis.contracts import AnalysisContract, AnalysisMode
 from broadway.calibration.contracts import CalibrationConfig
-from broadway.evaluate.contracts import DecisionConfig, ErrorAnalysisConfig
+from broadway.evaluate.contracts import (
+    TIME_CV_KINDS,
+    BootstrapConfig,
+    CvKind,
+    DecisionConfig,
+    ErrorAnalysisConfig,
+    ResidualDiagnosticsConfig,
+)
+from broadway.reports.decision import DecisionRule
 from broadway.training.models.registry import allowed_params
 
 if TYPE_CHECKING:
@@ -580,7 +588,22 @@ class TrainStep(BaseModel):
     random_state: int
     n_jobs: int
     cv_folds: int
-    cv_kind: Literal["kfold", "time_series_split"]
+    # `expanding` is forward-chaining CV (train on the chronological prefix,
+    # validate the next block); `rolling` slides a fixed training window;
+    # `time_series_split` is the pre-existing expanding alias. `kfold` is the
+    # shuffled split and is refused for a time split below.
+    cv_kind: CvKind
+    # Rows dropped between a training prefix and its validation block (the
+    # purge gap); a forecast horizon h requires cv_gap >= h.
+    cv_gap: int = Field(default=0, ge=0)
+    # Rolling window length in rows; required for cv_kind='rolling'.
+    cv_train_size: int | None = Field(default=None, ge=1)
+    # Whole-cycle fold boundaries (24 hourly, 7 daily): test windows and the
+    # rolling window must be whole multiples of it.
+    cv_seasonal_period: int | None = Field(default=None, ge=2)
+    # Multi-step evaluation: rows are grouped into h-step forecast origins and
+    # scored per step, and the purge gap must cover the whole horizon.
+    cv_horizon: int = Field(default=1, ge=1)
     model_file: str
     n_estimators: int
     learning_rate: float
@@ -592,6 +615,32 @@ class TrainStep(BaseModel):
     output_file: str
     learning_curve: LearningCurveConfig | None = None
     tracking: TrackingConfig | None = None
+
+    @model_validator(mode="after")
+    def _validate_cv_geometry(self) -> TrainStep:
+        """Refuse a time-aware CV whose geometry would leak or split a cycle."""
+        if self.cv_kind in TIME_CV_KINDS:
+            if self.cv_gap < self.cv_horizon:
+                raise ValueError(
+                    f"cv_gap ({self.cv_gap}) must be >= cv_horizon "
+                    f"({self.cv_horizon}): every scored row needs the whole "
+                    "forecast horizon purged from its training prefix"
+                )
+            if self.cv_kind == "rolling" and self.cv_train_size is None:
+                raise ValueError(
+                    "cv_kind='rolling' requires cv_train_size (the fixed "
+                    "training-window length in rows)"
+                )
+        elif (
+            self.cv_train_size is not None
+            or self.cv_seasonal_period is not None
+            or self.cv_horizon != 1
+        ):
+            raise ValueError(
+                "cv_train_size/cv_seasonal_period/cv_horizon only apply to a "
+                "time-aware cv_kind (expanding/rolling/time_series_split)"
+            )
+        return self
 
 
 class EvaluateStep(BaseModel):
@@ -606,6 +655,15 @@ class EvaluateStep(BaseModel):
     # predictions (its `alpha` is the miscoverage level).
     interval_source: Literal["conformal", "quantile"] = "conformal"
     error_analysis: ErrorAnalysisConfig = Field(default_factory=ErrorAnalysisConfig)
+    # Residual diagnostics read the ledger above; the bootstrap sizes the
+    # holdout metric intervals. Both are declared once here and in the config.
+    residuals: ResidualDiagnosticsConfig = Field(
+        default_factory=ResidualDiagnosticsConfig
+    )
+    bootstrap: BootstrapConfig = Field(default_factory=BootstrapConfig)
+    # Time-series CV verdict rule: the candidate's paired improvement over the
+    # seasonal-naive/persistence baseline must clear this rule to ship.
+    cv_decision: DecisionRule | None = None
     decision: DecisionConfig | None = None
 
 
@@ -659,5 +717,39 @@ class PipelineConfig(BaseModel):
                 "evaluate.interval_source='quantile' requires "
                 "experiment.model.params.alpha (the interval miscoverage, "
                 "e.g. 0.05 for a 95% interval)"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_time_split_cv(self) -> PipelineConfig:
+        """A time split must never score shuffled KFold folds.
+
+        ``kfold`` shuffles rows, so its training fold contains rows after the
+        validation fold — future information on time-ordered data. The time
+        split therefore requires the expanding (forward-chaining) vocabulary.
+        """
+        if self.experiment is None or self.train is None:
+            return self
+        if self.experiment.split.type == "time" and self.train.cv_kind == "kfold":
+            raise ValueError(
+                "experiment.split.type='time' cannot use train.cv_kind='kfold': "
+                "shuffled folds train on future rows; use 'expanding' (or the "
+                "'time_series_split' alias) with an optional cv_gap"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_cv_decision_geometry(self) -> PipelineConfig:
+        """A CV verdict compares against a time-ordered naive baseline."""
+        if (
+            self.evaluate is not None
+            and self.evaluate.cv_decision is not None
+            and self.train is not None
+            and self.train.cv_kind == "kfold"
+        ):
+            raise ValueError(
+                "evaluate.cv_decision compares time-series CV with a "
+                "seasonal-naive/persistence baseline and requires a time-aware "
+                "train.cv_kind (expanding/rolling/time_series_split), not 'kfold'"
             )
         return self

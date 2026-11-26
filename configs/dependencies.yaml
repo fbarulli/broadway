@@ -336,3 +336,10 @@ dependencies:
     adapter: broadway.features.engineering
     license: Apache-2.0
     registered: 2026-11-25
+  - name: pyod
+    owner: platform
+    scope: optional
+    purpose: Unsupervised anomaly detectors (IForest/LOF/KNN/HBOS/ECOD/COPOD) behind the anomaly extra.
+    adapter: broadway.unsupervised.anomaly
+    license: BSD-2-Clause
+    registered: 2026-11-26

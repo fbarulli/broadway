@@ -9,12 +9,13 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import statsmodels.api as sm
+from scipy.stats import norm
 from statsmodels.stats.diagnostic import het_breuschpagan
 from statsmodels.stats.stattools import jarque_bera
 
 from broadway import viz
 from broadway.stats.diagnostic_models import DiagnosticResult
-from broadway.stats.time_series import durbin_watson
+from broadway.stats.time_series import as_series, durbin_watson
 
 __all__ = [
     "bp_test",
@@ -28,6 +29,7 @@ __all__ = [
     "plot_residuals_histogram",
     "plot_residuals_qq",
     "plot_residuals_vs_fitted",
+    "qq_correlation",
     "residual_distribution_diagnostic",
 ]
 
@@ -40,6 +42,26 @@ def bp_test(resid: np.ndarray, exog: np.ndarray) -> tuple[float, float]:
 def jb_test(resid: np.ndarray) -> tuple[float, float, float, float]:
     statistic, p_value, skew, kurtosis = jarque_bera(resid)
     return float(statistic), float(p_value), float(skew), float(kurtosis)
+
+
+def qq_correlation(resid: np.ndarray) -> float:
+    """Correlation of sorted residuals with standard-normal quantiles.
+
+    The numeric QQ read: a perfectly straight normal line scores 1.0, while
+    heavy tails or skew pull it down. Residuals are standardized by their own
+    mean and standard deviation before correlating with ``norm.ppf`` at the
+    plotting positions ``(i + 0.5) / n``. Non-finite input and vectors with no
+    shape (fewer than 3 observations, or a constant value) fail loud.
+    """
+    values = as_series(resid)
+    if values.size < 3:
+        raise ValueError(f"QQ correlation needs at least 3 residuals, got {values.size}")
+    spread = float(np.std(values))
+    if spread == 0.0:
+        raise ValueError("QQ correlation is undefined for a constant residual vector")
+    positions = (np.arange(values.size) + 0.5) / values.size
+    standardized = np.sort((values - values.mean()) / spread)
+    return float(np.corrcoef(standardized, norm.ppf(positions))[0, 1])
 
 
 def _plot_residuals_vs_fitted(ax, model) -> None:

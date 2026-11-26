@@ -84,7 +84,7 @@ def test_train_step_cv_kind_invalid_raises() -> None:
 
 
 def test_train_step_cv_kind_time_series_split_parses() -> None:
-    step = TrainStep(**_train_step_kwargs(cv_kind="time_series_split"))
+    step = TrainStep(**_train_step_kwargs(cv_kind="time_series_split", cv_gap=1))
     assert step.cv_kind == "time_series_split"
 
 

@@ -30,20 +30,29 @@ from broadway.calibration.quantile import QuantileInterval
 from broadway.config.schema import PipelineConfig
 from broadway.evaluate.comparison import compare_models
 from broadway.evaluate.contracts import (
+    LEDGER_RESIDUAL_COLUMN,
+    TIME_CV_KINDS,
     BaselineComparison,
     DecisionConfig,
     DecisionReport,
     ErrorAnalysisConfig,
     EvaluationResult,
+    TimeSeriesCvResult,
 )
-from broadway.evaluate.metrics import compute_metrics, tune_threshold
+from broadway.evaluate.metrics import MetricBootstrap, compute_metrics, tune_threshold
 from broadway.evaluate.promotion import should_promote
-from broadway.evaluate.validation import cross_validate, residual_summary
+from broadway.evaluate.validation import (
+    ResidualDiagnosticsPass,
+    TimeSeriesCV,
+    cross_validate,
+    residual_summary,
+)
 from broadway.features.generic import validate_engineered_frame
 from broadway.features.plan import ColumnPlan
 from broadway.lineage.ids import node_id
 from broadway.lineage.records import write_record
 from broadway.observability.profiling import timed
+from broadway.reports.decision import Decision
 from broadway.training.contracts import TrainingResult
 from broadway.training.mlflow_utils import (
     get_champion,
@@ -82,13 +91,16 @@ def _load_val_features(
     return _feature_frame(cfg, val_df), val_df[cfg.dataset.target], val_df
 
 
-def _load_train_features(cfg: PipelineConfig) -> tuple[pd.DataFrame, pd.Series]:
+def _load_train_features(
+    cfg: PipelineConfig,
+) -> tuple[pd.DataFrame, pd.Series, pd.Series | None]:
     assert cfg.etl is not None and cfg.dataset is not None
     out_dir = _processed_dir(cfg)
     train_df = pd.read_parquet(out_dir / cfg.etl.train_features_file)
     validate_engineered_frame(cfg, train_df)
-    assert cfg.dataset is not None
-    return _feature_frame(cfg, train_df), train_df[cfg.dataset.target]
+    column = cfg.dataset.datetime_column
+    dates = train_df[column] if column is not None else None
+    return _feature_frame(cfg, train_df), train_df[cfg.dataset.target], dates
 
 
 def _load_training_result(cfg: PipelineConfig) -> TrainingResult:
@@ -309,7 +321,7 @@ class HoldoutErrorAnalysis:
             {
                 "y_true": truth,
                 "y_pred": prediction,
-                "residual": prediction - truth,
+                LEDGER_RESIDUAL_COLUMN: prediction - truth,
                 "abs_error": np.abs(prediction - truth),
             }
         )
@@ -358,9 +370,20 @@ def run(cfg: PipelineConfig) -> None:
     y_true = y_val.to_numpy()
     y_pred = candidate.predict(X_val)
     candidate_metrics = compute_metrics(y_true, y_pred)
+    assert cfg.evaluate is not None
+    with timed() as elapsed:
+        metric_intervals = MetricBootstrap(cfg.evaluate.bootstrap).intervals(y_true, y_pred)
+    logger.info(
+        "evaluate: bootstrap %d draws at %.0f%% level, %d rows: rmse [%.4f, %.4f] in %.3fs",
+        cfg.evaluate.bootstrap.iterations,
+        cfg.evaluate.bootstrap.level * 100.0,
+        len(y_true),
+        metric_intervals["rmse"].lower,
+        metric_intervals["rmse"].upper,
+        elapsed(),
+    )
 
     calibration_evaluation: CalibrationEvaluation | None = None
-    assert cfg.evaluate is not None
     if result.calibration is not None or cfg.evaluate.interval_source == "quantile":
         calibration_evaluation = _calibration_evaluation(
             cfg,
@@ -411,31 +434,87 @@ def run(cfg: PipelineConfig) -> None:
     if champion_uri is None:
         warnings.append("no champion model found — candidate compared against none")
 
-    X_train, y_train = _load_train_features(cfg)
+    X_train, y_train, train_dates = _load_train_features(cfg)
     # Score the same composed Pipeline shape train/HPO fit (preprocessing +
     # registry model), so CV reflects the deployed pipeline rather than a bare
     # estimator; build_model_pipeline re-seeds from cfg.experiment.random_state.
     cv_model = build_model_pipeline(cfg, result.model_type, result.params)
-    cv_metrics = cross_validate(
-        cv_model,
-        X_train.to_numpy(),
-        y_train.to_numpy(),
-        cfg.train.cv_folds,
-        cfg.experiment.random_state,
-        cfg.train.cv_kind,
-    )
+    cv_detail: TimeSeriesCvResult | None = None
+    cv_decision: Decision | None = None
+    if cfg.train.cv_kind in TIME_CV_KINDS:
+        with timed() as elapsed:
+            cv_detail, cv_decision = TimeSeriesCV.from_config(cfg).run(
+                cv_model,
+                X_train.to_numpy(),
+                y_train.to_numpy(),
+                dates=train_dates,
+            )
+        cv_metrics = cv_detail.metrics
+        logger.info(
+            "evaluate: %s cv folds=%d gap=%d horizon=%d seasonal=%s time_indexed=%s "
+            "rmse=%.4f mae=%.4f in %.3fs",
+            cv_detail.kind,
+            cv_detail.folds,
+            cv_detail.gap,
+            cv_detail.horizon,
+            cv_detail.seasonal_period,
+            cv_detail.time_indexed,
+            cv_detail.metrics["rmse"],
+            cv_detail.metrics["mae"],
+            elapsed(),
+        )
+        if cv_decision is not None:
+            logger.info(
+                "evaluate: cv decision verdict=%s improvement=%.4f [%.4f, %.4f] "
+                "vs %s (owner=%s)",
+                cv_decision.verdict,
+                cv_decision.value,
+                cv_decision.interval_low,
+                cv_decision.interval_high,
+                cv_decision.evidence.baseline,
+                cv_decision.owner,
+            )
+    else:
+        cv_metrics = cross_validate(
+            cv_model,
+            X_train.to_numpy(),
+            y_train.to_numpy(),
+            cfg.train.cv_folds,
+            cfg.experiment.random_state,
+            cfg.train.cv_kind,
+            gap=cfg.train.cv_gap,
+        )
     residuals = residual_summary(y_true, y_pred)
 
     eval_dir = Path(cfg.evaluate.output_dir)
     eval_dir.mkdir(parents=True, exist_ok=True)
     HoldoutErrorAnalysis.from_config(cfg).write(eval_dir, X_val, y_true, y_pred)
 
+    with timed() as elapsed:
+        residual_diagnostics = ResidualDiagnosticsPass.from_config(cfg).compute(
+            eval_dir / cfg.evaluate.error_analysis.ledger_file
+        )
+    logger.info(
+        "evaluate: residual diagnostics on %d rows: acf=%s, ljung-box p=%.4f, "
+        "jarque-bera p=%.4f, qq=%.4f in %.3fs",
+        residual_diagnostics.n_obs,
+        {lag: round(value, 4) for lag, value in residual_diagnostics.acf_lags.items()},
+        residual_diagnostics.ljung_box_p_value,
+        residual_diagnostics.jarque_bera_p_value,
+        residual_diagnostics.qq_correlation,
+        elapsed(),
+    )
+
     evaluation = EvaluationResult(
         metrics=candidate_metrics,
         promote=promote,
         reason=reason,
         cv_metrics=cv_metrics,
+        cv_detail=cv_detail,
+        cv_decision=cv_decision,
         residuals=residuals,
+        residual_diagnostics=residual_diagnostics,
+        metric_intervals=metric_intervals,
         # persist the candidate-vs-champion comparison even when champion is None,
         # so downstream consumers can trace champion-None (delta=None) values explicitly.
         comparison=comparison,
@@ -444,10 +523,6 @@ def run(cfg: PipelineConfig) -> None:
         warnings=warnings,
     )
 
-    eval_dir = Path(cfg.evaluate.output_dir)
-    eval_dir.mkdir(parents=True, exist_ok=True)
-    eval_dir = Path(cfg.evaluate.output_dir)
-    eval_dir.mkdir(parents=True, exist_ok=True)
     (eval_dir / cfg.evaluate.output_file).write_text(evaluation.model_dump_json(indent=2), encoding="utf-8")
     if calibration_evaluation is not None:
         _persist_calibration(eval_dir, calibration_evaluation)

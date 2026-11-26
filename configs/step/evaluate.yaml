@@ -19,6 +19,30 @@ error_analysis:
   # Names must exist in the experiment's ColumnPlan; empty carries the whole
   # plan into the ledger (the plan is the keep-set, never a code-side list).
   segment_columns: []
+# Residual diagnostics read the ledger above: residual autocorrelation at
+# lags 1..acf_lags, the Ljung-Box portmanteau at ljung_box_lags, and the
+# Jarque-Bera/QQ normality read.
+residuals:
+  acf_lags: 3
+  ljung_box_lags: 3
+# Percentile bootstrap for the holdout metric intervals (rmse/mae/mape);
+# numpy-only, deterministic at the configured seed.
+bootstrap:
+  iterations: 200
+  seed: 42
+  level: 0.95
+# Time-series CV verdict: the candidate's paired improvement over the
+# seasonal-naive (or persistence) baseline, tested with the bootstrap above.
+# `metric` names the CV metric; `direction: max` reads positive improvement as
+# better; the verdict is act / investigate / no_action / insufficient at
+# `min_effect` (metric units) and `min_sample_size` scored rows.
+cv_decision:
+  metric: rmse
+  direction: max
+  min_effect: 0.1
+  min_sample_size: 1000
+  action: ship the candidate
+  owner: fare_prediction
 # Opt-in binary framing over a regression target: `threshold` is the truth
 # event (a row is positive when its value reaches it); the grid samples
 # candidate model cutoffs for the configured objective. Delete this block to

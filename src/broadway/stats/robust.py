@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
 
 
@@ -12,6 +13,31 @@ def modified_zscore(series: pd.Series) -> pd.Series:
     if mad == 0:
         return pd.Series(0.0, index=series.index)
     return 0.6745 * (series - median) / mad
+
+
+def mad_zscores(values: np.ndarray) -> np.ndarray:
+    """Signed modified z-scores as a NumPy array (zeros when MAD == 0).
+
+    Array-friendly seam over :func:`modified_zscore`: one formula, one owner,
+    so a caller holding an array gets the same values without re-implementing
+    the Iglewicz-Hoaglin constant.
+    """
+    return modified_zscore(pd.Series(np.asarray(values, dtype=float))).to_numpy()
+
+
+def iqr_excursions(values: np.ndarray) -> np.ndarray:
+    """Distance outside the interquartile box, measured in IQRs (0.0 inside).
+
+    ``(x - Q3) / IQR`` above the box and ``(Q1 - x) / IQR`` below it, zero
+    between the quartiles. A zero-width box has no scale, so every excursion
+    is 0.0 (the same convention as :func:`modified_zscore` on a zero MAD).
+    """
+    array = np.asarray(values, dtype=float)
+    q1, q3 = np.quantile(array, [0.25, 0.75])
+    iqr = q3 - q1
+    if iqr == 0:
+        return np.zeros_like(array)
+    return np.maximum(np.maximum(array - q3, q1 - array), 0.0) / iqr
 
 
 def outlier_mask(df: pd.DataFrame, columns: list[str], threshold: float) -> pd.Series:
