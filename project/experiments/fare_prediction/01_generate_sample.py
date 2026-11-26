@@ -3,8 +3,13 @@
 import json
 from pathlib import Path
 
+import matplotlib
+
+matplotlib.use("Agg")
+
+import matplotlib.pyplot as plt
 import pandas as pd
-from _common import RESULTS, SAMPLE_NAME
+from _common import RESULTS, SAMPLE_NAME, UNIT_FMT
 
 from broadway.lineage.sample import load_sample
 from broadway.samples import generate_sample
@@ -47,6 +52,26 @@ def _profile(artifact: Path, provenance: dict) -> str:
     return "\n".join(lines)
 
 
+def plot_profile(frame: pd.DataFrame, out_path: Path) -> None:
+    """Plot the sample's distributions — the human-readable output of this step."""
+    columns = [
+        column
+        for column in ("fare_amount", "trip_distance", "trip_duration_minutes", "speed_mph")
+        if column in frame.columns
+    ]
+    figure, axes = plt.subplots(
+        1, len(columns), figsize=(4.2 * len(columns), 3.6), constrained_layout=True
+    )
+    for axis, column in zip(axes, columns):
+        values = frame[column].dropna()
+        axis.hist(values, bins=60, color="#4c78a8")
+        axis.set_yscale("log")
+        axis.set_title(f"{column} (n={len(values):,})")
+        axis.set_xlabel(UNIT_FMT.get(column, column))
+    figure.savefig(out_path, dpi=150)
+    plt.close(figure)
+
+
 def main() -> None:
     spec = load_sample(SAMPLE_NAME)
     artifact = Path(spec.path)
@@ -60,6 +85,9 @@ def main() -> None:
     output = RESULTS / "01_generate_sample.md"
     output.write_text(_profile(artifact, provenance), encoding="utf-8")
     print(f"profile: {output}")
+    figure = RESULTS / "01_generate_sample.png"
+    plot_profile(pd.read_parquet(artifact), figure)
+    print(f"plot: {figure}")
 
 
 if __name__ == "__main__":

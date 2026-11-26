@@ -357,10 +357,8 @@ def _render_artifacts(stem: str, focus: str, selected: str = "") -> str:
     selected_path = next((path for path in files if path.name == selected), None)
     if selected_path is None:
         selected_path = next(
-            (path for path in files if path.suffix.lower() == ".md"),
-            next(
-                (path for path in files if path.suffix.lower() in _IMAGE_SUFFIXES), files[0]
-            ),
+            (path for path in files if path.suffix.lower() in _IMAGE_SUFFIXES),
+            next((path for path in files if path.suffix.lower() == ".md"), files[0]),
         )
     options = "".join(
         f'<option value="{html.escape(path.name)}"'
