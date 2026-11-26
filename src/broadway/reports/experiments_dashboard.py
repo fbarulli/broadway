@@ -343,9 +343,8 @@ def _render_code(stem: str, focus: str) -> str:
     numbered = "\n".join(f"{number:4d}  {line}" for number, line in enumerate(lines, 1))
     raw = html.escape(_h(f"/experiments/{stem}/source", focus))
     return (
-        f'<p><a href="{raw}">open the raw .py</a></p>'
-        f'<details class="code-block" open><summary>{html.escape(script.name)}'
-        f" ({len(lines)} lines)</summary>"
+        f'<details class="code-block"><summary>show code — {html.escape(script.name)}'
+        f" ({len(lines)} lines) · <a href=\"{raw}\">raw .py</a></summary>"
         f'<pre class="text-preview">{html.escape(numbered)}</pre></details>'
     )
 
@@ -365,14 +364,12 @@ def _render_artifacts(stem: str, focus: str, selected: str = "") -> str:
         f'{" selected" if path == selected_path else ""}>{html.escape(path.name)}</option>'
         for path in files
     )
-    download = html.escape(_artifact_url(selected_path, focus))
     picker = (
         '<form class="artifact-picker" method="get">'
         f'<input type="hidden" name="focus" value="{html.escape(focus)}">'
         '<label for="artifact">output</label> '
         f'<select id="artifact" name="artifact" onchange="this.form.submit()">{options}</select> '
         '<noscript><button type="submit">show</button></noscript>'
-        f'<a href="{download}" download>download</a>'
         "</form>"
     )
     preview = _render_artifact_preview(selected_path, focus)
@@ -716,6 +713,7 @@ def _render_series_cards(
             f'<h2><a href="{html.escape(_h(f"/experiments/{stem}", focus))}">{html.escape(stem)}</a></h2>'
             f"<p>{html.escape(question)}</p>"
             f"{figure}"
+            f"{_render_code(stem, focus)}"
             f"{_render_observations_form(stem, load_observations(stem), focus, back_url)}"
             "</section>"
         )

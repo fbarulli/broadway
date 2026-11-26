@@ -302,10 +302,10 @@ def test_experiment_page_renders_the_step_source(monkeypatch, tmp_path) -> None:
     body = ui.experiment_page("01_ingest", "alpha").body.decode("utf-8")
 
     assert "<h2>code</h2>" in body
-    assert "<details class=\"code-block\" open>" in body
-    assert "01_ingest.py" in body
+    assert '<details class="code-block"><summary>show code — 01_ingest.py' in body
     assert "Load the source data." in body
-    assert "open the raw .py" in body
+    assert "raw .py" in body
+    assert "download" not in body
 
     source = ui.experiment_source("01_ingest", "alpha")
     assert source.status_code == 200
