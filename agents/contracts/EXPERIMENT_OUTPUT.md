@@ -28,10 +28,18 @@ This contract is enforced by `scripts/check_experiment_outputs.py` (gate
    ```json
    {"question": "...", "metric": "ks_fare_amount", "value": 0.0120,
     "interval_low": 0.0111, "interval_high": 0.0149,
-    "threshold": 0.01, "direction": "max", "verdict": "act",
+    "min_effect": 0.01, "null_quantile": 0.95,
+    "threshold": 0.01, "null_threshold": 0.0077,
+    "direction": "max", "verdict": "act",
     "action": "review the fare-policy exclusion before training",
     "owner": "fare_prediction", "sample_size": 50000}
    ```
+
+   **The rule is sample-size calibrated.** An absolute threshold does not
+   travel: a KS distance of 0.01 is noise on 1,000 rows and a real signal on
+   8.5M. The effective threshold is `max(min_effect, null_quantile of the
+   no-effect permutation null at this n)`; below `min_sample_size` the verdict
+   is `insufficient` ("collect at least N rows") instead of a false act/ignore.
    The verdict is never hand-written: `Decision.evaluate` derives it from the
    interval (act when the whole interval clears the threshold; investigate
    when it straddles; no_action otherwise).

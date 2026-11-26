@@ -12,6 +12,7 @@ decisions:
   "01_generate_sample":
     metric: ks_fare_amount
     direction: max
-    threshold: 0.01
+    min_effect: 0.01
+    min_sample_size: 1000
     action: "review the fare-policy exclusion before training"
     owner: fare_prediction

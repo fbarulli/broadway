@@ -77,6 +77,11 @@ class StepOutput:
         tables = "\n".join(
             f"- [{name}]({path.name})" for name, path in self._tables
         ) or "- none"
+        null = (
+            f" (permutation null {decision.null_threshold:,.4f})"
+            if decision.null_threshold is not None
+            else ""
+        )
         return (
             f"# {self._stem}\n\n"
             f"## question\n\n{decision.question}\n\n"
@@ -84,7 +89,7 @@ class StepOutput:
             f"- metric: {decision.metric} = {decision.value:,.4f} "
             f"[{decision.interval_low:,.4f}, {decision.interval_high:,.4f}] 95% "
             f"(n={decision.sample_size:,})\n"
-            f"- rule: {decision.direction} {decision.threshold:,.4f}\n"
+            f"- rule: {decision.direction} {decision.threshold:,.4f}{null}\n"
             f"{comparison}"
             f"- action ({decision.owner}): {decision.action}\n\n"
             f"![figure]({self._figure_path.name})\n\n"

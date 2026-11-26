@@ -33,7 +33,21 @@ def _ecdf(values: pd.Series) -> tuple[np.ndarray, np.ndarray]:
     return ordered, np.linspace(0.0, 1.0, len(ordered))
 
 
-def _drift(source: pd.DataFrame, frame: pd.DataFrame) -> tuple[float, tuple[float, float]]:
+def _null_ks(source_values: pd.Series, sample_values: pd.Series) -> list[float]:
+    """KS under the no-effect permutation at this sample size (the null band)."""
+    pool = np.concatenate([source_values.to_numpy(), sample_values.to_numpy()])
+    source_n = len(source_values)
+    rng = np.random.default_rng(0)
+    null = []
+    for _ in range(BOOTSTRAP_ITERATIONS):
+        permuted = rng.permutation(pool)
+        null.append(float(ks_2samp(permuted[:source_n], permuted[source_n:]).statistic))
+    return null
+
+
+def _drift(
+    source: pd.DataFrame, frame: pd.DataFrame
+) -> tuple[float, tuple[float, float], list[float]]:
     """KS distance of fare with a bootstrap 95% interval (the decision metric)."""
     column = "fare_amount"
     source_values = source[column].dropna().sample(
@@ -48,7 +62,9 @@ def _drift(source: pd.DataFrame, frame: pd.DataFrame) -> tuple[float, tuple[floa
         resample = sample_values.sample(n=len(sample_values), replace=True, random_state=iteration)
         draws.append(float(ks_2samp(source_values, resample).statistic))
     low, high = np.percentile(draws, [2.5, 97.5])
-    return point, (min(float(low), point), max(float(high), point))
+    return point, (min(float(low), point), max(float(high), point)), _null_ks(
+        source_values, sample_values
+    )
 
 
 def _figure(source: pd.DataFrame, frame: pd.DataFrame, sampled: int) -> object:
@@ -102,13 +118,14 @@ def main() -> None:
     source = pd.read_parquet(provenance["source"]["path"], columns=list(COMPARED))
     RESULTS.mkdir(parents=True, exist_ok=True)
 
-    value, interval = _drift(source, frame)
+    value, interval, null = _drift(source, frame)
     rule = load_decision_rule(STEM)
     decision = Decision.evaluate(
         rule=rule,
         value=value,
         interval=interval,
         sample_size=min(COMPARE_SAMPLE, len(frame)),
+        null_values=null,
         question="Did sampling plus the fare policy preserve the source population?",
     )
     output = StepOutput(results_dir=RESULTS, stem=STEM, decision=decision)

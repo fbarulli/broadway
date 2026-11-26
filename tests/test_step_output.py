@@ -1,4 +1,4 @@
-"""StepOutput + Decision: a step publishes a computed verdict, not prose."""
+"""StepOutput + Decision: a step publishes a computed, n-calibrated verdict."""
 
 from __future__ import annotations
 
@@ -15,7 +15,8 @@ def _rule(**overrides) -> DecisionRule:
     data = {
         "metric": "ks_fare_amount",
         "direction": "max",
-        "threshold": 0.01,
+        "min_effect": 0.01,
+        "min_sample_size": 100,
         "action": "review the policy",
         "owner": "fare_prediction",
     }
@@ -30,7 +31,7 @@ class _Figure:
 
 def test_verdict_act_when_the_interval_clears_the_threshold() -> None:
     decision = Decision.evaluate(
-        rule=_rule(), value=0.012, interval=(0.011, 0.013), sample_size=10, question="q"
+        rule=_rule(), value=0.012, interval=(0.011, 0.013), sample_size=10_000, question="q"
     )
 
     assert decision.verdict == "act"
@@ -38,7 +39,7 @@ def test_verdict_act_when_the_interval_clears_the_threshold() -> None:
 
 def test_verdict_investigate_when_the_interval_straddles_the_threshold() -> None:
     decision = Decision.evaluate(
-        rule=_rule(), value=0.009, interval=(0.008, 0.012), sample_size=10, question="q"
+        rule=_rule(), value=0.009, interval=(0.008, 0.012), sample_size=10_000, question="q"
     )
 
     assert decision.verdict == "investigate"
@@ -46,22 +47,51 @@ def test_verdict_investigate_when_the_interval_straddles_the_threshold() -> None
 
 def test_verdict_no_action_when_the_interval_is_inside_the_rule() -> None:
     decision = Decision.evaluate(
-        rule=_rule(), value=0.005, interval=(0.004, 0.006), sample_size=10, question="q"
+        rule=_rule(), value=0.005, interval=(0.004, 0.006), sample_size=10_000, question="q"
     )
 
+    assert decision.verdict == "no_action"
+
+
+def test_small_samples_get_an_insufficient_verdict() -> None:
+    decision = Decision.evaluate(
+        rule=_rule(min_sample_size=5_000),
+        value=0.012,
+        interval=(0.011, 0.013),
+        sample_size=800,
+        question="q",
+    )
+
+    assert decision.verdict == "insufficient"
+    assert "collect at least 5,000 rows" in decision.action
+
+
+def test_the_null_band_raises_the_threshold_at_small_n() -> None:
+    """A 0.012 KS is noise on 1k rows: the permutation null lifts the bar."""
+    decision = Decision.evaluate(
+        rule=_rule(min_sample_size=100),
+        value=0.012,
+        interval=(0.011, 0.013),
+        sample_size=1_000,
+        null_values=[0.02, 0.03, 0.05, 0.06],
+        question="q",
+    )
+
+    assert decision.null_threshold == pytest.approx(0.0585, abs=1e-9)
+    assert decision.threshold == pytest.approx(0.0585, abs=1e-9)
     assert decision.verdict == "no_action"
 
 
 def test_value_must_lie_inside_its_interval() -> None:
     with pytest.raises(ValidationError):
         Decision.evaluate(
-            rule=_rule(), value=0.02, interval=(0.011, 0.013), sample_size=10, question="q"
+            rule=_rule(), value=0.02, interval=(0.011, 0.013), sample_size=10_000, question="q"
         )
 
 
 def test_output_writes_the_decision_record(tmp_path) -> None:
     decision = Decision.evaluate(
-        rule=_rule(), value=0.012, interval=(0.011, 0.013), sample_size=10, question="q"
+        rule=_rule(), value=0.012, interval=(0.011, 0.013), sample_size=10_000, question="q"
     )
     output = StepOutput(results_dir=tmp_path, stem="01_step", decision=decision)
     output.save_figure(_Figure())
@@ -78,7 +108,7 @@ def test_output_writes_the_decision_record(tmp_path) -> None:
 
 def test_output_without_a_figure_is_refused(tmp_path) -> None:
     decision = Decision.evaluate(
-        rule=_rule(), value=0.012, interval=(0.011, 0.013), sample_size=10, question="q"
+        rule=_rule(), value=0.012, interval=(0.011, 0.013), sample_size=10_000, question="q"
     )
     output = StepOutput(results_dir=tmp_path, stem="02_step", decision=decision)
 

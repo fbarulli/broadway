@@ -1,41 +1,44 @@
-"""Decision records: a measured value, its uncertainty, a rule, and a verdict.
+"""Decision records: a measured value, its uncertainty, a calibrated rule, a verdict.
 
 An insight is prose. A decision is evidence: one metric, a 95% interval, the
-config-declared threshold it must clear, the resulting verdict
-(``act`` / ``investigate`` / ``no_action``) and the action an owner takes. The
-verdict is computed from the interval against the threshold — never hand-typed —
-so a step cannot claim "act" on noise or "no action" while the interval crosses
-the line.
+**null band at the observed sample size**, the config-declared minimum effect,
+and the resulting verdict (``act`` / ``investigate`` / ``no_action`` /
+``insufficient``) plus the owner's action.
+
+Absolute thresholds do not travel across sample sizes: a KS distance of 0.01 is
+noise on 1,000 rows and a real signal on 8.5M. The rule therefore clears
+``max(min_effect, null_quantile of the permutation null)`` and a sample below
+``min_sample_size`` yields ``insufficient`` instead of a false verdict.
 """
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Literal
 
+import numpy as np
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-Verdict = Literal["act", "investigate", "no_action"]
+Verdict = Literal["act", "investigate", "no_action", "insufficient"]
 Direction = Literal["max", "min"]
 
 
 class DecisionRule(BaseModel):
-    """The config-declared test for one step (``decisions.<step>`` in YAML).
-
-    ``direction: max`` means the metric must stay at or below ``threshold``;
-    ``direction: min`` means it must stay at or above it.
-    """
+    """The config-declared test for one step (``decisions.<step>`` in YAML)."""
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     metric: str = Field(min_length=1)
     direction: Direction
-    threshold: float
+    min_effect: float = Field(gt=0)
+    null_quantile: float = Field(default=0.95, gt=0.5, lt=1.0)
+    min_sample_size: int = Field(default=100, gt=0)
     action: str = Field(min_length=1)
     owner: str = Field(min_length=1)
 
 
 class Decision(BaseModel):
-    """One evaluated decision: value + interval vs the rule."""
+    """One evaluated decision: value + interval vs the calibrated threshold."""
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -47,6 +50,7 @@ class Decision(BaseModel):
     reference: float | None = None
     delta: float | None = None
     threshold: float
+    null_threshold: float | None = None
     direction: Direction
     verdict: Verdict
     action: str
@@ -70,24 +74,44 @@ class Decision(BaseModel):
         interval: tuple[float, float],
         sample_size: int,
         question: str,
+        null_values: Sequence[float] | None = None,
         reference: float | None = None,
     ) -> Decision:
-        """Compute the verdict from the interval vs the rule's threshold."""
+        """Compute the verdict from the interval vs the calibrated threshold.
+
+        ``null_values`` is the metric's distribution under the no-effect
+        permutation at this sample size; absent, the threshold is the declared
+        ``min_effect`` alone (a small-sample run then usually lands in
+        ``insufficient`` or ``investigate``, which is the honest outcome).
+        """
         low, high = interval
-        if rule.direction == "max":
-            if low > rule.threshold:
-                verdict: Verdict = "act"
-            elif high > rule.threshold:
-                verdict = "investigate"
-            else:
-                verdict = "no_action"
-        else:
-            if high < rule.threshold:
+        null_threshold = None
+        threshold = rule.min_effect
+        if null_values is not None and len(null_values) > 0:
+            percentile = rule.null_quantile if rule.direction == "max" else 1.0 - rule.null_quantile
+            null_threshold = float(np.percentile(np.asarray(null_values, dtype=float), percentile * 100))
+            threshold = max(threshold, null_threshold) if rule.direction == "max" else min(
+                threshold, null_threshold
+            )
+        if sample_size < rule.min_sample_size:
+            verdict: Verdict = "insufficient"
+            action = f"collect at least {rule.min_sample_size:,} rows before deciding"
+        elif rule.direction == "max":
+            if low > threshold:
                 verdict = "act"
-            elif low < rule.threshold:
+            elif high > threshold:
                 verdict = "investigate"
             else:
                 verdict = "no_action"
+            action = rule.action
+        else:
+            if high < threshold:
+                verdict = "act"
+            elif low < threshold:
+                verdict = "investigate"
+            else:
+                verdict = "no_action"
+            action = rule.action
         return cls(
             question=question,
             metric=rule.metric,
@@ -96,10 +120,11 @@ class Decision(BaseModel):
             interval_high=high,
             reference=reference,
             delta=None if reference is None else value - reference,
-            threshold=rule.threshold,
+            threshold=threshold,
+            null_threshold=null_threshold,
             direction=rule.direction,
             verdict=verdict,
-            action=rule.action,
+            action=action,
             owner=rule.owner,
             sample_size=sample_size,
         )
