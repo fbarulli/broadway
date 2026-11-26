@@ -10,7 +10,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from _common import RESULTS, SAMPLE_NAME, UNIT_FMT, load_decision_rule
+from _common import RESULTS, SAMPLE_NAME, SEED, UNIT_FMT, load_decision_rule
 from scipy.stats import ks_2samp
 
 from broadway.lineage.sample import load_sample
@@ -37,7 +37,7 @@ def _null_ks(source_values: pd.Series, sample_values: pd.Series) -> list[float]:
     """KS under the no-effect permutation at this sample size (the null band)."""
     pool = np.concatenate([source_values.to_numpy(), sample_values.to_numpy()])
     source_n = len(source_values)
-    rng = np.random.default_rng(0)
+    rng = np.random.default_rng(SEED)
     null = []
     for _ in range(BOOTSTRAP_ITERATIONS):
         permuted = rng.permutation(pool)
@@ -51,15 +51,17 @@ def _drift(
     """KS distance of fare with a bootstrap 95% interval (the decision metric)."""
     column = "fare_amount"
     source_values = source[column].dropna().sample(
-        n=min(COMPARE_SAMPLE, len(source)), random_state=0
+        n=min(COMPARE_SAMPLE, len(source)), random_state=SEED
     )
     sample_values = frame[column].dropna().sample(
-        n=min(COMPARE_SAMPLE, len(frame)), random_state=0
+        n=min(COMPARE_SAMPLE, len(frame)), random_state=SEED
     )
     point = float(ks_2samp(source_values, sample_values).statistic)
     draws = []
     for iteration in range(BOOTSTRAP_ITERATIONS):
-        resample = sample_values.sample(n=len(sample_values), replace=True, random_state=iteration)
+        resample = sample_values.sample(
+            n=len(sample_values), replace=True, random_state=SEED + iteration
+        )
         draws.append(float(ks_2samp(source_values, resample).statistic))
     low, high = np.percentile(draws, [2.5, 97.5])
     return point, (min(float(low), point), max(float(high), point)), _null_ks(
@@ -107,8 +109,8 @@ def _segments(source: pd.DataFrame, frame: pd.DataFrame) -> list[SegmentEvidence
         n = min(COMPARE_SAMPLE, len(source_slice), len(frame_slice))
         if n == 0:
             continue
-        src = source_slice["fare_amount"].sample(n=n, random_state=0)
-        smp = frame_slice["fare_amount"].sample(n=n, random_state=0)
+        src = source_slice["fare_amount"].sample(n=n, random_state=SEED)
+        smp = frame_slice["fare_amount"].sample(n=n, random_state=SEED)
         evidence.append(
             SegmentEvidence(
                 segment=label,
@@ -147,8 +149,8 @@ def main() -> None:
 
     value, interval, null = _drift(source, frame)
     rule = load_decision_rule(STEM)
-    half = frame["fare_amount"].sample(frac=0.5, random_state=7)
-    source_half = source["fare_amount"].sample(n=len(half), random_state=7)
+    half = frame["fare_amount"].sample(frac=0.5, random_state=SEED)
+    source_half = source["fare_amount"].sample(n=len(half), random_state=SEED)
     evidence = Evidence(
         baseline="no-effect permutation (sample labels shuffled at this n)",
         segments=_segments(source, frame),
@@ -156,8 +158,8 @@ def main() -> None:
             "ks_half_sample": float(ks_2samp(source_half, half).statistic),
             "ks_seed_7": float(
                 ks_2samp(
-                    source["fare_amount"].sample(n=COMPARE_SAMPLE, random_state=7),
-                    frame["fare_amount"].sample(n=COMPARE_SAMPLE, random_state=7),
+                    source["fare_amount"].sample(n=COMPARE_SAMPLE, random_state=SEED),
+                    frame["fare_amount"].sample(n=COMPARE_SAMPLE, random_state=SEED),
                 ).statistic
             ),
         },
@@ -169,7 +171,8 @@ def main() -> None:
             "artifact": provenance["name"],
             "artifact_sha256": provenance["artifact_sha256"],
             "source": provenance["source"]["path"],
-            "seed": str(provenance["seed"]),
+            "seed": str(SEED),
+            "draw_seed": str(SEED),
             "exclusions": "fare<=4.40 with long distance/duration/speed",
         },
     )
