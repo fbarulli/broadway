@@ -132,9 +132,9 @@ NIGHT_HOURS = [20, 21, 22, 23, 0, 1, 2, 3, 4, 5]
 DATETIME_SRC = "pickup_datetime"
 
 TEMPORAL_FEATURES: list[DerivedFeature] = [
-    DerivedFeature(name="pickup_hour", func="pickup_hour", source=DATETIME_SRC),
-    DerivedFeature(name="pickup_day_of_week", func="pickup_day_of_week", source=DATETIME_SRC),
-    DerivedFeature(name="pickup_month", func="pickup_month", source=DATETIME_SRC),
+    DerivedFeature(name="pickup_hour", func="datetime_hour", source=DATETIME_SRC),
+    DerivedFeature(name="pickup_day_of_week", func="datetime_dayofweek", source=DATETIME_SRC),
+    DerivedFeature(name="pickup_month", func="datetime_month", source=DATETIME_SRC),
     DerivedFeature(name="is_weekend", func="is_weekend", source=DATETIME_SRC),
     DerivedFeature(name="is_rush_hour", func="is_rush_hour", source=DATETIME_SRC),
     DerivedFeature(name="is_night", func="is_night", source=DATETIME_SRC),
