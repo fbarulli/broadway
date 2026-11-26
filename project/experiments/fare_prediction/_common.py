@@ -22,8 +22,8 @@ import yaml
 from matplotlib.ticker import FuncFormatter, LogLocator
 
 from broadway.config.schema import DerivedFeature
-from broadway.reports.decision import DecisionRule
 from broadway.features.builders import build_derived
+from broadway.reports.decision import DecisionRule
 from broadway.utils import require_keys
 from project.paths import load_project_paths
 
