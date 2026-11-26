@@ -1,16 +1,47 @@
-# Short trips (< 0.31 mi)
+# 03_short_trips
 
-Total rows: 9,504
+## question
 
-| stat  | fare_amount | trip_duration_minutes |
-|-------|-------------|-----------------------|
-| count |        9504 |                  9504 |
-| mean  |        6.09 |                  3.64 |
-| std   |        7.75 |                  4.79 |
-| min   |        3.00 |                  1.00 |
-| 1%    |        3.00 |                  1.03 |
-| 25%   |        4.40 |                  1.83 |
-| 50%   |        4.40 |                  2.63 |
-| 75%   |        5.10 |                  3.95 |
-| 99%   |       70.00 |                 18.63 |
-| max   |       71.00 |                139.22 |
+Are short trips a material slice that deserves its own error read?
+
+## decision — no_action
+
+- metric: short_trip_share = 0.0095 [0.0087, 0.0104] 95% (n=50,000, unit=share)
+- rule: max 0.0200
+- action (fare_prediction): keep the short-trip slice visible in the error analysis
+
+![figure](03_short_trips.png)
+
+## evidence
+
+- baseline: zero short-trip mass (the slice is absent from the sample)
+
+### segments
+
+| segment | value | n |
+| --- | ---: | ---: |
+| weekday | 0.0096 | 36,195 |
+| weekend | 0.0094 | 13,805 |
+
+### sensitivity
+
+- share_under_0_5_mi_n50000: 0.0370
+- share_under_0_2_mi_n50000: 0.0020
+
+### falsifier
+
+the 95% interval of the short-trip share falls below the 2% floor
+
+### provenance
+
+- artifact: fare_prediction_1m
+- artifact_sha256: 158940b0d905b77d53f94cb849fffdff068958db642a7bbd19074a742a8aed67
+- seed: 42
+- analysis_sample: 50000
+- block: day
+- resampling: block
+- exclusions: distance floor 0.31 mi applied for the slice only
+
+## tables
+
+- [describe](03_short_trips_describe.csv)

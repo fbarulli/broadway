@@ -1,0 +1,49 @@
+{
+  "question": "Does pickup time carry fare signal worth keeping in the model?",
+  "metric": "fare_hour_eta_squared",
+  "value": 0.004491545339627927,
+  "interval_low": 0.0038733676645181917,
+  "interval_high": 0.006458443424245548,
+  "reference": null,
+  "delta": null,
+  "threshold": 0.01,
+  "null_threshold": 0.0006981759915578764,
+  "direction": "max",
+  "verdict": "no_action",
+  "action": "review whether the temporal features earn their keep in the model",
+  "owner": "fare_prediction",
+  "sample_size": 50000,
+  "unit": "variance_share",
+  "min_sample_size": 1000,
+  "evidence": {
+    "baseline": "no temporal signal: fare variance is unrelated to pickup hour",
+    "delta": null,
+    "segments": [
+      {
+        "segment": "weekday",
+        "value": 0.006322169007038228,
+        "sample_size": 36195
+      },
+      {
+        "segment": "weekend",
+        "value": 0.010137673916170247,
+        "sample_size": 13805
+      }
+    ],
+    "sensitivity": {
+      "day_of_week_eta_squared_n50000": 0.001565475826240497,
+      "hour_eta_squared_weekday_n36195": 0.006322169007038228,
+      "hour_eta_squared_second_seed_n25000": 0.005219494731121217
+    },
+    "falsifier": "the hour eta squared interval falls below the 1% variance floor",
+    "provenance": {
+      "artifact": "fare_prediction_1m",
+      "artifact_sha256": "158940b0d905b77d53f94cb849fffdff068958db642a7bbd19074a742a8aed67",
+      "seed": "42",
+      "analysis_sample": "50000",
+      "block": "day",
+      "resampling": "block+block_shuffle",
+      "exclusions": "temporal flags and cyclical encodings from the shared recipe"
+    }
+  }
+}

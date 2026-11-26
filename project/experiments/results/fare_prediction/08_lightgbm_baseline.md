@@ -1,25 +1,49 @@
-# LightGBM baseline (pre-trip features, log-dollar target)
+# 08_lightgbm_baseline
 
-LightGBM regressor on strictly pre-trip features; target `fare_amount_log`; MAE/RMSE/R² computed on real dollars via `np.expm1`.
+## question
 
-## Dollar-space metrics
+Does the baseline model beat the naive mean out of sample?
 
-| split | mae | rmse | r2 |
-| --- | --- | --- | --- |
-| val | 3.02 | 6.49 | 0.86 |
-| test | 3.09 | 6.76 | 0.85 |
+## decision — act
 
-## Top-10 gain importance
+- metric: rmse_improvement_vs_mean = 0.6593 [0.6355, 0.6802] 95% (n=50,000, unit=relative_improvement)
+- rule: max 0.0500 (permutation null -0.3544)
+- action (fare_prediction): adopt the LightGBM baseline as the reference model
 
-| feature | gain (% of total) |
-| --- | --- |
-| route_id_encoded | 90.2% |
-| dropoff_location_id | 3.0% |
-| dropoff_location_id_encoded | 2.8% |
-| pickup_location_id | 2.7% |
-| hour_cos | 0.4% |
-| pickup_hour | 0.3% |
-| dayofweek_sin | 0.2% |
-| pickup_day_of_week | 0.1% |
-| hour_sin | 0.1% |
-| dayofweek_cos | 0.1% |
+![figure](08_lightgbm_baseline.png)
+
+## evidence
+
+- baseline: naive train-mean prediction (the model must beat it out of sample)
+
+### segments
+
+| segment | value | n |
+| --- | ---: | ---: |
+| weekday | 0.6634 | 29,695 |
+| weekend | 0.6536 | 20,305 |
+
+### sensitivity
+
+- mae_improvement_n50000: 0.7432
+- val_improvement_n98807: 0.6586
+- improvement_second_seed_n25000: 0.6461
+
+### falsifier
+
+the RMSE-improvement interval falls below the 5% floor on test
+
+### provenance
+
+- artifact: lgbm_baseline.txt
+- source: prepared
+- seed: 42
+- analysis_sample: 50000
+- block: day
+- resampling: block+block_shuffle
+- exclusions: post-trip columns (distance/duration/speed) excluded as leakage
+
+## tables
+
+- [describe](08_lightgbm_baseline_describe.csv)
+- [importance](08_lightgbm_baseline_importance.csv)

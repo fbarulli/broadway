@@ -1,0 +1,49 @@
+{
+  "question": "Does the baseline model beat the naive mean out of sample?",
+  "metric": "rmse_improvement_vs_mean",
+  "value": 0.6592953622509695,
+  "interval_low": 0.6354524731066278,
+  "interval_high": 0.6802048352089186,
+  "reference": null,
+  "delta": null,
+  "threshold": 0.05,
+  "null_threshold": -0.35439507358642214,
+  "direction": "max",
+  "verdict": "act",
+  "action": "adopt the LightGBM baseline as the reference model",
+  "owner": "fare_prediction",
+  "sample_size": 50000,
+  "unit": "relative_improvement",
+  "min_sample_size": 1000,
+  "evidence": {
+    "baseline": "naive train-mean prediction (the model must beat it out of sample)",
+    "delta": null,
+    "segments": [
+      {
+        "segment": "weekday",
+        "value": 0.6633884198510775,
+        "sample_size": 29695
+      },
+      {
+        "segment": "weekend",
+        "value": 0.6536450840732997,
+        "sample_size": 20305
+      }
+    ],
+    "sensitivity": {
+      "mae_improvement_n50000": 0.7431824202002413,
+      "val_improvement_n98807": 0.6586,
+      "improvement_second_seed_n25000": 0.6460598451250219
+    },
+    "falsifier": "the RMSE-improvement interval falls below the 5% floor on test",
+    "provenance": {
+      "artifact": "lgbm_baseline.txt",
+      "source": "prepared",
+      "seed": "42",
+      "analysis_sample": "50000",
+      "block": "day",
+      "resampling": "block+block_shuffle",
+      "exclusions": "post-trip columns (distance/duration/speed) excluded as leakage"
+    }
+  }
+}

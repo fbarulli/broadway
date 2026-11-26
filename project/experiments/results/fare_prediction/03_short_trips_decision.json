@@ -1,0 +1,48 @@
+{
+  "question": "Are short trips a material slice that deserves its own error read?",
+  "metric": "short_trip_share",
+  "value": 0.00952,
+  "interval_low": 0.00865549765643743,
+  "interval_high": 0.010422403199953701,
+  "reference": null,
+  "delta": null,
+  "threshold": 0.02,
+  "null_threshold": null,
+  "direction": "max",
+  "verdict": "no_action",
+  "action": "keep the short-trip slice visible in the error analysis",
+  "owner": "fare_prediction",
+  "sample_size": 50000,
+  "unit": "share",
+  "min_sample_size": 1000,
+  "evidence": {
+    "baseline": "zero short-trip mass (the slice is absent from the sample)",
+    "delta": null,
+    "segments": [
+      {
+        "segment": "weekday",
+        "value": 0.009559331399364553,
+        "sample_size": 36195
+      },
+      {
+        "segment": "weekend",
+        "value": 0.009416877942774357,
+        "sample_size": 13805
+      }
+    ],
+    "sensitivity": {
+      "share_under_0_5_mi_n50000": 0.03704,
+      "share_under_0_2_mi_n50000": 0.00198
+    },
+    "falsifier": "the 95% interval of the short-trip share falls below the 2% floor",
+    "provenance": {
+      "artifact": "fare_prediction_1m",
+      "artifact_sha256": "158940b0d905b77d53f94cb849fffdff068958db642a7bbd19074a742a8aed67",
+      "seed": "42",
+      "analysis_sample": "50000",
+      "block": "day",
+      "resampling": "block",
+      "exclusions": "distance floor 0.31 mi applied for the slice only"
+    }
+  }
+}

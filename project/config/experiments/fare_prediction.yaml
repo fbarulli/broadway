@@ -16,3 +16,68 @@ decisions:
     min_sample_size: 1000
     action: "review the fare-policy exclusion before training"
     owner: fare_prediction
+  # 02 asks whether the fare surface is heavy-tailed enough to need a
+  # transformed target and fare-band segmentation: the p99/p01 ratio.
+  "02_filtered_profile":
+    metric: fare_p99_over_p1
+    direction: max
+    min_effect: 10.0
+    min_sample_size: 1000
+    action: "model fare on the log-target and report error by fare band"
+    owner: fare_prediction
+  # 03 asks whether short trips are a material slice that deserves its own
+  # error read (share of trips below 0.31 mi).
+  "03_short_trips":
+    metric: short_trip_share
+    direction: max
+    min_effect: 0.02
+    min_sample_size: 1000
+    action: "keep the short-trip slice visible in the error analysis"
+    owner: fare_prediction
+  # 04 asks whether the bottom/top 1% fares are plausible after the policy
+  # (the share passing the plausibility rules; under a shuffled duration only
+  # chance-level plausibility survives, which is the null).
+  "04_percentile_extremes_audit":
+    metric: plausible_extreme_share
+    direction: max
+    min_effect: 0.95
+    min_sample_size: 100
+    action: "keep the current plausibility exclusions"
+    owner: fare_prediction
+  # 05 asks whether pickup time carries fare signal worth keeping: the share
+  # of fare variance explained by pickup hour (eta squared).
+  "05_temporal_features":
+    metric: fare_hour_eta_squared
+    direction: max
+    min_effect: 0.01
+    min_sample_size: 1000
+    action: "review whether the temporal features earn their keep in the model"
+    owner: fare_prediction
+  # 06 asks whether the chronological split leaves the test slice inside the
+  # train-derived route frequency: the share of test routes unseen in train
+  # must stay below the 5% ceiling (lower is better).
+  "06_prepare_model_data":
+    metric: test_unseen_route_share
+    direction: min
+    min_effect: 0.05
+    min_sample_size: 1000
+    action: "ship the chronological split as-is"
+    owner: fare_prediction
+  # 07 asks whether a linear reading of the safe features hides nonlinearity:
+  # the largest |Pearson - Spearman| gap.
+  "07_specification_diagnostics":
+    metric: top_pearson_spearman_delta
+    direction: max
+    min_effect: 0.05
+    min_sample_size: 1000
+    action: "add the nonlinear transform for the flagged feature before modeling"
+    owner: fare_prediction
+  # 08 asks whether the baseline model beats the naive mean: relative RMSE
+  # improvement on the untouched test split.
+  "08_lightgbm_baseline":
+    metric: rmse_improvement_vs_mean
+    direction: max
+    min_effect: 0.05
+    min_sample_size: 1000
+    action: "adopt the LightGBM baseline as the reference model"
+    owner: fare_prediction

@@ -1,4 +1,4 @@
-,fare_amount,trip_distance,trip_duration_minutes
+index,fare_amount,trip_distance,trip_duration_minutes
 count,988077.0,988077.0,988077.0
 mean,18.596953982331335,3.3023349192421234,15.506960169433489
 std,16.80813426231116,4.35146375209403,12.525841707500657

@@ -1,37 +1,49 @@
-# Temporal features (v3 sample)
+# 05_temporal_features
 
-Total rows: 988,077
+## question
 
-## is_weekend
+Does pickup time carry fare signal worth keeping in the model?
 
-| value | count |
-|---|---|
-| 0 | 714,958 |
-| 1 | 273,119 |
+## decision — no_action
 
-## is_rush_hour
+- metric: fare_hour_eta_squared = 0.0045 [0.0039, 0.0065] 95% (n=50,000, unit=variance_share)
+- rule: max 0.0100 (permutation null 0.0007)
+- action (fare_prediction): review whether the temporal features earn their keep in the model
 
-| value | count |
-|---|---|
-| 0 | 664,580 |
-| 1 | 323,497 |
+![figure](05_temporal_features.png)
 
-## is_night
+## evidence
 
-| value | count |
-|---|---|
-| 0 | 717,205 |
-| 1 | 270,872 |
+- baseline: no temporal signal: fare variance is unrelated to pickup hour
 
-## Cyclical features describe
+### segments
 
-| stat  | hour_sin | hour_cos | dayofweek_sin | dayofweek_cos |
-|-------|----------|----------|---------------|---------------|
-| count |   988077 |   988077 |        988077 |        988077 |
-| mean  |    -0.31 |    -0.18 |          0.01 |         -0.06 |
-| std   |     0.64 |     0.68 |          0.71 |          0.70 |
-| min   |    -1.00 |    -1.00 |         -0.97 |         -0.90 |
-| 25%   |    -0.87 |    -0.87 |         -0.78 |         -0.90 |
-| 50%   |    -0.50 |    -0.26 |          0.00 |         -0.22 |
-| 75%   |     0.26 |     0.50 |          0.78 |          0.62 |
-| max   |     1.00 |     1.00 |          0.97 |          1.00 |
+| segment | value | n |
+| --- | ---: | ---: |
+| weekday | 0.0063 | 36,195 |
+| weekend | 0.0101 | 13,805 |
+
+### sensitivity
+
+- day_of_week_eta_squared_n50000: 0.0016
+- hour_eta_squared_weekday_n36195: 0.0063
+- hour_eta_squared_second_seed_n25000: 0.0052
+
+### falsifier
+
+the hour eta squared interval falls below the 1% variance floor
+
+### provenance
+
+- artifact: fare_prediction_1m
+- artifact_sha256: 158940b0d905b77d53f94cb849fffdff068958db642a7bbd19074a742a8aed67
+- seed: 42
+- analysis_sample: 50000
+- block: day
+- resampling: block+block_shuffle
+- exclusions: temporal flags and cyclical encodings from the shared recipe
+
+## tables
+
+- [features](05_temporal_features_features.csv)
+- [describe](05_temporal_features_describe.csv)

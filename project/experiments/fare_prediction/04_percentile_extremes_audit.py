@@ -1,4 +1,8 @@
-"""04: audit the bottom and top 1% of fares for plausibility."""
+"""04: audit the bottom and top 1% of fares for plausibility.
+
+Answers whether the fare extremes contain implausible trips the policy must
+exclude (flagged share of the bottom/top 1%).
+"""
 
 from pathlib import Path
 
@@ -10,9 +14,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from _common import RESULTS, SAMPLE_NAME, UNIT_FMT
+from _common import RESULTS, SAMPLE_NAME, SEED, UNIT_FMT, load_decision_rule
 from matplotlib.ticker import FuncFormatter
 
+from broadway.reports.decision import Evidence, SegmentEvidence
+from broadway.reports.measurement import MeasurementEstimator, MeasurementSpec
+from broadway.reports.step_output import StepOutput
 from broadway.samples import read_named_sample
 
 BOTTOM_Q = 0.01
@@ -20,13 +27,12 @@ TOP_Q = 0.99
 PROFILE_COLS = ["fare_amount", "trip_distance", "trip_duration_minutes"]
 BOTTOM_SUSPECT = {"max_distance": 5.0, "max_duration": 30.0, "max_speed": 60.0}
 TOP_SUSPECT = {"min_distance": 3.0, "min_duration": 5.0, "max_speed": 100.0}
-
-EVIDENCE_CSV = RESULTS / "04_percentile_extremes_audit_describe.csv"
-SUMMARY_MD = RESULTS / "04_percentile_extremes.md"
-PNG_OUT = RESULTS / "04_percentile_extremes_audit.png"
-
 FLAG_COLS = ["fare_amount", "trip_distance", "trip_duration_minutes", "speed_mph"]
 PERCENTILES = [0.01, 0.25, 0.5, 0.75, 0.99]
+STEM = "04_percentile_extremes_audit"
+ANALYSIS_SAMPLE = 50_000
+BLOCK = "day"
+ALTERNATE_SPEED_CAP = 40.0
 
 
 def _profile(subset: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
@@ -34,129 +40,46 @@ def _profile(subset: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
     return subset[cols].describe(percentiles=PERCENTILES)
 
 
-def _flagged(df: pd.DataFrame, thresholds: dict[str, float], high: bool) -> pd.DataFrame:
-    """Return rows of ``df`` violating the plausibility thresholds.
-
-    Speed is derived as ``trip_distance / (trip_duration_minutes / 60)`` in
-    mph; a zero duration yields infinite speed, which any max-speed rule
-    flags. For ``high=True`` (top fares) flag distance below ``min_distance``,
-    duration below ``min_duration``, or speed above ``max_speed``; for
-    ``high=False`` (bottom fares) flag distance above ``max_distance``,
-    duration above ``max_duration``, or speed above ``max_speed``.
-    """
-    flagged = df.copy()
-    duration_h = flagged["trip_duration_minutes"] / 60.0
-    flagged["speed_mph"] = np.where(
-        duration_h > 0, flagged["trip_distance"] / duration_h, np.inf
-    )
+def _flag_mask(frame: pd.DataFrame, thresholds: dict[str, float], high: bool) -> np.ndarray:
+    """Boolean plausibility violations for one extreme's fare band."""
+    speed = frame["trip_distance"] / (frame["trip_duration_minutes"] / 60.0)
+    speed = speed.replace([np.inf, -np.inf], np.finfo(float).max)
     if high:
-        violates = (
-            (flagged["trip_distance"] < thresholds["min_distance"])
-            | (flagged["trip_duration_minutes"] < thresholds["min_duration"])
-            | (flagged["speed_mph"] > thresholds["max_speed"])
-        )
-    else:
-        violates = (
-            (flagged["trip_distance"] > thresholds["max_distance"])
-            | (flagged["trip_duration_minutes"] > thresholds["max_duration"])
-            | (flagged["speed_mph"] > thresholds["max_speed"])
-        )
-    return flagged[violates]
+        return (
+            (frame["trip_distance"] < thresholds["min_distance"])
+            | (frame["trip_duration_minutes"] < thresholds["min_duration"])
+            | (speed > thresholds["max_speed"])
+        ).to_numpy()
+    return (
+        (frame["trip_distance"] > thresholds["max_distance"])
+        | (frame["trip_duration_minutes"] > thresholds["max_duration"])
+        | (speed > thresholds["max_speed"])
+    ).to_numpy()
 
 
-def _describe_table(desc: pd.DataFrame) -> str:
-    """Render a describe frame as a clean, aligned Markdown pipe table (03 style)."""
-    rows: list[list[str]] = []
-    for label, row in desc.iterrows():
-        cells = [
-            f"{int(value)}" if label == "count" else f"{value:,.2f}"
-            for value in row
-        ]
-        rows.append([str(label), *cells])
-    header = ["stat", *desc.columns]
-    widths = [
-        max(len(row[i]) for row in [header, *rows]) for i in range(len(header))
-    ]
-
-    def fmt(cells: list[str], aligns: list[str]) -> str:
-        return "| " + " | ".join(
-            cell.rjust(w) if a == "r" else cell.ljust(w)
-            for cell, w, a in zip(cells, widths, aligns)
-        ) + " |"
-
-    aligns = ["l"] + ["r"] * (len(header) - 1)
-    sep = "|" + "|".join("-" * (w + 2) for w in widths) + "|"
-    body = "\n".join([fmt(header, aligns), sep] + [fmt(row, aligns) for row in rows])
-    return body
+def _flagged(frame: pd.DataFrame, thresholds: dict[str, float], high: bool) -> pd.DataFrame:
+    """Rows of ``frame`` violating the plausibility thresholds (with speed)."""
+    flagged = frame.copy()
+    flagged["speed_mph"] = flagged["trip_distance"] / (
+        flagged["trip_duration_minutes"] / 60.0
+    )
+    return flagged[_flag_mask(frame, thresholds, high)]
 
 
-def _flagged_rows_table(flagged: pd.DataFrame, limit: int = 10) -> str:
-    """Render the top ``limit`` flagged trips as a unit-formatted pipe table."""
-    head = flagged[FLAG_COLS].head(limit)
-    header = ["#", "fare_amount", "trip_distance", "trip_duration_minutes", "speed_mph"]
-    rows = []
-    for i, (_, row) in enumerate(head.iterrows(), 1):
-        rows.append([
-            str(i),
-            f"${row['fare_amount']:,.2f}",
-            f"{row['trip_distance']:,.2f} mi",
-            f"{row['trip_duration_minutes']:.1f} min",
-            f"{row['speed_mph']:,.1f} mph",
-        ])
-    widths = [
-        max(len(row[i]) for row in [header, *rows]) for i in range(len(header))
-    ]
+def _plausible_share(frame: pd.DataFrame) -> float:
+    """Share of the extremes that passes the plausibility rules.
 
-    def fmt(cells: list[str], aligns: list[str]) -> str:
-        return "| " + " | ".join(
-            cell.rjust(w) if a == "r" else cell.ljust(w)
-            for cell, w, a in zip(cells, widths, aligns)
-        ) + " |"
-
-    aligns = ["r"] * len(header)
-    sep = "|" + "|".join("-" * (w + 2) for w in widths) + "|"
-    body = "\n".join([fmt(header, aligns), sep] + [fmt(row, aligns) for row in rows])
-    return body
-
-
-def _summary_md(
-    bottom_desc: pd.DataFrame,
-    top_desc: pd.DataFrame,
-    n_bottom: int,
-    n_top: int,
-    q01: float,
-    q99: float,
-    bottom_flagged: pd.DataFrame,
-    top_flagged: pd.DataFrame,
-) -> str:
-    """Render the audit Markdown summary (03 ``describe_to_markdown`` style)."""
-    return "\n".join([
-        "# Percentile extremes audit (bottom/top 1% of fares)",
-        "",
-        (f"Bottom 1%: fares <= ${q01:,.2f} — {n_bottom:,} rows "
-         f"({len(bottom_flagged):,} flagged)"),
-        (f"Top 1%: fares >= ${q99:,.2f} — {n_top:,} rows "
-         f"({len(top_flagged):,} flagged)"),
-        "",
-        "## Bottom 1% describe",
-        "",
-        _describe_table(bottom_desc),
-        "",
-        "## Top 1% describe",
-        "",
-        _describe_table(top_desc),
-        "",
-        f"Flagged rows: bottom {len(bottom_flagged):,}, top {len(top_flagged):,}.",
-        "",
-        "## Bottom flagged rows (head 10)",
-        "",
-        _flagged_rows_table(bottom_flagged),
-        "",
-        "## Top flagged rows (head 10)",
-        "",
-        _flagged_rows_table(top_flagged),
-        "",
+    The statistic recomputes the flags from the raw columns (never a
+    precomputed flag), so the block-shuffled null actually breaks the joint
+    that produces a flag: under a shuffled duration only chance-level
+    plausibility survives.
+    """
+    top = frame["top"].to_numpy(dtype=bool)
+    flags = np.concatenate([
+        _flag_mask(frame[~top], BOTTOM_SUSPECT, high=False),
+        _flag_mask(frame[top], TOP_SUSPECT, high=True),
     ])
+    return float(1.0 - flags.mean())
 
 
 def _combined_evidence(
@@ -190,15 +113,10 @@ def _combined_evidence(
                 "trip_duration_minutes": row["trip_duration_minutes"],
                 "speed_mph": row["speed_mph"],
             })
-    return pd.DataFrame(rows).set_index("stat")
+    return pd.DataFrame(rows).reset_index(drop=True)
 
 
-def plot_extremes(
-    df: pd.DataFrame,
-    bottom: pd.DataFrame,
-    top: pd.DataFrame,
-    out_path: Path,
-) -> None:
+def plot_extremes(df: pd.DataFrame, bottom: pd.DataFrame, top: pd.DataFrame) -> object:
     """Two-panel figure: bottom-vs-top fare boxplot plus fare-density comparison."""
     fig, axes = plt.subplots(1, 2, figsize=(12, 4.5), constrained_layout=True)
     extremes = pd.concat([
@@ -225,8 +143,7 @@ def plot_extremes(
     axes[1].legend(fontsize=7)
     axes[1].set_title("fare density: all vs bottom/top 1%")
     axes[1].grid(True, alpha=0.3, axis="y")
-    fig.savefig(out_path, dpi=150)
-    plt.close(fig)
+    return fig
 
 
 def main() -> None:
@@ -236,47 +153,99 @@ def main() -> None:
 
     q01 = float(df["fare_amount"].quantile(BOTTOM_Q))
     q99 = float(df["fare_amount"].quantile(TOP_Q))
-    print(f"1% quantile fare: ${q01:,.2f}")
-    print(f"99% quantile fare: ${q99:,.2f}")
-
-    bottom = df[df["fare_amount"] <= q01][PROFILE_COLS]
-    top = df[df["fare_amount"] >= q99][PROFILE_COLS]
+    bottom = df[df["fare_amount"] <= q01][[*PROFILE_COLS, "pickup_datetime"]]
+    top = df[df["fare_amount"] >= q99][[*PROFILE_COLS, "pickup_datetime"]]
     print(f"Bottom 1% (fare <= ${q01:,.2f}): {len(bottom):,} rows")
     print(f"Top 1% (fare >= ${q99:,.2f}): {len(top):,} rows")
-
-    print("Bottom fare value_counts (head 8):")
-    print(bottom["fare_amount"].value_counts().head(8))
-
-    bottom_desc = _profile(bottom, PROFILE_COLS)
-    top_desc = _profile(top, PROFILE_COLS)
-    print("Bottom 1% describe:")
-    print(bottom_desc)
-    print("Top 1% describe:")
-    print(top_desc)
 
     bottom_flagged = _flagged(bottom, BOTTOM_SUSPECT, high=False)
     top_flagged = _flagged(top, TOP_SUSPECT, high=True)
     print(f"Bottom flagged: {len(bottom_flagged)}")
     print(f"Top flagged: {len(top_flagged)}")
-    print("Bottom flagged rows (head):")
-    print(bottom_flagged[FLAG_COLS].head(10))
-    print("Top flagged rows (head):")
-    print(top_flagged[FLAG_COLS].head(10))
 
-    combined = _combined_evidence(bottom_desc, top_desc, bottom_flagged, top_flagged)
-    combined.to_csv(EVIDENCE_CSV)
-    print(f"wrote {EVIDENCE_CSV} ({len(combined)} rows)")
-
-    plot_extremes(df, bottom, top, PNG_OUT)
-    print(f"wrote {PNG_OUT}")
-
-    SUMMARY_MD.write_text(
-        _summary_md(
-            bottom_desc, top_desc, len(bottom), len(top), q01, q99,
-            bottom_flagged, top_flagged,
-        )
+    frame = pd.concat([
+        bottom.assign(top=False),
+        top.assign(top=True),
+    ]).assign(day=lambda part: part["pickup_datetime"].dt.floor("D"))
+    analysis = frame.sample(n=min(ANALYSIS_SAMPLE, len(frame)), random_state=SEED)
+    rule = load_decision_rule(STEM)
+    spec = MeasurementSpec(
+        bootstrap="block",
+        block_column=BLOCK,
+        null="block_shuffle",
+        null_column="trip_duration_minutes",
+        iterations=200,
+        seed=SEED,
     )
-    print(f"wrote {SUMMARY_MD}")
+    measurement = MeasurementEstimator().estimate(
+        frame, _plausible_share, spec, name=rule.metric, unit="share"
+    )
+    n = measurement.sample_size
+    bottom_analysis = analysis[~analysis["top"]]
+    top_analysis = analysis[analysis["top"]]
+    half = frame.sample(n=max(2, len(analysis) // 2), random_state=SEED + 1)
+    evidence = Evidence(
+        baseline="plausible extremes (no implausible trip in the bottom/top 1%)",
+        segments=[
+            SegmentEvidence(
+                segment="bottom_1pct",
+                value=float(1.0 - _flag_mask(
+                    bottom_analysis, BOTTOM_SUSPECT, high=False
+                ).mean()),
+                sample_size=len(bottom_analysis),
+            ),
+            SegmentEvidence(
+                segment="top_1pct",
+                value=float(1.0 - _flag_mask(
+                    top_analysis, TOP_SUSPECT, high=True
+                ).mean()),
+                sample_size=len(top_analysis),
+            ),
+        ],
+        sensitivity={
+            f"plausible_share_at_40mph_cap_n{n}": float(1.0 - np.concatenate([
+                _flag_mask(bottom_analysis, {**BOTTOM_SUSPECT, "max_speed": ALTERNATE_SPEED_CAP}, high=False),
+                _flag_mask(top_analysis, {**TOP_SUSPECT, "max_speed": ALTERNATE_SPEED_CAP}, high=True),
+            ]).mean()),
+            f"plausible_share_second_seed_n{len(half)}": _plausible_share(half),
+        },
+        falsifier="the plausible-share interval falls below the 95% floor",
+        provenance={
+            "artifact": sample.provenance["name"],
+            "artifact_sha256": sample.provenance["artifact_sha256"],
+            "seed": str(measurement.seed),
+            "analysis_sample": str(measurement.sample_size),
+            "block": BLOCK,
+            "resampling": measurement.resampling,
+            "exclusions": "bottom/top 1% quantile cut at the measured fare",
+        },
+    )
+    decision = measurement.to_decision(
+        rule,
+        question="Are the fare extremes plausible after the policy?",
+        evidence=evidence,
+    )
+    output = StepOutput(
+        results_dir=RESULTS, stem=STEM, decision=decision, source=Path(__file__)
+    )
+    output.add_table(
+        "describe",
+        _combined_evidence(
+            _profile(bottom, PROFILE_COLS), _profile(top, PROFILE_COLS),
+            bottom_flagged[FLAG_COLS], top_flagged[FLAG_COLS],
+        ),
+    )
+    output.save_figure(plot_extremes(analysis, bottom, top))
+    plt.close("all")
+    report, figure, decision_path = output.write()
+    print(f"report: {report}")
+    print(f"plot: {figure}")
+    print(
+        f"decision: {decision_path} -> {decision.verdict} "
+        f"({rule.metric} {measurement.value:.4f} "
+        f"[{decision.interval_low:.4f}, {decision.interval_high:.4f}], "
+        f"n={measurement.sample_size:,}, null={decision.null_threshold})"
+    )
 
 
 if __name__ == "__main__":

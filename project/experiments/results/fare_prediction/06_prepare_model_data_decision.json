@@ -1,0 +1,49 @@
+{
+  "question": "Does the chronological split leave the test slice inside the train route frequency?",
+  "metric": "test_unseen_route_share",
+  "value": 0.00884,
+  "interval_low": 0.007964024463261155,
+  "interval_high": 0.009570918100487104,
+  "reference": null,
+  "delta": null,
+  "threshold": 0.05,
+  "null_threshold": null,
+  "direction": "min",
+  "verdict": "act",
+  "action": "ship the chronological split as-is",
+  "owner": "fare_prediction",
+  "sample_size": 50000,
+  "unit": "share",
+  "min_sample_size": 1000,
+  "evidence": {
+    "baseline": "every test route seen in train (unseen share of zero)",
+    "delta": null,
+    "segments": [
+      {
+        "segment": "repeated_train_routes",
+        "value": 0.0,
+        "sample_size": 49286
+      },
+      {
+        "segment": "rare_or_unseen_train_routes",
+        "value": 0.6190476190476191,
+        "sample_size": 714
+      }
+    ],
+    "sensitivity": {
+      "val_unseen_route_share_n98807": 0.008359731597963707,
+      "unseen_route_share_second_seed_n25000": 0.00984
+    },
+    "falsifier": "the unseen-route interval exceeds the 5% ceiling",
+    "provenance": {
+      "artifact": "fare_prediction_1m",
+      "artifact_sha256": "158940b0d905b77d53f94cb849fffdff068958db642a7bbd19074a742a8aed67",
+      "version": "v3",
+      "seed": "42",
+      "analysis_sample": "50000",
+      "block": "day",
+      "resampling": "block",
+      "exclusions": "route frequency fitted on the chronological train slice only"
+    }
+  }
+}

@@ -11,32 +11,35 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import statsmodels.api as sm
-from _common import RESULTS, SAFE_NUMERIC_FEATURES, SEED
+from _common import DATETIME_SRC, RESULTS, SAFE_NUMERIC_FEATURES, SEED, load_decision_rule
 from scipy.stats import pearsonr, spearmanr
 from sklearn.feature_selection import mutual_info_regression
 from statsmodels.regression.linear_model import RegressionResultsWrapper
 from statsmodels.stats.diagnostic import linear_reset
 
+from broadway.reports.decision import Evidence, SegmentEvidence
+from broadway.reports.measurement import MeasurementEstimator, MeasurementSpec
+from broadway.reports.step_output import StepOutput
+
 PREPARED_TRAIN = RESULTS / "prepared" / "train.parquet"
 TARGET = "fare_amount"
-RESET_X_COLS = ["pickup_hour", "route_id_encoded", "pu_rush_interaction"]
-# The safe-feature nonlinearity check: route_id_encoded is the strongest safe
-# association; a quadratic term tests whether its curve needs capturing.
+RESET_X_COLS = ["pickup_hour", "route_frequency"]
+# The safe-feature nonlinearity check: route_frequency carries most of the
+# non-temporal signal; a quadratic term tests whether its curve needs capturing.
 RESET_VARIANTS = (
     ("linear (safe)", RESET_X_COLS),
-    ("quadratic route_id", ["pickup_hour", "route_id_encoded", "route_id_sq", "pu_rush_interaction"]),
+    ("quadratic route_frequency", ["pickup_hour", "route_frequency", "route_frequency_sq"]),
 )
 AUDIT_COLS = list(SAFE_NUMERIC_FEATURES)
 MI_NEIGHBORS = 5
-DELTA_THRESHOLD = 0.05
 R2_FLOOR = 0.01
 N_FITTED_BINS = 10
 SCATTER_SAMPLE = 25_000
+STEM = "07_specification_diagnostics"
+ANALYSIS_SAMPLE = 50_000
+BLOCK = "day"
 
-DESCRIBE_CSV = RESULTS / "07_specification_diagnostics_describe.csv"
-PNG_MAIN = RESULTS / "07_specification_diagnostics.png"
 PNG_RESET = RESULTS / "07_specification_diagnostics_reset.png"
-SUMMARY_MD = RESULTS / "07_specification_diagnostics.md"
 
 
 def _corr(stat: object) -> float:
@@ -67,19 +70,19 @@ def run_reset(model: RegressionResultsWrapper) -> dict[int, tuple[float, float]]
 
 def _variant_frame(df: pd.DataFrame, x_cols: list[str]) -> pd.DataFrame:
     """X frame with the transforms a RESET variant needs."""
-    base_cols = [c for c in x_cols if c not in ("route_id_sq",)]
+    base_cols = [c for c in x_cols if c not in ("route_frequency_sq",)]
     out = df[base_cols].copy()
-    if "route_id_sq" in x_cols:
-        out["route_id_sq"] = df["route_id_encoded"] ** 2
+    if "route_frequency_sq" in x_cols:
+        out["route_frequency_sq"] = df["route_frequency"] ** 2
     return out
 
 
 def run_reset_variants(df: pd.DataFrame) -> pd.DataFrame:
-    """RESET (power=2) across the linear and quadratic-route_id specs.
+    """RESET (power=2) across the linear and quadratic route-frequency specs.
 
-    route_id_encoded is the strongest safe association; the quadratic term
-    tests whether its curve needs capturing (the safe-set analogue of the
-    earlier monotonic-trap check on duration).
+    route_frequency carries the non-temporal signal; the quadratic term tests
+    whether its curve needs capturing (the safe-set analogue of the earlier
+    monotonic-trap check on duration).
     """
     rows = []
     for label, x_cols in RESET_VARIANTS:
@@ -93,7 +96,7 @@ def run_reset_variants(df: pd.DataFrame) -> pd.DataFrame:
             "reset_p": float(test.pvalue),
         })
     variants = pd.DataFrame(rows).set_index("model")
-    print("\nRESET variants (safe features — route_id_encoded curvature):")
+    print("\nRESET variants (safe features — route_frequency curvature):")
     print(variants.round(4).to_string())
     return variants
 
@@ -170,7 +173,7 @@ def _diag_scatter(
     ax.grid(True, alpha=0.3)
 
 
-def plot_main(evidence: pd.DataFrame, out_path: Path) -> None:
+def plot_main(evidence: pd.DataFrame) -> object:
     """4 panels: association bars (Pearson/Spearman, MI/R²) and two y=x scatter audits."""
     fig, axes = plt.subplots(2, 2, figsize=(14, 10), constrained_layout=True)
     _bars(axes[0, 0], evidence.sort_values("delta", ascending=False),
@@ -184,8 +187,7 @@ def plot_main(evidence: pd.DataFrame, out_path: Path) -> None:
     _diag_scatter(axes[1, 1], evidence, "r2", "mi",
                   "MI vs R² — above y=x = nonlinear association the linear model misses",
                   label_top=3)
-    fig.savefig(out_path, dpi=150)
-    plt.close(fig)
+    return fig
 
 
 def _variance_by_bin(ax: plt.Axes, model: RegressionResultsWrapper) -> None:
@@ -226,21 +228,21 @@ def _residuals_fitted(
 
 
 def _route_curve(ax: plt.Axes, df: pd.DataFrame) -> None:
-    """Fare vs route_id_encoded: linear / log / quadratic fits over the same curve."""
+    """Fare vs route_frequency: linear / log / quadratic fits over the same curve."""
     sample = df.sample(n=min(SCATTER_SAMPLE, len(df)), random_state=SEED)
-    d = sample["route_id_encoded"]
+    d = sample["route_frequency"]
     y = sample[TARGET]
     ax.scatter(d, y, s=3, alpha=0.12, color="#4c72b0")
     grid = np.linspace(d.quantile(0.01), d.quantile(0.99), 100)
     ax.plot(grid, np.polyval(np.polyfit(d, y, 1), grid), "-",
             color="#dd8452", lw=1.6, label="linear")
     ax.plot(grid, np.polyval(np.polyfit(np.log1p(d), y, 1), np.log1p(grid)), "--",
-            color="#2ca02c", lw=1.6, label="log(route_id_encoded)")
+            color="#2ca02c", lw=1.6, label="log(route_frequency)")
     ax.plot(grid, np.polyval(np.polyfit(d, y, 2), grid), ":",
             color="#d62728", lw=1.6, label="quadratic")
-    ax.set_xlabel("route_id_encoded")
+    ax.set_xlabel("route_frequency")
     ax.set_ylabel("fare_amount")
-    ax.set_title("fare vs route_id_encoded — linear vs log vs quadratic")
+    ax.set_title("fare vs route_frequency — linear vs log vs quadratic")
     ax.legend(fontsize=8)
     ax.grid(True, alpha=0.3)
 
@@ -280,53 +282,9 @@ def _markdown_table(frame: pd.DataFrame) -> str:
     return body
 
 
-def _summary_md(
-    n_rows: int,
-    evidence: pd.DataFrame,
-    reset: dict[int, tuple[float, float]],
-    variants: pd.DataFrame,
-) -> str:
-    """Render the specification-diagnostics Markdown summary."""
-    f2, p2 = reset[2]
-    f3, p3 = reset[3]
-    verdict2 = "specification error (p<0.05)" if p2 < 0.05 else "no evidence of misspecification"
-    verdict3 = "specification error (p<0.05)" if p3 < 0.05 else "no evidence of misspecification"
-    delta_flagged = evidence[evidence["delta"] >= DELTA_THRESHOLD].index.tolist()
-    top_delta = evidence.nlargest(3, "delta")[["pearson", "spearman", "delta"]]
-    top_ratio = evidence.nlargest(3, "mi_r2_ratio")[["mi", "r2", "mi_r2_ratio"]]
-    return "\n".join([
-        "# Specification diagnostics (prepared train)",
-        "",
-        "Ramsey RESET · Pearson-vs-Spearman discrepancies · MI-vs-R² audit.",
-        "",
-        f"- Rows: {n_rows:,} (prepared train, NaN-dropped); target: {TARGET}.",
-        f"- RESET baseline: {TARGET} ~ {' + '.join(RESET_X_COLS)} (plain OLS).",
-        f"- RESET power=2 (yhat²): F={f2:,.1f}, p={p2:.3e} → {verdict2}.",
-        f"- RESET power=3 (yhat²+yhat³): F={f3:,.1f}, p={p3:.3e} → {verdict3}.",
-        "",
-        "## RESET variants (non-linear monotonic trap — duration curvature)",
-        "",
-        ("trip_duration_minutes is monotonic but curved; log or quadratic terms "
-         "should collapse the specification error."),
-        "",
-        _markdown_table(variants),
-        "",
-        "## Evidence table",
-        "",
-        _markdown_table(evidence),
-        "",
-        f"## Flagged: top-3 |Pearson − Spearman| (threshold Δ ≥ {DELTA_THRESHOLD:.2f})",
-        "",
-        (f"Features over threshold: {', '.join(delta_flagged)}." if delta_flagged
-         else "No feature exceeds the threshold."),
-        "",
-        _markdown_table(top_delta),
-        "",
-        "## Flagged: top-3 MI/R² ratio (nonlinearity candidates)",
-        "",
-        _markdown_table(top_ratio),
-        "",
-    ])
+def _top_delta(frame: pd.DataFrame) -> float:
+    """The largest |Pearson - Spearman| gap across the audited safe features."""
+    return float(frame["delta"].max())
 
 
 def main() -> None:
@@ -340,22 +298,86 @@ def main() -> None:
 
     evidence = correlation_evidence(df).join(mi_r2_evidence(df))
     print(evidence.round(4).to_string())
-    evidence.to_csv(DESCRIBE_CSV)
-    print(f"wrote {DESCRIBE_CSV} ({len(evidence)} rows)")
-
-    plot_main(evidence, PNG_MAIN)
-    print(f"wrote {PNG_MAIN}")
 
     plot_reset(model, reset, df, PNG_RESET)
     print(f"wrote {PNG_RESET}")
 
-    SUMMARY_MD.write_text(_summary_md(len(df), evidence, reset, variants))
-    print(f"wrote {SUMMARY_MD}")
-
-    top_delta = evidence.nlargest(3, "delta").index.tolist()
-    top_ratio = evidence.nlargest(3, "mi_r2_ratio").index.tolist()
-    print(f"top-3 |delta| features: {top_delta}")
-    print(f"top-3 MI/R2 ratio features: {top_ratio}")
+    analysis = df.sample(n=min(ANALYSIS_SAMPLE, len(df)), random_state=SEED).assign(
+        day=lambda part: part[DATETIME_SRC].dt.floor("D")
+    )
+    weekend = analysis["pickup_day_of_week"] >= 5
+    half = analysis.sample(n=max(2, len(analysis) // 2), random_state=SEED + 1)
+    rule = load_decision_rule(STEM)
+    spec = MeasurementSpec(
+        bootstrap="block",
+        block_column=BLOCK,
+        null="block_shuffle",
+        null_column=TARGET,
+        iterations=100,
+        seed=SEED,
+    )
+    measurement = MeasurementEstimator().estimate(
+        analysis,
+        lambda part: _top_delta(correlation_evidence(part)),
+        spec,
+        name=rule.metric,
+        unit="correlation_gap",
+    )
+    n = measurement.sample_size
+    decision_evidence = Evidence(
+        baseline="linear reading sufficient: Pearson equals Spearman on every feature",
+        segments=[
+            SegmentEvidence(
+                segment="weekday",
+                value=_top_delta(correlation_evidence(analysis[~weekend])),
+                sample_size=int((~weekend).sum()),
+            ),
+            SegmentEvidence(
+                segment="weekend",
+                value=_top_delta(correlation_evidence(analysis[weekend])),
+                sample_size=int(weekend.sum()),
+            ),
+        ],
+        sensitivity={
+            f"top_mi_r2_ratio_n{n}": float(correlation_evidence(analysis).join(
+                mi_r2_evidence(analysis)
+            )["mi_r2_ratio"].max()),
+            f"top_delta_second_seed_n{len(half)}": _top_delta(correlation_evidence(half)),
+            f"reset_power2_p_value_n{n}": reset[2][1],
+        },
+        falsifier="every |Pearson - Spearman| gap falls below 0.05",
+        provenance={
+            "artifact": PREPARED_TRAIN.name,
+            "source": str(PREPARED_TRAIN),
+            "seed": str(measurement.seed),
+            "analysis_sample": str(measurement.sample_size),
+            "block": BLOCK,
+            "resampling": measurement.resampling,
+            "exclusions": "post-trip columns (distance/duration/speed) excluded as leakage",
+        },
+    )
+    decision = measurement.to_decision(
+        rule,
+        evidence=decision_evidence,
+        question="Does a linear reading of the safe features hide nonlinearity?",
+    )
+    reset_table = variants.reset_index().rename(columns={"index": "model"})
+    output = StepOutput(
+        results_dir=RESULTS, stem=STEM, decision=decision, source=Path(__file__)
+    )
+    output.add_table("describe", evidence.reset_index())
+    output.add_table("reset", reset_table)
+    output.save_figure(plot_main(evidence))
+    plt.close("all")
+    report, figure, decision_path = output.write()
+    print(f"report: {report}")
+    print(f"plot: {figure}")
+    print(
+        f"decision: {decision_path} -> {decision.verdict} "
+        f"({rule.metric} {measurement.value:.4f} "
+        f"[{decision.interval_low:.4f}, {decision.interval_high:.4f}], "
+        f"n={measurement.sample_size:,}, null={decision.null_threshold})"
+    )
 
 
 if __name__ == "__main__":
