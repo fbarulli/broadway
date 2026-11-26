@@ -19,6 +19,7 @@ import os
 import socket
 import sys
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import mlflow
 import optuna
@@ -76,6 +77,14 @@ def _dummy_objective(params: dict) -> float:
     return 0.0
 
 
+def _redacted_url(url: str) -> str:
+    """Storage URL with the password removed (never print a credential)."""
+    parts = urlsplit(url)
+    host = parts.hostname or ""
+    port = f":{parts.port}" if parts.port else ""
+    return f"{parts.scheme}://{host}{port}{parts.path}"
+
+
 def log_endpoints(model_name: str, cfg: dict, db_url: str) -> None:
     """Log the actual endpoints in use (visibility requirement)."""
     host = socket.gethostname()
@@ -84,7 +93,7 @@ def log_endpoints(model_name: str, cfg: dict, db_url: str) -> None:
           f"ip={socket.gethostbyname(host)} "
           f"db={db['host']}:{db['port']}/{db['name']} "
           f"tracking_uri={cfg['mlflow']['tracking_uri']}")
-    print(f"[worker] db_url={db_url}")
+    print(f"[worker] storage={_redacted_url(db_url)}")
 
 
 def log_to_mlflow(
@@ -125,7 +134,7 @@ def preflight(db_url: str, tracking_uri: str) -> None:
         import sqlalchemy
         sqlalchemy.create_engine(db_url).connect().close()
     except Exception as exc:
-        print(f"[worker] FATAL: cannot reach Optuna storage {db_url!r}: {exc}",
+        print(f"[worker] FATAL: cannot reach Optuna storage {_redacted_url(db_url)}: {exc}",
               file=sys.stderr)
         sys.exit(1)
     try:
