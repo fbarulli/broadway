@@ -31,11 +31,14 @@ import traceback
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import optuna
+import pandas as pd
 from hpo_study import DatasetIdentity, HpoStudyConfig, SharedStudyStorage
 from lane_contract import resolve_callable
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from broadway.evaluate.leaderboard import ChampionDecision, MetricDirection, MetricLeaderboard
 from broadway.training.hpo import Objective, run_model_study
 
 REDACTED = "<redacted>"  # what a scrubbed traceback shows in place of the storage URL
@@ -93,6 +96,56 @@ def _storage_target(invocation: WorkerInvocation, study: HpoStudyConfig) -> tupl
 def _redact(trace: str, secret: str) -> str:
     """Scrub the storage URL out of a traceback before it reaches stderr."""
     return trace.replace(secret, REDACTED) if secret else trace
+
+
+class StudyChampion:
+    """The best completed trial and its interval — the study's champion record.
+
+    Trials are the runs; the champion is the best objective value under the
+    study's declared direction. Its 95% interval is a bagged minimum (resample
+    the completed trial values with replacement and take the best of each
+    draw), which says how much of the lead depends on the trial sample rather
+    than on a lucky single run.
+    """
+
+    def __init__(self, values: dict[int, float], direction: str, seed: int) -> None:
+        if not values:
+            raise ValueError("a study champion needs at least one completed trial")
+        self._values = values
+        self._direction = direction
+        self._seed = seed
+
+    def decision(self) -> ChampionDecision:
+        """Rank the completed trials and attach the champion's interval."""
+        direction = (
+            MetricDirection.MINIMIZE if self._direction == "minimize" else MetricDirection.MAXIMIZE
+        )
+        frame = pd.DataFrame(
+            {
+                "trial": [str(number) for number in self._values],
+                "objective": list(self._values.values()),
+            }
+        )
+        board = MetricLeaderboard.from_frame(
+            frame, id_column="trial", metrics={"objective": direction}
+        )
+        champion = board.top("objective", limit=1)[0]
+        draws = np.asarray(list(self._values.values()), dtype=float)
+        rng = np.random.default_rng(self._seed)
+        best = draws.min() if direction is MetricDirection.MINIMIZE else draws.max()
+        bagged = [
+            (
+                draws[rng.integers(0, draws.size, draws.size)].min()
+                if direction is MetricDirection.MINIMIZE
+                else draws[rng.integers(0, draws.size, draws.size)].max()
+            )
+            for _ in range(200)
+        ]
+        low, high = np.percentile(bagged, [2.5, 97.5])
+        return board.champion(
+            "objective",
+            {champion: (min(float(low), float(best)), max(float(high), float(best)))},
+        )
 
 
 class HpoWorker:
@@ -163,6 +216,15 @@ class HpoWorker:
             "dataset": self._identity.model_dump(),
             "best_value": float(study.best_value),
             "best_params": dict(study.best_params),
+            "champion": StudyChampion(
+                {
+                    trial.number: float(trial.value)
+                    for trial in study.trials
+                    if trial.value is not None
+                },
+                self._direction,
+                invocation.sampler_seed(),
+            ).decision().model_dump(mode="json"),
             "elapsed_s": round(elapsed_s, 3),
         }
 

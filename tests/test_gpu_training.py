@@ -568,3 +568,15 @@ def test_preflight_requires_the_declared_dataset(
     captured = capsys.readouterr()
     assert "FileNotFoundError" in captured.err
     assert "declares" in captured.err
+
+
+def test_study_champion_picks_the_best_trial_with_its_interval() -> None:
+    champion = hpo_kernel.StudyChampion(
+        {0: 0.50, 1: 0.10, 2: 0.80}, "minimize", seed=42
+    ).decision()
+
+    assert champion.champion == "1"
+    assert champion.value == 0.10
+    assert champion.runner_up == "0"
+    assert champion.margin == pytest.approx(0.40)
+    assert champion.interval_low <= champion.value <= champion.interval_high
