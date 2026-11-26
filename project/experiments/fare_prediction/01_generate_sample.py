@@ -14,6 +14,38 @@ def _provenance(artifact: Path) -> dict:
     return json.loads(artifact.with_suffix(".json").read_text(encoding="utf-8"))
 
 
+def _profile(artifact: Path, provenance: dict) -> str:
+    """Render the sample's actual output: shape, dtypes, head rows, numeric summary."""
+    frame = pd.read_parquet(artifact)
+    lines = [
+        f"# 01 — {provenance['name']} ({provenance['version']})",
+        "",
+        f"- artifact: `{artifact}`",
+        f"- rows: {len(frame):,} · columns: {len(frame.columns)}",
+        f"- source: `{provenance['source']['path']}` (seed {provenance['seed']}, size {provenance['size']})",
+        f"- definition_sha256: `{provenance['definition_sha256']}`",
+        f"- artifact_sha256: `{provenance['artifact_sha256']}`",
+        "",
+        "## columns",
+        "",
+        "| column | dtype | missing | missing % |",
+        "| --- | --- | ---: | ---: |",
+    ]
+    missing = frame.isna().sum()
+    for column in frame.columns:
+        count = int(missing[column])
+        share = 100.0 * count / len(frame) if len(frame) else 0.0
+        lines.append(f"| {column} | {frame[column].dtype} | {count:,} | {share:.2f}% |")
+    lines += ["", "## head", "", frame.head(5).to_markdown(index=False), ""]
+    numeric = frame.select_dtypes("number")
+    if not numeric.empty:
+        summary = numeric.describe().T[["mean", "std", "min", "50%", "max"]]
+        lines += ["## numeric summary", "", summary.to_markdown(floatfmt=".4f"), ""]
+    if provenance.get("derived"):
+        lines += [f"derived: {', '.join(provenance['derived'])}", ""]
+    return "\n".join(lines)
+
+
 def main() -> None:
     spec = load_sample(SAMPLE_NAME)
     artifact = Path(spec.path)
@@ -23,22 +55,10 @@ def main() -> None:
         artifact = generate_sample(SAMPLE_NAME)
         print(f"artifact: {artifact}")
     provenance = _provenance(artifact)
-    summary = pd.DataFrame(
-        [
-            {
-                "artifact": str(artifact),
-                "rows": provenance["row_count"],
-                "columns": len(provenance["columns"]),
-                "version": provenance["version"],
-                "definition_sha256": provenance["definition_sha256"],
-                "artifact_sha256": provenance["artifact_sha256"],
-            }
-        ]
-    )
     RESULTS.mkdir(parents=True, exist_ok=True)
-    output = RESULTS / "01_generate_sample.csv"
-    summary.to_csv(output, index=False)
-    print(f"summary: {output}")
+    output = RESULTS / "01_generate_sample.md"
+    output.write_text(_profile(artifact, provenance), encoding="utf-8")
+    print(f"profile: {output}")
 
 
 if __name__ == "__main__":
