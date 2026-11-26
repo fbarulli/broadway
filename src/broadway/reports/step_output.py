@@ -77,6 +77,22 @@ class StepOutput:
         tables = "\n".join(
             f"- [{name}]({path.name})" for name, path in self._tables
         ) or "- none"
+        evidence = self._decision.evidence
+        segments = "\n".join(
+            f"| {item.segment} | {item.value:,.4f} | {item.sample_size:,} |"
+            for item in evidence.segments
+        )
+        sensitivity = "\n".join(
+            f"- {name}: {value:,.4f}" for name, value in evidence.sensitivity.items()
+        )
+        provenance = "\n".join(
+            f"- {name}: {value}" for name, value in evidence.provenance.items()
+        )
+        delta = (
+            f"\n- delta vs baseline: {evidence.delta:+,.4f}"
+            if evidence.delta is not None
+            else ""
+        )
         null = (
             f" (permutation null {decision.null_threshold:,.4f})"
             if decision.null_threshold is not None
@@ -93,6 +109,12 @@ class StepOutput:
             f"{comparison}"
             f"- action ({decision.owner}): {decision.action}\n\n"
             f"![figure]({self._figure_path.name})\n\n"
+            f"## evidence\n\n"
+            f"- baseline: {evidence.baseline}{delta}\n\n"
+            f"### segments\n\n| segment | value | n |\n| --- | ---: | ---: |\n{segments}\n\n"
+            f"### sensitivity\n\n{sensitivity}\n\n"
+            f"### falsifier\n\n{evidence.falsifier}\n\n"
+            f"### provenance\n\n{provenance}\n\n"
             f"## tables\n\n{tables}\n"
         )
 

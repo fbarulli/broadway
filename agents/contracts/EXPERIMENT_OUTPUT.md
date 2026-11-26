@@ -60,6 +60,36 @@ The dashboard opens on the figure and renders `<stem>*.csv` as evidence tables
 `<stem>_decision.json` next to the report. The dashboard renders the record as
 a coloured verdict badge on the step page.
 
+## The evidence bundle (required)
+
+A verdict without the evidence behind it is a claim. `Decision` therefore
+requires an `Evidence` object, validated by construction:
+
+| Field | What it must carry |
+|---|---|
+| `baseline` | what the metric is measured against (source, naive model, null) |
+| `delta` | the difference from that baseline, when one exists |
+| `segments` | at least one re-measurement inside a slice (weekday/weekend, borough, size band) — a slice that would expose a hiding failure |
+| `sensitivity` | at least one robustness check (half sample, second seed, alternative knob) |
+| `falsifier` | the result that would reverse the verdict |
+| `provenance` | artifact + hash, source path, seed, exclusions |
+
+A step that cannot supply one of these records why in the report instead of
+omitting it silently.
+
+## How to instruct an agent to surface more evidence
+
+Put this in every build/delegation prompt (and quote this file):
+
+> Every step you build must publish a `StepOutput` decision record: one metric
+> with its 95% interval and n; the baseline it is measured against and the
+> delta; at least one segment re-measurement; at least one sensitivity check;
+> the falsifier; and provenance (artifact + hash, seed, exclusions). The
+> verdict is computed by `Decision.evaluate` against a sample-size-calibrated
+> threshold — never typed. If you cannot supply a piece of evidence, say so in
+> the report; do not drop it silently. The gate (`experiment-outputs`) fails
+> the build when the record or its evidence is missing.
+
 ## Where decisions must exist
 
 The contract is not only for experiment scripts; every pipeline step that a

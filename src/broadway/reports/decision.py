@@ -23,6 +23,35 @@ Verdict = Literal["act", "investigate", "no_action", "insufficient"]
 Direction = Literal["max", "min"]
 
 
+class SegmentEvidence(BaseModel):
+    """The metric re-measured inside one segment (a slice that could hide a failure)."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    segment: str = Field(min_length=1)
+    value: float
+    sample_size: int = Field(gt=0)
+
+
+class Evidence(BaseModel):
+    """What must accompany a decision so a reader can check it, not trust it.
+
+    ``baseline`` names what the metric is compared against; ``segments`` proves
+    the finding is not one slice's artifact; ``sensitivity`` shows the verdict's
+    dependence on one knob; ``falsifier`` says what result would reverse it;
+    ``provenance`` pins the data (artifact, hash, seed, exclusions).
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    baseline: str = Field(min_length=1)
+    delta: float | None = None
+    segments: list[SegmentEvidence] = Field(min_length=1)
+    sensitivity: dict[str, float] = Field(min_length=1)
+    falsifier: str = Field(min_length=1)
+    provenance: dict[str, str] = Field(min_length=1)
+
+
 class DecisionRule(BaseModel):
     """The config-declared test for one step (``decisions.<step>`` in YAML)."""
 
@@ -56,6 +85,7 @@ class Decision(BaseModel):
     action: str
     owner: str
     sample_size: int = Field(gt=0)
+    evidence: Evidence
 
     @model_validator(mode="after")
     def _ordered_interval(self) -> Decision:
@@ -74,6 +104,7 @@ class Decision(BaseModel):
         interval: tuple[float, float],
         sample_size: int,
         question: str,
+        evidence: Evidence,
         null_values: Sequence[float] | None = None,
         reference: float | None = None,
     ) -> Decision:
@@ -127,4 +158,5 @@ class Decision(BaseModel):
             action=action,
             owner=rule.owner,
             sample_size=sample_size,
+            evidence=evidence,
         )

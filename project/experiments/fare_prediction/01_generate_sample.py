@@ -14,7 +14,7 @@ from _common import RESULTS, SAMPLE_NAME, UNIT_FMT, load_decision_rule
 from scipy.stats import ks_2samp
 
 from broadway.lineage.sample import load_sample
-from broadway.reports.decision import Decision
+from broadway.reports.decision import Decision, Evidence, SegmentEvidence
 from broadway.reports.step_output import StepOutput
 from broadway.samples import generate_sample
 
@@ -94,6 +94,31 @@ def _figure(source: pd.DataFrame, frame: pd.DataFrame, sampled: int) -> object:
     return figure
 
 
+def _segments(source: pd.DataFrame, frame: pd.DataFrame) -> list[SegmentEvidence]:
+    """Re-measure the KS inside weekday/weekend slices (a failing slice must show)."""
+    evidence = []
+    for label, weekend in (("weekday", False), ("weekend", True)):
+        source_mask = source["pickup_datetime"].dt.dayofweek >= 5
+        frame_mask = frame["pickup_datetime"].dt.dayofweek >= 5
+        if weekend:
+            source_slice, frame_slice = source[source_mask], frame[frame_mask]
+        else:
+            source_slice, frame_slice = source[~source_mask], frame[~frame_mask]
+        n = min(COMPARE_SAMPLE, len(source_slice), len(frame_slice))
+        if n == 0:
+            continue
+        src = source_slice["fare_amount"].sample(n=n, random_state=0)
+        smp = frame_slice["fare_amount"].sample(n=n, random_state=0)
+        evidence.append(
+            SegmentEvidence(
+                segment=label,
+                value=float(ks_2samp(src, smp).statistic),
+                sample_size=n,
+            )
+        )
+    return evidence
+
+
 def _columns_table(frame: pd.DataFrame) -> pd.DataFrame:
     missing = frame.isna().sum()
     return pd.DataFrame(
@@ -115,17 +140,46 @@ def main() -> None:
         print(f"artifact: {artifact}")
     provenance = _provenance(artifact)
     frame = pd.read_parquet(artifact)
-    source = pd.read_parquet(provenance["source"]["path"], columns=list(COMPARED))
+    source = pd.read_parquet(
+        provenance["source"]["path"], columns=[*COMPARED, "pickup_datetime"]
+    )
     RESULTS.mkdir(parents=True, exist_ok=True)
 
     value, interval, null = _drift(source, frame)
     rule = load_decision_rule(STEM)
+    half = frame["fare_amount"].sample(frac=0.5, random_state=7)
+    source_half = source["fare_amount"].sample(n=len(half), random_state=7)
+    evidence = Evidence(
+        baseline="no-effect permutation (sample labels shuffled at this n)",
+        segments=_segments(source, frame),
+        sensitivity={
+            "ks_half_sample": float(ks_2samp(source_half, half).statistic),
+            "ks_seed_7": float(
+                ks_2samp(
+                    source["fare_amount"].sample(n=COMPARE_SAMPLE, random_state=7),
+                    frame["fare_amount"].sample(n=COMPARE_SAMPLE, random_state=7),
+                ).statistic
+            ),
+        },
+        falsifier=(
+            "the KS interval no longer clears the null band once the fare-policy "
+            "exclusions are relaxed"
+        ),
+        provenance={
+            "artifact": provenance["name"],
+            "artifact_sha256": provenance["artifact_sha256"],
+            "source": provenance["source"]["path"],
+            "seed": str(provenance["seed"]),
+            "exclusions": "fare<=4.40 with long distance/duration/speed",
+        },
+    )
     decision = Decision.evaluate(
         rule=rule,
         value=value,
         interval=interval,
         sample_size=min(COMPARE_SAMPLE, len(frame)),
         null_values=null,
+        evidence=evidence,
         question="Did sampling plus the fare policy preserve the source population?",
     )
     output = StepOutput(results_dir=RESULTS, stem=STEM, decision=decision)
