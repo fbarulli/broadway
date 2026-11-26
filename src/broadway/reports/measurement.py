@@ -163,6 +163,7 @@ class Measurement(BaseModel):
             evidence=evidence,
             null_values=null_values,
             reference=reference,
+            unit=self.unit,
         )
 
 

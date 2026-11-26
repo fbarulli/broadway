@@ -27,6 +27,28 @@ def mean_width(lower: np.ndarray, upper: np.ndarray) -> float:
     return float(np.mean(widths))
 
 
+def coverage_tolerance(
+    nominal: float, n: int, business_tolerance: float, sigma: float = 3.0
+) -> float:
+    """The coverage band a calibrated interval must land in at this n.
+
+    A fixed tolerance ignores sample size: 0.05 is generous at n=100 and
+    meaningless at n=100,000, where sampling noise on the coverage estimate is
+    ``sqrt(p(1-p)/n)``. The effective tolerance is the tighter of the declared
+    business tolerance and ``sigma`` standard errors — so a large holdout is
+    judged by its real noise floor, not by a constant that hides a genuine
+    miscalibration.
+    """
+    if n < 1:
+        raise ValueError(f"coverage tolerance needs at least one row, got {n}")
+    if not 0.0 < nominal < 1.0:
+        raise ValueError(f"nominal coverage must be in (0, 1), got {nominal}")
+    if business_tolerance < 0.0:
+        raise ValueError(f"business tolerance must be non-negative, got {business_tolerance}")
+    noise = sigma * (nominal * (1.0 - nominal) / n) ** 0.5
+    return min(business_tolerance, noise)
+
+
 def coverage_by_period(
     index: pd.DatetimeIndex,
     y_true: np.ndarray,

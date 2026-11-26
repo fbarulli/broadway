@@ -144,3 +144,24 @@ def test_evidence_bundle_cannot_be_empty() -> None:
             falsifier="nothing",
             provenance={},
         )
+
+
+def test_min_direction_null_band_can_only_tighten_the_bar() -> None:
+    """For a min-direction rule the null's LOW tail is the noise floor: clearing
+    both it and ``min_effect`` is stricter, never looser (the documented rule)."""
+    rule = _rule(metric="rmse", direction="min", min_effect=0.10)
+    without_null = Decision.evaluate(
+        rule=rule, value=0.05, interval=(0.04, 0.06), sample_size=10_000,
+        question="q", evidence=_evidence(),
+    )
+    with_null = Decision.evaluate(
+        rule=rule, value=0.05, interval=(0.04, 0.06), sample_size=10_000,
+        question="q", evidence=_evidence(),
+        null_values=[0.02, 0.03, 0.04, 0.05, 0.06],
+    )
+
+    assert without_null.verdict == "act"
+    assert with_null.null_threshold == pytest.approx(0.022)
+    assert with_null.threshold == pytest.approx(0.022)
+    assert with_null.verdict == "no_action"
+    assert with_null.min_sample_size == rule.min_sample_size

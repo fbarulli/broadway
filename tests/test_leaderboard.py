@@ -6,6 +6,7 @@ from pathlib import Path
 
 import matplotlib.colors as mcolors
 import pandas as pd
+import pytest
 
 from broadway.evaluate.leaderboard import MetricDirection, MetricLeaderboard
 
@@ -53,3 +54,26 @@ def test_leaderboard_plots_one_ranked_figure_per_metric(tmp_path: Path) -> None:
         "leaderboard_r2.png",
     ]
     assert all(path.exists() for path in written.values())
+
+
+def test_champion_picks_the_best_run_with_its_measured_interval() -> None:
+    frame = pd.DataFrame(
+        {
+            "run": ["a", "b", "c"],
+            "rmse": [0.90, 0.20, 0.50],
+        }
+    )
+    board = MetricLeaderboard.from_frame(
+        frame, id_column="run", metrics={"rmse": MetricDirection.MINIMIZE}
+    )
+
+    champion = board.champion(
+        "rmse", {"a": (0.85, 0.95), "b": (0.18, 0.24), "c": (0.47, 0.53)}
+    )
+
+    assert champion.champion == "b"
+    assert champion.value == 0.20
+    assert (champion.interval_low, champion.interval_high) == (0.18, 0.24)
+    assert champion.runner_up == "c"
+    assert champion.margin == pytest.approx(0.30)
+    assert champion.n_runs == 3

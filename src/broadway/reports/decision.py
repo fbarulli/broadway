@@ -14,13 +14,19 @@ noise on 1,000 rows and a real signal on 8.5M. The rule therefore clears
 from __future__ import annotations
 
 from collections.abc import Sequence
+from pathlib import Path
 from typing import Literal
 
 import numpy as np
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+import yaml
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 Verdict = Literal["act", "investigate", "no_action", "insufficient"]
 Direction = Literal["max", "min"]
+
+
+class DecisionRuleError(ValueError):
+    """A step's decision rule is absent or invalid in the experiment config."""
 
 
 class SegmentEvidence(BaseModel):
@@ -66,6 +72,47 @@ class DecisionRule(BaseModel):
     owner: str = Field(min_length=1)
 
 
+class DecisionRuleSet(BaseModel):
+    """The validated ``decisions:`` block of one experiment config.
+
+    The YAML block is the SSOT for every step's rule; loading it once validates
+    all rules at the boundary (pydantic ``extra="forbid"``), and an undeclared
+    step fails with :class:`DecisionRuleError` naming the step and the declared
+    ones instead of a bare ``KeyError``.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    decisions: dict[str, DecisionRule]
+
+    @classmethod
+    def from_yaml(cls, path: Path) -> DecisionRuleSet:
+        """Parse and validate the experiment config's decisions block."""
+        source = Path(path)
+        document = yaml.safe_load(source.read_text(encoding="utf-8"))
+        if not isinstance(document, dict):
+            raise DecisionRuleError(f"{source}: experiment config must be a mapping")
+        if "decisions" not in document:
+            raise DecisionRuleError(f"{source}: config missing required key: decisions")
+        try:
+            return cls(decisions=document["decisions"])
+        except ValidationError as error:
+            raise DecisionRuleError(
+                f"{source}: invalid decisions block — every step needs metric, "
+                "direction, min_effect, action, and owner"
+            ) from error
+
+    def rule(self, step: str) -> DecisionRule:
+        """The rule declared for ``step``; fail loud when it is not declared."""
+        try:
+            return self.decisions[step]
+        except KeyError as error:
+            declared = ", ".join(sorted(self.decisions))
+            raise DecisionRuleError(
+                f"no decision rule for step '{step}' (declared: {declared})"
+            ) from error
+
+
 class Decision(BaseModel):
     """One evaluated decision: value + interval vs the calibrated threshold."""
 
@@ -85,6 +132,8 @@ class Decision(BaseModel):
     action: str
     owner: str
     sample_size: int = Field(gt=0)
+    unit: str | None = None
+    min_sample_size: int | None = None
     evidence: Evidence
 
     @model_validator(mode="after")
@@ -107,6 +156,7 @@ class Decision(BaseModel):
         evidence: Evidence,
         null_values: Sequence[float] | None = None,
         reference: float | None = None,
+        unit: str | None = None,
     ) -> Decision:
         """Compute the verdict from the interval vs the calibrated threshold.
 
@@ -158,5 +208,7 @@ class Decision(BaseModel):
             action=action,
             owner=rule.owner,
             sample_size=sample_size,
+            unit=unit,
+            min_sample_size=rule.min_sample_size,
             evidence=evidence,
         )

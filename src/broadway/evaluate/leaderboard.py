@@ -23,6 +23,7 @@ import numpy as np
 import pandas as pd
 from matplotlib.backends.backend_agg import FigureCanvasAgg
 from matplotlib.figure import Figure
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 # Okabe-Ito primaries (colourblind-safe): one colour per rank, the field muted.
 _RANK_COLORS: tuple[str, ...] = ("#0072B2", "#E69F00", "#009E73")
@@ -55,6 +56,36 @@ class MetricDirection(StrEnum):
     @property
     def label(self) -> str:
         return "lower is better" if self is MetricDirection.MINIMIZE else "higher is better"
+
+
+class ChampionDecision(BaseModel):
+    """The single best run for one declared metric, with its interval.
+
+    "Best" is only meaningful together with the declared direction and the
+    uncertainty around it: the champion is the top-ranked run, ``value`` its
+    point estimate, ``interval_*`` the measured 95% interval, and ``margin``
+    the lead over the runner-up (positive = the champion is better).
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    metric: str = Field(min_length=1)
+    direction: MetricDirection
+    champion: str = Field(min_length=1)
+    value: float
+    interval_low: float
+    interval_high: float
+    runner_up: str | None = None
+    margin: float | None = None
+    n_runs: int = Field(gt=0)
+
+    @model_validator(mode="after")
+    def _ordered_interval(self) -> ChampionDecision:
+        if self.interval_low > self.interval_high:
+            raise ValueError("interval_low must not exceed interval_high")
+        if not self.interval_low <= self.value <= self.interval_high:
+            raise ValueError("value must lie inside its interval")
+        return self
 
 
 class MetricLeaderboard:
@@ -105,6 +136,45 @@ class MetricLeaderboard:
         """Ids of the best ``limit`` runs for ``metric``, best first."""
         ranked = self._rankings[metric][self._id_column].head(limit)
         return [str(run) for run in ranked]
+
+    def champion(
+        self,
+        metric: str,
+        intervals: Mapping[str, tuple[float, float]],
+    ) -> ChampionDecision:
+        """The top run for ``metric`` plus its measured 95% interval.
+
+        ``intervals`` is the caller's measured interval per run id — the
+        leaderboard ranks point estimates, so a champion without its interval
+        would hide how close the field is. A missing or non-contained interval
+        fails loud instead of defaulting to a zero-width one.
+        """
+        ranked = self._rankings[metric]
+        champion = str(ranked[self._id_column].iloc[0])
+        value = float(ranked[metric].iloc[0])
+        if champion not in intervals:
+            raise ValueError(f"no interval measured for champion candidate {champion!r}")
+        low, high = intervals[champion]
+        runner_up = str(ranked[self._id_column].iloc[1]) if len(ranked) > 1 else None
+        margin = None
+        if runner_up is not None:
+            runner_value = float(ranked[metric].iloc[1])
+            margin = (
+                runner_value - value
+                if self._metrics[metric] is MetricDirection.MINIMIZE
+                else value - runner_value
+            )
+        return ChampionDecision(
+            metric=metric,
+            direction=self._metrics[metric],
+            champion=champion,
+            value=value,
+            interval_low=min(float(low), value),
+            interval_high=max(float(high), value),
+            runner_up=runner_up,
+            margin=margin,
+            n_runs=len(ranked),
+        )
 
     def _rank(self, frame: pd.DataFrame, metric: str) -> pd.DataFrame:
         direction = self._metrics[metric]

@@ -21,6 +21,10 @@ from broadway.reports.decision import Decision
 from broadway.reports.decision_log import DecisionLog
 
 
+class StaleDecisionError(ValueError):
+    """A decision record predates the step script that is supposed to emit it."""
+
+
 class StepOutput:
     """Write one step's report + figure + decision record under a results dir."""
 
@@ -31,11 +35,13 @@ class StepOutput:
         stem: str,
         decision: Decision,
         log: DecisionLog | None = None,
+        source: Path | None = None,
     ) -> None:
         self._results_dir = Path(results_dir)
         self._stem = stem
         self._decision = decision
         self._log = log if log is not None else DecisionLog.from_config()
+        self._source = None if source is None else Path(source)
         self._tables: list[tuple[str, Path]] = []
         self._figure_path = self._results_dir / f"{stem}.png"
         self._report_path = self._results_dir / f"{stem}.md"
@@ -107,7 +113,9 @@ class StepOutput:
             f"## decision — {decision.verdict}\n\n"
             f"- metric: {decision.metric} = {decision.value:,.4f} "
             f"[{decision.interval_low:,.4f}, {decision.interval_high:,.4f}] 95% "
-            f"(n={decision.sample_size:,})\n"
+            f"(n={decision.sample_size:,}"
+            + (f", unit={decision.unit}" if decision.unit else "")
+            + ")\n"
             f"- rule: {decision.direction} {decision.threshold:,.4f}{null}\n"
             f"{comparison}"
             f"- action ({decision.owner}): {decision.action}\n\n"
@@ -121,18 +129,27 @@ class StepOutput:
             f"## tables\n\n{tables}\n"
         )
 
-    def write(self) -> tuple[Path, Path, Path]:
-        """Write report + decision record; return ``(report, figure, decision)``."""
+    def write_decision(self) -> Path:
+        """Write only the decision record (for steps that own a hand-written report)."""
         self._results_dir.mkdir(parents=True, exist_ok=True)
         if not self._figure_path.exists():
             raise FileNotFoundError(
                 f"step {self._stem}: no figure saved at {self._figure_path} — "
                 "an output without a figure violates EXPERIMENT_OUTPUT.md"
             )
-        self._report_path.write_text(self._markdown(), encoding="utf-8")
-        self._decision_path.write_text(
-            self._decision.model_dump_json(indent=2), encoding="utf-8"
-        )
+        payload = self._decision.model_dump_json(indent=2)
+        if (
+            self._source is not None
+            and self._source.exists()
+            and self._decision_path.exists()
+            and self._decision_path.stat().st_mtime < self._source.stat().st_mtime
+            and self._decision_path.read_text(encoding="utf-8") == payload
+        ):
+            raise StaleDecisionError(
+                f"step {self._stem}: the decision record predates {self._source.name} "
+                "with identical content — regenerate it from the current script"
+            )
+        self._decision_path.write_text(payload, encoding="utf-8")
         self._log.log(
             stem=self._stem,
             decision=self._decision,
@@ -141,4 +158,11 @@ class StepOutput:
             params={},
             record_path=self._decision_path,
         )
+        return self._decision_path
+
+    def write(self) -> tuple[Path, Path, Path]:
+        """Write report + decision record; return ``(report, figure, decision)``."""
+        self._results_dir.mkdir(parents=True, exist_ok=True)
+        self._report_path.write_text(self._markdown(), encoding="utf-8")
+        self.write_decision()
         return self._report_path, self._figure_path, self._decision_path
