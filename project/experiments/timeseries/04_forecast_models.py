@@ -23,6 +23,7 @@ Outputs (all under results/timeseries/):
 - 04_forecast_models_intervals.csv: model, alpha, nominal, coverage, mean width
 - 04_forecast_models.md: holdout window, ranking, interval validation, verdict
 - 04_forecast_models.png: actual vs each model (seed mean), last 7 holdout days
+- 04_forecast_models_<metric>.png: one ranked leaderboard per metric, top 3 highlighted
 """
 
 import importlib
@@ -38,6 +39,7 @@ import pandas as pd
 
 from broadway.calibration.metrics import coverage, mean_width
 from broadway.calibration.quantile import QuantileInterval
+from broadway.evaluate.leaderboard import MetricDirection, MetricLeaderboard
 from broadway.stats.forecast import (
     ArimaOrder,
     AutoArimaForecaster,
@@ -68,6 +70,13 @@ SARIMA_ORDER = ArimaOrder(p=1, d=0, q=1)
 SARIMA_SEASONAL_ORDER = SeasonalOrder(p=0, d=1, q=1, s=24)
 AUTO_ARIMA_SEASON_LENGTH = 24
 WEEKEND_DAYS = (5, 6)  # pandas dayofweek: Monday=0 .. Sunday=6
+
+# Which end of each reported metric is better — the leaderboard never infers it.
+FORECAST_DIRECTIONS: dict[str, MetricDirection] = {
+    "MAE": MetricDirection.MINIMIZE,
+    "RMSE": MetricDirection.MINIMIZE,
+    "MAPE": MetricDirection.MINIMIZE,
+}
 
 
 def _import_module(module: str, package: str) -> Any:
@@ -344,6 +353,20 @@ def _metric_cell(mean: float, std: float) -> str:
     return f"{mean:.1f}" if pd.isna(std) else f"{mean:.1f} ± {std:.1f}"
 
 
+def _mean_wide(aggregate: pd.DataFrame) -> pd.DataFrame:
+    """Model × metric mean — one row per run, the leaderboard's input shape."""
+    return aggregate.pivot(index="model", columns="metric", values="mean")
+
+
+def _write_leaderboards(stem: str, aggregate: pd.DataFrame) -> None:
+    """One ranked figure per metric; prints the top 3 so the verdict is visible."""
+    board = MetricLeaderboard.from_frame(
+        _mean_wide(aggregate).reset_index(), id_column="model", metrics=FORECAST_DIRECTIONS
+    )
+    for metric, path in board.write(RESULTS, stem).items():
+        print(f"leaderboard {metric}: top 3 {', '.join(board.top(metric))} -> {path.name}")
+
+
 def _report_table(wide: pd.DataFrame, spread: pd.DataFrame, runs: pd.Series) -> list[str]:
     rows = []
     for name in wide.index:
@@ -380,7 +403,7 @@ def _write_report(
     intervals: pd.DataFrame,
     skipped: list[str],
 ) -> None:
-    wide = aggregate.pivot(index="model", columns="metric", values="mean").sort_values("MAE")
+    wide = _mean_wide(aggregate).sort_values("MAE")
     spread = aggregate.pivot(index="model", columns="metric", values="std")
     runs = aggregate.groupby("model")["runs"].max()
     best = str(wide.index[0])
@@ -435,7 +458,8 @@ def _write_report(
         "",
         (
             f"Artifacts: {stem}_metrics.csv, {stem}_aggregate.csv, {stem}_intervals.csv, "
-            f"{stem}.md, {stem}.png (this directory)."
+            f"{stem}.md, {stem}.png, and one {stem}_<metric>.png leaderboard per metric "
+            "(this directory)."
         ),
     ]
     (RESULTS / f"{stem}.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -463,6 +487,7 @@ def main() -> None:
     aggregate.to_csv(RESULTS / f"{stem}_aggregate.csv", index=False)
     interval_frame.to_csv(RESULTS / f"{stem}_intervals.csv", index=False)
     _plot_holdout(stem, actual, _mean_paths(runs))
+    _write_leaderboards(stem, aggregate)
     _write_report(stem, train, actual, aggregate, interval_frame, skipped)
     print(aggregate[aggregate["metric"] == "MAE"].sort_values("mean").to_string(index=False))
     print(interval_frame.to_string(index=False))
