@@ -1,0 +1,11 @@
+# Exploratory data analysis knobs (SSOT). Every threshold the report applies
+# is declared here and read by broadway.eda.module — never inline in code.
+sample_size: 50000          # rows profiled per frame; 0 means all rows
+plot_format: png            # png|svg, embedded as base64 in the HTML report
+output_dir: artifacts/reports
+output_file: eda.html
+max_categories: 20          # top values / missingness patterns shown per column
+max_plots: 12               # numeric/categorical columns plotted per figure
+iqr_multiplier: 1.5         # IQR fence: q25/q75 +/- multiplier * IQR
+z_threshold: 3.0            # |x - mean| > threshold * std
+imbalance_min_share: 0.2    # classification minority share below this is flagged

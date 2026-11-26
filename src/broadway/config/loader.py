@@ -16,6 +16,7 @@ from broadway.config.schema import (
     ContractsStep,
     DatasetContract,
     DiscoverStep,
+    EdaStep,
     EnvironmentConfig,
     EtlStep,
     EvaluateStep,
@@ -39,6 +40,7 @@ STEP_MODELS = {
     "discover": DiscoverStep,
     "etl": EtlStep,
     "contracts": ContractsStep,
+    "eda": EdaStep,
     "features": FeaturesStep,
     "stats": StatsStep,
     "causal": CausalStep,
@@ -52,6 +54,7 @@ STEP_MODULES = {
     "discover": "broadway.discover.module",
     "etl": "broadway.etl.module",
     "contracts": "broadway.contracts.module",
+    "eda": "broadway.eda.module",
     "features": "broadway.features.module",
     "stats": "broadway.stats.module",
     "causal": "broadway.causal.module",
@@ -71,6 +74,7 @@ _TOP_LEVEL_SECTIONS: frozenset[str] = frozenset({"environment", "dataset", "expe
 # sections (e.g. "etl", "train") are attached here from step/<name>.yaml and
 # must exist for the step to run; top-level sections arrive via the CLI args.
 _STEP_SECTION_REQUIREMENTS: dict[str, tuple[str, ...]] = {
+    "eda": ("environment", "dataset", "etl"),
     "features": ("environment", "dataset", "experiment", "etl"),
     "train": ("environment", "dataset", "experiment", "etl", "analysis"),
     "evaluate": ("environment", "dataset", "experiment", "etl", "train", "analysis"),

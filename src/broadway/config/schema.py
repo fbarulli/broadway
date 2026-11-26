@@ -261,6 +261,32 @@ class ContractsStep(BaseModel):
     null_threshold: float
 
 
+class EdaStep(BaseModel):
+    """Exploratory-data-analysis knobs; every threshold lives in the config.
+
+    ``sample_size`` of 0 means "all rows"; ``plot_format`` selects the image
+    encoding embedded in the self-contained HTML report (plotly is not a
+    dependency — matplotlib renders the images).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    sample_size: int = Field(ge=0)
+    plot_format: Literal["png", "svg"]
+    output_dir: str
+    output_file: str
+    max_categories: int = Field(ge=1)
+    max_plots: int = Field(ge=1)
+    iqr_multiplier: float = Field(gt=0.0)
+    z_threshold: float = Field(gt=0.0)
+    imbalance_min_share: float = Field(gt=0.0, le=1.0)
+
+    @property
+    def output_path(self) -> Path:
+        """Report path (``output_dir/output_file``)."""
+        return Path(self.output_dir) / self.output_file
+
+
 class FeaturesStep(BaseModel):
     encoding_smoothing: int
     frequency_fill: float
@@ -478,6 +504,7 @@ class PipelineConfig(BaseModel):
     discover: DiscoverStep | None = None
     etl: EtlStep | None = None
     contracts: ContractsStep | None = None
+    eda: EdaStep | None = None
     features: FeaturesStep | None = None
     stats: StatsStep | None = None
     causal: CausalStep | None = None
