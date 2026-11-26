@@ -8,6 +8,7 @@ and HTML escaping of user/file-derived content.
 from __future__ import annotations
 
 import asyncio
+import json
 
 import pandas as pd
 from starlette.requests import Request
@@ -311,3 +312,33 @@ def test_experiment_page_renders_the_step_source(monkeypatch, tmp_path) -> None:
     assert source.status_code == 200
     assert "Load the source data." in source.body.decode()
     assert ui.experiment_source("missing", "alpha").status_code == 404
+
+
+def test_experiment_page_renders_the_decision_record(monkeypatch, tmp_path) -> None:
+    root, _, _ = _seed_dashboard(monkeypatch, tmp_path)
+    results = root / "results" / "alpha"
+    (results / "01_ingest_decision.json").write_text(
+        json.dumps(
+            {
+                "question": "q",
+                "metric": "ks_fare_amount",
+                "value": 0.012,
+                "interval_low": 0.011,
+                "interval_high": 0.013,
+                "threshold": 0.01,
+                "direction": "max",
+                "verdict": "act",
+                "action": "review the policy",
+                "owner": "fare_prediction",
+                "sample_size": 50000,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    body = ui.experiment_page("01_ingest", "alpha").body.decode("utf-8")
+
+    assert 'class="decision act"' in body
+    assert "ACT" in body
+    assert "ks_fare_amount = 0.0120 [0.0110, 0.0130]" in body
+    assert "review the policy" in body

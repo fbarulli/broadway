@@ -10,12 +10,18 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from _common import RESULTS, SAMPLE_NAME, UNIT_FMT
+from _common import RESULTS, SAMPLE_NAME, UNIT_FMT, load_decision_rule
+from scipy.stats import ks_2samp
 
 from broadway.lineage.sample import load_sample
+from broadway.reports.decision import Decision
+from broadway.reports.step_output import StepOutput
 from broadway.samples import generate_sample
 
 COMPARED = ("fare_amount", "trip_distance", "trip_duration_minutes")
+STEM = "01_generate_sample"
+COMPARE_SAMPLE = 50_000
+BOOTSTRAP_ITERATIONS = 200
 
 
 def _provenance(artifact: Path) -> dict:
@@ -27,47 +33,26 @@ def _ecdf(values: pd.Series) -> tuple[np.ndarray, np.ndarray]:
     return ordered, np.linspace(0.0, 1.0, len(ordered))
 
 
-def _profile_markdown(artifact: Path, provenance: dict) -> str:
-    frame = pd.read_parquet(artifact)
-    lines = [
-        f"# 01 — {provenance['name']} ({provenance['version']})",
-        "",
-        f"- artifact: `{artifact}`",
-        f"- rows: {len(frame):,} · columns: {len(frame.columns)}",
-        f"- source: `{provenance['source']['path']}` (seed {provenance['seed']}, size {provenance['size']})",
-        f"- definition_sha256: `{provenance['definition_sha256']}`",
-        f"- artifact_sha256: `{provenance['artifact_sha256']}`",
-        "",
-        "## columns",
-        "",
-        "| column | dtype | missing | missing % |",
-        "| --- | --- | ---: | ---: |",
-    ]
-    missing = frame.isna().sum()
-    for column in frame.columns:
-        count = int(missing[column])
-        share = 100.0 * count / len(frame) if len(frame) else 0.0
-        lines.append(f"| {column} | {frame[column].dtype} | {count:,} | {share:.2f}% |")
-    numeric = frame.select_dtypes("number")
-    if not numeric.empty:
-        lines += [""]
-        lines += ["## numeric summary", ""]
-        summary = numeric.describe().T[["mean", "std", "min", "50%", "max"]]
-        lines += [summary.to_markdown(floatfmt=".4f"), ""]
-    return "\n".join(lines)
+def _drift(source: pd.DataFrame, frame: pd.DataFrame) -> tuple[float, tuple[float, float]]:
+    """KS distance of fare with a bootstrap 95% interval (the decision metric)."""
+    column = "fare_amount"
+    source_values = source[column].dropna().sample(
+        n=min(COMPARE_SAMPLE, len(source)), random_state=0
+    )
+    sample_values = frame[column].dropna().sample(
+        n=min(COMPARE_SAMPLE, len(frame)), random_state=0
+    )
+    point = float(ks_2samp(source_values, sample_values).statistic)
+    draws = []
+    for iteration in range(BOOTSTRAP_ITERATIONS):
+        resample = sample_values.sample(n=len(sample_values), replace=True, random_state=iteration)
+        draws.append(float(ks_2samp(source_values, resample).statistic))
+    low, high = np.percentile(draws, [2.5, 97.5])
+    return point, (min(float(low), point), max(float(high), point))
 
 
-def _plot_sample_vs_source(
-    frame: pd.DataFrame, provenance: dict, out_path: Path
-) -> None:
-    """Plot what 01 actually did: the sample against its source, plus the row funnel.
-
-    The step's question is "did sampling + policy keep the population shape?" — a
-    sample-only histogram cannot answer it, so the panels overlay the source's
-    empirical CDF on the artifact's and show the rows each stage removed.
-    """
-    source = pd.read_parquet(provenance["source"]["path"], columns=list(COMPARED))
-    source = source.sample(n=min(len(source), 200_000), random_state=provenance["seed"])
+def _figure(source: pd.DataFrame, frame: pd.DataFrame, sampled: int) -> object:
+    """ECDF overlays (the sample vs its source) plus the row funnel."""
     figure, axes = plt.subplots(1, len(COMPARED) + 1, figsize=(18, 4), constrained_layout=True)
     for axis, column in zip(axes, COMPARED):
         for values, label, colour in (
@@ -83,16 +68,25 @@ def _plot_sample_vs_source(
         axis.set_xlim(low, high)
         axis.legend(loc="lower right", fontsize=8)
     funnel = axes[-1]
-    stages = ["source", "sampled", "filtered"]
-    counts = [len(source), provenance["size"], provenance["row_count"]]
-    funnel.bar(stages, counts, color=["#9ecae1", "#6baed6", "#08519c"])
-    for index, count in enumerate(counts):
+    counts = {"source": len(source), "sampled": sampled, "filtered": len(frame)}
+    funnel.bar(list(counts), list(counts.values()), color=["#9ecae1", "#6baed6", "#08519c"])
+    for index, count in enumerate(counts.values()):
         funnel.text(index, count, f"{count:,}", ha="center", va="bottom", fontsize=9)
     funnel.set_title("row funnel")
     funnel.set_ylabel("rows")
     funnel.tick_params(axis="x", labelsize=8)
-    figure.savefig(out_path, dpi=150)
-    plt.close(figure)
+    return figure
+
+
+def _columns_table(frame: pd.DataFrame) -> pd.DataFrame:
+    missing = frame.isna().sum()
+    return pd.DataFrame(
+        {
+            "column": list(frame.columns),
+            "dtype": [str(frame[column].dtype) for column in frame.columns],
+            "missing": [int(missing[column]) for column in frame.columns],
+        }
+    )
 
 
 def main() -> None:
@@ -104,13 +98,40 @@ def main() -> None:
         artifact = generate_sample(SAMPLE_NAME)
         print(f"artifact: {artifact}")
     provenance = _provenance(artifact)
+    frame = pd.read_parquet(artifact)
+    source = pd.read_parquet(provenance["source"]["path"], columns=list(COMPARED))
     RESULTS.mkdir(parents=True, exist_ok=True)
-    report = RESULTS / "01_generate_sample.md"
-    report.write_text(_profile_markdown(artifact, provenance), encoding="utf-8")
+
+    value, interval = _drift(source, frame)
+    rule = load_decision_rule(STEM)
+    decision = Decision.evaluate(
+        rule=rule,
+        value=value,
+        interval=interval,
+        sample_size=min(COMPARE_SAMPLE, len(frame)),
+        question="Did sampling plus the fare policy preserve the source population?",
+    )
+    output = StepOutput(results_dir=RESULTS, stem=STEM, decision=decision)
+    output.add_table("columns", _columns_table(frame))
+    output.add_table(
+        "funnel",
+        pd.DataFrame(
+            {
+                "stage": ["source", "sampled", "filtered"],
+                "rows": [
+                    len(source),
+                    provenance["size"],
+                    provenance["row_count"],
+                ],
+            }
+        ),
+    )
+    output.save_figure(_figure(source, frame, provenance["size"]))
+    plt.close("all")
+    report, plot, decision_path = output.write()
     print(f"report: {report}")
-    figure = RESULTS / "01_generate_sample.png"
-    _plot_sample_vs_source(pd.read_parquet(artifact), provenance, figure)
-    print(f"plot: {figure}")
+    print(f"plot: {plot}")
+    print(f"decision: {decision_path} -> {decision.verdict} ({rule.metric} {value:.4f})")
 
 
 if __name__ == "__main__":

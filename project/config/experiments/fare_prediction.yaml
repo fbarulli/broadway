@@ -4,3 +4,14 @@
 # shape/filters remain owned by the sample registry
 # (project/config/sample/fare_prediction_1m.yaml).
 seed: 42
+
+# Output contract (agents/contracts/EXPERIMENT_OUTPUT.md): one decision per step.
+# The verdict is computed from the metric's 95% interval against this threshold;
+# a step cannot publish a figure without it.
+decisions:
+  "01_generate_sample":
+    metric: ks_fare_amount
+    direction: max
+    threshold: 0.01
+    action: "review the fare-policy exclusion before training"
+    owner: fare_prediction

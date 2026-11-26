@@ -22,6 +22,7 @@ import yaml
 from matplotlib.ticker import FuncFormatter, LogLocator
 
 from broadway.config.schema import DerivedFeature
+from broadway.reports.decision import DecisionRule
 from broadway.features.builders import build_derived
 from broadway.utils import require_keys
 from project.paths import load_project_paths
@@ -41,6 +42,17 @@ def _load_experiment_seed() -> int:
 
 
 SEED = _load_experiment_seed()
+
+
+def load_decision_rule(step: str) -> DecisionRule:
+    """The step's decision rule from the experiment config (YAML SSOT)."""
+    path = PATHS.experiment_configs / "fare_prediction.yaml"
+    config = yaml.safe_load(path.read_text(encoding="utf-8"))
+    require_keys(config, ["decisions"], path.name)
+    rule = config["decisions"].get(step)
+    if rule is None:
+        raise KeyError(f"no decision rule for step '{step}' in {path.name}")
+    return DecisionRule(**rule)
 
 # Pre-trip feature contract: fare prediction uses only information known
 # before the trip starts. Post-trip columns are LEAKAGE and are excluded from

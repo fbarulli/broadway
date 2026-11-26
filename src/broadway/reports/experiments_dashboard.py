@@ -331,6 +331,34 @@ def _render_artifact_preview(path: Path, focus: str) -> str:
     return f'<p>No inline preview for {html.escape(mime or suffix or "this file type")}.</p>'
 
 
+
+def _render_decision(stem: str, focus: str) -> str:
+    """Render the step's decision record (metric + 95% interval vs the rule)."""
+    path = _results_dir(focus) / f"{stem}_decision.json"
+    if not path.is_file():
+        return ""
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        value = float(payload["value"])
+        low = float(payload["interval_low"])
+        high = float(payload["interval_high"])
+        threshold = float(payload["threshold"])
+        verdict = str(payload["verdict"])
+        direction = "\u2264" if payload["direction"] == "max" else "\u2265"
+    except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError):
+        logger.warning("dashboard: unreadable decision record at %s", path, exc_info=True)
+        return ""
+    return (
+        f'<section class="decision {html.escape(verdict)}">'
+        f"<strong>{html.escape(verdict.upper())}</strong> "
+        f"{html.escape(str(payload.get('metric', '')))} = {value:,.4f} "
+        f"[{low:,.4f}, {high:,.4f}] 95% {direction} {threshold:,.4f} "
+        f"\u00b7 {html.escape(str(payload.get('action', '')))} "
+        f"({html.escape(str(payload.get('owner', '')))})"
+        "</section>"
+    )
+
+
 def _render_code(stem: str, focus: str) -> str:
     """Render the step's source with line numbers (the code the step runs)."""
     script = _script_for(stem, focus)
@@ -669,6 +697,10 @@ def _render_experiment_page(
   .artifact-preview {{ border: 1px solid #ddd; border-radius: 6px; padding: 1rem; background: #fafafa; }}
   .artifact-preview figure {{ margin: 0; }}
   .artifact-preview figcaption, .preview-note {{ color: #666; font-size: 0.85rem; margin-top: 0.5rem; }}
+  .decision {{ margin: 0.9rem 0; padding: 0.6rem 0.9rem; border-left: 6px solid #999; background: #f4f4f4; font-size: 0.95rem; }}
+  .decision.act {{ border-color: #c0362c; background: #fde7e5; }}
+  .decision.investigate {{ border-color: #d08c00; background: #fff4dc; }}
+  .decision.no_action {{ border-color: #2a7; background: #e3f4e8; }}
   .table-scroll {{ max-height: 38rem; overflow: auto; }}
   .text-preview {{ max-height: 38rem; overflow: auto; white-space: pre-wrap; }}
   .evidence {{ border-collapse: collapse; width: 100%; font-size: 0.9rem; }}
@@ -679,6 +711,7 @@ def _render_experiment_page(
 <body>
 <h1>{html.escape(stem)}</h1>
 <p>{html.escape(question)}</p>
+{_render_decision(stem, focus)}
 {_series_selector(series, focus)}
 {strip}
 {nav}
