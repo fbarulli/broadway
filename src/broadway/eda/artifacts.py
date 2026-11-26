@@ -1,15 +1,19 @@
 """The EDA step's artifacts on disk: report, evidence tables, figures, decisions.
 
 One writer, one stem. ``<stem>.html`` is the human report; ``<stem>_effects.csv``,
-``<stem>_correlations.csv`` and ``<stem>_outliers.csv`` are the aggregate
-evidence tables rendered under the figures; ``<stem>_decisions.json`` is the
-decision record (``agents/contracts/EXPERIMENT_OUTPUT.md``) and
-``<stem>_<figure>.<format>`` the three figures. Aggregate rows only — a CSV
-never carries a raw datapoint.
+``<stem>_correlations.csv``, ``<stem>_outliers.csv`` and ``<stem>_comparison.csv``
+are the aggregate evidence tables rendered under the figures;
+``<stem>_decision.json`` is **the** decision record — singular, the summary
+metric the dashboard reads (``experiments_dashboard`` looks for
+``<stem>_decision.json`` and ``.gitignore`` un-ignores only that name), whose
+provenance points at the per-feature evidence in
+``<stem>_feature_decisions.json``. ``<stem>_<figure>.<format>`` are the three
+figures. Aggregate rows only — a CSV never carries a raw datapoint.
 """
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 import pandas as pd
@@ -17,11 +21,14 @@ from matplotlib.figure import Figure
 
 from broadway.config.viz import load_viz_config
 from broadway.eda.models import (
+    CompareResult,
     CorrelationResult,
     EdaDecisionBundle,
     FeatureTestBundle,
     OutlierResult,
 )
+
+logger = logging.getLogger(__name__)
 
 _DECIMALS = 6
 
@@ -41,8 +48,16 @@ class EdaArtifactWriter:
     def html_path(self) -> Path:
         return self._directory / f"{self._stem}.html"
 
-    def decisions_path(self) -> Path:
-        return self._directory / f"{self._stem}_decisions.json"
+    def decision_path(self) -> Path:
+        """The singular record the dashboard reads (``<stem>_decision.json``)."""
+        return self._directory / f"{self._stem}_decision.json"
+
+    def feature_decisions_path(self) -> Path:
+        """Every family's decisions as evidence under the singular record."""
+        return self._directory / f"{self._stem}_feature_decisions.json"
+
+    def comparison_path(self) -> Path:
+        return self._directory / f"{self._stem}_comparison.csv"
 
     def effects_path(self) -> Path:
         return self._directory / f"{self._stem}_effects.csv"
@@ -79,20 +94,31 @@ class EdaArtifactWriter:
         tests: FeatureTestBundle,
         correlation: CorrelationResult,
         outliers: OutlierResult,
+        comparison: CompareResult,
     ) -> list[Path]:
         self.prepare()
-        written = [
+        return [
             self._write(self.effects_path(), self._effects_frame(tests)),
             self._write(self.correlations_path(), self._correlations_frame(correlation)),
             self._write(self.outliers_path(), self._outliers_frame(outliers)),
+            self._write(self.comparison_path(), self._comparison_frame(comparison)),
         ]
-        return written
 
-    def write_decisions(self, bundle: EdaDecisionBundle) -> Path:
+    def write_decisions(self, bundle: EdaDecisionBundle) -> list[Path]:
+        """Write the singular record plus its per-feature evidence sidecar."""
         self.prepare()
-        path = self.decisions_path()
-        path.write_text(bundle.model_dump_json(indent=2), encoding="utf-8")
-        return path
+        sidecar = self.feature_decisions_path()
+        sidecar.write_text(bundle.model_dump_json(indent=2), encoding="utf-8")
+        if bundle.summary is None:
+            logger.warning(
+                "eda: no summary decision to publish — every family was unmeasurable; "
+                "the report records why (evidence: %s)",
+                sidecar,
+            )
+            return [sidecar]
+        path = self.decision_path()
+        path.write_text(bundle.summary.model_dump_json(indent=2), encoding="utf-8")
+        return [path, sidecar]
 
     @staticmethod
     def _write(path: Path, frame: pd.DataFrame) -> Path:
@@ -132,6 +158,22 @@ class EdaArtifactWriter:
                 "spearman": [self._rounded(pair.spearman) for pair in rows],
                 "spearman_p": [self._rounded(pair.spearman_p) for pair in rows],
                 "spearman_q": [self._rounded(pair.spearman_q) for pair in rows],
+            }
+        )
+
+    def _comparison_frame(self, comparison: CompareResult) -> pd.DataFrame:
+        rows = comparison.numeric_shifts
+        return pd.DataFrame(
+            {
+                "column": [item.column for item in rows],
+                "before_mean": [self._rounded(item.before_mean) for item in rows],
+                "after_mean": [self._rounded(item.after_mean) for item in rows],
+                "mean_delta": [self._rounded(item.mean_delta) for item in rows],
+                "mean_delta_low": [self._rounded(item.mean_delta_low) for item in rows],
+                "mean_delta_high": [self._rounded(item.mean_delta_high) for item in rows],
+                "median_delta": [self._rounded(item.median_delta) for item in rows],
+                "median_delta_low": [self._rounded(item.median_delta_low) for item in rows],
+                "median_delta_high": [self._rounded(item.median_delta_high) for item in rows],
             }
         )
 

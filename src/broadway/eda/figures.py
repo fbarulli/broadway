@@ -47,7 +47,13 @@ class DecisionFigures:
     """Effect bars, the correlation heatmap and the outlier-share bars."""
 
     def effects(self, bundle: FeatureTestBundle) -> Figure | None:
-        """Per-feature effect, ranked, top three highlighted, minimum effect drawn."""
+        """Per-feature effect, ranked, top three highlighted, thresholds drawn.
+
+        Two lines matter and they are not the same: the declared minimum effect
+        and each feature's *effective* threshold ``max(min_effect, null band)``
+        the verdict actually compares against. Drawing only the minimum would
+        show a bar "past the line" next to an `investigate` verdict.
+        """
         rows = [row for row in bundle.features if row.verdict is not None] or list(
             bundle.features
         )
@@ -61,19 +67,37 @@ class DecisionFigures:
         )
         figure = leaderboard.figures()["effect"]
         axis = figure.axes[0]
+        thresholds = self._effective_thresholds(bundle, [row.feature for row in rows])
+        axis.scatter(
+            thresholds,
+            np.arange(len(rows)),
+            marker="|",
+            s=180,
+            linewidths=1.6,
+            color=_THRESHOLD_COLOR,
+            zorder=3,
+            label="effective threshold (max(min_effect, null 95th))",
+        )
         axis.axvline(
             bundle.min_effect,
             color=_THRESHOLD_COLOR,
             linestyle="--",
             linewidth=1.0,
-            label=f"minimum effect {bundle.min_effect:g}",
+            label=f"declared minimum effect {bundle.min_effect:g}",
         )
         axis.legend(loc="lower right", fontsize=_LABEL_FONTSIZE)
         axis.set_title(
-            f"association effect vs minimum effect {bundle.min_effect:g} — {bundle.target}",
-            fontsize=_TITLE_FONTSIZE,
+            f"association effect vs threshold — {bundle.target}", fontsize=_TITLE_FONTSIZE
         )
         return figure
+
+    @staticmethod
+    def _effective_thresholds(bundle: FeatureTestBundle, features: list[str]) -> list[float]:
+        """Each feature's own effective threshold; the declared minimum when undecided."""
+        thresholds = {decision.metric: decision.threshold for decision in bundle.decisions}
+        return [
+            thresholds.get(f"association_{feature}", bundle.min_effect) for feature in features
+        ]
 
     def correlation(self, result: CorrelationResult) -> Figure | None:
         """Pearson and Spearman coefficients side by side, values annotated."""

@@ -133,6 +133,7 @@ class EdaReportBuilder:
             items.append(f"Before/after ETL comparison skipped: {escape(compare.skip_reason or '')}.")
         items.append(self._test_finding(result.feature_tests))
         items.append(self._outlier_finding(result.outliers))
+        items.append(self._compare_finding(result.compare))
         return "<h2>Findings</h2><ul>" + "".join(f"<li>{item}</li>" for item in items) + "</ul>"
 
     @staticmethod
@@ -161,6 +162,16 @@ class EdaReportBuilder:
             f"({escape(top.test)} {escape(top.effect_name)} {self._fmt(top.effect)}, "
             f"q={self._fmt(top.q_value)}). Skipped: "
             f"{escape(', '.join(tests.skipped)) or 'none'}."
+        )
+
+    def _compare_finding(self, compare: CompareResult) -> str:
+        decision = compare.decision
+        if decision is None:
+            return "ETL comparison: no numeric column produced a standardized-shift decision."
+        return (
+            f"ETL comparison: {escape(decision.metric)} = {self._fmt(decision.value)} "
+            f"[{self._fmt(decision.interval_low)}, {self._fmt(decision.interval_high)}] 95% "
+            f"vs threshold {self._fmt(decision.threshold)} → {escape(decision.verdict)}."
         )
 
     def _outlier_finding(self, outliers: OutlierResult) -> str:
@@ -199,6 +210,20 @@ class EdaReportBuilder:
             ]
             for row in tests.features
         ]
+        comparison = result.compare.decision
+        comparison_html = (
+            ""
+            if comparison is None
+            else (
+                f"<p class='{self._verdict_class(comparison.verdict)}'>"
+                f"ETL comparison — {escape(comparison.verdict)}: "
+                f"{escape(comparison.metric)} = {self._fmt(comparison.value)} "
+                f"[{self._fmt(comparison.interval_low)}, {self._fmt(comparison.interval_high)}] "
+                f"95% vs threshold {self._fmt(comparison.threshold)} at "
+                f"n={comparison.sample_size:,}. Action ({escape(comparison.owner)}): "
+                f"{escape(comparison.action)}</p>"
+            )
+        )
         outlier_rows = [
             [
                 escape(item.column),
@@ -215,6 +240,7 @@ class EdaReportBuilder:
             f"{self._fmt(tests.min_effect)}; the verdict is computed by "
             "Decision.evaluate against the permutation null band at this n.</p>"
             + headline
+            + comparison_html
             + "<h3>Feature tests</h3>"
             + self._table(
                 ["feature", "test", "effect", "significance", "n", "verdict"], feature_rows
@@ -400,10 +426,10 @@ class EdaReportBuilder:
                 escape(item.column),
                 self._fmt(item.before_mean),
                 self._fmt(item.after_mean),
-                self._fmt(item.mean_delta),
+                self._interval(item.mean_delta, item.mean_delta_low, item.mean_delta_high),
                 self._fmt(item.before_median),
                 self._fmt(item.after_median),
-                self._fmt(item.median_delta),
+                self._interval(item.median_delta, item.median_delta_low, item.median_delta_high),
             ]
             for item in compare.numeric_shifts
         ]
@@ -449,6 +475,13 @@ class EdaReportBuilder:
         if not body:
             body = f"<tr><td colspan='{len(headers)}'>none</td></tr>"
         return f"<table><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table>"
+
+    def _interval(self, value: float | None, low: float | None, high: float | None) -> str:
+        if value is None:
+            return "—"
+        if low is None or high is None:
+            return self._fmt(value)
+        return f"{value:+.4f} [{low:+.4f}, {high:+.4f}]"
 
     @staticmethod
     def _fmt(value: float | None) -> str:

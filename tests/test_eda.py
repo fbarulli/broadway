@@ -12,6 +12,7 @@ from broadway.eda import module
 from broadway.eda.compare import EtlComparator
 from broadway.eda.missing import MissingnessAnalyzer
 from broadway.eda.quality import QualityAnalyzer
+from broadway.eda.segments import SegmentPlan
 from broadway.eda.summary import SummaryAnalyzer
 
 
@@ -68,23 +69,35 @@ def test_quality_flags_constants_outliers_and_imbalance() -> None:
 
 
 def test_etl_compare_records_skip_reason_and_row_delta() -> None:
-    comparator = EtlComparator("before", "after")
-    skipped = comparator.compare(None, pd.DataFrame({"a": [1, 2]}), 10, 2, "missing")
+    step = load_config("eda", dataset="test", experiment="baseline").eda
+    assert step is not None
+    comparator = EtlComparator("before", "after", step)
+    before = pd.DataFrame({"a": [1.0, 2.0]})
+    plan = SegmentPlan.build(before, None, step.max_categories)
+    provenance = {"dataset": "test"}
+    skipped = comparator.compare(None, before, 10, 2, "missing", [], plan, provenance)
     assert not skipped.available
     assert skipped.skip_reason == "missing"
     assert skipped.before_rows is None
 
     compared = comparator.compare(
-        pd.DataFrame({"a": [1.0, 2.0]}),
+        before,
         pd.DataFrame({"a": [2.0, 3.0], "b": [4.0, 5.0]}),
         10,
         8,
         None,
+        [],
+        plan,
+        provenance,
     )
     assert compared.available
     assert compared.row_delta == -2
     assert compared.added_columns == ["b"]
-    assert compared.numeric_shifts[0].mean_delta == 1.0
+    shift = compared.numeric_shifts[0]
+    assert shift.mean_delta == 1.0
+    assert shift.mean_delta_low is not None and shift.mean_delta_high is not None
+    assert shift.mean_delta_low <= 1.0 <= shift.mean_delta_high
+    assert compared.decision is not None and compared.decision.metric.startswith("standardized_shift_")
 
 
 def test_eda_run_writes_self_contained_html_report(tmp_path: Path) -> None:

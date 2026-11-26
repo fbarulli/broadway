@@ -23,9 +23,14 @@ from broadway.eda.correlation import CorrelationAnalyzer
 from broadway.eda.models import QualityResult
 from broadway.eda.outliers import OutlierDecisionAnalyzer
 from broadway.eda.quality import QualityAnalyzer
+from broadway.eda.segments import SegmentPlan
 from broadway.eda.tests import FeatureTestAnalyzer
 
 _PROVENANCE = {"artifact": "synthetic", "rows": "n/a", "seed": "0"}
+
+
+def _plan(frame: pd.DataFrame, datetime_column: str | None = None) -> SegmentPlan:
+    return SegmentPlan.build(frame, datetime_column, 20)
 
 
 def _step(**overrides: object) -> EdaStep:
@@ -62,8 +67,9 @@ def test_test_choice_follows_dtype_and_shape() -> None:
     frame = _frame(600)
     frame["signal"] = frame["target"] * 2.0 + frame["signal"] * 0.1
 
+    plan = _plan(frame)
     regression = FeatureTestAnalyzer(step, TaskType.REGRESSION).analyze(
-        frame, "target", _PROVENANCE
+        frame, "target", _PROVENANCE, plan
     )
     chosen = {row.feature: row.test for row in regression.features}
     assert chosen["signal"] == "spearman"
@@ -73,7 +79,7 @@ def test_test_choice_follows_dtype_and_shape() -> None:
         flag=(frame["target"] > frame["target"].median()).astype(int)
     )
     binary = FeatureTestAnalyzer(step, TaskType.CLASSIFICATION).analyze(
-        classification, "flag", _PROVENANCE
+        classification, "flag", _PROVENANCE, _plan(classification)
     )
     binary_choice = {row.feature: row.test for row in binary.features}
     assert binary_choice["signal"] in {"welch", "mann_whitney"}
@@ -90,7 +96,7 @@ def test_time_and_single_group_columns_are_skipped_not_tested() -> None:
     )
 
     bundle = FeatureTestAnalyzer(step, TaskType.REGRESSION).analyze(
-        frame, "target", _PROVENANCE
+        frame, "target", _PROVENANCE, _plan(frame)
     )
 
     tested = {row.feature for row in bundle.features}
@@ -109,7 +115,7 @@ def test_a_frame_with_no_testable_feature_records_why() -> None:
     )
 
     bundle = FeatureTestAnalyzer(step, TaskType.REGRESSION).analyze(
-        frame, "target", _PROVENANCE
+        frame, "target", _PROVENANCE, _plan(frame)
     )
     correlation = CorrelationAnalyzer(step).analyze(
         frame.assign(label=["a", "b"]), "label"
@@ -132,8 +138,9 @@ def test_a_significant_but_trivial_association_is_no_action() -> None:
     )
     frame["target"] = frame["target"] + 0.08 * frame["weak"]
 
-    bundle = FeatureTestAnalyzer(_step(min_effect=0.3, permutations=20), TaskType.REGRESSION).analyze(
-        frame, "target", _PROVENANCE
+    step = _step(min_effect=0.3, permutations=20)
+    bundle = FeatureTestAnalyzer(step, TaskType.REGRESSION).analyze(
+        frame, "target", _PROVENANCE, _plan(frame)
     )
 
     row = bundle.features[0]
@@ -158,9 +165,9 @@ def test_outlier_share_against_the_configured_maximum() -> None:
         frame, TaskType.REGRESSION, "target"
     )
 
-    result = OutlierDecisionAnalyzer(_step(outlier_max_share=0.05, permutations=20)).analyze(
-        quality, frame, _PROVENANCE
-    )
+    result = OutlierDecisionAnalyzer(
+        _step(outlier_max_share=0.05, permutations=20)
+    ).analyze(quality, frame, _PROVENANCE, _plan(frame))
 
     shares = {item.column: item for item in result.columns}
     assert shares["extreme"].iqr_share == pytest.approx(0.2)
@@ -221,6 +228,7 @@ def test_eda_step_publishes_every_decision_artifact(tmp_path: Path) -> None:
                     "output_file": "eda.html",
                     "permutations": 20,
                     "max_features": 2,
+                    "min_sample_size": 50,
                 }
             ),
         }
@@ -228,6 +236,7 @@ def test_eda_step_publishes_every_decision_artifact(tmp_path: Path) -> None:
     frame = _frame(400)
     frame["target"] = frame["target"] + 2.0 * frame["signal"]
     frame["extreme"] = np.where(np.arange(400) < 80, 100.0, frame["noise"])
+    frame["when"] = pd.date_range("2024-01-01", periods=400, freq="h")
     processed = tmp_path / cfg.environment.processed_subdir
     processed.mkdir(parents=True)
     frame.to_parquet(processed / cfg.etl.train_file, index=False)
@@ -245,7 +254,9 @@ def test_eda_step_publishes_every_decision_artifact(tmp_path: Path) -> None:
         "eda_effects.png",
         "eda_correlations.png",
         "eda_outliers.png",
-        "eda_decisions.json",
+        "eda_decision.json",
+        "eda_feature_decisions.json",
+        "eda_comparison.csv",
     ):
         artifact = reports / name
         assert artifact.exists(), name
@@ -254,9 +265,16 @@ def test_eda_step_publishes_every_decision_artifact(tmp_path: Path) -> None:
     effects = pd.read_csv(reports / "eda_effects.csv")
     assert list(effects.columns[:4]) == ["feature", "feature_kind", "target_kind", "test"]
     assert effects.loc[effects["feature"] == "signal", "verdict"].item() == "act"
-    decisions = json.loads((reports / "eda_decisions.json").read_text(encoding="utf-8"))
-    assert decisions["summary"]["verdict"] == "act"
-    assert decisions["outliers"]
+    decision = json.loads((reports / "eda_decision.json").read_text(encoding="utf-8"))
+    assert decision["verdict"] == "act"
+    assert decision["metric"] == "association_signal"
+    assert decision["evidence"]["provenance"]["rows"] == "450"
+    sidecar = json.loads(
+        (reports / "eda_feature_decisions.json").read_text(encoding="utf-8")
+    )
+    assert sidecar["summary"]["metric"] == "association_signal"
+    assert sidecar["comparison"] is not None
+    assert sidecar["outliers"]
     html = (reports / "eda.html").read_text(encoding="utf-8")
     assert "Decisions" in html and "Correlation" in html
     assert html.count("data:image/png;base64,") >= 4

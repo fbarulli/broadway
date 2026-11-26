@@ -3,18 +3,21 @@
 The test is chosen by dtype and shape, never by taste: a numeric feature against
 a binary target is a Welch t (point-biserial r), a numeric feature against a
 multi-level target a one-way ANOVA (η²) or Kruskal-Wallis (ε²) depending on the
-per-group normality check, a categorical pair a χ² with Cramér's V. Every
-feature then gets an effect size, a Benjamini-Hochberg q over the family, a
-permutation null at this n, a bootstrap interval and a computed verdict — a raw
-p-value is not evidence, and a significant-but-trivial association is not an act.
+per-group normality check, a categorical pair a χ² with Cramér's V. Float
+columns are measurements; integer columns are codes/counts and are tested as
+nominal groups (a zone id is never an ordering).
 
-Each measure is a Strategy (``EffectTest``) built by ``FeatureTestFactory``; the
-analyzer only orchestrates (measure → correct → decide).
+Every published number comes from one owner: ``reports.measurement`` draws the
+frame once, bootstraps the effect for the interval and shuffles the target for
+the null band at the same n and seed. The effect algebra lives once here
+(``EffectStatistic``) and serves both the observed test and the resampling, so
+the value, the interval and the null cannot disagree. Per-feature decisions use
+semantic segments (``eda.segments``); the summary decision is the family's own
+aggregate — act when any feature acts, else the strongest investigate.
 """
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
 from typing import Literal
 
 import numpy as np
@@ -25,7 +28,9 @@ from broadway.config.schema import EdaStep, TaskType
 from broadway.eda.correction import MultipleTestingCorrection
 from broadway.eda.kinds import ColumnKinds, FeatureKind, TargetKind
 from broadway.eda.models import FeatureTestBundle, FeatureTestResult
+from broadway.eda.segments import SegmentPlan
 from broadway.reports.decision import Decision, DecisionRule, Evidence, SegmentEvidence
+from broadway.reports.measurement import MeasurementEstimator, MeasurementSpec
 from broadway.stats.assumptions import check_normality
 from broadway.stats.effect_size import epsilon_squared
 
@@ -41,32 +46,55 @@ EffectName = Literal[
 
 _MIN_ROWS = 3
 _MIN_GROUP_SIZE = 2
-_CI_LOW = 2.5
-_CI_HIGH = 97.5
+_EFFECT_NAMES: dict[TestName, EffectName] = {
+    "spearman": "abs_spearman_r",
+    "welch": "point_biserial_r",
+    "mann_whitney": "rank_biserial_r",
+    "anova": "eta_squared",
+    "kruskal": "epsilon_squared",
+    "chi2": "cramers_v",
+}
 
 
-class EffectTest(ABC):
-    """One prepared measure: effect on a row subset, a null draw, its p-value."""
+class EffectStatistic:
+    """The effect algebra for one test, callable on any feature/target pair frame.
 
-    name: TestName
-    effect_name: EffectName
-    n: int
+    ``values`` is the measured (continuous) column and ``labels`` the grouping
+    or target column; both are numeric codes on the pair frame the caller builds,
+    so a resample (bootstrap or shuffle) is just another frame.
+    """
 
-    @abstractmethod
-    def effect(self, index: np.ndarray | None = None) -> float:
-        """The effect size on ``index`` rows (``None`` = every observed row)."""
+    def __init__(self, test: TestName, values: str, labels: str) -> None:
+        self.test = test
+        self.effect_name = _EFFECT_NAMES[test]
+        self._values = values
+        self._labels = labels
 
-    @abstractmethod
-    def shuffled_effect(self, rng: np.random.Generator) -> float:
-        """The effect under the no-effect null: the target's labels permuted."""
+    def __call__(self, frame: pd.DataFrame) -> float:
+        values = frame[self._values].to_numpy(dtype=float)
+        labels = frame[self._labels].to_numpy(dtype=float)
+        return self.measure(values, labels)
 
-    @abstractmethod
-    def p_value(self) -> float:
-        """The analytic p-value of the selected test at the observed n."""
+    def measure(self, values: np.ndarray, labels: np.ndarray) -> float:
+        """The effect on two aligned arrays (one code path for observed and resampled)."""
+        if values.size < _MIN_ROWS:
+            return 0.0
+        if self.test == "spearman":
+            return abs(self.rank_correlation(values, labels))
+        if self.test == "welch":
+            return self.point_biserial(values, labels)
+        if self.test == "mann_whitney":
+            return self.rank_biserial(values, labels)
+        if self.test == "anova":
+            return self.eta_squared(values, labels)
+        if self.test == "kruskal":
+            return self.epsilon_squared(values, labels)
+        return self.cramers_v(values, labels)
 
-    @abstractmethod
-    def alternative(self) -> tuple[str, float]:
-        """The counterpart measure's name and value (the sensitivity check)."""
+    @staticmethod
+    def rank_correlation(values: np.ndarray, labels: np.ndarray) -> float:
+        """Spearman's rho on midranks; 0.0 when either side is constant."""
+        return EffectStatistic.correlation(stats.rankdata(values), stats.rankdata(labels))
 
     @staticmethod
     def correlation(first: np.ndarray, second: np.ndarray) -> float:
@@ -80,67 +108,15 @@ class EffectTest(ABC):
             return 0.0
         return float((left * right).sum() / denominator)
 
-
-class RankCorrelationTest(EffectTest):
-    """Numeric vs numeric: |Spearman r| on midranks, |Pearson r| as counterpart."""
-
-    name: TestName = "spearman"
-    effect_name: EffectName = "abs_spearman_r"
-
-    def __init__(self, values: np.ndarray, target: np.ndarray) -> None:
-        self.n = int(values.size)
-        self._values = values
-        self._target = target
-        self._value_ranks = stats.rankdata(values)
-        self._target_ranks = stats.rankdata(target)
-        coefficient, p_value = stats.spearmanr(values, target)
-        self._observed = abs(float(coefficient)) if np.isfinite(coefficient) else 0.0
-        self._p_value = float(p_value) if np.isfinite(p_value) else 1.0
-
-    def effect(self, index: np.ndarray | None = None) -> float:
-        if index is None:
-            return self._observed
-        return abs(self.correlation(self._value_ranks[index], self._target_ranks[index]))
-
-    def shuffled_effect(self, rng: np.random.Generator) -> float:
-        return abs(self.correlation(self._value_ranks, rng.permutation(self._target_ranks)))
-
-    def p_value(self) -> float:
-        return self._p_value
-
-    def alternative(self) -> tuple[str, float]:
-        return "abs_pearson_r", abs(self.correlation(self._values, self._target))
-
-
-class BinaryGroupTest(EffectTest):
-    """Numeric feature vs binary target: two labelled groups."""
-
-    def __init__(self, values: np.ndarray, labels: np.ndarray) -> None:
-        self.n = int(values.size)
-        self._values = values
-        self._labels = labels
-        self._floats = labels.astype(float)
-        self._ranks = stats.rankdata(values)
-        self._observed = self.point_biserial()
-
-    def point_biserial(self, index: np.ndarray | None = None) -> float:
+    @staticmethod
+    def point_biserial(values: np.ndarray, labels: np.ndarray) -> float:
         """|point-biserial r| = |Pearson r| between the values and the 0/1 labels."""
-        values = self._values if index is None else self._values[index]
-        labels = self._floats if index is None else self._floats[index]
-        return abs(self.correlation(values, labels))
-
-    def rank_biserial(self, index: np.ndarray | None = None) -> float:
-        """|rank-biserial r| from the Mann-Whitney U of the two groups."""
-        labels = self._labels if index is None else self._labels[index]
-        ranks = self._ranks if index is None else self._ranks[index]
-        return self._rank_biserial(labels, ranks)
-
-    def shuffled_rank_biserial(self, rng: np.random.Generator) -> float:
-        """The rank-biserial effect with the group labels permuted (not the rows)."""
-        return self._rank_biserial(rng.permutation(self._labels), self._ranks)
+        return abs(EffectStatistic.correlation(values, labels))
 
     @staticmethod
-    def _rank_biserial(labels: np.ndarray, ranks: np.ndarray) -> float:
+    def rank_biserial(values: np.ndarray, labels: np.ndarray) -> float:
+        """|rank-biserial r| from the Mann-Whitney U of the two groups."""
+        ranks = stats.rankdata(values)
         first = labels == 0
         count_first = int(first.sum())
         count_second = int(labels.size - count_first)
@@ -149,235 +125,117 @@ class BinaryGroupTest(EffectTest):
         statistic = float(ranks[first].sum()) - count_first * (count_first + 1) / 2.0
         return abs(2.0 * statistic / (count_first * count_second) - 1.0)
 
-    def effect(self, index: np.ndarray | None = None) -> float:
-        return self._observed
+    @staticmethod
+    def eta_squared(values: np.ndarray, codes: np.ndarray) -> float:
+        """Between-group share of total variance (η²) on the groups present."""
+        sizes, means, centre, total = EffectStatistic._group_moments(values, codes)
+        if sizes.size < 2 or total == 0.0:
+            return 0.0
+        between = float((sizes * (means - centre) ** 2).sum())
+        return float(np.clip(between / total, 0.0, 1.0))
 
-    def alternative(self) -> tuple[str, float]:
-        return "rank_biserial_r", self.rank_biserial()
-
-
-class WelchTest(BinaryGroupTest):
-    """Parametric binary-group test; the effect is the point-biserial |r|."""
-
-    name: TestName = "welch"
-    effect_name: EffectName = "point_biserial_r"
-
-    def __init__(self, values: np.ndarray, labels: np.ndarray) -> None:
-        super().__init__(values, labels)
-        first, second = values[labels == 0], values[labels == 1]
-        _statistic, p_value = stats.ttest_ind(first, second, equal_var=False)
-        self._p_value = float(p_value) if np.isfinite(p_value) else 1.0
-
-    def effect(self, index: np.ndarray | None = None) -> float:
-        return self.point_biserial(index)
-
-    def shuffled_effect(self, rng: np.random.Generator) -> float:
-        return abs(self.correlation(self._values, rng.permutation(self._floats)))
-
-    def p_value(self) -> float:
-        return self._p_value
-
-
-class MannWhitneyTest(BinaryGroupTest):
-    """Non-parametric binary-group test; the effect is the rank-biserial |r|."""
-
-    name: TestName = "mann_whitney"
-    effect_name: EffectName = "rank_biserial_r"
-
-    def __init__(self, values: np.ndarray, labels: np.ndarray) -> None:
-        super().__init__(values, labels)
-        first, second = values[labels == 0], values[labels == 1]
-        _statistic, p_value = stats.mannwhitneyu(first, second, alternative="two-sided")
-        self._p_value = float(p_value) if np.isfinite(p_value) else 1.0
-
-    def effect(self, index: np.ndarray | None = None) -> float:
-        return self.rank_biserial(index)
-
-    def shuffled_effect(self, rng: np.random.Generator) -> float:
-        return self.shuffled_rank_biserial(rng)
-
-    def p_value(self) -> float:
-        return self._p_value
-
-    def alternative(self) -> tuple[str, float]:
-        return "point_biserial_r", self.point_biserial()
-
-
-class GroupDifferenceTest(EffectTest):
-    """A numeric value across ≥2 groups — the shared bincount algebra."""
-
-    def __init__(self, values: np.ndarray, codes: np.ndarray) -> None:
-        self.n = int(values.size)
-        self._values = values
-        self._codes = codes
-        self._levels = int(codes.max()) + 1
-        self._ranks = stats.rankdata(values)
-        self._groups = [values[codes == level] for level in range(self._levels)]
-        self._observed = self.effect()
-
-    def _present(self, codes: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-        sizes = np.bincount(codes, minlength=self._levels)[: self._levels].astype(float)
-        return np.flatnonzero(sizes > 0), sizes
-
-    def eta_squared(self, index: np.ndarray | None = None) -> float:
-        """Between-group share of total variance (η²) on the selected rows."""
-        values = self._values if index is None else self._values[index]
-        codes = self._codes if index is None else self._codes[index]
-        return self._eta_squared(values, codes)
-
-    def epsilon_squared(self, index: np.ndarray | None = None) -> float:
+    @staticmethod
+    def epsilon_squared(values: np.ndarray, codes: np.ndarray) -> float:
         """Kruskal's rank effect ε² = (H - k + 1) / (n - k), on midranks."""
-        ranks = self._ranks if index is None else self._ranks[index]
-        codes = self._codes if index is None else self._codes[index]
-        return self._epsilon_squared(ranks, codes)
-
-    def shuffled_eta_squared(self, rng: np.random.Generator) -> float:
-        """η² with the group labels permuted against the values (the null)."""
-        return self._eta_squared(self._values, rng.permutation(self._codes))
-
-    def shuffled_epsilon_squared(self, rng: np.random.Generator) -> float:
-        """ε² with the group labels permuted against the ranks (the null)."""
-        return self._epsilon_squared(self._ranks, rng.permutation(self._codes))
-
-    def _eta_squared(self, values: np.ndarray, codes: np.ndarray) -> float:
-        if values.size < _MIN_ROWS:
+        ranks = stats.rankdata(values)
+        sizes, means, _centre, _total = EffectStatistic._group_moments(ranks, codes)
+        if sizes.size < 2 or ranks.size <= sizes.size:
             return 0.0
-        levels, sizes = self._present(codes)
-        if levels.size < 2:
-            return 0.0
-        means = np.bincount(codes, weights=values, minlength=self._levels)[levels] / sizes[levels]
-        centre = values.mean()
-        total = float(((values - centre) ** 2).sum())
-        between = float((sizes[levels] * (means - centre) ** 2).sum())
-        return 0.0 if total == 0.0 else float(np.clip(between / total, 0.0, 1.0))
-
-    def _epsilon_squared(self, ranks: np.ndarray, codes: np.ndarray) -> float:
-        levels, sizes = self._present(codes)
-        if levels.size < 2 or ranks.size <= levels.size:
-            return 0.0
-        mean_ranks = np.bincount(codes, weights=ranks, minlength=self._levels)[levels] / sizes[
-            levels
-        ]
         h = float(
             12.0
             / (ranks.size * (ranks.size + 1))
-            * (sizes[levels] * mean_ranks**2).sum()
+            * (sizes * means**2).sum()
             - 3.0 * (ranks.size + 1)
         )
-        return epsilon_squared(h, int(levels.size), int(ranks.size))
+        return epsilon_squared(h, int(sizes.size), int(ranks.size))
 
+    @staticmethod
+    def cramers_v(feature: np.ndarray, target: np.ndarray) -> float:
+        """Cramér's V of the contingency table, empty rows/columns dropped."""
+        table = EffectStatistic.contingency(feature, target)
+        if table.shape[0] < 2 or table.shape[1] < 2:
+            return 0.0
+        chi_square = EffectStatistic.chi_square(table)
+        denominator = float(table.sum()) * min(table.shape[0] - 1, table.shape[1] - 1)
+        return 0.0 if denominator <= 0.0 else float(np.sqrt(chi_square / denominator))
 
-class AnovaTest(GroupDifferenceTest):
-    """Normality is not rejected in every group: one-way ANOVA, effect = η²."""
+    @staticmethod
+    def cramers_v_corrected(feature: np.ndarray, target: np.ndarray) -> float:
+        """Bergsma's bias-corrected Cramér's V (the small-cell counterpart)."""
+        table = EffectStatistic.contingency(feature, target)
+        rows, columns = table.shape
+        total = float(table.sum())
+        if rows < 2 or columns < 2 or total <= 1.0:
+            return 0.0
+        degrees = float((rows - 1) * (columns - 1))
+        denominator = float(min(rows, columns) - 1) - degrees / (total - 1.0)
+        if denominator <= 0.0:
+            return 0.0
+        phi_squared = EffectStatistic.chi_square(table) / total - degrees / (total - 1.0)
+        return float(np.sqrt(max(phi_squared, 0.0) / denominator))
 
-    name: TestName = "anova"
-    effect_name: EffectName = "eta_squared"
-
-    def __init__(self, values: np.ndarray, codes: np.ndarray) -> None:
-        super().__init__(values, codes)
-        _statistic, p_value = stats.f_oneway(*self._groups)
-        self._p_value = float(p_value) if np.isfinite(p_value) else 1.0
-
-    def effect(self, index: np.ndarray | None = None) -> float:
-        return self.eta_squared(index)
-
-    def shuffled_effect(self, rng: np.random.Generator) -> float:
-        return self.shuffled_eta_squared(rng)
-
-    def p_value(self) -> float:
-        return self._p_value
-
-    def alternative(self) -> tuple[str, float]:
-        return "epsilon_squared", self.epsilon_squared()
-
-
-class KruskalTest(GroupDifferenceTest):
-    """Normality is rejected (or untestable): Kruskal-Wallis, effect = ε²."""
-
-    name: TestName = "kruskal"
-    effect_name: EffectName = "epsilon_squared"
-
-    def __init__(self, values: np.ndarray, codes: np.ndarray) -> None:
-        super().__init__(values, codes)
-        _statistic, p_value = stats.kruskal(*self._groups)
-        self._p_value = float(p_value) if np.isfinite(p_value) else 1.0
-
-    def effect(self, index: np.ndarray | None = None) -> float:
-        return self.epsilon_squared(index)
-
-    def shuffled_effect(self, rng: np.random.Generator) -> float:
-        return self.shuffled_epsilon_squared(rng)
-
-    def p_value(self) -> float:
-        return self._p_value
-
-    def alternative(self) -> tuple[str, float]:
-        return "eta_squared", self.eta_squared()
-
-
-class CategoricalAssociationTest(EffectTest):
-    """Two categorical columns: χ² association, effect = Cramér's V."""
-
-    name: TestName = "chi2"
-    effect_name: EffectName = "cramers_v"
-
-    def __init__(self, feature_codes: np.ndarray, target_codes: np.ndarray) -> None:
-        self.n = int(feature_codes.size)
-        self._feature = feature_codes
-        self._target = target_codes
-        self._feature_levels = int(feature_codes.max()) + 1
-        self._target_levels = int(target_codes.max()) + 1
-        self._observed = self._cramers_v(feature_codes, target_codes)
-        table = self._table(feature_codes, target_codes)
-        _statistic, p_value, _dof, _expected = stats.chi2_contingency(table)
-        self._p_value = float(p_value) if np.isfinite(p_value) else 1.0
-
-    def _table(self, feature: np.ndarray, target: np.ndarray) -> np.ndarray:
-        """Observed contingency table, empty rows/columns removed."""
-        combined = feature * self._target_levels + target
-        counts = np.bincount(combined, minlength=self._feature_levels * self._target_levels)
-        table = counts.reshape(self._feature_levels, self._target_levels).astype(float)
+    @staticmethod
+    def contingency(feature: np.ndarray, target: np.ndarray) -> np.ndarray:
+        """Observed contingency table with empty rows/columns removed."""
+        feature_codes = feature.astype(int)
+        target_codes = target.astype(int)
+        combined = feature_codes * (int(target_codes.max()) + 1) + target_codes
+        counts = np.bincount(combined).astype(float)
+        table = counts.reshape(int(feature_codes.max()) + 1, int(target_codes.max()) + 1)
         rows = np.flatnonzero(table.sum(axis=1) > 0)
         columns = np.flatnonzero(table.sum(axis=0) > 0)
         return table[np.ix_(rows, columns)]
 
-    def _cramers_v(self, feature: np.ndarray, target: np.ndarray) -> float:
-        table = self._table(feature, target)
-        if table.shape[0] < 2 or table.shape[1] < 2:
-            return 0.0
+    @staticmethod
+    def chi_square(table: np.ndarray) -> float:
         total = float(table.sum())
         expected = table.sum(axis=1, keepdims=True) @ table.sum(axis=0, keepdims=True) / total
         mask = expected > 0.0
-        chi_square = float(((table[mask] - expected[mask]) ** 2 / expected[mask]).sum())
-        denominator = total * min(table.shape[0] - 1, table.shape[1] - 1)
-        return 0.0 if denominator <= 0.0 else float(np.sqrt(chi_square / denominator))
+        return float(((table[mask] - expected[mask]) ** 2 / expected[mask]).sum())
 
-    def effect(self, index: np.ndarray | None = None) -> float:
-        if index is None:
-            return self._observed
-        return self._cramers_v(self._feature[index], self._target[index])
+    @staticmethod
+    def _group_moments(
+        values: np.ndarray, codes: np.ndarray
+    ) -> tuple[np.ndarray, np.ndarray, float, float]:
+        """Present-group sizes and means, plus the grand mean and total SS."""
+        codes = codes.astype(int)
+        sizes = np.bincount(codes).astype(float)
+        level_sums = np.bincount(codes, weights=values).astype(float)
+        present = sizes > 0
+        sizes = sizes[present]
+        means = level_sums[present] / sizes
+        centre = float(values.mean())
+        total = float(((values - centre) ** 2).sum())
+        return sizes, means, centre, total
 
-    def shuffled_effect(self, rng: np.random.Generator) -> float:
-        return self._cramers_v(self._feature, rng.permutation(self._target))
+
+class FeatureTest:
+    """One observed per-feature test: its statistic, analytic p, and counterpart."""
+
+    def __init__(
+        self,
+        statistic: EffectStatistic,
+        p_value: float,
+        alternative_name: str,
+        alternative_value: float,
+    ) -> None:
+        self.statistic = statistic
+        self._p_value = p_value
+        self._alternative = (alternative_name, alternative_value)
+
+    @property
+    def name(self) -> TestName:
+        return self.statistic.test
+
+    @property
+    def effect_name(self) -> EffectName:
+        return self.statistic.effect_name
 
     def p_value(self) -> float:
         return self._p_value
 
     def alternative(self) -> tuple[str, float]:
-        """Bergsma's bias-corrected Cramér's V — the small-cell robustness check."""
-        table = self._table(self._feature, self._target)
-        rows, columns = table.shape
-        total = float(table.sum())
-        if rows < 2 or columns < 2 or total <= 1.0:
-            return "cramers_v_corrected", 0.0
-        expected = table.sum(axis=1, keepdims=True) @ table.sum(axis=0, keepdims=True) / total
-        chi_square = float(((table - expected) ** 2 / expected).sum())
-        degrees = float((rows - 1) * (columns - 1))
-        denominator = float(min(rows, columns) - 1) - degrees / (total - 1.0)
-        if denominator <= 0.0:
-            return "cramers_v_corrected", 0.0
-        phi_squared = chi_square / total - degrees / (total - 1.0)
-        return "cramers_v_corrected", float(np.sqrt(max(phi_squared, 0.0) / denominator))
+        return self._alternative
 
 
 class FeatureTestFactory:
@@ -390,50 +248,100 @@ class FeatureTestFactory:
 
     def build(
         self,
-        frame: pd.DataFrame,
+        pair: pd.DataFrame,
         feature: str,
         target: str,
         feature_kind: FeatureKind,
         target_kind: TargetKind,
-    ) -> EffectTest | None:
+    ) -> FeatureTest | None:
         """One prepared test for this feature, or ``None`` when it is untestable."""
-        if len(frame) < _MIN_ROWS:
+        if len(pair) < _MIN_ROWS:
             return None
+        if target_kind == "numeric" and feature_kind == "numeric":
+            return self._spearman(pair, feature, target)
         if target_kind == "numeric":
-            if feature_kind == "numeric":
-                return RankCorrelationTest(
-                    frame[feature].to_numpy(dtype=float), frame[target].to_numpy(dtype=float)
-                )
-            return self._groups(frame[target].to_numpy(dtype=float), self._codes(frame, feature))
-        target_codes = self._codes(frame, target)
+            return self._groups(pair[target], pair[feature], feature, target)
         if feature_kind == "numeric":
-            values = frame[feature].to_numpy(dtype=float)
             if target_kind == "binary":
-                return self._binary(values, target_codes)
-            return self._groups(values, target_codes)
-        feature_codes = self._codes(frame, feature)
-        if len(np.unique(feature_codes)) < 2 or len(np.unique(target_codes)) < 2:
-            return None
-        return CategoricalAssociationTest(feature_codes, target_codes)
+                return self._binary(pair[feature], pair[target], feature, target)
+            return self._groups(pair[feature], pair[target], feature, target)
+        return self._categorical(pair[feature], pair[target], feature, target)
 
-    def _groups(self, values: np.ndarray, codes: np.ndarray) -> EffectTest | None:
-        sizes = np.bincount(codes)
-        if sizes.size < 2:
-            return None
-        if int(sizes[sizes > 0].min()) < _MIN_GROUP_SIZE:
-            return None
+    def _spearman(self, pair: pd.DataFrame, feature: str, target: str) -> FeatureTest:
+        values = pair[feature].to_numpy(dtype=float)
+        labels = pair[target].to_numpy(dtype=float)
+        statistic = EffectStatistic("spearman", feature, target)
+        _coefficient, p_value = stats.spearmanr(values, labels)
+        return FeatureTest(
+            statistic,
+            self._finite_p(p_value),
+            "abs_pearson_r",
+            abs(EffectStatistic.correlation(values, labels)),
+        )
+
+    def _binary(
+        self, values: pd.Series, labels: pd.Series, feature: str, target: str
+    ) -> FeatureTest | None:
         groups = {
-            str(level): values[codes == level]
-            for level in range(int(codes.max()) + 1)
-            if (codes == level).any()
+            str(level): values.to_numpy(dtype=float)[labels.to_numpy() == level]
+            for level in (0, 1)
         }
-        return AnovaTest(values, codes) if self._normal(groups) else KruskalTest(values, codes)
-
-    def _binary(self, values: np.ndarray, codes: np.ndarray) -> EffectTest | None:
-        groups = {str(level): values[codes == level] for level in (0, 1)}
         if any(group.size < _MIN_GROUP_SIZE for group in groups.values()):
             return None
-        return WelchTest(values, codes) if self._normal(groups) else MannWhitneyTest(values, codes)
+        parametric = self._normal(groups)
+        statistic = EffectStatistic(
+            "welch" if parametric else "mann_whitney", str(values.name), str(labels.name)
+        )
+        first, second = groups["0"], groups["1"]
+        if parametric:
+            _statistic, p_value = stats.ttest_ind(first, second, equal_var=False)
+            alternative = ("rank_biserial_r", EffectStatistic.rank_biserial(
+                values.to_numpy(dtype=float), labels.to_numpy(dtype=float)
+            ))
+        else:
+            _statistic, p_value = stats.mannwhitneyu(first, second, alternative="two-sided")
+            alternative = ("point_biserial_r", EffectStatistic.point_biserial(
+                values.to_numpy(dtype=float), labels.to_numpy(dtype=float)
+            ))
+        return FeatureTest(statistic, self._finite_p(p_value), *alternative)
+
+    def _groups(
+        self, values: pd.Series, codes: pd.Series, feature: str, target: str
+    ) -> FeatureTest | None:
+        numeric = values.to_numpy(dtype=float)
+        labels = codes.to_numpy(dtype=float)
+        levels = np.unique(labels)
+        groups = {str(int(level)): numeric[labels == level] for level in levels}
+        if levels.size < 2 or any(g.size < _MIN_GROUP_SIZE for g in groups.values()):
+            return None
+        parametric = self._normal(groups)
+        statistic = EffectStatistic(
+            "anova" if parametric else "kruskal", str(values.name), str(codes.name)
+        )
+        if parametric:
+            _statistic, p_value = stats.f_oneway(*groups.values())
+            alternative = ("epsilon_squared", EffectStatistic.epsilon_squared(numeric, labels))
+        else:
+            _statistic, p_value = stats.kruskal(*groups.values())
+            alternative = ("eta_squared", EffectStatistic.eta_squared(numeric, labels))
+        return FeatureTest(statistic, self._finite_p(p_value), *alternative)
+
+    def _categorical(
+        self, feature_values: pd.Series, target_values: pd.Series, feature: str, target: str
+    ) -> FeatureTest | None:
+        feature_codes = feature_values.to_numpy(dtype=float)
+        target_codes = target_values.to_numpy(dtype=float)
+        if np.unique(feature_codes).size < 2 or np.unique(target_codes).size < 2:
+            return None
+        table = EffectStatistic.contingency(feature_codes, target_codes)
+        _statistic, p_value, _dof, _expected = stats.chi2_contingency(table)
+        statistic = EffectStatistic("chi2", feature, target)
+        return FeatureTest(
+            statistic,
+            self._finite_p(p_value),
+            "cramers_v_corrected",
+            EffectStatistic.cramers_v_corrected(feature_codes, target_codes),
+        )
 
     def _normal(self, groups: dict[str, np.ndarray]) -> bool:
         """Parametric only when no group's normality is rejected at ``alpha``."""
@@ -445,8 +353,8 @@ class FeatureTestFactory:
         return all(item["shapiro_p"] >= self._alpha for item in checked.values())
 
     @staticmethod
-    def _codes(frame: pd.DataFrame, column: str) -> np.ndarray:
-        return pd.factorize(frame[column], sort=True)[0]
+    def _finite_p(value: float) -> float:
+        return float(value) if np.isfinite(value) else 1.0
 
 
 class FeatureTestAnalyzer:
@@ -459,18 +367,24 @@ class FeatureTestAnalyzer:
             step.alpha, step.shapiro_sample, step.random_state
         )
         self._correction = MultipleTestingCorrection(step.correction)
+        self._estimator = MeasurementEstimator()
 
     def analyze(
-        self, frame: pd.DataFrame, target: str, provenance: dict[str, str]
+        self,
+        frame: pd.DataFrame,
+        target: str,
+        provenance: dict[str, str],
+        plan: SegmentPlan,
     ) -> FeatureTestBundle:
         """Test every testable feature against the target and publish the decisions."""
+        frame = frame.reset_index(drop=True)
         if target not in frame.columns:
             return self._empty(
                 target,
                 f"target '{target}' is not in the profiled frame; no association test ran",
                 [str(name) for name in frame.columns],
             )
-        target_kind = self._target_kind(frame[target])
+        target_kind = ColumnKinds.target(frame[target], self._task)
         tests, skipped = self._tests(frame, target, target_kind)
         if not tests:
             return self._empty(
@@ -479,29 +393,28 @@ class FeatureTestAnalyzer:
                 f"(skipped: {', '.join(skipped) or 'none'})",
                 skipped,
             )
-        q_values = self._correction.adjust([test.p_value() for _, _, test in tests])
-        ranked = sorted(
-            (
-                (str(feature), test, self._row(str(feature), kind, test, q, target_kind))
-                for (feature, kind, test), q in zip(tests, q_values)
-            ),
-            key=lambda entry: (-entry[2].effect, entry[0]),
-        )
-        rng = np.random.default_rng(self._step.random_state)
-        rows: list[FeatureTestResult] = []
+        q_values = self._correction.adjust([test.p_value() for _, _, test, _, _ in tests])
+        rows = [
+            self._row(feature, kind, test, pair, q_value, target_kind)
+            for (feature, kind, test, pair, _positions), q_value in zip(tests, q_values)
+        ]
+        ranked = sorted(zip(tests, rows), key=lambda entry: (-entry[1].effect, entry[0][0]))
+        results: list[FeatureTestResult] = []
         decisions: list[Decision] = []
-        for position, (feature, test, row) in enumerate(ranked):
+        for position, ((feature, _kind, test, pair, positions), row) in enumerate(ranked):
             if position < self._step.max_features:
-                decision = self._decide(feature, test, row, rng, provenance, target)
+                decision = self._decide(
+                    feature, test, pair, positions, row, plan, provenance, target, frame
+                )
                 decisions.append(decision)
                 row = row.model_copy(update={"verdict": decision.verdict})
-            rows.append(row)
+            results.append(row)
         return FeatureTestBundle(
             target=target,
             target_kind=target_kind,
             alpha=self._step.alpha,
             min_effect=self._step.min_effect,
-            features=rows,
+            features=results,
             skipped=skipped,
             decisions=decisions,
             summary=self._summary(decisions),
@@ -509,29 +422,30 @@ class FeatureTestAnalyzer:
 
     def _tests(
         self, frame: pd.DataFrame, target: str, target_kind: TargetKind
-    ) -> tuple[list[tuple[str, FeatureKind, EffectTest]], list[str]]:
-        tests: list[tuple[str, FeatureKind, EffectTest]] = []
+    ) -> tuple[list[tuple[str, FeatureKind, FeatureTest, pd.DataFrame, np.ndarray]], list[str]]:
+        tests: list[tuple[str, FeatureKind, FeatureTest, pd.DataFrame, np.ndarray]] = []
         skipped: list[str] = []
         for name in frame.columns:
             if str(name) == target:
                 continue
-            kind = self._feature_kind(frame[name])
+            kind = ColumnKinds.feature(frame[name])
             if kind is None:
                 skipped.append(str(name))
                 continue
-            pair = self._complete(frame, str(name), target, kind)
+            pair, positions = self._pair(frame, str(name), target, kind, target_kind)
             test = self._factory.build(pair, str(name), target, kind, target_kind)
             if test is None:
                 skipped.append(str(name))
                 continue
-            tests.append((str(name), kind, test))
+            tests.append((str(name), kind, test, pair, positions))
         return tests, skipped
 
     def _row(
         self,
         feature: str,
         kind: FeatureKind,
-        test: EffectTest,
+        test: FeatureTest,
+        pair: pd.DataFrame,
         q_value: float,
         target_kind: TargetKind,
     ) -> FeatureTestResult:
@@ -541,10 +455,10 @@ class FeatureTestAnalyzer:
             target_kind=target_kind,
             test=test.name,
             effect_name=test.effect_name,
-            effect=test.effect(),
+            effect=test.statistic(pair),
             p_value=test.p_value(),
             q_value=q_value,
-            n=test.n,
+            n=len(pair),
             significant=q_value < self._step.alpha,
             verdict=None,
         )
@@ -552,88 +466,125 @@ class FeatureTestAnalyzer:
     def _decide(
         self,
         feature: str,
-        test: EffectTest,
+        test: FeatureTest,
+        pair: pd.DataFrame,
+        positions: np.ndarray,
         row: FeatureTestResult,
-        rng: np.random.Generator,
+        plan: SegmentPlan,
         provenance: dict[str, str],
         target: str,
+        family: pd.DataFrame,
     ) -> Decision:
-        null = [test.shuffled_effect(rng) for _ in range(self._step.permutations)]
-        draws = [
-            test.effect(rng.integers(0, row.n, row.n))
-            for _ in range(self._step.permutations)
-        ]
-        low, high = np.percentile(draws, [_CI_LOW, _CI_HIGH])
+        measurement = self._estimator.estimate(
+            pair,
+            test.statistic,
+            MeasurementSpec(
+                bootstrap="iid",
+                null="shuffle",
+                null_column=target,
+                iterations=self._step.permutations,
+                seed=self._step.random_state,
+                confidence=1.0 - self._step.alpha,
+            ),
+            name=f"association_{feature}",
+        )
         alternative_name, alternative_value = test.alternative()
         evidence = Evidence(
-            baseline="no-effect permutation of the target at this n",
-            segments=self._halves(test, row.n),
+            baseline="no-effect shuffle of the target at this n",
+            segments=self._segments(test, pair, positions, plan, family),
             sensitivity={
                 alternative_name: alternative_value,
-                "permutations": float(self._step.permutations),
+                "iterations": float(self._step.permutations),
                 "alpha": self._step.alpha,
             },
             falsifier=(
-                "the association's 95% interval falls at or below "
-                "max(min_effect, the permutation null band) — the feature would be "
-                f"indistinguishable from a shuffled target at n={row.n:,}"
+                "the association's interval falls at or below "
+                "max(min_effect, the shuffle null band) — the feature would be "
+                f"indistinguishable from a shuffled target at n={measurement.sample_size:,}"
             ),
             provenance={
                 **provenance,
                 "feature": feature,
                 "test": test.name,
-                "rows": str(row.n),
-                "seed": str(self._step.random_state),
+                "rows": str(measurement.sample_size),
+                "seed": str(measurement.seed),
+                "resampling": measurement.resampling,
+                "segments": plan.rule,
             },
         )
         rule = DecisionRule(
             metric=f"association_{feature}",
             direction="max",
             min_effect=self._step.min_effect,
-            null_quantile=self._step.null_quantile,
             min_sample_size=self._step.min_sample_size,
             action=self._step.decisions.features.action,
             owner=self._step.decisions.features.owner,
         )
-        return Decision.evaluate(
-            rule=rule,
-            value=row.effect,
-            interval=(min(float(low), row.effect), max(float(high), row.effect)),
-            sample_size=row.n,
+        return measurement.to_decision(
+            rule,
             question=(
                 f"Does {feature} move the {row.target_kind} target '{target}'"
                 " beyond the minimum effect and the no-effect null band?"
             ),
             evidence=evidence,
-            null_values=null,
             reference=0.0,
         )
 
-    def _halves(self, test: EffectTest, n: int) -> list[SegmentEvidence]:
-        half = n // 2
-        segments = [
-            SegmentEvidence(segment=label, value=test.effect(index), sample_size=int(index.size))
-            for label, index in (
-                ("first half", np.arange(0, half)),
-                ("second half", np.arange(half, n)),
+    def _segments(
+        self,
+        test: FeatureTest,
+        pair: pd.DataFrame,
+        positions: np.ndarray,
+        plan: SegmentPlan,
+        family: pd.DataFrame,
+    ) -> list[SegmentEvidence]:
+        """Re-measure the effect inside each semantic segment (not row halves)."""
+        labels = plan.labels(family).iloc[positions].reset_index(drop=True)
+        return [
+            SegmentEvidence(
+                segment=name,
+                value=test.statistic(pair.iloc[index]),
+                sample_size=int(index.size),
             )
-            if index.size > 0
+            for name, index in SegmentPlan.groups(labels)
         ]
-        if not segments:
-            segments.append(
-                SegmentEvidence(segment="whole sample", value=test.effect(), sample_size=n)
-            )
-        return segments
 
     def _summary(self, decisions: list[Decision]) -> Decision | None:
+        """The family aggregate: act if any act, else the strongest investigate.
+
+        The verdict is not typed: the family rule selects which feature's
+        *computed* decision is representative (the largest margin over its own
+        threshold) and the record states the family counts in its provenance.
+        """
         if not decisions:
             return None
-        return decisions[0].model_copy(
+        acting = [item for item in decisions if item.verdict == "act"]
+        pool = acting or [item for item in decisions if item.verdict == "investigate"] or decisions
+        chosen = max(
+            pool,
+            key=lambda item: (
+                item.interval_low - item.threshold if acting else item.interval_high - item.threshold,
+                item.value,
+            ),
+        )
+        evidence = chosen.evidence.model_copy(
+            update={
+                "provenance": {
+                    **chosen.evidence.provenance,
+                    "family_size": str(len(decisions)),
+                    "acted": str(len(acting)),
+                    "investigated": str(sum(1 for item in decisions if item.verdict == "investigate")),
+                    "selected_feature": chosen.metric,
+                }
+            }
+        )
+        return chosen.model_copy(
             update={
                 "question": (
                     "Is there at least one feature whose association with the target "
                     "survives multiple-testing correction and the minimum effect?"
-                )
+                ),
+                "evidence": evidence,
             }
         )
 
@@ -652,20 +603,30 @@ class FeatureTestAnalyzer:
         )
 
     @staticmethod
-    def _feature_kind(series: pd.Series) -> FeatureKind | None:
-        return ColumnKinds.feature(series)
-
-    def _target_kind(self, series: pd.Series) -> TargetKind:
-        return ColumnKinds.target(series, self._task)
+    def _pair(
+        frame: pd.DataFrame,
+        feature: str,
+        target: str,
+        kind: FeatureKind,
+        target_kind: TargetKind,
+    ) -> tuple[pd.DataFrame, np.ndarray]:
+        """Encode one pair as numeric columns and keep the original row positions."""
+        values = frame[[feature, target]].dropna()
+        if kind == "numeric":
+            values = values[np.isfinite(values[feature].to_numpy(dtype=float))]
+        if target_kind == "numeric":
+            values = values[np.isfinite(values[target].to_numpy(dtype=float))]
+        pair = pd.DataFrame(
+            {
+                feature: FeatureTestAnalyzer._encode(values[feature], kind),
+                target: FeatureTestAnalyzer._encode(values[target], target_kind),
+            }
+        )
+        return pair, values.index.to_numpy()
 
     @staticmethod
-    def _complete(
-        frame: pd.DataFrame, feature: str, target: str, kind: FeatureKind
-    ) -> pd.DataFrame:
-        """Pairwise-complete rows for one feature/target pair (finite numerics)."""
-        pair = frame[[feature, target]].dropna()
+    def _encode(series: pd.Series, kind: FeatureKind | TargetKind | None) -> np.ndarray:
+        """A measurement stays float; a code/count becomes a nominal integer code."""
         if kind == "numeric":
-            pair = pair[np.isfinite(pair[feature].to_numpy(dtype=float))]
-        if pd.api.types.is_numeric_dtype(pair[target]):
-            pair = pair[np.isfinite(pair[target].to_numpy(dtype=float))]
-        return pair.reset_index(drop=True)
+            return series.to_numpy(dtype=float)
+        return pd.factorize(series, sort=True)[0].astype(float)

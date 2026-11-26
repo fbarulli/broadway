@@ -358,12 +358,13 @@ class EdaDecisionAction(BaseModel):
 
 
 class EdaDecisionsConfig(BaseModel):
-    """One declared action per EDA decision family (feature tests, outliers)."""
+    """One declared action per EDA decision family."""
 
     model_config = ConfigDict(extra="forbid")
 
     features: EdaDecisionAction
     outliers: EdaDecisionAction
+    comparison: EdaDecisionAction
 
 
 class EdaStep(BaseModel):
@@ -390,7 +391,6 @@ class EdaStep(BaseModel):
     alpha: float = Field(gt=0.0, lt=1.0)
     min_effect: float = Field(gt=0.0, le=1.0)
     correction: Literal["bh", "none"]
-    null_quantile: float = Field(gt=0.5, lt=1.0)
     min_sample_size: int = Field(ge=1)
     max_features: int = Field(ge=1)
     permutations: int = Field(ge=10)

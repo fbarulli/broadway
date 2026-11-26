@@ -147,6 +147,8 @@ class QualityResult(BaseModel):
 
 
 class ColumnShift(BaseModel):
+    """One column's ETL shift: point deltas plus their bootstrap intervals."""
+
     model_config = ConfigDict(extra="forbid")
 
     column: str
@@ -155,7 +157,11 @@ class ColumnShift(BaseModel):
     before_median: float | None
     after_median: float | None
     mean_delta: float | None
+    mean_delta_low: float | None = None
+    mean_delta_high: float | None = None
     median_delta: float | None
+    median_delta_low: float | None = None
+    median_delta_high: float | None = None
 
 
 class CompareResult(BaseModel):
@@ -173,6 +179,7 @@ class CompareResult(BaseModel):
     dtype_changes: dict[str, str]
     numeric_shifts: list[ColumnShift]
     notes: list[str]
+    decision: Decision | None = None
 
 
 class EmbeddedFigure(BaseModel):
@@ -300,6 +307,7 @@ class EdaDecisionBundle(BaseModel):
 
     dataset: str
     summary: Decision | None
+    comparison: Decision | None
     features: list[Decision]
     outliers: list[Decision]
 
