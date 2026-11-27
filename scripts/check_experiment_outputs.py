@@ -123,7 +123,9 @@ class StepAudit:
         return ", ".join(missing)
 
     def decision_reason(self) -> str:
-        return "" if self.has_decision else "no StepOutput decision record (metric + interval + verdict)"
+        if not self.has_decision:
+            return "no StepOutput decision record (metric + interval + verdict)"
+        return "no valid decision record at the pair's results path"
 
 
 @dataclass
@@ -313,9 +315,12 @@ def main() -> int:
     violations = audit.violations()
     advisory = audit.advisory()
     for step in violations:
-        print(f"FAIL {step.series}/{step.stem}.py: {step.reason()}")
+        print(f"FAIL {step.series}/{step.stem}.py: {step.reason() or step.decision_reason()}")
     for step in advisory:
-        print(f"note {step.series}/{step.stem}.py: {step.reason()} (not yet enforced)")
+        print(
+            f"note {step.series}/{step.stem}.py: {step.reason() or step.decision_reason()} "
+            "(not yet enforced)"
+        )
     enforced_pipeline = _enforced_pipeline_steps(layout)
     skipped_pipeline = tuple(
         step
