@@ -69,10 +69,10 @@ def test_cli_discover_passes_optional_args(
     _main(
         monkeypatch, "discover", "--csv", "a.csv", "--target", "price",
         "--task", "regression", "--datetime-column", "dt",
-        "--ignore-columns", "c1", "c2", "--artifacts-subdir", "amazon",
+        "--ignore-columns", "c1", "c2", "--artifacts-subdir", "olist",
     )
     assert spy.calls == [
-        ("a.csv", "price", "regression", "dt", ["c1", "c2"], "amazon")
+        ("a.csv", "price", "regression", "dt", ["c1", "c2"], "olist")
     ]
 
 

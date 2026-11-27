@@ -72,26 +72,31 @@ src/broadway/
 `reports/model_evaluation.html` do **not** exist; they were removed or never
 shipped. Do not write against them.
 
-## 2. Project (the Amazon dataset layer)
+## 2. Project (the Olist dataset layer)
 
 ```
 project/
 ├── config/                    # the project config tree (overlay-selected)
-│   ├── dataset/amazon.yaml    # 23 columns, target, renames, processed/artifact namespace
-│   ├── analysis/amazon.yaml   # goal, row definition, decision moment, leakage note
-│   ├── experiment/            # amazon (reference), amazon_hpo (search space),
-│   │                          #   amazon_champion (deployable default champion)
-│   ├── experiments/           # amazon_survey.yaml (decision rule), amazon_hpo.yaml
+│   ├── dataset/olist.yaml     # 32 columns, target, processed/artifact namespace
+│   ├── analysis/olist.yaml    # goal, row definition, decision moment, leakage note
+│   ├── project/olist.yaml     # the raw-CSV join/aggregation spec (grain + drops)
+│   ├── experiment/            # olist (reference, PR-AUC), olist_hpo (search space)
+│   ├── experiments/           # olist_hpo.yaml (project HPO spec)
 │   ├── step/                  # eda/etl/features/baseline/train/evaluate/selection/hpo
 │   │                          #   output slots, rules, folds and seeds
 │   └── layout.yaml            # every project path, resolved once
-├── features/amazon.py         # the Amazon ColumnPlan (single keep-set)
+├── data.py                    # OlistCanonicalBuilder: raw CSVs → one row per order
+├── features/olist.py          # the Olist ColumnPlan (role-derived keep-set)
 ├── experiments/
-│   ├── amazon_survey/         # 01_profile, publishing <stem>_decision.json
 │   └── results/               # committed figures, reports, tables, decisions
 ├── paths.py                   # project layout loader
 ├── cli.py / dashboard.py      # project composition roots
 ```
+
+The raw CSVs live in `data/raw/olist/` (git-ignored); `python -m project.data`
+builds the order-grain parquet the contract names, then
+`python -m project.cli etl --dataset olist --experiment olist` runs the
+platform ETL and `eda` publishes the decision records on the pipeline surface.
 
 ## 3. GPU lane (`gpu_training/`)
 
@@ -107,7 +112,7 @@ gpu_training/
 ```
 
 The lane is config-driven: the kernel carries no vendor code, and the study
-targets `project/config/experiments/amazon_hpo.yaml` (the project HPO spec).
+targets `project/config/experiments/olist_hpo.yaml` (the project HPO spec).
 
 ## 4. Artifacts a run produces
 

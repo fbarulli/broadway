@@ -20,7 +20,7 @@ def test_project_cli_activates_the_project_config_overlay() -> None:
             "-c",
             (
                 "import project.cli; from broadway.config.loader import load_config; "
-                "print(load_config('etl', dataset='amazon', experiment='amazon').dataset.name)"
+                "print(load_config('etl', dataset='olist', experiment='olist').dataset.name)"
             ),
         ],
         cwd=REPO,
@@ -31,4 +31,4 @@ def test_project_cli_activates_the_project_config_overlay() -> None:
         env=environment,
     )
     assert result.returncode == 0, result.stderr
-    assert result.stdout.strip() == "amazon"
+    assert result.stdout.strip() == "olist"

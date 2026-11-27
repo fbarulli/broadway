@@ -66,7 +66,7 @@ def _decision() -> AnalysisDecision:
 
 
 def test_gantt_sections_in_run_order_with_statuses() -> None:
-    md = render_timeline_gantt("amazon", _seq(), [_step()], [])
+    md = render_timeline_gantt("olist", _seq(), [_step()], [])
     assert md.startswith("gantt")
     assert "dateFormat YYYY-MM-DD" in md
     first = md.index("Describe groups")
@@ -78,7 +78,7 @@ def test_gantt_sections_in_run_order_with_statuses() -> None:
 
 
 def test_flowchart_chains_steps_and_marks_decision() -> None:
-    md = render_decision_flowchart("amazon", _seq(), [_step()], [_decision()])
+    md = render_decision_flowchart("olist", _seq(), [_step()], [_decision()])
     assert md.startswith("flowchart LR")
     assert 'describe_groups["Describe groups - completed"]' in md
     assert 'decide_omnibus{"Choose principal method - completed - welch"}' in md
@@ -98,8 +98,8 @@ def test_hostile_labels_render_safe() -> None:
             ),
         ]
     )
-    gantt = render_timeline_gantt(f"amazon {HOSTILE}", seq, [], [])
-    flow = render_decision_flowchart(f"amazon {HOSTILE}", seq, [], [])
+    gantt = render_timeline_gantt(f"olist {HOSTILE}", seq, [], [])
+    flow = render_decision_flowchart(f"olist {HOSTILE}", seq, [], [])
     for doc in (gantt, flow):
         assert HOSTILE not in doc
         assert "<B>" not in doc

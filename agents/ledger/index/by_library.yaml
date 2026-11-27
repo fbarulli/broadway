@@ -72,6 +72,7 @@ broadway.config.schema:
 - GATE-ETL-11
 broadway.config.schema(DatasetContract):
 - GATE-FEAT-29
+broadway.config.schema(DatasetContract, ColumnRole):
 - GATE-INFRA-181
 broadway.config.schema(DatasetContract, FeatureConfig, PipelineConfig):
 - GATE-FEAT-26
@@ -106,6 +107,8 @@ broadway.contracts.pandera:
 - GATE-ETL-19
 broadway.contracts.pandera (build_raw_schema):
 - GATE-ETL-12
+broadway.contracts.pandera(is_numeric_dtype):
+- GATE-INFRA-181
 broadway.contracts.pandera(pandera_dtype):
 - GATE-FEAT-26
 - GATE-FEAT-27
@@ -350,7 +353,6 @@ lookup value audit (data/lookup_value_audit.py:48):
 matplotlib:
 - GATE-SURF-66
 - GATE-INFRA-182
-- GATE-INFRA-183
 matplotlib (Agg):
 - GATE-STATS-48
 matplotlib Agg (:8):
@@ -502,6 +504,7 @@ psycopg2-binary:
 pyarrow:
 - GATE-TRAIN-32
 - GATE-INFRA-168
+- GATE-INFRA-183
 pydantic:
 - GATE-INGEST-05
 - GATE-INGEST-06
@@ -524,6 +527,7 @@ pydantic:
 - GATE-INFRA-171
 - GATE-INFRA-172
 - GATE-INFRA-176
+- GATE-INFRA-183
 pydantic (extra=forbid models :25-45):
 - GATE-STATS-49
 python -m broadway.cli equivalent:
@@ -577,8 +581,6 @@ scikit-learn:
 - GATE-HPO-81
 - GATE-HPO-87
 - GATE-INFRA-161
-scipy:
-- GATE-INFRA-183
 scipy.stats:
 - GATE-STATS-45
 scipy.stats (levene/skew/kurtosis/shapiro):

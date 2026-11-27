@@ -1,0 +1,112 @@
+# The one join/aggregation spec for the Olist order-grain table (SSOT).
+#
+# Every source label, join key, aggregate and output name lives here; the
+# builder class (project/data.py) reads this file and contains no column
+# literal. `output` is the dataset contract's path (project/config/dataset/
+# olist.yaml) and the parquet the ETL reads.
+#
+# Grain: one row per order_id. Orders without a review keep a null target and
+# are dropped by the ETL's accounted "null target" rule; orders without item
+# rows keep null item aggregates (755 of 99,441). No row is dropped here.
+name: olist
+source_dir: data/raw/olist
+output: data/raw/olist/olist_orders.parquet
+grain: order_id
+
+files:
+  orders: olist_orders_dataset.csv
+  customers: olist_customers_dataset.csv
+  items: olist_order_items_dataset.csv
+  payments: olist_order_payments_dataset.csv
+  reviews: olist_order_reviews_dataset.csv
+  products: olist_products_dataset.csv
+  sellers: olist_sellers_dataset.csv
+  category_translation: product_category_name_translation.csv
+
+orders:
+  key: order_id
+  customer_key: customer_id
+  status: order_status
+  purchase: order_purchase_timestamp
+  approved: order_approved_at
+  carrier: order_delivered_carrier_date
+  delivered: order_delivered_customer_date
+  estimated: order_estimated_delivery_date
+
+customers:
+  key: customer_id
+  # CEP prefixes can start with 0; padding to five characters keeps them
+  # comparable and makes the column a categorical source, not a quantity.
+  zero_pad:
+    customer_zip_code_prefix: 5
+  columns:
+    customer_unique_id: customer_unique_id
+    customer_state: customer_state
+    customer_city: customer_city
+    customer_zip_code_prefix: customer_zip_code_prefix
+
+# Item rows are enriched with product and seller attributes BEFORE aggregation,
+# so every mean/mode is over the order's item lines (not over distinct products).
+items:
+  key: order_id
+  count: items_count
+  distinct:
+    seller_id: sellers_count
+    product_id: products_count
+  sum:
+    price: total_price
+    freight_value: total_freight
+  mean:
+    price: mean_item_price
+    product_weight_g: mean_product_weight_g
+    product_photos_qty: mean_product_photos_qty
+    product_description_lenght: mean_product_description_length
+  mode:
+    seller_state: seller_state
+    category_pt: dominant_category_pt
+  enrich:
+    - file: products
+      key: product_id
+      columns:
+        product_weight_g: product_weight_g
+        product_photos_qty: product_photos_qty
+        product_description_lenght: product_description_lenght
+        product_category_name: category_pt
+    - file: sellers
+      key: seller_id
+      columns:
+        seller_state: seller_state
+
+payments:
+  key: order_id
+  sum:
+    payment_value: total_payment
+  max:
+    payment_installments: max_installments
+  distinct:
+    payment_type: payment_type_count
+  mode:
+    payment_type: dominant_payment_type
+
+# One review per order in practice; 551 extra review rows are resolved by the
+# declared stable sort (latest creation/answer wins) before the join.
+reviews:
+  key: order_id
+  score: review_score
+  target: bad_review
+  bad_threshold: 2
+  dedupe_sort:
+    - review_creation_date
+    - review_answer_timestamp
+
+deliveries:
+  delivery_days: delivery_days
+  estimated_days: estimated_days
+  late: late
+
+category_translation:
+  file: category_translation
+  key: product_category_name
+  value: product_category_name_english
+  source: dominant_category_pt
+  output: dominant_category

@@ -33,7 +33,7 @@ def test_main_wires_project_paths_into_generic_dashboard(monkeypatch, tmp_path) 
 
 
 def test_eda_writes_to_the_layout_results_root() -> None:
-    config = load_config("eda", dataset="amazon")
+    config = load_config("eda", dataset="olist")
     assert config.eda is not None
     assert config.eda.output_path.parent == (
         load_project_paths().experiments / "results" / "pipeline" / "eda"

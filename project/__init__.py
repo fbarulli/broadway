@@ -1,4 +1,4 @@
-"""Project composition boundary for the Amazon dataset project."""
+"""Project composition boundary for the Olist dataset project."""
 
 from __future__ import annotations
 

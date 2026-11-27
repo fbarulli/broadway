@@ -66,19 +66,20 @@ k8s/optuna/teardown.sh:
 - GATE-INFRA-145
 k8s/postgres-deployment.yaml:
 - GATE-INFRA-133
-project/config/dataset/amazon.yaml:
+project/config/dataset/olist.yaml:
 - GATE-INFRA-183
-project/config/experiment/amazon.yaml:
+project/config/experiment/olist.yaml:
 - GATE-INFRA-183
 project/config/experiment/taxi.yaml:
 - GATE-INFRA-180
-project/config/experiments/amazon_survey.yaml:
+project/config/project/olist.yaml:
 - GATE-INFRA-183
 project/dashboard.py:
 - GATE-INFRA-123
 project/data.py:
 - GATE-TRAIN-32
 - GATE-CFG-104
+- GATE-INFRA-183
 project/etl/process.py:
 - GATE-INGEST-01
 - GATE-INGEST-04
@@ -89,8 +90,6 @@ project/etl/process_config.py:
 - GATE-ETL-117
 project/experiments.py:
 - GATE-INFRA-122
-project/experiments/amazon_survey/01_profile.py:
-- GATE-INFRA-183
 project/experiments/mlflow/03_optuna_worker.py:
 - GATE-CFG-111
 - GATE-INFRA-129
@@ -98,7 +97,7 @@ project/experiments/mlflow/03_optuna_worker.py:
 - GATE-CUST-152
 project/experiments/mlflow/_common.py:
 - GATE-CFG-111
-project/features/amazon.py:
+project/features/olist.py:
 - GATE-INFRA-181
 - GATE-INFRA-183
 scripts/check_branch_parity.sh:

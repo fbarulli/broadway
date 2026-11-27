@@ -1,0 +1,163 @@
+# Olist dataset contract — the ONLY raw schema the ETL/EDA steps read.
+#
+# Grain: one row per order_id, built by project/data.py from the nine downloaded
+# CSVs (join/aggregation spec: project/config/project/olist.yaml). The path is
+# the builder's output; the builder keeps every order (99,441 rows), so the ETL's
+# accounted target-null rule removes the 768 orders with no review. Orders
+# without item rows are kept: their count columns are 0 (zero item lines) and
+# their price/weight/category aggregates are null (unknown, not zero).
+#
+# Target: bad_review = (review_score <= 2), decided AT PURCHASE. Delivery,
+# review and timestamp columns are EDA/context only — the feature plan
+# (project/features/olist.py) never selects them.
+name: olist
+path: data/raw/olist/olist_orders.parquet
+target: bad_review
+task: classification
+datetime_column: null
+processed_subdir: processed/olist
+artifacts_subdir: olist
+columns:
+  order_id:
+    dtype: object
+    null_count: 0
+    role: ignore
+  customer_id:
+    dtype: object
+    null_count: 0
+    role: ignore
+  customer_unique_id:
+    dtype: object
+    null_count: 0
+    role: ignore
+  customer_state:
+    dtype: object
+    null_count: 0
+    role: feature
+  customer_city:
+    dtype: object
+    null_count: 0
+    role: feature
+  customer_zip_code_prefix:
+    dtype: object
+    null_count: 0
+    role: feature
+  order_status:
+    dtype: object
+    null_count: 0
+    role: ignore
+  order_purchase_timestamp:
+    dtype: datetime64
+    null_count: 0
+    role: ignore
+  order_approved_at:
+    dtype: datetime64
+    null_count: 160
+    role: ignore
+  order_delivered_carrier_date:
+    dtype: datetime64
+    null_count: 1783
+    role: ignore
+  order_delivered_customer_date:
+    dtype: datetime64
+    null_count: 2965
+    role: ignore
+  order_estimated_delivery_date:
+    dtype: datetime64
+    null_count: 0
+    role: ignore
+  delivery_days:
+    dtype: float64
+    null_count: 2965
+    role: ignore
+  estimated_days:
+    dtype: float64
+    null_count: 0
+    role: ignore
+  late:
+    dtype: float64
+    null_count: 2965
+    role: ignore
+  items_count:
+    dtype: float64
+    null_count: 0
+    role: feature
+  sellers_count:
+    dtype: float64
+    null_count: 0
+    role: feature
+  products_count:
+    dtype: float64
+    null_count: 0
+    role: feature
+  total_price:
+    dtype: float64
+    null_count: 775
+    role: feature
+  total_freight:
+    dtype: float64
+    null_count: 775
+    role: feature
+  mean_item_price:
+    dtype: float64
+    null_count: 775
+    role: feature
+  mean_product_weight_g:
+    dtype: float64
+    null_count: 791
+    role: feature
+  mean_product_photos_qty:
+    dtype: float64
+    null_count: 2164
+    role: feature
+  mean_product_description_length:
+    dtype: float64
+    null_count: 2164
+    role: feature
+  total_payment:
+    dtype: float64
+    null_count: 1
+    role: feature
+  max_installments:
+    dtype: float64
+    null_count: 1
+    role: feature
+  payment_type_count:
+    dtype: float64
+    null_count: 1
+    role: feature
+  dominant_payment_type:
+    dtype: object
+    null_count: 1
+    role: feature
+  dominant_category:
+    dtype: object
+    null_count: 2185
+    role: feature
+  seller_state:
+    dtype: object
+    null_count: 775
+    role: feature
+  review_score:
+    dtype: float64
+    null_count: 768
+    role: ignore
+  bad_review:
+    dtype: float64
+    null_count: 768
+    role: target
+lookup_tables: {}
+# Ids, the post-purchase status and timestamps, and the target's source column.
+# delivery_days/late stay profiled: they are the expected context finding, never
+# predictors (the feature plan is the leakage boundary, not the profiler).
+exclude_from_profiling:
+- order_id
+- customer_id
+- customer_unique_id
+- order_status
+- order_purchase_timestamp
+- order_approved_at
+- order_delivered_carrier_date
+- order_delivered_customer_date
+- order_estimated_delivery_date
+- review_score

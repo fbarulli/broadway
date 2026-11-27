@@ -117,12 +117,13 @@ ratchet grows into (`PIPELINE_DECISION_ENFORCED`):
 ## The ratchet
 
 `ENFORCED` in `scripts/check_experiment_outputs.py` lists the series that must
-publish a question + figure (currently `amazon_survey`). `DECISION_ENFORCED`
-lists the individual steps that must build a `StepOutput` with a decision
-record (currently `amazon_survey/01_profile`). An entry is added once it
+publish a question + figure (currently empty: the Olist substrate publishes
+through the pipeline steps, not a script series). `DECISION_ENFORCED` lists
+the individual script pairs that must build a `StepOutput` with a decision
+record (currently empty for the same reason). An entry is added once it
 complies. **Never remove an entry merely for falling out of compliance**; an
 entry is retired only when its dataset/series is removed (the predecessor
-series were retired with the owner-approved Amazon replacement). The rule itself lives in
+series were retired with the owner-approved dataset replacement). The rule itself lives in
 the series' `project/config/experiments/<series>.yaml` under `decisions.<step>`
 — one threshold, one direction, one action, one owner.
 
@@ -139,5 +140,7 @@ gap is visible rather than forgotten.
 ## Known advisory backlog (not enforced yet)
 
 The predecessor advisory backlog (`mlflow`, `more_modeling`, `multivariate`,
-`polynomial_regression_et_all`) was retired with its dataset; the Amazon
-project currently has only the enforced `amazon_survey` series.
+`polynomial_regression_et_all`) was retired with its dataset. The Olist
+project enforces the `etl` and `eda` pipeline records; the classification
+baseline/features/training/selection/HPO/evaluate chain is the next unit and
+re-joins `PIPELINE_DECISION_ENFORCED` when it publishes its records.

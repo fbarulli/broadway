@@ -28,7 +28,7 @@ Our models:
   (`hpo_run.yaml`, `hpo_run_kaggle.yaml`). SSOT; no values in code.
 - `adapters/` — the adapter contract; `cpu_smoke.py` is the probe's reference
   implementation and `project.py` is the real HPO objective for this project's
-  Amazon dataset. Probe adapters: `gluonts_step.py` (GluonTS SimpleFeedForward),
+  Olist dataset. Probe adapters: `gluonts_step.py` (GluonTS SimpleFeedForward),
   `timesfm_step.py` (TimesFM 2.5 200M torch module, no checkpoint download) and
   `prophet_step.py` (CPU-only). Each imports its vendor package lazily and fails
   loud with the install hint when it is absent — never a made-up number.
@@ -109,10 +109,10 @@ Output (`baseline/memory_baseline.json` by default):
 `config/hpo_kernel.yaml` names the study and nothing else:
 
 ```yaml
-hpo_spec: project/config/experiments/amazon_hpo.yaml   # -> hpo: search spaces, direction, metric, budget
+hpo_spec: project/config/experiments/olist_hpo.yaml    # -> hpo: search spaces, direction, metric, budget
 model: lgbm                                        # the model's entry in that spec
-dataset: amazon                                    # project/config/dataset/amazon.yaml
-experiment: amazon                                 # project/config/experiment/amazon.yaml
+dataset: olist                                     # project/config/dataset/olist.yaml
+experiment: olist                                  # project/config/experiment/olist.yaml
 micro_batch_param: null                            # tabular model: no batch dial
 storage_env: OPTUNA_STORAGE_URL
 local_storage_url: sqlite:///artifacts/gpu_training/hpo_study.db

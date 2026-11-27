@@ -12,8 +12,8 @@ run is recorded with its exit code and the process exits with it — never maske
 Usage::
 
     python scripts/verify_live.py --step etl \
-        --command "ds-pipeline etl --dataset amazon" \
-        --dataset data/processed/amazon/amazon_canonical.parquet [--log-path logs/etl.log]
+        --command "ds-pipeline etl --dataset olist" \
+        --dataset data/processed/olist/olist_canonical.parquet [--log-path logs/etl.log]
 
 The script prints the written JSON path on stdout and exits with the recorded
 command's exit code (1 when the command produced no exit code, e.g. timeout).

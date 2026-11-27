@@ -1,91 +1,91 @@
 {
-  "dataset": "amazon",
+  "dataset": "olist",
   "summary": {
     "question": "Is there at least one feature whose association with the target survives multiple-testing correction and the minimum effect?",
-    "metric": "association_rating_accuracy_score",
-    "value": 0.22993240309247154,
-    "interval_low": 0.18007180190274175,
-    "interval_high": 0.2949677721209352,
+    "metric": "association_delivery_days",
+    "value": 0.3708283417611825,
+    "interval_low": 0.360542633657631,
+    "interval_high": 0.38289545537136743,
     "reference": 0.0,
-    "delta": 0.22993240309247154,
+    "delta": 0.3708283417611825,
     "threshold": 0.05,
-    "null_threshold": 0.007443146113530719,
+    "null_threshold": 0.010022098969709214,
     "direction": "max",
     "verdict": "act",
     "action": "keep the feature whose association clears the minimum effect; drop or defer the trivial ones",
     "owner": "eda",
-    "sample_size": 602,
-    "unit": "epsilon_squared",
+    "sample_size": 95830,
+    "unit": "rank_biserial_r",
     "min_sample_size": 100,
     "evidence": {
       "baseline": "no-effect shuffle of the target at this n",
       "delta": null,
       "segments": [
         {
-          "segment": "Female",
-          "value": 0.1871653320964484,
-          "sample_size": 352
+          "segment": "boleto",
+          "value": 0.3587472371899513,
+          "sample_size": 19062
         },
         {
-          "segment": "Male",
-          "value": 0.23251150690839578,
-          "sample_size": 142
+          "segment": "credit_card",
+          "value": 0.3767022147580734,
+          "sample_size": 73445
         },
         {
-          "segment": "Others",
-          "value": 0.3840006265664158,
-          "sample_size": 19
+          "segment": "debit_card",
+          "value": 0.34326528337636764,
+          "sample_size": 1477
         },
         {
-          "segment": "Prefer not to say",
-          "value": 0.32799706517102206,
-          "sample_size": 89
+          "segment": "voucher",
+          "value": 0.29814786858641706,
+          "sample_size": 1845
         }
       ],
       "sensitivity": {
-        "eta_squared": 0.2703413084405568,
+        "point_biserial_r": 0.31157910724460175,
         "iterations": 200.0,
         "alpha": 0.05
       },
-      "falsifier": "the association's interval falls at or below max(min_effect, the shuffle null band) — the feature would be indistinguishable from a shuffled target at n=602",
+      "falsifier": "the association's interval falls at or below max(min_effect, the shuffle null band) — the feature would be indistinguishable from a shuffled target at n=95,830",
       "provenance": {
-        "dataset": "amazon",
+        "dataset": "olist",
         "artifact": "train.parquet+val.parquet",
-        "source": "data/raw/amazon/amazon_consumer_behavior_survey.csv",
-        "sample_sha256": "9858827b9b2fb5f4",
-        "sampled_rows": "602",
-        "sample_size": "602",
+        "source": "data/raw/olist/olist_orders.parquet",
+        "sample_sha256": "095d310540b9de31",
+        "sampled_rows": "98673",
+        "sample_size": "98673",
         "seed": "42",
         "exclusions": "pairwise-complete rows per feature; exclude_from_profiling dropped",
-        "feature": "rating_accuracy_score",
-        "test": "kruskal",
-        "rows": "602",
+        "feature": "delivery_days",
+        "test": "mann_whitney",
+        "rows": "95830",
         "resampling": "iid+shuffle",
-        "segments": "levels of Gender",
+        "segments": "levels of dominant_payment_type",
         "family_size": "12",
-        "acted": "3",
-        "investigated": "7",
-        "selected_feature": "association_rating_accuracy_score",
-        "effect_name": "epsilon_squared",
-        "correlation": "target 'Shopping_Satisfaction' is not numeric; ranked association belongs to the tests"
+        "acted": "11",
+        "investigated": "1",
+        "selected_feature": "association_delivery_days",
+        "effect_name": "rank_biserial_r",
+        "correlation": "measured over 13 numeric columns"
       }
     }
   },
   "comparison": {
-    "question": "Did the ETL change the recommendation_personalization_score distribution beyond sampling noise (train+val (post-split) vs canonical (pre-split))?",
-    "metric": "standardized_shift_recommendation_personalization_score",
-    "value": 0.0,
-    "interval_low": 0.0,
-    "interval_high": 0.12985202292837028,
+    "question": "Did the ETL change the estimated_days distribution beyond sampling noise (train+val (post-split) vs canonical (pre-split))?",
+    "metric": "standardized_shift_estimated_days",
+    "value": 4.023482721246091e-16,
+    "interval_low": 4.023482721246091e-16,
+    "interval_high": 0.011291848818011544,
     "reference": 0.0,
-    "delta": 0.0,
-    "threshold": 0.10859807383250566,
-    "null_threshold": 0.10859807383250566,
+    "delta": 4.023482721246091e-16,
+    "threshold": 0.05,
+    "null_threshold": 0.00901451614849422,
     "direction": "max",
-    "verdict": "investigate",
+    "verdict": "no_action",
     "action": "re-check the ETL transform on the shifted column before profiling or training on it",
     "owner": "eda",
-    "sample_size": 1204,
+    "sample_size": 197346,
     "unit": null,
     "min_sample_size": 100,
     "evidence": {
@@ -93,66 +93,71 @@
       "delta": null,
       "segments": [
         {
-          "segment": "Female",
+          "segment": "boleto",
           "value": 0.0,
-          "sample_size": 704
+          "sample_size": 39272
         },
         {
-          "segment": "Male",
+          "segment": "credit_card",
           "value": 0.0,
-          "sample_size": 284
+          "sample_size": 151076
         },
         {
-          "segment": "Others",
+          "segment": "debit_card",
           "value": 0.0,
-          "sample_size": 38
+          "sample_size": 3042
         },
         {
-          "segment": "Prefer not to say",
+          "segment": "not_defined",
           "value": 0.0,
-          "sample_size": 178
+          "sample_size": 6
+        },
+        {
+          "segment": "voucher",
+          "value": 0.0,
+          "sample_size": 3948
         }
       ],
       "sensitivity": {
-        "mean_delta": 0.0,
+        "mean_delta": -3.552713678800501e-15,
         "median_delta": 0.0,
         "iterations": 200.0
       },
       "falsifier": "the standardized shift's interval falls at or below the minimum effect and the label-shuffle null band at this n",
       "provenance": {
-        "dataset": "amazon",
+        "dataset": "olist",
         "artifact": "train.parquet+val.parquet",
-        "source": "data/raw/amazon/amazon_consumer_behavior_survey.csv",
-        "sample_sha256": "9858827b9b2fb5f4",
-        "sampled_rows": "602",
-        "sample_size": "602",
+        "source": "data/raw/olist/olist_orders.parquet",
+        "sample_sha256": "095d310540b9de31",
+        "sampled_rows": "98673",
+        "sample_size": "98673",
         "seed": "42",
         "exclusions": "pairwise-complete rows per feature; exclude_from_profiling dropped",
-        "column": "recommendation_personalization_score",
+        "column": "estimated_days",
         "before": "canonical (pre-split)",
         "after": "train+val (post-split)",
-        "rows": "1204",
+        "rows": "197346",
         "resampling": "iid+shuffle",
-        "segments": "levels of Gender"
+        "segments": "levels of dominant_payment_type"
       }
     }
   },
   "features": [
     {
-      "question": "Does rating_accuracy_score move the numeric target 'Shopping_Satisfaction' beyond the minimum effect and the no-effect null band?",
-      "metric": "association_rating_accuracy_score",
-      "value": 0.22993240309247154,
-      "interval_low": 0.18007180190274175,
-      "interval_high": 0.2949677721209352,
+      "question": "Does customer_zip_code_prefix move the binary target 'bad_review' beyond the minimum effect and the no-effect null band?",
+      "metric": "association_customer_zip_code_prefix",
+      "value": 0.4127961743311978,
+      "interval_low": 0.4127961743311978,
+      "interval_high": 0.5139883758502998,
       "reference": 0.0,
-      "delta": 0.22993240309247154,
-      "threshold": 0.05,
-      "null_threshold": 0.007443146113530719,
+      "delta": 0.4127961743311978,
+      "threshold": 0.392959964035769,
+      "null_threshold": 0.392959964035769,
       "direction": "max",
       "verdict": "act",
       "action": "keep the feature whose association clears the minimum effect; drop or defer the trivial ones",
       "owner": "eda",
-      "sample_size": 602,
+      "sample_size": 98673,
       "unit": null,
       "min_sample_size": 100,
       "evidence": {
@@ -160,64 +165,69 @@
         "delta": null,
         "segments": [
           {
-            "segment": "Female",
-            "value": 0.1871653320964484,
-            "sample_size": 352
+            "segment": "boleto",
+            "value": 0.6761058709194053,
+            "sample_size": 19636
           },
           {
-            "segment": "Male",
-            "value": 0.23251150690839578,
-            "sample_size": 142
+            "segment": "credit_card",
+            "value": 0.45146796041818793,
+            "sample_size": 75538
           },
           {
-            "segment": "Others",
-            "value": 0.3840006265664158,
-            "sample_size": 19
+            "segment": "debit_card",
+            "value": 0.9457894796178666,
+            "sample_size": 1521
           },
           {
-            "segment": "Prefer not to say",
-            "value": 0.32799706517102206,
-            "sample_size": 89
+            "segment": "not_defined",
+            "value": 1.0,
+            "sample_size": 3
+          },
+          {
+            "segment": "voucher",
+            "value": 0.923082334910508,
+            "sample_size": 1974
           }
         ],
         "sensitivity": {
-          "eta_squared": 0.2703413084405568,
+          "cramers_v_corrected": 0.14833911426691138,
           "iterations": 200.0,
           "alpha": 0.05
         },
-        "falsifier": "the association's interval falls at or below max(min_effect, the shuffle null band) — the feature would be indistinguishable from a shuffled target at n=602",
+        "falsifier": "the association's interval falls at or below max(min_effect, the shuffle null band) — the feature would be indistinguishable from a shuffled target at n=98,673",
         "provenance": {
-          "dataset": "amazon",
+          "dataset": "olist",
           "artifact": "train.parquet+val.parquet",
-          "source": "data/raw/amazon/amazon_consumer_behavior_survey.csv",
-          "sample_sha256": "9858827b9b2fb5f4",
-          "sampled_rows": "602",
-          "sample_size": "602",
+          "source": "data/raw/olist/olist_orders.parquet",
+          "sample_sha256": "095d310540b9de31",
+          "sampled_rows": "98673",
+          "sample_size": "98673",
           "seed": "42",
           "exclusions": "pairwise-complete rows per feature; exclude_from_profiling dropped",
-          "feature": "rating_accuracy_score",
-          "test": "kruskal",
-          "rows": "602",
+          "feature": "customer_zip_code_prefix",
+          "test": "chi2",
+          "rows": "98673",
           "resampling": "iid+shuffle",
-          "segments": "levels of Gender"
+          "segments": "levels of dominant_payment_type"
         }
       }
     },
     {
-      "question": "Does recommendation_personalization_score move the numeric target 'Shopping_Satisfaction' beyond the minimum effect and the no-effect null band?",
-      "metric": "association_recommendation_personalization_score",
-      "value": 0.188902586255417,
-      "interval_low": 0.14616621144591038,
-      "interval_high": 0.24891635461851516,
+      "question": "Does delivery_days move the binary target 'bad_review' beyond the minimum effect and the no-effect null band?",
+      "metric": "association_delivery_days",
+      "value": 0.3708283417611825,
+      "interval_low": 0.360542633657631,
+      "interval_high": 0.38289545537136743,
       "reference": 0.0,
-      "delta": 0.188902586255417,
+      "delta": 0.3708283417611825,
       "threshold": 0.05,
-      "null_threshold": 0.00972203046929848,
+      "null_threshold": 0.010022098969709214,
       "direction": "max",
       "verdict": "act",
       "action": "keep the feature whose association clears the minimum effect; drop or defer the trivial ones",
       "owner": "eda",
-      "sample_size": 602,
+      "sample_size": 95830,
       "unit": null,
       "min_sample_size": 100,
       "evidence": {
@@ -225,64 +235,64 @@
         "delta": null,
         "segments": [
           {
-            "segment": "Female",
-            "value": 0.172280583381565,
-            "sample_size": 352
+            "segment": "boleto",
+            "value": 0.3587472371899513,
+            "sample_size": 19062
           },
           {
-            "segment": "Male",
-            "value": 0.1663473497410023,
-            "sample_size": 142
+            "segment": "credit_card",
+            "value": 0.3767022147580734,
+            "sample_size": 73445
           },
           {
-            "segment": "Others",
-            "value": 0.3937393483709267,
-            "sample_size": 19
+            "segment": "debit_card",
+            "value": 0.34326528337636764,
+            "sample_size": 1477
           },
           {
-            "segment": "Prefer not to say",
-            "value": 0.26589704549772836,
-            "sample_size": 89
+            "segment": "voucher",
+            "value": 0.29814786858641706,
+            "sample_size": 1845
           }
         ],
         "sensitivity": {
-          "eta_squared": 0.20672382787730567,
+          "point_biserial_r": 0.31157910724460175,
           "iterations": 200.0,
           "alpha": 0.05
         },
-        "falsifier": "the association's interval falls at or below max(min_effect, the shuffle null band) — the feature would be indistinguishable from a shuffled target at n=602",
+        "falsifier": "the association's interval falls at or below max(min_effect, the shuffle null band) — the feature would be indistinguishable from a shuffled target at n=95,830",
         "provenance": {
-          "dataset": "amazon",
+          "dataset": "olist",
           "artifact": "train.parquet+val.parquet",
-          "source": "data/raw/amazon/amazon_consumer_behavior_survey.csv",
-          "sample_sha256": "9858827b9b2fb5f4",
-          "sampled_rows": "602",
-          "sample_size": "602",
+          "source": "data/raw/olist/olist_orders.parquet",
+          "sample_sha256": "095d310540b9de31",
+          "sampled_rows": "98673",
+          "sample_size": "98673",
           "seed": "42",
           "exclusions": "pairwise-complete rows per feature; exclude_from_profiling dropped",
-          "feature": "recommendation_personalization_score",
-          "test": "kruskal",
-          "rows": "602",
+          "feature": "delivery_days",
+          "test": "mann_whitney",
+          "rows": "95830",
           "resampling": "iid+shuffle",
-          "segments": "levels of Gender"
+          "segments": "levels of dominant_payment_type"
         }
       }
     },
     {
-      "question": "Does Customer_Reviews_Importance move the numeric target 'Shopping_Satisfaction' beyond the minimum effect and the no-effect null band?",
-      "metric": "association_Customer_Reviews_Importance",
-      "value": 0.163894001904076,
-      "interval_low": 0.11237855276223087,
-      "interval_high": 0.22686542605844173,
+      "question": "Does late move the binary target 'bad_review' beyond the minimum effect and the no-effect null band?",
+      "metric": "association_late",
+      "value": 0.2951844493298851,
+      "interval_low": 0.2868272569321127,
+      "interval_high": 0.30338797475621276,
       "reference": 0.0,
-      "delta": 0.163894001904076,
+      "delta": 0.2951844493298851,
       "threshold": 0.05,
-      "null_threshold": 0.006449449191233903,
+      "null_threshold": 0.005004600701019211,
       "direction": "max",
       "verdict": "act",
       "action": "keep the feature whose association clears the minimum effect; drop or defer the trivial ones",
       "owner": "eda",
-      "sample_size": 602,
+      "sample_size": 95830,
       "unit": null,
       "min_sample_size": 100,
       "evidence": {
@@ -290,64 +300,64 @@
         "delta": null,
         "segments": [
           {
-            "segment": "Female",
-            "value": 0.12005247166586705,
-            "sample_size": 352
+            "segment": "boleto",
+            "value": 0.2786046859268313,
+            "sample_size": 19062
           },
           {
-            "segment": "Male",
-            "value": 0.1781561159691745,
-            "sample_size": 142
+            "segment": "credit_card",
+            "value": 0.3013440426349008,
+            "sample_size": 73445
           },
           {
-            "segment": "Others",
-            "value": 0.2759473684210529,
-            "sample_size": 19
+            "segment": "debit_card",
+            "value": 0.2408931324652165,
+            "sample_size": 1477
           },
           {
-            "segment": "Prefer not to say",
-            "value": 0.3140991589655383,
-            "sample_size": 89
+            "segment": "voucher",
+            "value": 0.26195440907289647,
+            "sample_size": 1845
           }
         ],
         "sensitivity": {
-          "eta_squared": 0.18157114541678615,
+          "point_biserial_r": 0.36372987124511635,
           "iterations": 200.0,
           "alpha": 0.05
         },
-        "falsifier": "the association's interval falls at or below max(min_effect, the shuffle null band) — the feature would be indistinguishable from a shuffled target at n=602",
+        "falsifier": "the association's interval falls at or below max(min_effect, the shuffle null band) — the feature would be indistinguishable from a shuffled target at n=95,830",
         "provenance": {
-          "dataset": "amazon",
+          "dataset": "olist",
           "artifact": "train.parquet+val.parquet",
-          "source": "data/raw/amazon/amazon_consumer_behavior_survey.csv",
-          "sample_sha256": "9858827b9b2fb5f4",
-          "sampled_rows": "602",
-          "sample_size": "602",
+          "source": "data/raw/olist/olist_orders.parquet",
+          "sample_sha256": "095d310540b9de31",
+          "sampled_rows": "98673",
+          "sample_size": "98673",
           "seed": "42",
           "exclusions": "pairwise-complete rows per feature; exclude_from_profiling dropped",
-          "feature": "Customer_Reviews_Importance",
-          "test": "kruskal",
-          "rows": "602",
+          "feature": "late",
+          "test": "mann_whitney",
+          "rows": "95830",
           "resampling": "iid+shuffle",
-          "segments": "levels of Gender"
+          "segments": "levels of dominant_payment_type"
         }
       }
     },
     {
-      "question": "Does Product_Search_Method move the numeric target 'Shopping_Satisfaction' beyond the minimum effect and the no-effect null band?",
-      "metric": "association_Product_Search_Method",
-      "value": 0.06915927211045891,
-      "interval_low": 0.03507764004754904,
-      "interval_high": 0.11438726430870622,
+      "question": "Does customer_city move the binary target 'bad_review' beyond the minimum effect and the no-effect null band?",
+      "metric": "association_customer_city",
+      "value": 0.21904677531346475,
+      "interval_low": 0.21904677531346475,
+      "interval_high": 0.26797101621748237,
       "reference": 0.0,
-      "delta": 0.06915927211045891,
-      "threshold": 0.05,
-      "null_threshold": 0.007216742251489046,
+      "delta": 0.21904677531346475,
+      "threshold": 0.20817701666785185,
+      "null_threshold": 0.20817701666785185,
       "direction": "max",
-      "verdict": "investigate",
+      "verdict": "act",
       "action": "keep the feature whose association clears the minimum effect; drop or defer the trivial ones",
       "owner": "eda",
-      "sample_size": 600,
+      "sample_size": 98673,
       "unit": null,
       "min_sample_size": 100,
       "evidence": {
@@ -355,64 +365,69 @@
         "delta": null,
         "segments": [
           {
-            "segment": "Female",
-            "value": 0.024929145149193747,
-            "sample_size": 350
+            "segment": "boleto",
+            "value": 0.3388228567261268,
+            "sample_size": 19636
           },
           {
-            "segment": "Male",
-            "value": 0.130734985507358,
-            "sample_size": 142
+            "segment": "credit_card",
+            "value": 0.23692487601645806,
+            "sample_size": 75538
           },
           {
-            "segment": "Others",
+            "segment": "debit_card",
+            "value": 0.5337202181080578,
+            "sample_size": 1521
+          },
+          {
+            "segment": "not_defined",
             "value": 0.0,
-            "sample_size": 19
+            "sample_size": 3
           },
           {
-            "segment": "Prefer not to say",
-            "value": 0.12154092780001587,
-            "sample_size": 89
+            "segment": "voucher",
+            "value": 0.5004949836132756,
+            "sample_size": 1974
           }
         ],
         "sensitivity": {
-          "eta_squared": 0.08379436171741976,
+          "cramers_v_corrected": 0.08087244508649172,
           "iterations": 200.0,
           "alpha": 0.05
         },
-        "falsifier": "the association's interval falls at or below max(min_effect, the shuffle null band) — the feature would be indistinguishable from a shuffled target at n=600",
+        "falsifier": "the association's interval falls at or below max(min_effect, the shuffle null band) — the feature would be indistinguishable from a shuffled target at n=98,673",
         "provenance": {
-          "dataset": "amazon",
+          "dataset": "olist",
           "artifact": "train.parquet+val.parquet",
-          "source": "data/raw/amazon/amazon_consumer_behavior_survey.csv",
-          "sample_sha256": "9858827b9b2fb5f4",
-          "sampled_rows": "602",
-          "sample_size": "602",
+          "source": "data/raw/olist/olist_orders.parquet",
+          "sample_sha256": "095d310540b9de31",
+          "sampled_rows": "98673",
+          "sample_size": "98673",
           "seed": "42",
           "exclusions": "pairwise-complete rows per feature; exclude_from_profiling dropped",
-          "feature": "Product_Search_Method",
-          "test": "kruskal",
-          "rows": "600",
+          "feature": "customer_city",
+          "test": "chi2",
+          "rows": "98673",
           "resampling": "iid+shuffle",
-          "segments": "levels of Gender"
+          "segments": "levels of dominant_payment_type"
         }
       }
     },
     {
-      "question": "Does Review_Reliability move the numeric target 'Shopping_Satisfaction' beyond the minimum effect and the no-effect null band?",
-      "metric": "association_Review_Reliability",
-      "value": 0.05532266486488841,
-      "interval_low": 0.02864472474176382,
-      "interval_high": 0.10021514495186742,
+      "question": "Does total_freight move the binary target 'bad_review' beyond the minimum effect and the no-effect null band?",
+      "metric": "association_total_freight",
+      "value": 0.14852787871265327,
+      "interval_low": 0.13881265039287743,
+      "interval_high": 0.15969743760361024,
       "reference": 0.0,
-      "delta": 0.05532266486488841,
+      "delta": 0.14852787871265327,
       "threshold": 0.05,
-      "null_threshold": 0.00733801436031526,
+      "null_threshold": 0.010748448546037149,
       "direction": "max",
-      "verdict": "investigate",
+      "verdict": "act",
       "action": "keep the feature whose association clears the minimum effect; drop or defer the trivial ones",
       "owner": "eda",
-      "sample_size": 602,
+      "sample_size": 97917,
       "unit": null,
       "min_sample_size": 100,
       "evidence": {
@@ -420,64 +435,64 @@
         "delta": null,
         "segments": [
           {
-            "segment": "Female",
-            "value": 0.02147661535666305,
-            "sample_size": 352
+            "segment": "boleto",
+            "value": 0.1239916442528739,
+            "sample_size": 19471
           },
           {
-            "segment": "Male",
-            "value": 0.09059809533894674,
-            "sample_size": 142
+            "segment": "credit_card",
+            "value": 0.15786951919215275,
+            "sample_size": 75041
           },
           {
-            "segment": "Others",
-            "value": 0.2304511278195481,
-            "sample_size": 19
+            "segment": "debit_card",
+            "value": 0.1137189991880857,
+            "sample_size": 1514
           },
           {
-            "segment": "Prefer not to say",
-            "value": 0.03565002846369902,
-            "sample_size": 89
+            "segment": "voucher",
+            "value": 0.06749295210769513,
+            "sample_size": 1890
           }
         ],
         "sensitivity": {
-          "eta_squared": 0.07471917190146019,
+          "point_biserial_r": 0.08655356645040051,
           "iterations": 200.0,
           "alpha": 0.05
         },
-        "falsifier": "the association's interval falls at or below max(min_effect, the shuffle null band) — the feature would be indistinguishable from a shuffled target at n=602",
+        "falsifier": "the association's interval falls at or below max(min_effect, the shuffle null band) — the feature would be indistinguishable from a shuffled target at n=97,917",
         "provenance": {
-          "dataset": "amazon",
+          "dataset": "olist",
           "artifact": "train.parquet+val.parquet",
-          "source": "data/raw/amazon/amazon_consumer_behavior_survey.csv",
-          "sample_sha256": "9858827b9b2fb5f4",
-          "sampled_rows": "602",
-          "sample_size": "602",
+          "source": "data/raw/olist/olist_orders.parquet",
+          "sample_sha256": "095d310540b9de31",
+          "sampled_rows": "98673",
+          "sample_size": "98673",
           "seed": "42",
           "exclusions": "pairwise-complete rows per feature; exclude_from_profiling dropped",
-          "feature": "Review_Reliability",
-          "test": "kruskal",
-          "rows": "602",
+          "feature": "total_freight",
+          "test": "mann_whitney",
+          "rows": "97917",
           "resampling": "iid+shuffle",
-          "segments": "levels of Gender"
+          "segments": "levels of dominant_payment_type"
         }
       }
     },
     {
-      "question": "Does Cart_Completion_Frequency move the numeric target 'Shopping_Satisfaction' beyond the minimum effect and the no-effect null band?",
-      "metric": "association_Cart_Completion_Frequency",
-      "value": 0.05080483781548949,
-      "interval_low": 0.025307815190941715,
-      "interval_high": 0.10647262397336515,
+      "question": "Does total_payment move the binary target 'bad_review' beyond the minimum effect and the no-effect null band?",
+      "metric": "association_total_payment",
+      "value": 0.10024903515595285,
+      "interval_low": 0.0887913315457832,
+      "interval_high": 0.10926930515840523,
       "reference": 0.0,
-      "delta": 0.05080483781548949,
+      "delta": 0.10024903515595285,
       "threshold": 0.05,
-      "null_threshold": 0.007187067075938521,
+      "null_threshold": 0.009609480395847907,
       "direction": "max",
-      "verdict": "investigate",
+      "verdict": "act",
       "action": "keep the feature whose association clears the minimum effect; drop or defer the trivial ones",
       "owner": "eda",
-      "sample_size": 602,
+      "sample_size": 98672,
       "unit": null,
       "min_sample_size": 100,
       "evidence": {
@@ -485,129 +500,409 @@
         "delta": null,
         "segments": [
           {
-            "segment": "Female",
-            "value": 0.011523801242026989,
-            "sample_size": 352
+            "segment": "boleto",
+            "value": 0.0970285095050607,
+            "sample_size": 19636
           },
           {
-            "segment": "Male",
-            "value": 0.10416346574653126,
-            "sample_size": 142
+            "segment": "credit_card",
+            "value": 0.1023789608984591,
+            "sample_size": 75538
           },
           {
-            "segment": "Others",
-            "value": 0.029036654135338274,
-            "sample_size": 19
+            "segment": "debit_card",
+            "value": 0.04655397512540371,
+            "sample_size": 1521
           },
           {
-            "segment": "Prefer not to say",
-            "value": 0.07467692900442151,
-            "sample_size": 89
-          }
-        ],
-        "sensitivity": {
-          "eta_squared": 0.0644011912261613,
-          "iterations": 200.0,
-          "alpha": 0.05
-        },
-        "falsifier": "the association's interval falls at or below max(min_effect, the shuffle null band) — the feature would be indistinguishable from a shuffled target at n=602",
-        "provenance": {
-          "dataset": "amazon",
-          "artifact": "train.parquet+val.parquet",
-          "source": "data/raw/amazon/amazon_consumer_behavior_survey.csv",
-          "sample_sha256": "9858827b9b2fb5f4",
-          "sampled_rows": "602",
-          "sample_size": "602",
-          "seed": "42",
-          "exclusions": "pairwise-complete rows per feature; exclude_from_profiling dropped",
-          "feature": "Cart_Completion_Frequency",
-          "test": "kruskal",
-          "rows": "602",
-          "resampling": "iid+shuffle",
-          "segments": "levels of Gender"
-        }
-      }
-    },
-    {
-      "question": "Does Add_to_Cart_Browsing move the numeric target 'Shopping_Satisfaction' beyond the minimum effect and the no-effect null band?",
-      "metric": "association_Add_to_Cart_Browsing",
-      "value": 0.047058242911967404,
-      "interval_low": 0.019680659472680946,
-      "interval_high": 0.08677553410794733,
-      "reference": 0.0,
-      "delta": 0.047058242911967404,
-      "threshold": 0.05,
-      "null_threshold": 0.007372693500074599,
-      "direction": "max",
-      "verdict": "investigate",
-      "action": "keep the feature whose association clears the minimum effect; drop or defer the trivial ones",
-      "owner": "eda",
-      "sample_size": 602,
-      "unit": null,
-      "min_sample_size": 100,
-      "evidence": {
-        "baseline": "no-effect shuffle of the target at this n",
-        "delta": null,
-        "segments": [
-          {
-            "segment": "Female",
-            "value": 0.046389826662477276,
-            "sample_size": 352
-          },
-          {
-            "segment": "Male",
-            "value": 0.05236569641271226,
-            "sample_size": 142
-          },
-          {
-            "segment": "Others",
+            "segment": "not_defined",
             "value": 0.0,
-            "sample_size": 19
+            "sample_size": 3
           },
           {
-            "segment": "Prefer not to say",
-            "value": 0.0010717003986919049,
-            "sample_size": 89
+            "segment": "voucher",
+            "value": 0.125685866050253,
+            "sample_size": 1974
           }
         ],
         "sensitivity": {
-          "eta_squared": 0.046340632367235124,
+          "point_biserial_r": 0.05605011224332769,
           "iterations": 200.0,
           "alpha": 0.05
         },
-        "falsifier": "the association's interval falls at or below max(min_effect, the shuffle null band) — the feature would be indistinguishable from a shuffled target at n=602",
+        "falsifier": "the association's interval falls at or below max(min_effect, the shuffle null band) — the feature would be indistinguishable from a shuffled target at n=98,672",
         "provenance": {
-          "dataset": "amazon",
+          "dataset": "olist",
           "artifact": "train.parquet+val.parquet",
-          "source": "data/raw/amazon/amazon_consumer_behavior_survey.csv",
-          "sample_sha256": "9858827b9b2fb5f4",
-          "sampled_rows": "602",
-          "sample_size": "602",
+          "source": "data/raw/olist/olist_orders.parquet",
+          "sample_sha256": "095d310540b9de31",
+          "sampled_rows": "98673",
+          "sample_size": "98673",
           "seed": "42",
           "exclusions": "pairwise-complete rows per feature; exclude_from_profiling dropped",
-          "feature": "Add_to_Cart_Browsing",
-          "test": "kruskal",
-          "rows": "602",
+          "feature": "total_payment",
+          "test": "mann_whitney",
+          "rows": "98672",
           "resampling": "iid+shuffle",
-          "segments": "levels of Gender"
+          "segments": "levels of dominant_payment_type"
         }
       }
     },
     {
-      "question": "Does Review_Helpfulness move the numeric target 'Shopping_Satisfaction' beyond the minimum effect and the no-effect null band?",
-      "metric": "association_Review_Helpfulness",
-      "value": 0.03543096908348148,
-      "interval_low": 0.012381931076450928,
-      "interval_high": 0.07077700390962105,
+      "question": "Does total_price move the binary target 'bad_review' beyond the minimum effect and the no-effect null band?",
+      "metric": "association_total_price",
+      "value": 0.08653741759868716,
+      "interval_low": 0.0766389462259207,
+      "interval_high": 0.09745409008171065,
       "reference": 0.0,
-      "delta": 0.03543096908348148,
+      "delta": 0.08653741759868716,
       "threshold": 0.05,
-      "null_threshold": 0.005342848465039964,
+      "null_threshold": 0.011038307025754718,
+      "direction": "max",
+      "verdict": "act",
+      "action": "keep the feature whose association clears the minimum effect; drop or defer the trivial ones",
+      "owner": "eda",
+      "sample_size": 97917,
+      "unit": null,
+      "min_sample_size": 100,
+      "evidence": {
+        "baseline": "no-effect shuffle of the target at this n",
+        "delta": null,
+        "segments": [
+          {
+            "segment": "boleto",
+            "value": 0.0831359749486541,
+            "sample_size": 19471
+          },
+          {
+            "segment": "credit_card",
+            "value": 0.0884354972294088,
+            "sample_size": 75041
+          },
+          {
+            "segment": "debit_card",
+            "value": 0.029625068149815803,
+            "sample_size": 1514
+          },
+          {
+            "segment": "voucher",
+            "value": 0.08821333844896329,
+            "sample_size": 1890
+          }
+        ],
+        "sensitivity": {
+          "point_biserial_r": 0.047342469586664854,
+          "iterations": 200.0,
+          "alpha": 0.05
+        },
+        "falsifier": "the association's interval falls at or below max(min_effect, the shuffle null band) — the feature would be indistinguishable from a shuffled target at n=97,917",
+        "provenance": {
+          "dataset": "olist",
+          "artifact": "train.parquet+val.parquet",
+          "source": "data/raw/olist/olist_orders.parquet",
+          "sample_sha256": "095d310540b9de31",
+          "sampled_rows": "98673",
+          "sample_size": "98673",
+          "seed": "42",
+          "exclusions": "pairwise-complete rows per feature; exclude_from_profiling dropped",
+          "feature": "total_price",
+          "test": "mann_whitney",
+          "rows": "97917",
+          "resampling": "iid+shuffle",
+          "segments": "levels of dominant_payment_type"
+        }
+      }
+    },
+    {
+      "question": "Does customer_state move the binary target 'bad_review' beyond the minimum effect and the no-effect null band?",
+      "metric": "association_customer_state",
+      "value": 0.08613746692482604,
+      "interval_low": 0.08224353502526607,
+      "interval_high": 0.09417908284419162,
+      "reference": 0.0,
+      "delta": 0.08613746692482604,
+      "threshold": 0.05,
+      "null_threshold": 0.019958687459852194,
+      "direction": "max",
+      "verdict": "act",
+      "action": "keep the feature whose association clears the minimum effect; drop or defer the trivial ones",
+      "owner": "eda",
+      "sample_size": 98673,
+      "unit": null,
+      "min_sample_size": 100,
+      "evidence": {
+        "baseline": "no-effect shuffle of the target at this n",
+        "delta": null,
+        "segments": [
+          {
+            "segment": "boleto",
+            "value": 0.08483632821565533,
+            "sample_size": 19636
+          },
+          {
+            "segment": "credit_card",
+            "value": 0.08954043240843841,
+            "sample_size": 75538
+          },
+          {
+            "segment": "debit_card",
+            "value": 0.13407010398892336,
+            "sample_size": 1521
+          },
+          {
+            "segment": "not_defined",
+            "value": 0.0,
+            "sample_size": 3
+          },
+          {
+            "segment": "voucher",
+            "value": 0.11859020306269565,
+            "sample_size": 1974
+          }
+        ],
+        "sensitivity": {
+          "cramers_v_corrected": 0.08460526034998304,
+          "iterations": 200.0,
+          "alpha": 0.05
+        },
+        "falsifier": "the association's interval falls at or below max(min_effect, the shuffle null band) — the feature would be indistinguishable from a shuffled target at n=98,673",
+        "provenance": {
+          "dataset": "olist",
+          "artifact": "train.parquet+val.parquet",
+          "source": "data/raw/olist/olist_orders.parquet",
+          "sample_sha256": "095d310540b9de31",
+          "sampled_rows": "98673",
+          "sample_size": "98673",
+          "seed": "42",
+          "exclusions": "pairwise-complete rows per feature; exclude_from_profiling dropped",
+          "feature": "customer_state",
+          "test": "chi2",
+          "rows": "98673",
+          "resampling": "iid+shuffle",
+          "segments": "levels of dominant_payment_type"
+        }
+      }
+    },
+    {
+      "question": "Does items_count move the binary target 'bad_review' beyond the minimum effect and the no-effect null band?",
+      "metric": "association_items_count",
+      "value": 0.06604513730579176,
+      "interval_low": 0.05703199617409705,
+      "interval_high": 0.07229872494892958,
+      "reference": 0.0,
+      "delta": 0.06604513730579176,
+      "threshold": 0.05,
+      "null_threshold": 0.005386694087221021,
+      "direction": "max",
+      "verdict": "act",
+      "action": "keep the feature whose association clears the minimum effect; drop or defer the trivial ones",
+      "owner": "eda",
+      "sample_size": 98673,
+      "unit": null,
+      "min_sample_size": 100,
+      "evidence": {
+        "baseline": "no-effect shuffle of the target at this n",
+        "delta": null,
+        "segments": [
+          {
+            "segment": "boleto",
+            "value": 0.06090002771179226,
+            "sample_size": 19636
+          },
+          {
+            "segment": "credit_card",
+            "value": 0.07232232039670639,
+            "sample_size": 75538
+          },
+          {
+            "segment": "debit_card",
+            "value": 0.03328446979240629,
+            "sample_size": 1521
+          },
+          {
+            "segment": "not_defined",
+            "value": 0.0,
+            "sample_size": 3
+          },
+          {
+            "segment": "voucher",
+            "value": 0.05680988780562357,
+            "sample_size": 1974
+          }
+        ],
+        "sensitivity": {
+          "point_biserial_r": 0.08341260507272577,
+          "iterations": 200.0,
+          "alpha": 0.05
+        },
+        "falsifier": "the association's interval falls at or below max(min_effect, the shuffle null band) — the feature would be indistinguishable from a shuffled target at n=98,673",
+        "provenance": {
+          "dataset": "olist",
+          "artifact": "train.parquet+val.parquet",
+          "source": "data/raw/olist/olist_orders.parquet",
+          "sample_sha256": "095d310540b9de31",
+          "sampled_rows": "98673",
+          "sample_size": "98673",
+          "seed": "42",
+          "exclusions": "pairwise-complete rows per feature; exclude_from_profiling dropped",
+          "feature": "items_count",
+          "test": "mann_whitney",
+          "rows": "98673",
+          "resampling": "iid+shuffle",
+          "segments": "levels of dominant_payment_type"
+        }
+      }
+    },
+    {
+      "question": "Does estimated_days move the binary target 'bad_review' beyond the minimum effect and the no-effect null band?",
+      "metric": "association_estimated_days",
+      "value": 0.06604389894372142,
+      "interval_low": 0.05752839673006793,
+      "interval_high": 0.07545639191442717,
+      "reference": 0.0,
+      "delta": 0.06604389894372142,
+      "threshold": 0.05,
+      "null_threshold": 0.011372034650436132,
+      "direction": "max",
+      "verdict": "act",
+      "action": "keep the feature whose association clears the minimum effect; drop or defer the trivial ones",
+      "owner": "eda",
+      "sample_size": 98673,
+      "unit": null,
+      "min_sample_size": 100,
+      "evidence": {
+        "baseline": "no-effect shuffle of the target at this n",
+        "delta": null,
+        "segments": [
+          {
+            "segment": "boleto",
+            "value": 0.04795403711193502,
+            "sample_size": 19636
+          },
+          {
+            "segment": "credit_card",
+            "value": 0.07365933723532514,
+            "sample_size": 75538
+          },
+          {
+            "segment": "debit_card",
+            "value": 0.06876779892652907,
+            "sample_size": 1521
+          },
+          {
+            "segment": "not_defined",
+            "value": 1.0,
+            "sample_size": 3
+          },
+          {
+            "segment": "voucher",
+            "value": 0.026931458904709382,
+            "sample_size": 1974
+          }
+        ],
+        "sensitivity": {
+          "point_biserial_r": 0.042826857939497115,
+          "iterations": 200.0,
+          "alpha": 0.05
+        },
+        "falsifier": "the association's interval falls at or below max(min_effect, the shuffle null band) — the feature would be indistinguishable from a shuffled target at n=98,673",
+        "provenance": {
+          "dataset": "olist",
+          "artifact": "train.parquet+val.parquet",
+          "source": "data/raw/olist/olist_orders.parquet",
+          "sample_sha256": "095d310540b9de31",
+          "sampled_rows": "98673",
+          "sample_size": "98673",
+          "seed": "42",
+          "exclusions": "pairwise-complete rows per feature; exclude_from_profiling dropped",
+          "feature": "estimated_days",
+          "test": "mann_whitney",
+          "rows": "98673",
+          "resampling": "iid+shuffle",
+          "segments": "levels of dominant_payment_type"
+        }
+      }
+    },
+    {
+      "question": "Does dominant_category move the binary target 'bad_review' beyond the minimum effect and the no-effect null band?",
+      "metric": "association_dominant_category",
+      "value": 0.06512594447274409,
+      "interval_low": 0.06303195278466335,
+      "interval_high": 0.07578453916484898,
+      "reference": 0.0,
+      "delta": 0.06512594447274409,
+      "threshold": 0.05,
+      "null_threshold": 0.030188320283035634,
+      "direction": "max",
+      "verdict": "act",
+      "action": "keep the feature whose association clears the minimum effect; drop or defer the trivial ones",
+      "owner": "eda",
+      "sample_size": 96517,
+      "unit": null,
+      "min_sample_size": 100,
+      "evidence": {
+        "baseline": "no-effect shuffle of the target at this n",
+        "delta": null,
+        "segments": [
+          {
+            "segment": "boleto",
+            "value": 0.0925650353989325,
+            "sample_size": 19203
+          },
+          {
+            "segment": "credit_card",
+            "value": 0.06596349492413081,
+            "sample_size": 73965
+          },
+          {
+            "segment": "debit_card",
+            "value": 0.19902561971471563,
+            "sample_size": 1484
+          },
+          {
+            "segment": "voucher",
+            "value": 0.18509609273133001,
+            "sample_size": 1864
+          }
+        ],
+        "sensitivity": {
+          "cramers_v_corrected": 0.059318397448100996,
+          "iterations": 200.0,
+          "alpha": 0.05
+        },
+        "falsifier": "the association's interval falls at or below max(min_effect, the shuffle null band) — the feature would be indistinguishable from a shuffled target at n=96,517",
+        "provenance": {
+          "dataset": "olist",
+          "artifact": "train.parquet+val.parquet",
+          "source": "data/raw/olist/olist_orders.parquet",
+          "sample_sha256": "095d310540b9de31",
+          "sampled_rows": "98673",
+          "sample_size": "98673",
+          "seed": "42",
+          "exclusions": "pairwise-complete rows per feature; exclude_from_profiling dropped",
+          "feature": "dominant_category",
+          "test": "chi2",
+          "rows": "96517",
+          "resampling": "iid+shuffle",
+          "segments": "levels of dominant_payment_type"
+        }
+      }
+    },
+    {
+      "question": "Does max_installments move the binary target 'bad_review' beyond the minimum effect and the no-effect null band?",
+      "metric": "association_max_installments",
+      "value": 0.047701350771338746,
+      "interval_low": 0.03822711575733642,
+      "interval_high": 0.056801840177667665,
+      "reference": 0.0,
+      "delta": 0.047701350771338746,
+      "threshold": 0.05,
+      "null_threshold": 0.009778398816902522,
       "direction": "max",
       "verdict": "investigate",
       "action": "keep the feature whose association clears the minimum effect; drop or defer the trivial ones",
       "owner": "eda",
-      "sample_size": 602,
+      "sample_size": 98672,
       "unit": null,
       "min_sample_size": 100,
       "evidence": {
@@ -615,326 +910,71 @@
         "delta": null,
         "segments": [
           {
-            "segment": "Female",
-            "value": 0.04682515407812793,
-            "sample_size": 352
-          },
-          {
-            "segment": "Male",
-            "value": 0.04500118200773037,
-            "sample_size": 142
-          },
-          {
-            "segment": "Others",
-            "value": 0.10200501253132854,
-            "sample_size": 19
-          },
-          {
-            "segment": "Prefer not to say",
-            "value": 0.034971040350974814,
-            "sample_size": 89
-          }
-        ],
-        "sensitivity": {
-          "eta_squared": 0.039158073492866666,
-          "iterations": 200.0,
-          "alpha": 0.05
-        },
-        "falsifier": "the association's interval falls at or below max(min_effect, the shuffle null band) — the feature would be indistinguishable from a shuffled target at n=602",
-        "provenance": {
-          "dataset": "amazon",
-          "artifact": "train.parquet+val.parquet",
-          "source": "data/raw/amazon/amazon_consumer_behavior_survey.csv",
-          "sample_sha256": "9858827b9b2fb5f4",
-          "sampled_rows": "602",
-          "sample_size": "602",
-          "seed": "42",
-          "exclusions": "pairwise-complete rows per feature; exclude_from_profiling dropped",
-          "feature": "Review_Helpfulness",
-          "test": "kruskal",
-          "rows": "602",
-          "resampling": "iid+shuffle",
-          "segments": "levels of Gender"
-        }
-      }
-    },
-    {
-      "question": "Does Recommendation_Helpfulness move the numeric target 'Shopping_Satisfaction' beyond the minimum effect and the no-effect null band?",
-      "metric": "association_Recommendation_Helpfulness",
-      "value": 0.029345116630248868,
-      "interval_low": 0.008522452509640982,
-      "interval_high": 0.07152252441485035,
-      "reference": 0.0,
-      "delta": 0.029345116630248868,
-      "threshold": 0.05,
-      "null_threshold": 0.004965822723636525,
-      "direction": "max",
-      "verdict": "investigate",
-      "action": "keep the feature whose association clears the minimum effect; drop or defer the trivial ones",
-      "owner": "eda",
-      "sample_size": 602,
-      "unit": null,
-      "min_sample_size": 100,
-      "evidence": {
-        "baseline": "no-effect shuffle of the target at this n",
-        "delta": null,
-        "segments": [
-          {
-            "segment": "Female",
-            "value": 0.03500150605172046,
-            "sample_size": 352
-          },
-          {
-            "segment": "Male",
-            "value": 0.020109120953657276,
-            "sample_size": 142
-          },
-          {
-            "segment": "Others",
+            "segment": "boleto",
             "value": 0.0,
-            "sample_size": 19
+            "sample_size": 19636
           },
           {
-            "segment": "Prefer not to say",
-            "value": 0.05201312356966294,
-            "sample_size": 89
-          }
-        ],
-        "sensitivity": {
-          "eta_squared": 0.02859834413792456,
-          "iterations": 200.0,
-          "alpha": 0.05
-        },
-        "falsifier": "the association's interval falls at or below max(min_effect, the shuffle null band) — the feature would be indistinguishable from a shuffled target at n=602",
-        "provenance": {
-          "dataset": "amazon",
-          "artifact": "train.parquet+val.parquet",
-          "source": "data/raw/amazon/amazon_consumer_behavior_survey.csv",
-          "sample_sha256": "9858827b9b2fb5f4",
-          "sampled_rows": "602",
-          "sample_size": "602",
-          "seed": "42",
-          "exclusions": "pairwise-complete rows per feature; exclude_from_profiling dropped",
-          "feature": "Recommendation_Helpfulness",
-          "test": "kruskal",
-          "rows": "602",
-          "resampling": "iid+shuffle",
-          "segments": "levels of Gender"
-        }
-      }
-    },
-    {
-      "question": "Does Saveforlater_Frequency move the numeric target 'Shopping_Satisfaction' beyond the minimum effect and the no-effect null band?",
-      "metric": "association_Saveforlater_Frequency",
-      "value": 0.023044757527646544,
-      "interval_low": 0.0056265780172856175,
-      "interval_high": 0.06508293956362,
-      "reference": 0.0,
-      "delta": 0.023044757527646544,
-      "threshold": 0.05,
-      "null_threshold": 0.007188214560986237,
-      "direction": "max",
-      "verdict": "investigate",
-      "action": "keep the feature whose association clears the minimum effect; drop or defer the trivial ones",
-      "owner": "eda",
-      "sample_size": 602,
-      "unit": null,
-      "min_sample_size": 100,
-      "evidence": {
-        "baseline": "no-effect shuffle of the target at this n",
-        "delta": null,
-        "segments": [
-          {
-            "segment": "Female",
-            "value": 0.02548620017762099,
-            "sample_size": 352
+            "segment": "credit_card",
+            "value": 0.0672786147467227,
+            "sample_size": 75538
           },
           {
-            "segment": "Male",
-            "value": 0.08383331709755582,
-            "sample_size": 142
-          },
-          {
-            "segment": "Others",
-            "value": 0.0718750000000006,
-            "sample_size": 19
-          },
-          {
-            "segment": "Prefer not to say",
-            "value": 0.07977179722364337,
-            "sample_size": 89
-          }
-        ],
-        "sensitivity": {
-          "eta_squared": 0.03235213565652483,
-          "iterations": 200.0,
-          "alpha": 0.05
-        },
-        "falsifier": "the association's interval falls at or below max(min_effect, the shuffle null band) — the feature would be indistinguishable from a shuffled target at n=602",
-        "provenance": {
-          "dataset": "amazon",
-          "artifact": "train.parquet+val.parquet",
-          "source": "data/raw/amazon/amazon_consumer_behavior_survey.csv",
-          "sample_sha256": "9858827b9b2fb5f4",
-          "sampled_rows": "602",
-          "sample_size": "602",
-          "seed": "42",
-          "exclusions": "pairwise-complete rows per feature; exclude_from_profiling dropped",
-          "feature": "Saveforlater_Frequency",
-          "test": "kruskal",
-          "rows": "602",
-          "resampling": "iid+shuffle",
-          "segments": "levels of Gender"
-        }
-      }
-    },
-    {
-      "question": "Does Browsing_Frequency move the numeric target 'Shopping_Satisfaction' beyond the minimum effect and the no-effect null band?",
-      "metric": "association_Browsing_Frequency",
-      "value": 0.014868378708197544,
-      "interval_low": 0.0018536899019051191,
-      "interval_high": 0.049594702694080985,
-      "reference": 0.0,
-      "delta": 0.014868378708197544,
-      "threshold": 0.05,
-      "null_threshold": 0.007376495043746398,
-      "direction": "max",
-      "verdict": "no_action",
-      "action": "keep the feature whose association clears the minimum effect; drop or defer the trivial ones",
-      "owner": "eda",
-      "sample_size": 602,
-      "unit": null,
-      "min_sample_size": 100,
-      "evidence": {
-        "baseline": "no-effect shuffle of the target at this n",
-        "delta": null,
-        "segments": [
-          {
-            "segment": "Female",
-            "value": 0.009162797002776925,
-            "sample_size": 352
-          },
-          {
-            "segment": "Male",
-            "value": 0.013813747844301855,
-            "sample_size": 142
-          },
-          {
-            "segment": "Others",
+            "segment": "debit_card",
             "value": 0.0,
-            "sample_size": 19
+            "sample_size": 1521
           },
           {
-            "segment": "Prefer not to say",
-            "value": 0.027628040579527887,
-            "sample_size": 89
-          }
-        ],
-        "sensitivity": {
-          "eta_squared": 0.02441149993273463,
-          "iterations": 200.0,
-          "alpha": 0.05
-        },
-        "falsifier": "the association's interval falls at or below max(min_effect, the shuffle null band) — the feature would be indistinguishable from a shuffled target at n=602",
-        "provenance": {
-          "dataset": "amazon",
-          "artifact": "train.parquet+val.parquet",
-          "source": "data/raw/amazon/amazon_consumer_behavior_survey.csv",
-          "sample_sha256": "9858827b9b2fb5f4",
-          "sampled_rows": "602",
-          "sample_size": "602",
-          "seed": "42",
-          "exclusions": "pairwise-complete rows per feature; exclude_from_profiling dropped",
-          "feature": "Browsing_Frequency",
-          "test": "kruskal",
-          "rows": "602",
-          "resampling": "iid+shuffle",
-          "segments": "levels of Gender"
-        }
-      }
-    },
-    {
-      "question": "Does Cart_Abandonment_Factors move the numeric target 'Shopping_Satisfaction' beyond the minimum effect and the no-effect null band?",
-      "metric": "association_Cart_Abandonment_Factors",
-      "value": 0.012967368787428197,
-      "interval_low": 0.0019008827781486347,
-      "interval_high": 0.04074935363006238,
-      "reference": 0.0,
-      "delta": 0.012967368787428197,
-      "threshold": 0.05,
-      "null_threshold": 0.006597424917848575,
-      "direction": "max",
-      "verdict": "no_action",
-      "action": "keep the feature whose association clears the minimum effect; drop or defer the trivial ones",
-      "owner": "eda",
-      "sample_size": 602,
-      "unit": null,
-      "min_sample_size": 100,
-      "evidence": {
-        "baseline": "no-effect shuffle of the target at this n",
-        "delta": null,
-        "segments": [
-          {
-            "segment": "Female",
+            "segment": "not_defined",
             "value": 0.0,
-            "sample_size": 352
+            "sample_size": 3
           },
           {
-            "segment": "Male",
-            "value": 0.047553291064670544,
-            "sample_size": 142
-          },
-          {
-            "segment": "Others",
-            "value": 0.3071710526315788,
-            "sample_size": 19
-          },
-          {
-            "segment": "Prefer not to say",
-            "value": 0.06705334718156952,
-            "sample_size": 89
+            "segment": "voucher",
+            "value": 0.002383679693899854,
+            "sample_size": 1974
           }
         ],
         "sensitivity": {
-          "eta_squared": 0.025462568958969454,
+          "point_biserial_r": 0.03546200997592971,
           "iterations": 200.0,
           "alpha": 0.05
         },
-        "falsifier": "the association's interval falls at or below max(min_effect, the shuffle null band) — the feature would be indistinguishable from a shuffled target at n=602",
+        "falsifier": "the association's interval falls at or below max(min_effect, the shuffle null band) — the feature would be indistinguishable from a shuffled target at n=98,672",
         "provenance": {
-          "dataset": "amazon",
+          "dataset": "olist",
           "artifact": "train.parquet+val.parquet",
-          "source": "data/raw/amazon/amazon_consumer_behavior_survey.csv",
-          "sample_sha256": "9858827b9b2fb5f4",
-          "sampled_rows": "602",
-          "sample_size": "602",
+          "source": "data/raw/olist/olist_orders.parquet",
+          "sample_sha256": "095d310540b9de31",
+          "sampled_rows": "98673",
+          "sample_size": "98673",
           "seed": "42",
           "exclusions": "pairwise-complete rows per feature; exclude_from_profiling dropped",
-          "feature": "Cart_Abandonment_Factors",
-          "test": "kruskal",
-          "rows": "602",
+          "feature": "max_installments",
+          "test": "mann_whitney",
+          "rows": "98672",
           "resampling": "iid+shuffle",
-          "segments": "levels of Gender"
+          "segments": "levels of dominant_payment_type"
         }
       }
     }
   ],
   "outliers": [
     {
-      "question": "Is more than 1.00% of age outside the IQR fence of 1.5 x IQR?",
-      "metric": "outlier_share_age",
-      "value": 0.03322259136212625,
-      "interval_low": 0.019892026578073096,
-      "interval_high": 0.046511627906976744,
+      "question": "Is more than 1.00% of delivery_days outside the IQR fence of 1.5 x IQR?",
+      "metric": "outlier_share_delivery_days",
+      "value": 0.050954815819680685,
+      "interval_low": 0.04948085150787854,
+      "interval_high": 0.05238521339872691,
       "reference": 0.006976603239280177,
-      "delta": 0.02624598812284607,
-      "threshold": 0.011710963455149473,
-      "null_threshold": 0.011710963455149473,
+      "delta": 0.04397821258040051,
+      "threshold": 0.01,
+      "null_threshold": 0.007409996869456329,
       "direction": "max",
       "verdict": "act",
       "action": "winsorize the flagged columns before training, or exclude them with a recorded reason",
       "owner": "eda",
-      "sample_size": 602,
+      "sample_size": 95830,
       "unit": null,
       "min_sample_size": 100,
       "evidence": {
@@ -942,63 +982,63 @@
         "delta": null,
         "segments": [
           {
-            "segment": "Female",
-            "value": 0.02556818181818182,
-            "sample_size": 352
+            "segment": "boleto",
+            "value": 0.054348966530269646,
+            "sample_size": 19062
           },
           {
-            "segment": "Male",
-            "value": 0.035211267605633804,
-            "sample_size": 142
+            "segment": "credit_card",
+            "value": 0.050541221322077744,
+            "sample_size": 73445
           },
           {
-            "segment": "Others",
-            "value": 0.0,
-            "sample_size": 19
+            "segment": "debit_card",
+            "value": 0.03114421123899797,
+            "sample_size": 1477
           },
           {
-            "segment": "Prefer not to say",
-            "value": 0.06741573033707865,
-            "sample_size": 89
+            "segment": "voucher",
+            "value": 0.04769647696476965,
+            "sample_size": 1845
           }
         ],
         "sensitivity": {
-          "z_score_share": 0.008306,
+          "z_score_share": 0.016414,
           "iqr_multiplier": 1.5,
           "iterations": 200.0
         },
         "falsifier": "the share's interval falls at or below the declared maximum share — the column would carry no more extreme values than its fence implies",
         "provenance": {
-          "dataset": "amazon",
+          "dataset": "olist",
           "artifact": "train.parquet+val.parquet",
-          "source": "data/raw/amazon/amazon_consumer_behavior_survey.csv",
-          "sample_sha256": "9858827b9b2fb5f4",
-          "sampled_rows": "602",
-          "sample_size": "602",
+          "source": "data/raw/olist/olist_orders.parquet",
+          "sample_sha256": "095d310540b9de31",
+          "sampled_rows": "98673",
+          "sample_size": "98673",
           "seed": "42",
           "exclusions": "pairwise-complete rows per feature; exclude_from_profiling dropped",
-          "column": "age",
-          "rows": "602",
+          "column": "delivery_days",
+          "rows": "95830",
           "resampling": "iid",
-          "segments": "levels of Gender"
+          "segments": "levels of dominant_payment_type"
         }
       }
     },
     {
-      "question": "Is more than 1.00% of Customer_Reviews_Importance outside the IQR fence of 1.5 x IQR?",
-      "metric": "outlier_share_Customer_Reviews_Importance",
-      "value": 0.0,
-      "interval_low": 0.0,
-      "interval_high": 0.0,
+      "question": "Is more than 1.00% of estimated_days outside the IQR fence of 1.5 x IQR?",
+      "metric": "outlier_share_estimated_days",
+      "value": 0.025609842611453996,
+      "interval_low": 0.024796803583553757,
+      "interval_high": 0.02661594357118969,
       "reference": 0.006976603239280177,
-      "delta": -0.006976603239280177,
-      "threshold": 0.011710963455149473,
-      "null_threshold": 0.011710963455149473,
+      "delta": 0.01863323937217382,
+      "threshold": 0.01,
+      "null_threshold": 0.007429083943936031,
       "direction": "max",
-      "verdict": "no_action",
+      "verdict": "act",
       "action": "winsorize the flagged columns before training, or exclude them with a recorded reason",
       "owner": "eda",
-      "sample_size": 602,
+      "sample_size": 98673,
       "unit": null,
       "min_sample_size": 100,
       "evidence": {
@@ -1006,24 +1046,960 @@
         "delta": null,
         "segments": [
           {
-            "segment": "Female",
-            "value": 0.0,
-            "sample_size": 352
+            "segment": "boleto",
+            "value": 0.025005092686901608,
+            "sample_size": 19636
           },
           {
-            "segment": "Male",
-            "value": 0.0,
-            "sample_size": 142
+            "segment": "credit_card",
+            "value": 0.025695676348327996,
+            "sample_size": 75538
           },
           {
-            "segment": "Others",
-            "value": 0.0,
-            "sample_size": 19
+            "segment": "debit_card",
+            "value": 0.02695595003287311,
+            "sample_size": 1521
           },
           {
-            "segment": "Prefer not to say",
+            "segment": "not_defined",
             "value": 0.0,
-            "sample_size": 89
+            "sample_size": 3
+          },
+          {
+            "segment": "voucher",
+            "value": 0.02735562310030395,
+            "sample_size": 1974
+          }
+        ],
+        "sensitivity": {
+          "z_score_share": 0.010388,
+          "iqr_multiplier": 1.5,
+          "iterations": 200.0
+        },
+        "falsifier": "the share's interval falls at or below the declared maximum share — the column would carry no more extreme values than its fence implies",
+        "provenance": {
+          "dataset": "olist",
+          "artifact": "train.parquet+val.parquet",
+          "source": "data/raw/olist/olist_orders.parquet",
+          "sample_sha256": "095d310540b9de31",
+          "sampled_rows": "98673",
+          "sample_size": "98673",
+          "seed": "42",
+          "exclusions": "pairwise-complete rows per feature; exclude_from_profiling dropped",
+          "column": "estimated_days",
+          "rows": "98673",
+          "resampling": "iid",
+          "segments": "levels of dominant_payment_type"
+        }
+      }
+    },
+    {
+      "question": "Is more than 1.00% of late outside the IQR fence of 1.5 x IQR?",
+      "metric": "outlier_share_late",
+      "value": 0.07995408535949076,
+      "interval_low": 0.07836637796097257,
+      "interval_high": 0.08164510069915476,
+      "reference": 0.006976603239280177,
+      "delta": 0.07297748212021059,
+      "threshold": 0.01,
+      "null_threshold": 0.007409996869456329,
+      "direction": "max",
+      "verdict": "act",
+      "action": "winsorize the flagged columns before training, or exclude them with a recorded reason",
+      "owner": "eda",
+      "sample_size": 95830,
+      "unit": null,
+      "min_sample_size": 100,
+      "evidence": {
+        "baseline": "binomial null at this n around the share a Gaussian reference produces at iqr_multiplier=1.5",
+        "delta": null,
+        "segments": [
+          {
+            "segment": "boleto",
+            "value": 0.08766131570664148,
+            "sample_size": 19062
+          },
+          {
+            "segment": "credit_card",
+            "value": 0.0782217986248213,
+            "sample_size": 73445
+          },
+          {
+            "segment": "debit_card",
+            "value": 0.07853757616790792,
+            "sample_size": 1477
+          },
+          {
+            "segment": "voucher",
+            "value": 0.06991869918699187,
+            "sample_size": 1845
+          }
+        ],
+        "sensitivity": {
+          "z_score_share": 0.079954,
+          "iqr_multiplier": 1.5,
+          "iterations": 200.0
+        },
+        "falsifier": "the share's interval falls at or below the declared maximum share — the column would carry no more extreme values than its fence implies",
+        "provenance": {
+          "dataset": "olist",
+          "artifact": "train.parquet+val.parquet",
+          "source": "data/raw/olist/olist_orders.parquet",
+          "sample_sha256": "095d310540b9de31",
+          "sampled_rows": "98673",
+          "sample_size": "98673",
+          "seed": "42",
+          "exclusions": "pairwise-complete rows per feature; exclude_from_profiling dropped",
+          "column": "late",
+          "rows": "95830",
+          "resampling": "iid",
+          "segments": "levels of dominant_payment_type"
+        }
+      }
+    },
+    {
+      "question": "Is more than 1.00% of items_count outside the IQR fence of 1.5 x IQR?",
+      "metric": "outlier_share_items_count",
+      "value": 0.10586482624426134,
+      "interval_low": 0.10375381309983481,
+      "interval_high": 0.10762265260000202,
+      "reference": 0.006976603239280177,
+      "delta": 0.09888822300498117,
+      "threshold": 0.01,
+      "null_threshold": 0.007429083943936031,
+      "direction": "max",
+      "verdict": "act",
+      "action": "winsorize the flagged columns before training, or exclude them with a recorded reason",
+      "owner": "eda",
+      "sample_size": 98673,
+      "unit": null,
+      "min_sample_size": 100,
+      "evidence": {
+        "baseline": "binomial null at this n around the share a Gaussian reference produces at iqr_multiplier=1.5",
+        "delta": null,
+        "segments": [
+          {
+            "segment": "boleto",
+            "value": 0.11336321042982278,
+            "sample_size": 19636
+          },
+          {
+            "segment": "credit_card",
+            "value": 0.10426540284360189,
+            "sample_size": 75538
+          },
+          {
+            "segment": "debit_card",
+            "value": 0.08284023668639054,
+            "sample_size": 1521
+          },
+          {
+            "segment": "not_defined",
+            "value": 1.0,
+            "sample_size": 3
+          },
+          {
+            "segment": "voucher",
+            "value": 0.10840932117527863,
+            "sample_size": 1974
+          }
+        ],
+        "sensitivity": {
+          "z_score_share": 0.022803,
+          "iqr_multiplier": 1.5,
+          "iterations": 200.0
+        },
+        "falsifier": "the share's interval falls at or below the declared maximum share — the column would carry no more extreme values than its fence implies",
+        "provenance": {
+          "dataset": "olist",
+          "artifact": "train.parquet+val.parquet",
+          "source": "data/raw/olist/olist_orders.parquet",
+          "sample_sha256": "095d310540b9de31",
+          "sampled_rows": "98673",
+          "sample_size": "98673",
+          "seed": "42",
+          "exclusions": "pairwise-complete rows per feature; exclude_from_profiling dropped",
+          "column": "items_count",
+          "rows": "98673",
+          "resampling": "iid",
+          "segments": "levels of dominant_payment_type"
+        }
+      }
+    },
+    {
+      "question": "Is more than 1.00% of sellers_count outside the IQR fence of 1.5 x IQR?",
+      "metric": "outlier_share_sellers_count",
+      "value": 0.02047165891378594,
+      "interval_low": 0.019427806998875072,
+      "interval_high": 0.021283177768994556,
+      "reference": 0.006976603239280177,
+      "delta": 0.013495055674505763,
+      "threshold": 0.01,
+      "null_threshold": 0.007429083943936031,
+      "direction": "max",
+      "verdict": "act",
+      "action": "winsorize the flagged columns before training, or exclude them with a recorded reason",
+      "owner": "eda",
+      "sample_size": 98673,
+      "unit": null,
+      "min_sample_size": 100,
+      "evidence": {
+        "baseline": "binomial null at this n around the share a Gaussian reference produces at iqr_multiplier=1.5",
+        "delta": null,
+        "segments": [
+          {
+            "segment": "boleto",
+            "value": 0.01919942961906702,
+            "sample_size": 19636
+          },
+          {
+            "segment": "credit_card",
+            "value": 0.02000317720882205,
+            "sample_size": 75538
+          },
+          {
+            "segment": "debit_card",
+            "value": 0.015779092702169626,
+            "sample_size": 1521
+          },
+          {
+            "segment": "not_defined",
+            "value": 1.0,
+            "sample_size": 3
+          },
+          {
+            "segment": "voucher",
+            "value": 0.05319148936170213,
+            "sample_size": 1974
+          }
+        ],
+        "sensitivity": {
+          "z_score_share": 0.020472,
+          "iqr_multiplier": 1.5,
+          "iterations": 200.0
+        },
+        "falsifier": "the share's interval falls at or below the declared maximum share — the column would carry no more extreme values than its fence implies",
+        "provenance": {
+          "dataset": "olist",
+          "artifact": "train.parquet+val.parquet",
+          "source": "data/raw/olist/olist_orders.parquet",
+          "sample_sha256": "095d310540b9de31",
+          "sampled_rows": "98673",
+          "sample_size": "98673",
+          "seed": "42",
+          "exclusions": "pairwise-complete rows per feature; exclude_from_profiling dropped",
+          "column": "sellers_count",
+          "rows": "98673",
+          "resampling": "iid",
+          "segments": "levels of dominant_payment_type"
+        }
+      }
+    },
+    {
+      "question": "Is more than 1.00% of products_count outside the IQR fence of 1.5 x IQR?",
+      "metric": "outlier_share_products_count",
+      "value": 0.040061617666433576,
+      "interval_low": 0.03883382485583696,
+      "interval_high": 0.04137960739006618,
+      "reference": 0.006976603239280177,
+      "delta": 0.0330850144271534,
+      "threshold": 0.01,
+      "null_threshold": 0.007429083943936031,
+      "direction": "max",
+      "verdict": "act",
+      "action": "winsorize the flagged columns before training, or exclude them with a recorded reason",
+      "owner": "eda",
+      "sample_size": 98673,
+      "unit": null,
+      "min_sample_size": 100,
+      "evidence": {
+        "baseline": "binomial null at this n around the share a Gaussian reference produces at iqr_multiplier=1.5",
+        "delta": null,
+        "segments": [
+          {
+            "segment": "boleto",
+            "value": 0.03753310246486046,
+            "sample_size": 19636
+          },
+          {
+            "segment": "credit_card",
+            "value": 0.03999311604755223,
+            "sample_size": 75538
+          },
+          {
+            "segment": "debit_card",
+            "value": 0.03879026955950033,
+            "sample_size": 1521
+          },
+          {
+            "segment": "not_defined",
+            "value": 1.0,
+            "sample_size": 3
+          },
+          {
+            "segment": "voucher",
+            "value": 0.0673758865248227,
+            "sample_size": 1974
+          }
+        ],
+        "sensitivity": {
+          "z_score_share": 0.040062,
+          "iqr_multiplier": 1.5,
+          "iterations": 200.0
+        },
+        "falsifier": "the share's interval falls at or below the declared maximum share — the column would carry no more extreme values than its fence implies",
+        "provenance": {
+          "dataset": "olist",
+          "artifact": "train.parquet+val.parquet",
+          "source": "data/raw/olist/olist_orders.parquet",
+          "sample_sha256": "095d310540b9de31",
+          "sampled_rows": "98673",
+          "sample_size": "98673",
+          "seed": "42",
+          "exclusions": "pairwise-complete rows per feature; exclude_from_profiling dropped",
+          "column": "products_count",
+          "rows": "98673",
+          "resampling": "iid",
+          "segments": "levels of dominant_payment_type"
+        }
+      }
+    },
+    {
+      "question": "Is more than 1.00% of total_price outside the IQR fence of 1.5 x IQR?",
+      "metric": "outlier_share_total_price",
+      "value": 0.08007802526629697,
+      "interval_low": 0.07866483858778353,
+      "interval_high": 0.08168372192775515,
+      "reference": 0.006976603239280177,
+      "delta": 0.07310142202701679,
+      "threshold": 0.01,
+      "null_threshold": 0.007414953481009426,
+      "direction": "max",
+      "verdict": "act",
+      "action": "winsorize the flagged columns before training, or exclude them with a recorded reason",
+      "owner": "eda",
+      "sample_size": 97917,
+      "unit": null,
+      "min_sample_size": 100,
+      "evidence": {
+        "baseline": "binomial null at this n around the share a Gaussian reference produces at iqr_multiplier=1.5",
+        "delta": null,
+        "segments": [
+          {
+            "segment": "boleto",
+            "value": 0.061784191875096296,
+            "sample_size": 19471
+          },
+          {
+            "segment": "credit_card",
+            "value": 0.08637944590290642,
+            "sample_size": 75041
+          },
+          {
+            "segment": "debit_card",
+            "value": 0.05548216644649934,
+            "sample_size": 1514
+          },
+          {
+            "segment": "voucher",
+            "value": 0.0380952380952381,
+            "sample_size": 1890
+          }
+        ],
+        "sensitivity": {
+          "z_score_share": 0.01726,
+          "iqr_multiplier": 1.5,
+          "iterations": 200.0
+        },
+        "falsifier": "the share's interval falls at or below the declared maximum share — the column would carry no more extreme values than its fence implies",
+        "provenance": {
+          "dataset": "olist",
+          "artifact": "train.parquet+val.parquet",
+          "source": "data/raw/olist/olist_orders.parquet",
+          "sample_sha256": "095d310540b9de31",
+          "sampled_rows": "98673",
+          "sample_size": "98673",
+          "seed": "42",
+          "exclusions": "pairwise-complete rows per feature; exclude_from_profiling dropped",
+          "column": "total_price",
+          "rows": "97917",
+          "resampling": "iid",
+          "segments": "levels of dominant_payment_type"
+        }
+      }
+    },
+    {
+      "question": "Is more than 1.00% of total_freight outside the IQR fence of 1.5 x IQR?",
+      "metric": "outlier_share_total_freight",
+      "value": 0.100799656852232,
+      "interval_low": 0.0990374500852763,
+      "interval_high": 0.10251565101054975,
+      "reference": 0.006976603239280177,
+      "delta": 0.09382305361295182,
+      "threshold": 0.01,
+      "null_threshold": 0.007414953481009426,
+      "direction": "max",
+      "verdict": "act",
+      "action": "winsorize the flagged columns before training, or exclude them with a recorded reason",
+      "owner": "eda",
+      "sample_size": 97917,
+      "unit": null,
+      "min_sample_size": 100,
+      "evidence": {
+        "baseline": "binomial null at this n around the share a Gaussian reference produces at iqr_multiplier=1.5",
+        "delta": null,
+        "segments": [
+          {
+            "segment": "boleto",
+            "value": 0.10061116532278773,
+            "sample_size": 19471
+          },
+          {
+            "segment": "credit_card",
+            "value": 0.1021041830466012,
+            "sample_size": 75041
+          },
+          {
+            "segment": "debit_card",
+            "value": 0.08586525759577279,
+            "sample_size": 1514
+          },
+          {
+            "segment": "voucher",
+            "value": 0.06296296296296296,
+            "sample_size": 1890
+          }
+        ],
+        "sensitivity": {
+          "z_score_share": 0.016044,
+          "iqr_multiplier": 1.5,
+          "iterations": 200.0
+        },
+        "falsifier": "the share's interval falls at or below the declared maximum share — the column would carry no more extreme values than its fence implies",
+        "provenance": {
+          "dataset": "olist",
+          "artifact": "train.parquet+val.parquet",
+          "source": "data/raw/olist/olist_orders.parquet",
+          "sample_sha256": "095d310540b9de31",
+          "sampled_rows": "98673",
+          "sample_size": "98673",
+          "seed": "42",
+          "exclusions": "pairwise-complete rows per feature; exclude_from_profiling dropped",
+          "column": "total_freight",
+          "rows": "97917",
+          "resampling": "iid",
+          "segments": "levels of dominant_payment_type"
+        }
+      }
+    },
+    {
+      "question": "Is more than 1.00% of mean_item_price outside the IQR fence of 1.5 x IQR?",
+      "metric": "outlier_share_mean_item_price",
+      "value": 0.07684058947884433,
+      "interval_low": 0.0753903816497646,
+      "interval_high": 0.07858722183073419,
+      "reference": 0.006976603239280177,
+      "delta": 0.06986398623956415,
+      "threshold": 0.01,
+      "null_threshold": 0.007414953481009426,
+      "direction": "max",
+      "verdict": "act",
+      "action": "winsorize the flagged columns before training, or exclude them with a recorded reason",
+      "owner": "eda",
+      "sample_size": 97917,
+      "unit": null,
+      "min_sample_size": 100,
+      "evidence": {
+        "baseline": "binomial null at this n around the share a Gaussian reference produces at iqr_multiplier=1.5",
+        "delta": null,
+        "segments": [
+          {
+            "segment": "boleto",
+            "value": 0.05397771044116892,
+            "sample_size": 19471
+          },
+          {
+            "segment": "credit_card",
+            "value": 0.08416732186404766,
+            "sample_size": 75041
+          },
+          {
+            "segment": "debit_card",
+            "value": 0.05680317040951123,
+            "sample_size": 1514
+          },
+          {
+            "segment": "voucher",
+            "value": 0.03756613756613757,
+            "sample_size": 1890
+          }
+        ],
+        "sensitivity": {
+          "z_score_share": 0.017903,
+          "iqr_multiplier": 1.5,
+          "iterations": 200.0
+        },
+        "falsifier": "the share's interval falls at or below the declared maximum share — the column would carry no more extreme values than its fence implies",
+        "provenance": {
+          "dataset": "olist",
+          "artifact": "train.parquet+val.parquet",
+          "source": "data/raw/olist/olist_orders.parquet",
+          "sample_sha256": "095d310540b9de31",
+          "sampled_rows": "98673",
+          "sample_size": "98673",
+          "seed": "42",
+          "exclusions": "pairwise-complete rows per feature; exclude_from_profiling dropped",
+          "column": "mean_item_price",
+          "rows": "97917",
+          "resampling": "iid",
+          "segments": "levels of dominant_payment_type"
+        }
+      }
+    },
+    {
+      "question": "Is more than 1.00% of mean_product_weight_g outside the IQR fence of 1.5 x IQR?",
+      "metric": "outlier_share_mean_product_weight_g",
+      "value": 0.1425113124482896,
+      "interval_low": 0.14018140774864404,
+      "interval_high": 0.14500388147209936,
+      "reference": 0.006976603239280177,
+      "delta": 0.13553470920900942,
+      "threshold": 0.01,
+      "null_threshold": 0.0074161653098538316,
+      "direction": "max",
+      "verdict": "act",
+      "action": "winsorize the flagged columns before training, or exclude them with a recorded reason",
+      "owner": "eda",
+      "sample_size": 97901,
+      "unit": null,
+      "min_sample_size": 100,
+      "evidence": {
+        "baseline": "binomial null at this n around the share a Gaussian reference produces at iqr_multiplier=1.5",
+        "delta": null,
+        "segments": [
+          {
+            "segment": "boleto",
+            "value": 0.13088816972312117,
+            "sample_size": 19467
+          },
+          {
+            "segment": "credit_card",
+            "value": 0.1472477675596428,
+            "sample_size": 75030
+          },
+          {
+            "segment": "debit_card",
+            "value": 0.10435931307793923,
+            "sample_size": 1514
+          },
+          {
+            "segment": "voucher",
+            "value": 0.10481736368448914,
+            "sample_size": 1889
+          }
+        ],
+        "sensitivity": {
+          "z_score_share": 0.025618,
+          "iqr_multiplier": 1.5,
+          "iterations": 200.0
+        },
+        "falsifier": "the share's interval falls at or below the declared maximum share — the column would carry no more extreme values than its fence implies",
+        "provenance": {
+          "dataset": "olist",
+          "artifact": "train.parquet+val.parquet",
+          "source": "data/raw/olist/olist_orders.parquet",
+          "sample_sha256": "095d310540b9de31",
+          "sampled_rows": "98673",
+          "sample_size": "98673",
+          "seed": "42",
+          "exclusions": "pairwise-complete rows per feature; exclude_from_profiling dropped",
+          "column": "mean_product_weight_g",
+          "rows": "97901",
+          "resampling": "iid",
+          "segments": "levels of dominant_payment_type"
+        }
+      }
+    },
+    {
+      "question": "Is more than 1.00% of mean_product_photos_qty outside the IQR fence of 1.5 x IQR?",
+      "metric": "outlier_share_mean_product_photos_qty",
+      "value": 0.029263088110381405,
+      "interval_low": 0.028257784499368124,
+      "interval_high": 0.030320961693840767,
+      "reference": 0.006976603239280177,
+      "delta": 0.022286484871101228,
+      "threshold": 0.01,
+      "null_threshold": 0.0074276450724067205,
+      "direction": "max",
+      "verdict": "act",
+      "action": "winsorize the flagged columns before training, or exclude them with a recorded reason",
+      "owner": "eda",
+      "sample_size": 96538,
+      "unit": null,
+      "min_sample_size": 100,
+      "evidence": {
+        "baseline": "binomial null at this n around the share a Gaussian reference produces at iqr_multiplier=1.5",
+        "delta": null,
+        "segments": [
+          {
+            "segment": "boleto",
+            "value": 0.028163881513873706,
+            "sample_size": 19209
+          },
+          {
+            "segment": "credit_card",
+            "value": 0.02983359692877516,
+            "sample_size": 73977
+          },
+          {
+            "segment": "debit_card",
+            "value": 0.02219233355749832,
+            "sample_size": 1487
+          },
+          {
+            "segment": "voucher",
+            "value": 0.023605150214592276,
+            "sample_size": 1864
+          }
+        ],
+        "sensitivity": {
+          "z_score_share": 0.014823,
+          "iqr_multiplier": 1.5,
+          "iterations": 200.0
+        },
+        "falsifier": "the share's interval falls at or below the declared maximum share — the column would carry no more extreme values than its fence implies",
+        "provenance": {
+          "dataset": "olist",
+          "artifact": "train.parquet+val.parquet",
+          "source": "data/raw/olist/olist_orders.parquet",
+          "sample_sha256": "095d310540b9de31",
+          "sampled_rows": "98673",
+          "sample_size": "98673",
+          "seed": "42",
+          "exclusions": "pairwise-complete rows per feature; exclude_from_profiling dropped",
+          "column": "mean_product_photos_qty",
+          "rows": "96538",
+          "resampling": "iid",
+          "segments": "levels of dominant_payment_type"
+        }
+      }
+    },
+    {
+      "question": "Is more than 1.00% of mean_product_description_length outside the IQR fence of 1.5 x IQR?",
+      "metric": "outlier_share_mean_product_description_length",
+      "value": 0.06168555387515797,
+      "interval_low": 0.06029361494955354,
+      "interval_high": 0.06312669622324887,
+      "reference": 0.006976603239280177,
+      "delta": 0.054708950635877794,
+      "threshold": 0.01,
+      "null_threshold": 0.0074276450724067205,
+      "direction": "max",
+      "verdict": "act",
+      "action": "winsorize the flagged columns before training, or exclude them with a recorded reason",
+      "owner": "eda",
+      "sample_size": 96538,
+      "unit": null,
+      "min_sample_size": 100,
+      "evidence": {
+        "baseline": "binomial null at this n around the share a Gaussian reference produces at iqr_multiplier=1.5",
+        "delta": null,
+        "segments": [
+          {
+            "segment": "boleto",
+            "value": 0.06205424540579937,
+            "sample_size": 19209
+          },
+          {
+            "segment": "credit_card",
+            "value": 0.061870581396920664,
+            "sample_size": 73977
+          },
+          {
+            "segment": "debit_card",
+            "value": 0.06724949562878278,
+            "sample_size": 1487
+          },
+          {
+            "segment": "voucher",
+            "value": 0.046137339055793994,
+            "sample_size": 1864
+          }
+        ],
+        "sensitivity": {
+          "z_score_share": 0.024374,
+          "iqr_multiplier": 1.5,
+          "iterations": 200.0
+        },
+        "falsifier": "the share's interval falls at or below the declared maximum share — the column would carry no more extreme values than its fence implies",
+        "provenance": {
+          "dataset": "olist",
+          "artifact": "train.parquet+val.parquet",
+          "source": "data/raw/olist/olist_orders.parquet",
+          "sample_sha256": "095d310540b9de31",
+          "sampled_rows": "98673",
+          "sample_size": "98673",
+          "seed": "42",
+          "exclusions": "pairwise-complete rows per feature; exclude_from_profiling dropped",
+          "column": "mean_product_description_length",
+          "rows": "96538",
+          "resampling": "iid",
+          "segments": "levels of dominant_payment_type"
+        }
+      }
+    },
+    {
+      "question": "Is more than 1.00% of total_payment outside the IQR fence of 1.5 x IQR?",
+      "metric": "outlier_share_total_payment",
+      "value": 0.07908018485487271,
+      "interval_low": 0.07762865858602237,
+      "interval_high": 0.08043163207394194,
+      "reference": 0.006976603239280177,
+      "delta": 0.07210358161559254,
+      "threshold": 0.01,
+      "null_threshold": 0.0074291592346359655,
+      "direction": "max",
+      "verdict": "act",
+      "action": "winsorize the flagged columns before training, or exclude them with a recorded reason",
+      "owner": "eda",
+      "sample_size": 98672,
+      "unit": null,
+      "min_sample_size": 100,
+      "evidence": {
+        "baseline": "binomial null at this n around the share a Gaussian reference produces at iqr_multiplier=1.5",
+        "delta": null,
+        "segments": [
+          {
+            "segment": "boleto",
+            "value": 0.06355673253208392,
+            "sample_size": 19636
+          },
+          {
+            "segment": "credit_card",
+            "value": 0.08455346977680107,
+            "sample_size": 75538
+          },
+          {
+            "segment": "debit_card",
+            "value": 0.05391190006574622,
+            "sample_size": 1521
+          },
+          {
+            "segment": "not_defined",
+            "value": 0.0,
+            "sample_size": 3
+          },
+          {
+            "segment": "voucher",
+            "value": 0.04356636271529889,
+            "sample_size": 1974
+          }
+        ],
+        "sensitivity": {
+          "z_score_share": 0.017381,
+          "iqr_multiplier": 1.5,
+          "iterations": 200.0
+        },
+        "falsifier": "the share's interval falls at or below the declared maximum share — the column would carry no more extreme values than its fence implies",
+        "provenance": {
+          "dataset": "olist",
+          "artifact": "train.parquet+val.parquet",
+          "source": "data/raw/olist/olist_orders.parquet",
+          "sample_sha256": "095d310540b9de31",
+          "sampled_rows": "98673",
+          "sample_size": "98673",
+          "seed": "42",
+          "exclusions": "pairwise-complete rows per feature; exclude_from_profiling dropped",
+          "column": "total_payment",
+          "rows": "98672",
+          "resampling": "iid",
+          "segments": "levels of dominant_payment_type"
+        }
+      }
+    },
+    {
+      "question": "Is more than 1.00% of max_installments outside the IQR fence of 1.5 x IQR?",
+      "metric": "outlier_share_max_installments",
+      "value": 0.06313847900113508,
+      "interval_low": 0.06161753080914545,
+      "interval_high": 0.06479067009891357,
+      "reference": 0.006976603239280177,
+      "delta": 0.0561618757618549,
+      "threshold": 0.01,
+      "null_threshold": 0.0074291592346359655,
+      "direction": "max",
+      "verdict": "act",
+      "action": "winsorize the flagged columns before training, or exclude them with a recorded reason",
+      "owner": "eda",
+      "sample_size": 98672,
+      "unit": null,
+      "min_sample_size": 100,
+      "evidence": {
+        "baseline": "binomial null at this n around the share a Gaussian reference produces at iqr_multiplier=1.5",
+        "delta": null,
+        "segments": [
+          {
+            "segment": "boleto",
+            "value": 0.0,
+            "sample_size": 19636
+          },
+          {
+            "segment": "credit_card",
+            "value": 0.08239561545182557,
+            "sample_size": 75538
+          },
+          {
+            "segment": "debit_card",
+            "value": 0.0,
+            "sample_size": 1521
+          },
+          {
+            "segment": "not_defined",
+            "value": 0.0,
+            "sample_size": 3
+          },
+          {
+            "segment": "voucher",
+            "value": 0.00303951367781155,
+            "sample_size": 1974
+          }
+        ],
+        "sensitivity": {
+          "z_score_share": 0.003172,
+          "iqr_multiplier": 1.5,
+          "iterations": 200.0
+        },
+        "falsifier": "the share's interval falls at or below the declared maximum share — the column would carry no more extreme values than its fence implies",
+        "provenance": {
+          "dataset": "olist",
+          "artifact": "train.parquet+val.parquet",
+          "source": "data/raw/olist/olist_orders.parquet",
+          "sample_sha256": "095d310540b9de31",
+          "sampled_rows": "98673",
+          "sample_size": "98673",
+          "seed": "42",
+          "exclusions": "pairwise-complete rows per feature; exclude_from_profiling dropped",
+          "column": "max_installments",
+          "rows": "98672",
+          "resampling": "iid",
+          "segments": "levels of dominant_payment_type"
+        }
+      }
+    },
+    {
+      "question": "Is more than 1.00% of payment_type_count outside the IQR fence of 1.5 x IQR?",
+      "metric": "outlier_share_payment_type_count",
+      "value": 0.022569725960758878,
+      "interval_low": 0.021604406518566564,
+      "interval_high": 0.023472210961569647,
+      "reference": 0.006976603239280177,
+      "delta": 0.0155931227214787,
+      "threshold": 0.01,
+      "null_threshold": 0.0074291592346359655,
+      "direction": "max",
+      "verdict": "act",
+      "action": "winsorize the flagged columns before training, or exclude them with a recorded reason",
+      "owner": "eda",
+      "sample_size": 98672,
+      "unit": null,
+      "min_sample_size": 100,
+      "evidence": {
+        "baseline": "binomial null at this n around the share a Gaussian reference produces at iqr_multiplier=1.5",
+        "delta": null,
+        "segments": [
+          {
+            "segment": "boleto",
+            "value": 0.0,
+            "sample_size": 19636
+          },
+          {
+            "segment": "credit_card",
+            "value": 0.024557176520426806,
+            "sample_size": 75538
+          },
+          {
+            "segment": "debit_card",
+            "value": 0.0,
+            "sample_size": 1521
+          },
+          {
+            "segment": "not_defined",
+            "value": 0.0,
+            "sample_size": 3
+          },
+          {
+            "segment": "voucher",
+            "value": 0.1884498480243161,
+            "sample_size": 1974
+          }
+        ],
+        "sensitivity": {
+          "z_score_share": 0.02257,
+          "iqr_multiplier": 1.5,
+          "iterations": 200.0
+        },
+        "falsifier": "the share's interval falls at or below the declared maximum share — the column would carry no more extreme values than its fence implies",
+        "provenance": {
+          "dataset": "olist",
+          "artifact": "train.parquet+val.parquet",
+          "source": "data/raw/olist/olist_orders.parquet",
+          "sample_sha256": "095d310540b9de31",
+          "sampled_rows": "98673",
+          "sample_size": "98673",
+          "seed": "42",
+          "exclusions": "pairwise-complete rows per feature; exclude_from_profiling dropped",
+          "column": "payment_type_count",
+          "rows": "98672",
+          "resampling": "iid",
+          "segments": "levels of dominant_payment_type"
+        }
+      }
+    },
+    {
+      "question": "Is more than 1.00% of bad_review outside the IQR fence of 1.5 x IQR?",
+      "metric": "outlier_share_bad_review",
+      "value": 0.1468993544333303,
+      "interval_low": 0.14437561440312954,
+      "interval_high": 0.14881502538688393,
+      "reference": 0.006976603239280177,
+      "delta": 0.13992275119405012,
+      "threshold": 0.01,
+      "null_threshold": 0.007429083943936031,
+      "direction": "max",
+      "verdict": "act",
+      "action": "winsorize the flagged columns before training, or exclude them with a recorded reason",
+      "owner": "eda",
+      "sample_size": 98673,
+      "unit": null,
+      "min_sample_size": 100,
+      "evidence": {
+        "baseline": "binomial null at this n around the share a Gaussian reference produces at iqr_multiplier=1.5",
+        "delta": null,
+        "segments": [
+          {
+            "segment": "boleto",
+            "value": 0.14412303931554288,
+            "sample_size": 19636
+          },
+          {
+            "segment": "credit_card",
+            "value": 0.14698562313008023,
+            "sample_size": 75538
+          },
+          {
+            "segment": "debit_card",
+            "value": 0.1301775147928994,
+            "sample_size": 1521
+          },
+          {
+            "segment": "not_defined",
+            "value": 0.6666666666666666,
+            "sample_size": 3
+          },
+          {
+            "segment": "voucher",
+            "value": 0.1828774062816616,
+            "sample_size": 1974
           }
         ],
         "sensitivity": {
@@ -1033,210 +2009,18 @@
         },
         "falsifier": "the share's interval falls at or below the declared maximum share — the column would carry no more extreme values than its fence implies",
         "provenance": {
-          "dataset": "amazon",
+          "dataset": "olist",
           "artifact": "train.parquet+val.parquet",
-          "source": "data/raw/amazon/amazon_consumer_behavior_survey.csv",
-          "sample_sha256": "9858827b9b2fb5f4",
-          "sampled_rows": "602",
-          "sample_size": "602",
+          "source": "data/raw/olist/olist_orders.parquet",
+          "sample_sha256": "095d310540b9de31",
+          "sampled_rows": "98673",
+          "sample_size": "98673",
           "seed": "42",
           "exclusions": "pairwise-complete rows per feature; exclude_from_profiling dropped",
-          "column": "Customer_Reviews_Importance",
-          "rows": "602",
+          "column": "bad_review",
+          "rows": "98673",
           "resampling": "iid",
-          "segments": "levels of Gender"
-        }
-      }
-    },
-    {
-      "question": "Is more than 1.00% of recommendation_personalization_score outside the IQR fence of 1.5 x IQR?",
-      "metric": "outlier_share_recommendation_personalization_score",
-      "value": 0.05813953488372093,
-      "interval_low": 0.03986710963455149,
-      "interval_high": 0.07475083056478406,
-      "reference": 0.006976603239280177,
-      "delta": 0.05116293164444075,
-      "threshold": 0.011710963455149473,
-      "null_threshold": 0.011710963455149473,
-      "direction": "max",
-      "verdict": "act",
-      "action": "winsorize the flagged columns before training, or exclude them with a recorded reason",
-      "owner": "eda",
-      "sample_size": 602,
-      "unit": null,
-      "min_sample_size": 100,
-      "evidence": {
-        "baseline": "binomial null at this n around the share a Gaussian reference produces at iqr_multiplier=1.5",
-        "delta": null,
-        "segments": [
-          {
-            "segment": "Female",
-            "value": 0.05965909090909091,
-            "sample_size": 352
-          },
-          {
-            "segment": "Male",
-            "value": 0.035211267605633804,
-            "sample_size": 142
-          },
-          {
-            "segment": "Others",
-            "value": 0.15789473684210525,
-            "sample_size": 19
-          },
-          {
-            "segment": "Prefer not to say",
-            "value": 0.06741573033707865,
-            "sample_size": 89
-          }
-        ],
-        "sensitivity": {
-          "z_score_share": 0.0,
-          "iqr_multiplier": 1.5,
-          "iterations": 200.0
-        },
-        "falsifier": "the share's interval falls at or below the declared maximum share — the column would carry no more extreme values than its fence implies",
-        "provenance": {
-          "dataset": "amazon",
-          "artifact": "train.parquet+val.parquet",
-          "source": "data/raw/amazon/amazon_consumer_behavior_survey.csv",
-          "sample_sha256": "9858827b9b2fb5f4",
-          "sampled_rows": "602",
-          "sample_size": "602",
-          "seed": "42",
-          "exclusions": "pairwise-complete rows per feature; exclude_from_profiling dropped",
-          "column": "recommendation_personalization_score",
-          "rows": "602",
-          "resampling": "iid",
-          "segments": "levels of Gender"
-        }
-      }
-    },
-    {
-      "question": "Is more than 1.00% of rating_accuracy_score outside the IQR fence of 1.5 x IQR?",
-      "metric": "outlier_share_rating_accuracy_score",
-      "value": 0.03488372093023256,
-      "interval_low": 0.02159468438538206,
-      "interval_high": 0.04983388704318937,
-      "reference": 0.006976603239280177,
-      "delta": 0.02790711769095238,
-      "threshold": 0.011710963455149473,
-      "null_threshold": 0.011710963455149473,
-      "direction": "max",
-      "verdict": "act",
-      "action": "winsorize the flagged columns before training, or exclude them with a recorded reason",
-      "owner": "eda",
-      "sample_size": 602,
-      "unit": null,
-      "min_sample_size": 100,
-      "evidence": {
-        "baseline": "binomial null at this n around the share a Gaussian reference produces at iqr_multiplier=1.5",
-        "delta": null,
-        "segments": [
-          {
-            "segment": "Female",
-            "value": 0.017045454545454544,
-            "sample_size": 352
-          },
-          {
-            "segment": "Male",
-            "value": 0.035211267605633804,
-            "sample_size": 142
-          },
-          {
-            "segment": "Others",
-            "value": 0.15789473684210525,
-            "sample_size": 19
-          },
-          {
-            "segment": "Prefer not to say",
-            "value": 0.07865168539325842,
-            "sample_size": 89
-          }
-        ],
-        "sensitivity": {
-          "z_score_share": 0.0,
-          "iqr_multiplier": 1.5,
-          "iterations": 200.0
-        },
-        "falsifier": "the share's interval falls at or below the declared maximum share — the column would carry no more extreme values than its fence implies",
-        "provenance": {
-          "dataset": "amazon",
-          "artifact": "train.parquet+val.parquet",
-          "source": "data/raw/amazon/amazon_consumer_behavior_survey.csv",
-          "sample_sha256": "9858827b9b2fb5f4",
-          "sampled_rows": "602",
-          "sample_size": "602",
-          "seed": "42",
-          "exclusions": "pairwise-complete rows per feature; exclude_from_profiling dropped",
-          "column": "rating_accuracy_score",
-          "rows": "602",
-          "resampling": "iid",
-          "segments": "levels of Gender"
-        }
-      }
-    },
-    {
-      "question": "Is more than 1.00% of Shopping_Satisfaction outside the IQR fence of 1.5 x IQR?",
-      "metric": "outlier_share_Shopping_Satisfaction",
-      "value": 0.02823920265780731,
-      "interval_low": 0.016569767441860474,
-      "interval_high": 0.04156976744186048,
-      "reference": 0.006976603239280177,
-      "delta": 0.021262599418527133,
-      "threshold": 0.011710963455149473,
-      "null_threshold": 0.011710963455149473,
-      "direction": "max",
-      "verdict": "act",
-      "action": "winsorize the flagged columns before training, or exclude them with a recorded reason",
-      "owner": "eda",
-      "sample_size": 602,
-      "unit": null,
-      "min_sample_size": 100,
-      "evidence": {
-        "baseline": "binomial null at this n around the share a Gaussian reference produces at iqr_multiplier=1.5",
-        "delta": null,
-        "segments": [
-          {
-            "segment": "Female",
-            "value": 0.017045454545454544,
-            "sample_size": 352
-          },
-          {
-            "segment": "Male",
-            "value": 0.02112676056338028,
-            "sample_size": 142
-          },
-          {
-            "segment": "Others",
-            "value": 0.10526315789473684,
-            "sample_size": 19
-          },
-          {
-            "segment": "Prefer not to say",
-            "value": 0.06741573033707865,
-            "sample_size": 89
-          }
-        ],
-        "sensitivity": {
-          "z_score_share": 0.0,
-          "iqr_multiplier": 1.5,
-          "iterations": 200.0
-        },
-        "falsifier": "the share's interval falls at or below the declared maximum share — the column would carry no more extreme values than its fence implies",
-        "provenance": {
-          "dataset": "amazon",
-          "artifact": "train.parquet+val.parquet",
-          "source": "data/raw/amazon/amazon_consumer_behavior_survey.csv",
-          "sample_sha256": "9858827b9b2fb5f4",
-          "sampled_rows": "602",
-          "sample_size": "602",
-          "seed": "42",
-          "exclusions": "pairwise-complete rows per feature; exclude_from_profiling dropped",
-          "column": "Shopping_Satisfaction",
-          "rows": "602",
-          "resampling": "iid",
-          "segments": "levels of Gender"
+          "segments": "levels of dominant_payment_type"
         }
       }
     }

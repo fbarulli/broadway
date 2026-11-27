@@ -1,2 +1,0 @@
-metric,value,interval_low,interval_high,threshold,verdict,sample_size,reference
-improvement_rmse,0.23121387283237002,0.11401235798285828,0.3257923061590592,0.05,act,121,naive training-mean

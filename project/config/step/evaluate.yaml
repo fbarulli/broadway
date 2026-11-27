@@ -1,10 +1,10 @@
-# Amazon evaluate binding: holdout promotion evidence on the tracked pipeline
-# surface. Cross-sectional rows have no time CV, so the time-series cv_decision
-# block is explicitly nulled (the base config's expanding-CV verdict does not
-# apply); the binary decision block is nulled too — the target is ordinal and
-# this chain makes no classification claim.
-target_metric: rmse
-promotion_threshold: 0.05
+# Olist evaluate binding (the promotion check starts in the next unit).
+# The holdout decision metric is PR-AUC for the imbalanced binary target; the
+# time-series cv_decision and the threshold decision block are nulled because
+# this chain is not a forecast and the cutoff is not yet calibrated. Cross-
+# sectional orders use the stratified holdout split, never time CV.
+target_metric: pr_auc
+promotion_threshold: 0.02
 record_stem: promotion
 output_dir: project/experiments/results/pipeline/evaluate
 output_file: metrics.json

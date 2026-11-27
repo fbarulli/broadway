@@ -1,0 +1,53 @@
+# olist_hpo — the project HPO spec (SSOT) for the Olist champion.
+#
+# Read by the GPU lane (gpu_training/config/hpo_kernel.yaml -> hpo_spec) and by
+# broadway.training.hpo. PR-AUC is maximized for the imbalanced binary target
+# (14,495 bad / 84,178 good); accuracy is not a decision metric here. The
+# features listed below mirror project/features/olist.py: numeric sources stay
+# numeric, categorical sources are frequency-encoded by the plan.
+seed: 2026
+test_fraction: 0.2
+continuous_features:
+  - items_count
+  - sellers_count
+  - products_count
+  - total_price
+  - total_freight
+  - mean_item_price
+  - mean_product_weight_g
+  - mean_product_photos_qty
+  - mean_product_description_length
+  - total_payment
+  - max_installments
+  - payment_type_count
+categorical_features:
+  - customer_state
+  - customer_city
+  - customer_zip_code_prefix
+  - dominant_payment_type
+  - dominant_category
+  - seller_state
+hpo:
+  engine: optuna
+  direction: maximize
+  target_metric: pr_auc
+  total_trials: 30
+  initial_trials_per_model: 30
+  top_k: 1
+  models:
+    - name: rf
+      search_space:
+        n_estimators: [100, 600]
+        max_depth: [3, 20]
+        min_samples_leaf: [1, 10]
+        min_samples_split: [2, 20]
+        max_samples: [0.5, 1.0]
+    - name: lgbm
+      search_space:
+        n_estimators: [50, 500]
+        max_depth: [3, 12]
+        learning_rate: [0.01, 0.3]
+        num_leaves: [8, 127]
+        subsample: [0.6, 1.0]
+        colsample_bytree: [0.6, 1.0]
+        min_child_samples: [5, 100]

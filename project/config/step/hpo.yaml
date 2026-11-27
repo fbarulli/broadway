@@ -1,8 +1,8 @@
-# Amazon HPO — training-only repeated CV for the selected champion.
-# Search folds seed 7; the reported tuned score is read on seed 99, a partition
-# neither the search nor the selection (2026) optimized against. The search
-# space and trial budget live in experiment/amazon_hpo.yaml (SSOT).
-metric: rmse
+# Olist HPO (deferred to the next unit): training-only repeated CV for the
+# selected champion. Search folds seed 7; the reported tuned score is read on
+# seed 99, a partition neither the search nor the selection optimized against.
+# The search space, direction and trial budget live in experiment/olist_hpo.yaml.
+metric: pr_auc
 cv:
   folds: 5
   repeats: 3
@@ -16,6 +16,6 @@ selection_record: project/experiments/results/pipeline/selection/selection_champ
 min_effect: 0.01
 min_sample_size: 400
 action: "adopt the HPO-best params only when the interval clears the floor"
-owner: amazon
+owner: olist
 output_dir: project/experiments/results/pipeline/hpo
 output_file: project/experiments/results/pipeline/hpo/hpo_champion.json

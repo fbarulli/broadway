@@ -359,7 +359,7 @@ hand-maintaining a diagram:
 
 ```bash
 
-ds-pipeline lineage --analysis amazon --dataset amazon
+ds-pipeline lineage --analysis olist --dataset olist
 
 # → reports/lineage/graph.json + graph.md (Mermaid) + run-state summary
 
@@ -383,11 +383,11 @@ hierarchy built from the machine evidence in `artifacts/`.
 
 ```bash
 
-ds-pipeline walkthrough --analysis amazon --dataset amazon
+ds-pipeline walkthrough --analysis olist --dataset olist
 
 # → reports/index.md (dashboard) + reports/timeline.md + reports/results/ + reports/figures/
 
-ds-pipeline audit --dataset amazon [--analysis amazon]
+ds-pipeline audit --dataset olist [--analysis olist]
 
 # → reports/audit/{index,profile,transform,join,lookup_values}.md
 
@@ -687,7 +687,7 @@ dataset|analysis|experiment|project|sample|slice/<name>.yaml
 
 ```
 
-`configs/analysis/` holds generic/test analytical use cases. The Amazon project
+`configs/analysis/` holds generic/test analytical use cases. The Olist project
 
 profile lives under `project/config/` and overlays only matching config names.
 
@@ -786,7 +786,7 @@ Branch model and parity workflow live in `agents/contracts/MAIN_AGENT_CONTRACT.m
 
 |--------|------|----------|
 
-| `sklearn` | active development line (MAIN_AGENT_CONTRACT.md §2) | platform + the Amazon project (`project/`, scratch docs, generated `reports/`) |
+| `sklearn` | active development line (MAIN_AGENT_CONTRACT.md §2) | platform + the Olist project (`project/`, scratch docs, generated `reports/`) |
 
 | `taxi` | pass-along mirror of sklearn | fast-forward copy of sklearn |
 
@@ -816,9 +816,10 @@ Every step that a human reads publishes a computed record beside its report
 - Experiment rules live in `project/config/experiments/*.yaml` under
   `decisions.<step>`; an undeclared step raises a named `DecisionRuleError`.
 
-`amazon_survey/01_profile` publishes a record; the pipeline steps `etl`, `features`, `training` (HPO runs),
-`baseline`, `evaluate`, and `causal` publish theirs and are enforced in
-`scripts/check_experiment_outputs.py` (`PIPELINE_DECISION_ENFORCED`).
+The pipeline steps `etl` and `eda` publish the Olist decision records and are
+enforced in `scripts/check_experiment_outputs.py` (`PIPELINE_DECISION_ENFORCED`);
+the classification baseline/features/training/selection/HPO/evaluate chain is
+the next unit and re-joins the enforced set when it publishes its records.
 
 Promotion is interval-based: `artifacts/evaluation/promotion_decision.json`
 holds the paired-bootstrap improvement versus the champion, and the candidate
@@ -847,6 +848,6 @@ search-space definition:
    `broadway.training.hpo.run_model_study` — the same seeded TPE study the
    in-process bandit uses.
 
-The study/search-space/budget SSOT is `project/config/experiments/amazon_hpo.yaml`
+The study/search-space/budget SSOT is `project/config/experiments/olist_hpo.yaml`
 (via `gpu_training/config/hpo_kernel.yaml`); secrets (the shared storage URL)
 come from the environment and are redacted from every printed command.

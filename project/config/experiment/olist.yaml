@@ -1,0 +1,24 @@
+# olist — the reference experiment contract for the order-grain classifier.
+#
+# Target: bad_review = (review_score <= 2), decided AT PURCHASE. The metric is
+# PR-AUC (average precision) because 14,495 of 98,673 orders are bad (14.7%):
+# accuracy would be 85% by predicting "good" always. `split` is stratified on
+# the target because orders are exchangeable, not a time series; the next unit
+# selects/HPO's candidates against this metric on the same folds.
+data_source:
+  loader: canonical
+  version: null
+  schema_contract: engineered
+feature_plan: project.features.olist:plan
+model:
+  type: linear
+  params: {}
+split:
+  type: stratified
+  validation_size: 0.2
+random_state: 2026
+target_metric: pr_auc
+hpo: null
+preprocessing: []
+target_transforms: []
+calibration: null

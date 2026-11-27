@@ -141,7 +141,7 @@ class EffectStatistic:
         Ties are handled by midranks in H and the published value does NOT apply
         the tie correction to the denominator; on a heavily tied 1-5 rating the
         corrected variant is larger (e.g. 0.2515 vs the published 0.2299 for the
-        Amazon rating-accuracy family). The uncorrected definition is the one the
+        the retired survey's rating-accuracy family). The uncorrected definition is the one the
         registry's ``effect_name`` records — a consumer comparing across studies
         must use the same correction, not mix them.
         """
@@ -184,15 +184,24 @@ class EffectStatistic:
 
     @staticmethod
     def contingency(feature: np.ndarray, target: np.ndarray) -> np.ndarray:
-        """Observed contingency table with empty rows/columns removed."""
+        """Observed contingency table with empty rows/columns removed.
+
+        ``bincount`` sizes itself to the largest *observed* combined code, which
+        is narrower than the full table whenever the top feature code appears
+        with only one target class (a high-cardinality city whose last
+        alphabetical value is single-class). Reserving the full shape keeps the
+        reshape valid; empty rows are then dropped below.
+        """
         feature_codes = feature.astype(int)
         target_codes = target.astype(int)
-        combined = feature_codes * (int(target_codes.max()) + 1) + target_codes
-        counts = np.bincount(combined).astype(float)
-        table = counts.reshape(int(feature_codes.max()) + 1, int(target_codes.max()) + 1)
-        rows = np.flatnonzero(table.sum(axis=1) > 0)
-        columns = np.flatnonzero(table.sum(axis=0) > 0)
-        return table[np.ix_(rows, columns)]
+        rows = int(feature_codes.max()) + 1
+        columns = int(target_codes.max()) + 1
+        combined = feature_codes * columns + target_codes
+        counts = np.bincount(combined, minlength=rows * columns).astype(float)
+        table = counts.reshape(rows, columns)
+        row_index = np.flatnonzero(table.sum(axis=1) > 0)
+        column_index = np.flatnonzero(table.sum(axis=0) > 0)
+        return table[np.ix_(row_index, column_index)]
 
     @staticmethod
     def chi_square(table: np.ndarray) -> float:

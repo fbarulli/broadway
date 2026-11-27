@@ -280,11 +280,11 @@ def test_dataset_processed_subdir_scopes_canonical_artifacts(tmp_path: Path) -> 
     from broadway.data.loader import ProcessedStore, canonical_path
 
     environment = EnvironmentConfig(**{**_ENVIRONMENT, "data_dir": str(tmp_path)})
-    scoped = DatasetContract(**_rename_contract(processed_subdir="processed/amazon"))
+    scoped = DatasetContract(**_rename_contract(processed_subdir="processed/olist"))
     shared = DatasetContract(**_rename_contract())
 
     assert canonical_path(scoped, environment) == (
-        tmp_path / "processed" / "amazon" / "survey_canonical.parquet"
+        tmp_path / "processed" / "olist" / "survey_canonical.parquet"
     )
     assert ProcessedStore.from_parts(shared, environment).directory == tmp_path / "processed"
 
@@ -295,10 +295,10 @@ def test_artifact_store_scopes_a_dataset_namespace(tmp_path: Path) -> None:
     from broadway.data.loader import ArtifactStore
 
     root = tmp_path / "artifacts" / "discover"
-    scoped = DatasetContract(**_rename_contract(artifacts_subdir="amazon"))
+    scoped = DatasetContract(**_rename_contract(artifacts_subdir="olist"))
     shared = DatasetContract(**_rename_contract())
 
-    assert ArtifactStore.from_contract(scoped, root).directory == root / "amazon"
+    assert ArtifactStore.from_contract(scoped, root).directory == root / "olist"
     assert ArtifactStore.from_contract(shared, root).directory == root
     with pytest.raises(ValueError, match="relative path"):
         DatasetContract(**_rename_contract(artifacts_subdir="../escape"))

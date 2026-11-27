@@ -13,14 +13,14 @@ retired:
   # src/broadway/samples/generate.py generate_sample() surface — un-retired
   # 2026-11-26 so the sample-generation gate is probed again.
   history_rows_retained: ['GATE-INGEST-01', 'GATE-INGEST-04', 'GATE-ETL-17', 'GATE-ETL-18', 'GATE-ETL-19', 'GATE-ETL-117']
-- owners: ['project/data.py', 'project/experiments.py', 'project/config/experiment/taxi.yaml', 'project/features/__init__.py', 'project/config/project/taxi.yaml']
+- owners: ['project/experiments.py', 'project/config/experiment/taxi.yaml', 'project/features/__init__.py', 'project/config/project/taxi.yaml']
   date: '2026-11-27'
-  successor: 'project/config/dataset/amazon.yaml + project/features/amazon.py + project/config/experiment/amazon.yaml; the project readers/dispatcher were removed with the taxi dataset'
-  # Owner-approved Amazon replacement: these rows described the retired taxi
+  successor: 'project/data.py (re-created as the OlistCanonicalBuilder) + project/config/dataset/olist.yaml + project/features/olist.py + project/config/experiment/olist.yaml; the taxi readers/dispatcher were removed with the taxi dataset'
+  # Owner-approved dataset replacement: these rows described the retired taxi
   # dataset surface. Preserved as history; no longer bind a live surface.
-  history_rows_retained: ['GATE-TRAIN-32', 'GATE-CFG-104', 'GATE-CFG-111', 'GATE-CFG-112', 'GATE-INFRA-122', 'GATE-INFRA-129', 'GATE-INFRA-180', 'GATE-INFRA-181', 'GATE-CUST-149', 'GATE-CUST-152']
+  history_rows_retained: ['GATE-TRAIN-32', 'GATE-CFG-104', 'GATE-CFG-111', 'GATE-CFG-112', 'GATE-INFRA-122', 'GATE-INFRA-129', 'GATE-INFRA-180', 'GATE-CUST-149', 'GATE-CUST-152']
 meta:
-  head: '5c2bf11'
+  head: '030dc63'
   assembled: '2026-11-26'
   source_fragments:
   - agents/ledger/gates/01-ingest.md
@@ -2803,7 +2803,7 @@ gates:
   order: 84
   owner: src/broadway/config/schema.py:51 DatasetContract
   inputs:
-  - 'project/config/dataset/*.yaml (column pins: dtype/null_count/role per column, e.g. project/config/dataset/amazon.yaml; lookup_tables with value_policies/sentinel_values where a contract declares them)'
+  - 'project/config/dataset/*.yaml (column pins: dtype/null_count/role per column, e.g. project/config/dataset/olist.yaml; lookup_tables with value_policies/sentinel_values where a contract declares them)'
   outputs:
   - DatasetContract with dict[str, ColumnSchema]
   - consumed by pandera_dtype/build_raw_schema and every loader
@@ -2827,7 +2827,7 @@ gates:
   if_changed:
   - src/broadway/config/schema.py
   - src/broadway/contracts/pandera.py
-  - project/config/dataset/amazon.yaml
+  - project/config/dataset/olist.yaml
   - configs/dataset/test.yaml
   findings:
   - schema-without-strictness asymmetry — DatasetContract (schema.py:51) and EnvironmentConfig (schema.py:62) do NOT set ConfigDict(extra="forbid"), while AnalysisContract (analysis/contracts.py:20), DataSourceRef (schema.py:146), ModelHPOSpec (schema.py:120), PreprocessingStepConfig (schema.py:175) and SampleSpec (lineage/models.py:38) DO. A typo'd key in a dataset/environment yaml (e.g. `datbase_host`) is SILENTLY IGNORED by pydantic-v2 default — config drift invisible at the exact layer whose job is to pin truth.
@@ -3073,7 +3073,7 @@ gates:
   order: 93
   owner: 'src/broadway/data/loader.py:134 lookup pre-read existence admission (declared-lookup bootstrap check)'
   inputs:
-  - 'DatasetContract.lookup_tables paths — a contract may declare a lookup (the Amazon contract declares none); each declared path must resolve before the merge'
+  - 'DatasetContract.lookup_tables paths — a contract may declare a lookup (the Olist contract declares none); each declared path must resolve before the merge'
   outputs:
   - dangling-symlink-aware loud pre-merge error NAMING the bootstrap step
   transforms:
@@ -4803,69 +4803,73 @@ gates:
   - project/experiments/results/timeseries/04_forecast_models_champion.json
   - gpu_training/config/hpo_kernel.yaml objective reference
   findings: []
-# --- Amazon stage-1 surface (2026-11-27): the staged dataset binding, its
-# read-time normalization, the dataset-scoped artifact namespaces and the one
-# survey step. Stage 2 (owner-approved Amazon replacement) removed the predecessor dataset rows.
+# --- Olist substrate (2026-11-27): the pre-join owner, its dataset contract,
+# the role-derived feature plan, the classification experiment and the pipeline
+# evidence. The predecessor survey surface was removed with its dataset.
 - id: GATE-INFRA-183
   phase: infra-meta
   order: 167
-  owner: 'project/config/dataset/amazon.yaml:1 amazon contract + project/features/amazon.py:19 plan + project/config/experiment/amazon.yaml:1 data_source + project/config/experiments/amazon_survey.yaml:1 decision rules + project/experiments/amazon_survey/01_profile.py:1 main'
+  owner: 'project/data.py:205 OlistCanonicalBuilder + project/config/project/olist.yaml:1 join/aggregation spec + project/config/dataset/olist.yaml:1 olist contract + project/features/olist.py:34 plan + project/config/experiment/olist.yaml:1 data_source'
   inputs:
   - CFG-DATASET-CONTRACT
-  - 'raw survey CSV data/raw/amazon/amazon_consumer_behavior_survey.csv (602x23, git-ignored)'
-  - 'EDA-ranked feature family, declared once in project/config/experiments/amazon_survey.yaml'
+  - 'nine Olist CSVs data/raw/olist/*.csv (1.0M+ rows total, git-ignored)'
+  - 'join/aggregation spec project/config/project/olist.yaml (sources, keys, aggregates, grain, review dedupe)'
   outputs:
   - ARTIFACT-CANONICAL-PARQUET
-  - 'data/processed/amazon/{amazon_canonical,train,val}.parquet + amazon_clean.json (ProcessedStore dataset namespace)'
-  - 'artifacts/discover/amazon/{profile,qq_overview}.json + figures; artifacts/tracking/amazon/data_manifest.json (ArtifactStore dataset namespace)'
-  - 'project/experiments/results/amazon_survey/01_profile_{decision.json,md,png,ranked.csv,segments.csv}'
-  - 'project/experiments/results/pipeline/eda/eda_{decision.json,feature_decisions.json,*.csv,*.png}'
+  - 'data/raw/olist/olist_orders.parquet (99,441 order rows; the dataset contract path) + olist_build_report.json'
+  - 'data/processed/olist/{olist_canonical,train,val}.parquet + olist_clean.json (ProcessedStore dataset namespace)'
+  - 'artifacts/tracking/olist/data_manifest.json (ArtifactStore dataset namespace)'
+  - 'project/experiments/results/pipeline/{etl,eda}/…_{decision,md,png,csv,json}'
   transforms:
-  - 'DatasetContract.column_renames maps the two trailing-space raw labels to recommendation_personalization_score and rating_accuracy_score before any read; strip is refused because the space-free Personalized_Recommendation_Frequency is a different variable'
-  - 'ProcessedStore/ArtifactStore scope this dataset to processed/amazon and artifacts/*/amazon; since the stage-2 removal Amazon is the only project dataset (the predecessor parquet, manifest and tracked audit figures were archived)'
-  - 'target Shopping_Satisfaction is an ordinal 1-5 rating published as a regression task; the survey step measures |Spearman rho| with a selection-adjusted null over the declared 12-feature family and the shared segment plan, and publishes a StepOutput record'
-  - 'the generated feature plan keeps the 1-5 rating columns numeric (source ops) rather than frequency-encoded counts'
+  - 'one owner (OlistCanonicalBuilder) reads the config spec and writes one row per order_id: customers joined on customer_id, items enriched with products/sellers before item-line aggregation, payments aggregated, the 551 duplicate review rows resolved by a stable sort on review_creation_date + review_answer_timestamp, and the PT category translated to English'
+  - 'target bad_review = review_score <= 2 (config threshold); 99,441 rows carry 14,495 bad / 84,178 good / 768 missing-target, and the ETL drops the 768 with the accounted "null target" reason (rows_in=99,441, rows_out=98,673, unexplained 0)'
+  - 'orders without item rows are kept: 775 overall (756 with a review) keep null price/weight/category aggregates and 0 item counts; the grain and the drops are published in olist_build_report.json'
+  - 'ProcessedStore/ArtifactStore scope the dataset to processed/olist and artifacts/*/olist; delivery/review/timestamp columns are role=ignore and excluded from profiling and from the role-derived feature plan'
   touched_by:
   - pandas@2.3.3
-  - scipy@1.16.3
-  - matplotlib@3.10
+  - pyarrow@19.0.1
+  - pydantic@2.11.7
   - pyyaml@6.0.2
   validated_by:
-  - tests/test_loader.py::test_contract_column_renames_are_applied_on_read
   - tests/test_loader.py::test_dataset_processed_subdir_scopes_canonical_artifacts
   - tests/test_loader.py::test_artifact_store_scopes_a_dataset_namespace
-  - tests/test_experiment_outputs.py::test_decision_enforced_pair_needs_a_valid_record
+  - tests/test_column_plan.py::test_plan_apply_matches_eligible_surface_for_the_olist_contract
+  - project/tests/test_dashboard.py::test_eda_writes_to_the_layout_results_root
   if_changed:
   - GATE-INGEST-02
+  - GATE-INFRA-181
   - GATE-INFRA-182
-  - project/config/dataset/amazon.yaml
-  - project/experiments/results/amazon_survey/
+  - project/config/dataset/olist.yaml
+  - project/config/project/olist.yaml
+  - project/data.py
+  - project/experiments/results/pipeline/etl/
   - project/experiments/results/pipeline/eda/
   findings:
-  - 'onboard classifies every integer column as a nominal code, so the scaffold frequency-encoded the 1-5 rating columns the survey decision treats as ordinal measurements; the plan needed a hand-fix (recorded in project/features/amazon.py and the stage-1 proposal) and a regenerated scaffold re-introduces it.'
+  - 'customer_zip_code_prefix and customer_city are high-cardinality categoricals; the EDA permutation null is selection-adjusted (Cramér V threshold 0.393 for 4,117 cities), so their top association must not be read as a low-cardinality effect and the next unit must decide whether frequency encoding is enough.'
 # --- BAND 81-OBJECT-CUSTODY (minted per slate §0; header law above) ------
 - id: GATE-INFRA-181
   phase: infra-meta
   order: 165
-  owner: 'project/features/amazon.py:19 plan()  # package plan callable resolved by ExperimentConfig.feature_plan'
+  owner: 'project/features/olist.py: plan()  # role-derived plan callable resolved by ExperimentConfig.feature_plan'
   inputs:
-  - DatasetContract (target/datetime/columns) via project.features.load_contract
+  - DatasetContract (target/datetime/columns/roles) via project.features.load_contract
   outputs:
-  - ColumnPlan keep-set (14 ops) consumed by the project ML pipeline projection and project/config/experiment/taxi.yaml feature_plan
+  - 'ColumnPlan keep-set (18 ops: 12 numeric sources + 6 frequency encodings) consumed by the features/train/evaluate steps'
   transforms:
-  - 'single keep-set in project.ml_pipeline write order: pickup_hour/dayofweek/month, passenger_count/trip_distance/pickup_location_id/dropoff_location_id, is_weekend/rush_hour/is_night/log_distance/same_borough + route_frequency (frequency); raw zone ids stay categorical (no target encoding)'
-  - 'dtype truth (commit 3debc6d): passenger_count is declared float64 because the dataset contract and every persisted frame carry float64 — the earlier int64 claim made features/train/evaluate fail loud on a real taxi read'
-  - 'builder_params group_col=Borough lookup_col=Borough_lookup feed same_group; module-level PLAN = taxi(CONTRACT) is the resolved project plan instance'
+  - 'the plan is derived from the contract roles: role=feature numeric columns stay numeric sources, role=feature object columns become frequency encodings; role=ignore (ids, timestamps, delivery_days/late/review_score, order_status) never enters'
+  - 'target bad_review comes from the contract, so a plan can never target a different column'
+  - 'dtype truth: customer_zip_code_prefix is an object because the builder zero-pads the 5-char CEP prefix; item/payment counts are float64 because orders without item/payment rows carry NaN or 0'
   touched_by:
   - broadway.features.plan(ColumnPlan, ColumnOp)
-  - broadway.config.schema(DatasetContract)
+  - broadway.config.schema(DatasetContract, ColumnRole)
+  - broadway.contracts.pandera(is_numeric_dtype)
   validated_by:
-  - tests/test_column_plan.py::test_plan_apply_matches_eligible_surface_for_the_taxi_contract
-  - project/tests/test_ml_pipeline.py::test_transform_matches_pre_change_golden
+  - tests/test_column_plan.py::test_plan_apply_matches_eligible_surface_for_the_olist_contract
+  - tests/test_column_plan.py::test_olist_plan_excludes_every_non_feature_role
   if_changed:
   - GATE-FEAT-29
   - GATE-CFG-77
-  - project/config/experiment/taxi.yaml feature_plan reference
+  - project/config/experiment/olist.yaml feature_plan reference
   findings: []
 - id: GATE-CUST-147
   phase: object-custody

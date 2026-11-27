@@ -1,0 +1,29 @@
+name: olist
+mode: prediction
+goal: predict, at purchase, which orders will draw a bad review (review_score <= 2)
+  so the storefront and logistics teams can intervene before shipping instead of
+  learning from the review after delivery
+row_definition: one order_id; 98,673 orders carry a review and a defined target
+  (768 orders without a review are dropped by the ETL's accounted null-target
+  rule); 756 of the kept orders have no item line, so their price/weight/category
+  aggregates are null and their count columns are 0
+decision_moment: at purchase — after checkout/payment, before the order ships
+available_info:
+- customer location (state, city, zip prefix)
+- item counts, price and freight totals, mean item price
+- product category (English), mean weight, photo count and description length
+- seller state (joined through the order's items)
+- payment total, maximum installments, payment-type count and dominant type
+leakage_notes:
+- delivery_days, late and every post-purchase timestamp are measured in EDA as
+  context associations and are excluded from the feature plan; review_score is
+  the target's source and is excluded from both the plan and the profiler
+- order_status is a post-purchase outcome, not a purchase-time input, and is
+  excluded from the feature plan and the profiler
+- the split is stratified random on the target because rows are exchangeable
+  orders, not a time series; no future row can leak into training
+success_criterion: publish the EDA feature/outlier/comparison decisions with
+  n, a 95% interval and the permutation null at n≈98,673; the next unit's model
+  must beat the no-skill bad-review prevalence on PR-AUC (the metric for this
+  imbalanced binary target), never accuracy alone
+hypothesis: null

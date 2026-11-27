@@ -6,7 +6,7 @@ platform `train` step and the GPU lane's fan-out workers.
 ## 1. The model of HPO
 
 ```
-project/config/experiments/amazon_hpo.yaml (hpo block)   # project spec
+project/config/experiments/olist_hpo.yaml (hpo block)     # project spec
 configs/experiment/hyperopt.yaml (hpo block)             # platform train
         │  search spaces + budgets
         ▼
@@ -29,8 +29,8 @@ src/broadway/training/hpo.py  (the unified API)
 
 | Concern | Location |
 |---|---|
-| Project dataset/experiment | `project/config/dataset/amazon.yaml`, `project/config/experiment/amazon.yaml` |
-| Search spaces + budgets (GPU lane) | `project/config/experiments/amazon_hpo.yaml` → `hpo:` |
+| Project dataset/experiment | `project/config/dataset/olist.yaml`, `project/config/experiment/olist.yaml` |
+| Search spaces + budgets (GPU lane) | `project/config/experiments/olist_hpo.yaml` → `hpo:` |
 | Search spaces (platform `train`) | `configs/experiment/hyperopt.yaml` → `hpo:` |
 | Allowed params + base defaults per model | `src/broadway/training/models/registry.py` (`MODEL_META`) |
 | GPU lane study definition | `gpu_training/config/hpo_kernel.yaml` |
@@ -40,8 +40,8 @@ A model's HPO block looks like:
 ```yaml
 hpo:
   engine: optuna
-  direction: minimize
-  target_metric: rmse
+  direction: maximize
+  target_metric: pr_auc
   total_trials: 60
   initial_trials_per_model: 20
   top_k: 2
@@ -61,7 +61,7 @@ Model names are **registry keys** (`linear`, `lgbm`, `xgb`, `rf`); display label
 
 | Path | Command | Storage |
 |---|---|---|
-| Platform `train` + HPO | `uv run ds-pipeline train --dataset amazon --experiment hyperopt` | in-memory |
+| Platform `train` + HPO | `uv run ds-pipeline train --dataset olist --experiment hyperopt` | in-memory |
 | GPU lane dry-run (preflight) | `uv run python gpu_training/run_hpo.py --baseline baseline/memory_baseline.json --config gpu_training/config/hpo_run.yaml` | none |
 | GPU lane fan-out | the same command with `--execute` | shared URL or local SQLite |
 
@@ -73,11 +73,11 @@ the canonical `broadway.training.hpo.make_objective`; it never re-implements a f
 ## 4. Distributed k8s stack — retired with the predecessor dataset
 
 The former `k8s/optuna` worker/mini-cluster served the predecessor project's model
-battle. It is **not wired to Amazon**: the project HPO worker and its configmap
-were removed with the dataset, so the workload-image steps auto-skip when the
-project HPO spec is absent. The generic manifests and Dockerfiles remain in-tree
-as platform infrastructure; re-enabling a distributed study for Amazon is future
-work, not a claim that it runs today.
+battle. It is **not wired to Olist**: the project HPO worker and its configmap were
+removed with the predecessor dataset, so the workload-image steps auto-skip when
+the project HPO spec is absent. The generic manifests and Dockerfiles remain
+in-tree as platform infrastructure; re-enabling a distributed study for Olist is
+future work, not a claim that it runs today.
 
 ## 5. Viewing results
 
@@ -96,7 +96,7 @@ value/params, elapsed seconds).
 
 ## 6. Tuning a model
 
-1. Edit the search space in the `hpo:` block (`project/config/experiments/amazon_hpo.yaml`
+1. Edit the search space in the `hpo:` block (`project/config/experiments/olist_hpo.yaml`
    or `configs/experiment/hyperopt.yaml`).
 2. Run the path you want (platform `train` or the GPU lane).
 3. Read the leaderboard / run record; the bandit already shifted budget to the leaders.

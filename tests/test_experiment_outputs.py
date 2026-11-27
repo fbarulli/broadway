@@ -55,10 +55,13 @@ def test_enforced_series_steps_publish_a_question_and_a_figure() -> None:
     audit = _audit_module().ExperimentOutputAudit()
 
     assert audit.violations() == []
+    # The Olist substrate publishes through the pipeline steps, not a script
+    # series; the ratchet is empty until the modelling series lands.
+    assert audit._enforced == ()
     enforced_steps = sum(
         len(series.steps) for series in audit.series() if series.series in audit._enforced
     )
-    assert enforced_steps == 1
+    assert enforced_steps == 0
 
 
 def test_audit_of_a_missing_experiments_root_is_empty(tmp_path: Path) -> None:
@@ -115,19 +118,10 @@ def test_pipeline_enforced_set_is_pinned() -> None:
     """The enforced set is explicit: a step leaves it only with its dataset."""
     module = _audit_module()
 
-    assert module.PIPELINE_DECISION_ENFORCED == (
-        "etl",
-        "eda",
-        "features",
-        "baseline",
-        "training",
-        "selection",
-        "hpo",
-        "evaluate",
-    )
-    assert len(module.PIPELINE_DECISION_ENFORCED) == 8
+    assert module.PIPELINE_DECISION_ENFORCED == ("etl", "eda")
+    assert len(module.PIPELINE_DECISION_ENFORCED) == 2
     assert module.PIPELINE_NOT_APPLICABLE == {
-        "causal": "the Amazon project has no causal analysis config, so no record can exist"
+        "causal": "the Olist project has no causal analysis config, so no record can exist"
     }
 
 
@@ -175,14 +169,14 @@ def test_deleting_a_pipeline_record_turns_the_gate_red(
 def test_a_missing_non_eda_record_turns_the_gate_red(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """The step module is resolved via STEP_MODULES, so hpo's tuning.py is checked."""
+    """The step module is resolved via STEP_MODULES, so etl's module.py is checked."""
     module = _audit_module()
     experiments = tmp_path / "experiments"
     experiments.mkdir()
     results = tmp_path / "results"
     payload = json.dumps(_decision())
     for step in module.PIPELINE_DECISION_ENFORCED:
-        if step == "hpo":
+        if step == "etl":
             continue
         record = results / "pipeline" / step / f"{step}_decision.json"
         record.parent.mkdir(parents=True)
@@ -191,7 +185,7 @@ def test_a_missing_non_eda_record_turns_the_gate_red(
     monkeypatch.setattr(module, "resolve_project_layout", lambda: layout)
 
     assert module.main() == 1
-    assert "FAIL pipeline/hpo: missing published decision record" in capsys.readouterr().out
+    assert "FAIL pipeline/etl: missing published decision record" in capsys.readouterr().out
 
 
 

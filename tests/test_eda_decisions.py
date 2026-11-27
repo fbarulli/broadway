@@ -86,6 +86,21 @@ def test_test_choice_follows_dtype_and_shape() -> None:
     assert binary_choice["group"] == "chi2"
 
 
+def test_categorical_test_survives_a_top_code_in_one_target_class() -> None:
+    """Regression: reserve the full contingency shape before reshape.
+
+    The largest feature code can co-occur with only one target class (a city
+    whose last value has no bad reviews), which made ``bincount`` return fewer
+    cells than the declared shape and the reshape fail.
+    """
+    step = _step(permutations=20, max_features=2)
+    frame = pd.DataFrame({"city": ["a", "b", "c", "c"], "flag": [0, 0, 0, 1]})
+    bundle = FeatureTestAnalyzer(step, TaskType.CLASSIFICATION).analyze(
+        frame, "flag", _PROVENANCE, _plan(frame)
+    )
+    assert [row.feature for row in bundle.features] == ["city"]
+
+
 def test_time_and_single_group_columns_are_skipped_not_tested() -> None:
     step = _step(permutations=20)
     frame = _frame(300).assign(

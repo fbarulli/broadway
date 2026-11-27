@@ -1,6 +1,6 @@
 # DIGEST.md — rendered from agents/ledger/gates.yaml · NEVER HAND-EDIT ·
 
-> 173 gates · rendered 2026-11-27 @ HEAD 5c2bf11 · load THIS into context;
+> 173 gates · rendered 2026-11-27 @ HEAD 030dc63 · load THIS into context;
 > gates.yaml is the sole SSOT; the retired GATES.md/gates/*.md markdown world survives in agents/ledger/arbitration/2026-08-24/surface-and-analysis-preservation.md.
 
 | band | phase | gates | findings |
@@ -208,7 +208,7 @@
 - **GATE-CFG-73** `src/broadway/config/schema.py:62 EnvironmentConfig`
   [merged environment section (post GATE-CFG-71)] → [typed EnvironmentConfig instance embedded in PipelineConfig (loader.py:135)] · pins: 4
 - **GATE-CFG-74** `src/broadway/config/schema.py:51 DatasetContract` ⚠FINDING
-  [project/config/dataset/*.yaml (column pins: dtype/null_count/role per column, e.g. project/config/dataset/amazon.yaml; lookup_tables with value_policies/sentinel_values where a contract declares them)] → [DatasetContract with dict[str, ColumnSchema], consumed by pandera_dtype/build_raw_schema and every loader] · pins: 5
+  [project/config/dataset/*.yaml (column pins: dtype/null_count/role per column, e.g. project/config/dataset/olist.yaml; lookup_tables with value_policies/sentinel_values where a contract declares them)] → [DatasetContract with dict[str, ColumnSchema], consumed by pandera_dtype/build_raw_schema and every loader] · pins: 5
 - **GATE-CFG-75** `src/broadway/contracts/pandera.py:46 build_raw_schema()` ⚠FINDING
   [DatasetContract.columns (post GATE-CFG-74)] → [pa.DataFrameSchema, one pa.Column per contract entry, coerce=False strict dtypes, nullable=True (pandera.py:55-59)] · pins: 5
 - **GATE-CFG-76** `src/broadway/config/schema.py:187 ExperimentConfig` ⚠FINDING
@@ -226,7 +226,7 @@
 - **GATE-CFG-105** `src/broadway/onboard/module.py:215 init() (_write_configs :178-198)`
   [stdin prompts + 13 argv flags] → [configs dataset/analysis/experiment YAMLs + profile JSON + 1 lineage record (write call :302)] · pins: none direct
 - **GATE-CFG-107** `src/broadway/data/loader.py:134 lookup pre-read existence admission (declared-lookup bootstrap check)` ⚠FINDING
-  [DatasetContract.lookup_tables paths — a contract may declare a lookup (the Amazon contract declares none); each declared path must resolve before the merge] → [dangling-symlink-aware loud pre-merge error NAMING the bootstrap step] · pins: none direct
+  [DatasetContract.lookup_tables paths — a contract may declare a lookup (the Olist contract declares none); each declared path must resolve before the merge] → [dangling-symlink-aware loud pre-merge error NAMING the bootstrap step] · pins: none direct
 - **GATE-CFG-108** `src/broadway/onboard/infer.py:10 _IDENTIFIER_THRESHOLD`
   [BROADWAY_IDENTIFIER_THRESHOLD env var] → [typed float threshold or named parse error] · pins: none direct
 - **GATE-CFG-111** `project/experiments/mlflow/_common.py:60 CONFIG_PATH BROADWAY_MLFLOW_CONFIG resolution + project/experiments/mlflow/03_optuna_worker.py:46-49 HPO_CONFIG_PATH env branch` ⚠FINDING
@@ -375,12 +375,12 @@
   [] → [] · pins: none direct
 - **GATE-INFRA-180** `project/config/experiment/taxi.yaml:1 calibration opt-in overlay (split_conformal)`
   [] → [] · pins: none direct
-- **GATE-INFRA-181** `project/features/amazon.py:19 plan()  # package plan callable resolved by ExperimentConfig.feature_plan`
-  [DatasetContract (target/datetime/columns) via project.features.load_contract] → [ColumnPlan keep-set (14 ops) consumed by the project ML pipeline projection and project/config/experiment/taxi.yaml feature_plan] · pins: 2
+- **GATE-INFRA-181** `project/features/olist.py: plan()  # role-derived plan callable resolved by ExperimentConfig.feature_plan`
+  [DatasetContract (target/datetime/columns/roles) via project.features.load_contract] → [ColumnPlan keep-set (18 ops: 12 numeric sources + 6 frequency encodings) consumed by the features/train/evaluate steps] · pins: 2
 - **GATE-INFRA-182** `src/broadway/evaluate/leaderboard.py:45 MetricDirection + src/broadway/evaluate/feature_selection.py rfe_curve + src/broadway/evaluate/explain.py shap_summary + src/broadway/tracking/manifest.py:20 DataManifest + gpu_training/adapters/gluonts_step.py step + gpu_training/adapters/prophet_step.py step + gpu_training/adapters/timesfm_step.py step`
   [ranked frame (one row per run) + declared metric directions, measured 95% intervals per run (ChampionDecision)] → [one ranked leaderboard figure per metric + <stem>_champion.json, rfe curve, SHAP/permutation/PDP tables, data manifest, GPU adapter step()] · pins: 4
-- **GATE-INFRA-183** `project/config/dataset/amazon.yaml:1 amazon contract + project/features/amazon.py:19 plan + project/config/experiment/amazon.yaml:1 data_source + project/config/experiments/amazon_survey.yaml:1 decision rules + project/experiments/amazon_survey/01_profile.py:1 main` ⚠FINDING
-  [CFG-DATASET-CONTRACT, raw survey CSV data/raw/amazon/amazon_consumer_behavior_survey.csv (602x23, git-ignored), EDA-ranked feature family, declared once in project/config/experiments/amazon_survey.yaml] → [ARTIFACT-CANONICAL-PARQUET, data/processed/amazon/{amazon_canonical,train,val}.parquet + amazon_clean.json (ProcessedStore dataset namespace), artifacts/discover/amazon/{profile,qq_overview}.json + figures; artifacts/tracking/amazon/data_manifest.json (ArtifactStore dataset namespace), project/experiments/results/amazon_survey/01_profile_{decision.json,md,png,ranked.csv,segments.csv}, project/experiments/results/pipeline/eda/eda_{decision.json,feature_decisions.json,*.csv,*.png}] · pins: 4
+- **GATE-INFRA-183** `project/data.py:205 OlistCanonicalBuilder + project/config/project/olist.yaml:1 join/aggregation spec + project/config/dataset/olist.yaml:1 olist contract + project/features/olist.py:34 plan + project/config/experiment/olist.yaml:1 data_source` ⚠FINDING
+  [CFG-DATASET-CONTRACT, nine Olist CSVs data/raw/olist/*.csv (1.0M+ rows total, git-ignored), join/aggregation spec project/config/project/olist.yaml (sources, keys, aggregates, grain, review dedupe)] → [ARTIFACT-CANONICAL-PARQUET, data/raw/olist/olist_orders.parquet (99,441 order rows; the dataset contract path) + olist_build_report.json, data/processed/olist/{olist_canonical,train,val}.parquet + olist_clean.json (ProcessedStore dataset namespace), artifacts/tracking/olist/data_manifest.json (ArtifactStore dataset namespace), project/experiments/results/pipeline/{etl,eda}/…_{decision,md,png,csv,json}] · pins: 4
 
 ### 81-object-custody — object-custody
 

@@ -140,15 +140,15 @@ def test_plan_requires_a_fitting_batch() -> None:
         run_hpo._plan(_run_config(), {"max_batch": None, "concurrent_trials": 1}, 5)
 
 
-def _amazon_fixture(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """Tmp parquet + config overlay for the real Amazon dataset/experiment contracts.
+def _olist_fixture(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Tmp parquet + config overlay for the real Olist dataset/experiment contracts.
 
     The declared data path is overlaid, exactly as a Kaggle mount would be; the
     contracts themselves are the committed project ones (no hand-written columns).
     """
-    parquet = tmp_path / "amazon.parquet"
+    parquet = tmp_path / "olist.parquet"
     contract = yaml.safe_load(
-        (_ROOT / "project" / "config" / "dataset" / "amazon.yaml").read_text(encoding="utf-8")
+        (_ROOT / "project" / "config" / "dataset" / "olist.yaml").read_text(encoding="utf-8")
     )
     arrays = {
         name: pa.array([1, 2, 3], type=pa.int64())
@@ -160,11 +160,11 @@ def _amazon_fixture(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     overlay = tmp_path / "overlay"
     for kind in ("dataset", "experiment"):
         source = yaml.safe_load(
-            (_ROOT / "project" / "config" / kind / "amazon.yaml").read_text(encoding="utf-8")
+            (_ROOT / "project" / "config" / kind / "olist.yaml").read_text(encoding="utf-8")
         )
         if kind == "dataset":
             source["path"] = str(parquet)
-        target = overlay / kind / "amazon.yaml"
+        target = overlay / kind / "olist.yaml"
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(yaml.safe_dump(source), encoding="utf-8")
     monkeypatch.setenv("BROADWAY_CONFIG_OVERLAY_DIR", str(overlay))
@@ -194,7 +194,7 @@ def _fake_objective_module(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> s
 def _write_run_inputs(
     tmp_path: Path, command: str, monkeypatch: pytest.MonkeyPatch
 ) -> tuple[Path, Path]:
-    _amazon_fixture(tmp_path, monkeypatch)
+    _olist_fixture(tmp_path, monkeypatch)
     baseline = tmp_path / "baseline.json"
     baseline.write_text('{"max_batch": 8, "concurrent_trials": 2}', encoding="utf-8")
     config_path = tmp_path / "hpo_run.yaml"
@@ -252,7 +252,7 @@ def test_execute_starts_every_worker_before_collecting(
 def test_kaggle_profile_plans_one_worker_per_t4_and_redacts_the_url(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    _amazon_fixture(tmp_path, monkeypatch)
+    _olist_fixture(tmp_path, monkeypatch)
     secret = "postgresql://optuna:TOPSECRET123@db/study"
     monkeypatch.setenv("OPTUNA_STORAGE_URL", secret)
     baseline = tmp_path / "baseline.json"
@@ -350,7 +350,7 @@ def test_per_worker_seeds_never_share_a_cold_start(
 
     monkeypatch.setattr(hpo_kernel.optuna.samplers, "TPESampler", recording_sampler)
     monkeypatch.delenv("OPTUNA_STORAGE_URL", raising=False)
-    _amazon_fixture(tmp_path, monkeypatch)
+    _olist_fixture(tmp_path, monkeypatch)
     code = hpo_kernel.main(
         [
             "--config", str(_study_config(tmp_path)),
@@ -374,7 +374,7 @@ def test_parallel_workers_share_a_fresh_sqlite_study(
 ) -> None:
     # A fresh host-local study: both workers race the schema creation. Before the
     # inter-process lock, one worker died with "table study_directions already exists".
-    _amazon_fixture(tmp_path, monkeypatch)
+    _olist_fixture(tmp_path, monkeypatch)
     study_config = _study_config(tmp_path)
     objective = _fake_objective_module(tmp_path, monkeypatch)
     environment = {
@@ -551,7 +551,7 @@ def test_prophet_step_needs_the_package_runs_a_cpu_fit_and_refuses_a_gpu(
 def test_preflight_requires_the_declared_dataset(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    parquet = _amazon_fixture(tmp_path, monkeypatch)
+    parquet = _olist_fixture(tmp_path, monkeypatch)
     study = hpo_study.HpoStudyConfig.from_yaml(STUDY_CONFIG)
     identity = study.identity()
     assert identity.path == str(parquet)

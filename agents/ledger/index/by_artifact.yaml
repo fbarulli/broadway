@@ -174,8 +174,8 @@ CV folds via cross_validate (src/broadway/evaluate/validation.py:42):
 - GATE-TRAIN-36
 ChampionArtifact records bucketed bare_model / pipeline_signature / ambiguous (:21-23):
 - GATE-TRAIN-39
-? ColumnPlan keep-set (14 ops) consumed by the project ML pipeline projection and project/config/experiment/taxi.yaml feature_plan
-: - GATE-INFRA-181
+'ColumnPlan keep-set (18 ops: 12 numeric sources + 6 frequency encodings) consumed by the features/train/evaluate steps':
+- GATE-INFRA-181
 ColumnPlan|None (resolved from ExperimentConfig.feature_plan):
 - GATE-FEAT-29
 ? 'DETERMINISM OK + exit 0 | one `<file>: <field-path>` line per offender + exit 1 | `<file>: missing counterpart` | usage exit 2'
@@ -185,7 +185,7 @@ DatasetContract:
 - GATE-FEAT-29
 DatasetContract (contract.columns order IS the projection order):
 - GATE-ETL-17
-DatasetContract (target/datetime/columns) via project.features.load_contract:
+DatasetContract (target/datetime/columns/roles) via project.features.load_contract:
 - GATE-INFRA-181
 DatasetContract with dict[str, ColumnSchema]:
 - GATE-CFG-74
@@ -193,14 +193,12 @@ DatasetContract.columns (declared dtypes/null_count):
 - GATE-FEAT-26
 DatasetContract.columns (post GATE-CFG-74):
 - GATE-CFG-75
-? DatasetContract.lookup_tables paths — a contract may declare a lookup (the Amazon contract declares none); each declared path must resolve before the merge
+? DatasetContract.lookup_tables paths — a contract may declare a lookup (the Olist contract declares none); each declared path must resolve before the merge
 : - GATE-CFG-107
 DatasetContract.path (csv/parquet/xlsx via READERS dict keyed on suffix):
 - GATE-ETL-11
 DerivedFeature(name,func,source):
 - GATE-FEAT-20
-EDA-ranked feature family, declared once in project/config/experiments/amazon_survey.yaml:
-- GATE-INFRA-183
 ? 'EDA: DatasetContract columns/roles/task/target + exclude_from_profiling; sampling seed = cfg.experiment.random_state else cfg.etl.random_state'
 : - GATE-SURF-66
 ? 'EDA: ETL split parquets <process_dir>/<etl.train_file> (+ optional val_file) — the step reads the persisted split, never re-runs etl (eda/module.py:98-121)'
@@ -412,8 +410,6 @@ argv[1] ∈ {unset, --static, --tier=fast, --tier=full, --clean-lint} (else usag
 - GATE-INFRA-90
 artifacts <dataset>_clean.json (StructuralCleanResult):
 - GATE-SURF-63
-? artifacts/discover/amazon/{profile,qq_overview}.json + figures; artifacts/tracking/amazon/data_manifest.json (ArtifactStore dataset namespace)
-: - GATE-INFRA-183
 artifacts/discover/profile.json (DatasetProfile):
 - GATE-SURF-63
 artifacts/discover/qq_overview.json (QqOverview):
@@ -428,6 +424,8 @@ artifacts/lineage records + decisions (lineage/records.py LINEAGE_DIR):
 : - GATE-TLINE-58
 ? artifacts/timeline/<analysis>/steps/<step_id>.json and .../decisions/<decision.id>.json (model_dump_json indent=2); read back by load_step/load_steps/load_decision/load_decisions which feed every gate check
 : - GATE-TLINE-53
+artifacts/tracking/olist/data_manifest.json (ArtifactStore dataset namespace):
+- GATE-INFRA-183
 atomic branch-tracked CURRENT update or terminal archive entry:
 - GATE-INFRA-148
 audit JSONs (GATE-ETL-13/14/15):
@@ -540,10 +538,12 @@ dashboard series endpoints with one selected experiment series and one inline ar
 - GATE-SURF-102
 dashboard server (uvicorn.run(app, host="127.0.0.1", port=8000) :19):
 - GATE-INFRA-123
-data/processed/amazon/{amazon_canonical,train,val}.parquet + amazon_clean.json (ProcessedStore dataset namespace):
-- GATE-INFRA-183
 data/processed/deadcode_census.md suspicion report (gitignored sink); stdout default:
 - GATE-INFRA-147
+data/processed/olist/{olist_canonical,train,val}.parquet + olist_clean.json (ProcessedStore dataset namespace):
+- GATE-INFRA-183
+data/raw/olist/olist_orders.parquet (99,441 order rows; the dataset contract path) + olist_build_report.json:
+- GATE-INFRA-183
 dataset name → configs/dataset/<name>.yaml via _load_contract (:140):
 - GATE-ETL-19
 dataset.lookup_tables CSVs read with keep_default_na=False + authored na_values:
@@ -688,6 +688,8 @@ init-job manifest apply:
 - GATE-INFRA-125
 inline constants (no env dialect, D21):
 - GATE-INFRA-94
+join/aggregation spec project/config/project/olist.yaml (sources, keys, aggregates, grain, review dedupe):
+- GATE-INFRA-183
 k8s/optuna/ + project/k8s/optuna/configmap.yaml (Kubernetes manifest inputs):
 - GATE-INFRA-99
 k8s/optuna/*.sh + scripts/*.sh via sh -n + shellcheck (shell-scripts):
@@ -783,6 +785,8 @@ named RuntimeError with README hint (:63, :75-76):
 - GATE-TRAIN-120
 named local refs (pr-1/pr-2 and future strays):
 - GATE-INFRA-142
+nine Olist CSVs data/raw/olist/*.csv (1.0M+ rows total, git-ignored):
+- GATE-INFRA-183
 node_id strings from lineage/ids.py:1 node_id() (f"{kind}:{name}", no character validation):
 - GATE-TLINE-58
 normality.json (runners.py:219):
@@ -912,7 +916,7 @@ project-provided experiment scripts and result artifacts via BROADWAY_EXPERIMENT
 - GATE-SURF-102
 project/config/ (project-owned layout, experiment, and dataset config-overlay SSOT):
 - GATE-INFRA-92
-? 'project/config/dataset/*.yaml (column pins: dtype/null_count/role per column, e.g. project/config/dataset/amazon.yaml; lookup_tables with value_policies/sentinel_values where a contract declares them)'
+? 'project/config/dataset/*.yaml (column pins: dtype/null_count/role per column, e.g. project/config/dataset/olist.yaml; lookup_tables with value_policies/sentinel_values where a contract declares them)'
 : - GATE-CFG-74
 project/config/project/taxi.yaml knobs:
 - GATE-ETL-117
@@ -928,12 +932,10 @@ project/experiments/polynomial_regression_et_all/:
 - GATE-INFRA-129
 project/experiments/results/**/*.csv (tracked):
 - GATE-SURF-68
-project/experiments/results/amazon_survey/01_profile_{decision.json,md,png,ranked.csv,segments.csv}:
-- GATE-INFRA-183
-project/experiments/results/pipeline/eda/eda_{decision.json,feature_decisions.json,*.csv,*.png}:
-- GATE-INFRA-183
 ? project/experiments/results/pipeline/eda/{eda_decision.json, eda_feature_decisions.json, eda_*.csv, eda_*.png} — committed pipeline evidence rendered by reports/pipeline_evidence.py on the dashboard root
 : - GATE-SURF-66
+project/experiments/results/pipeline/{etl,eda}/…_{decision,md,png,csv,json}:
+- GATE-INFRA-183
 project/experiments/results/univariate/fare_amount_trip_distance/ratecode1_sample.parquet|.json (pinned, tracked):
 - GATE-SURF-68
 project/experiments/univariate/fare_amount_trip_distance/:
@@ -972,8 +974,6 @@ raw dict[Any, Any] section payload:
 - GATE-CFG-70
 raw sampled pd.DataFrame (pre-feature-engineering):
 - GATE-TRAIN-32
-raw survey CSV data/raw/amazon/amazon_consumer_behavior_survey.csv (602x23, git-ignored):
-- GATE-INFRA-183
 raw yellow_tripdata_*.parquet glob (get_raw_files :28 raises FileNotFoundError when empty):
 - GATE-ETL-19
 raw_dir/processed_dir/processed_file for the LEGACY pipeline:

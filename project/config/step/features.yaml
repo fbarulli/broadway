@@ -1,11 +1,11 @@
-# Project dataset binding for the features step's dataset-specific knobs.
-# The base `configs/step/features.yaml` carries the generic mechanics only; the
-# imputation study's injected columns must exist in this dataset's column plan,
-# so the whole block lives in the project overlay.
+# Olist feature-step binding: the base `configs/step/features.yaml` carries the
+# generic mechanics; the imputation study's injected columns must exist in this
+# dataset's column plan, so the whole block lives here.
 #
 # The report, figure and decision record are committed evidence on the
 # dashboard's pipeline surface; the fitted pipeline itself stays in the
-# dataset's processed store (cfg.etl), never here.
+# dataset's processed store (cfg.etl), never here. This chain is deferred to the
+# modelling unit; the columns below are Olist plan numerics with real nulls.
 output_dir: project/experiments/results/pipeline/features
 imputation_study:
   strategies: [median, mean, mode, knn]
@@ -15,6 +15,6 @@ imputation_study:
   knn_neighbors: 5
   missing_injection:
     rate: 0.10
-    columns: [age, Customer_Reviews_Importance]
+    columns: [total_price, mean_product_weight_g]
   output_dir: artifacts/features
   output_file: imputation_impact.json

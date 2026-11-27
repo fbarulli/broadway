@@ -222,7 +222,7 @@ def test_hpo_configs_parse() -> None:
 
     from broadway.config.schema import HPOConfig
 
-    project_hpo = repo_root() / "project" / "config" / "experiments" / "amazon_hpo.yaml"
+    project_hpo = repo_root() / "project" / "config" / "experiments" / "olist_hpo.yaml"
     if not project_hpo.exists():
         pytest.skip("project-only: data-agnostic main carries no project/")
 

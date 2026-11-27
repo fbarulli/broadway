@@ -1,4 +1,4 @@
-# Amazon ETL binding: the row-drop report/figure/decision land on the tracked
+# Olist ETL binding: the row-drop report/figure/decision land on the tracked
 # pipeline-evidence surface; the canonical + split artifacts stay in
-# data/processed/amazon (the dataset contract's processed_subdir).
+# data/processed/olist (the dataset contract's processed_subdir).
 output_dir: project/experiments/results/pipeline/etl

@@ -7,7 +7,7 @@ Update freely; remove entries when done (git history is the record).
 
 - **Statistical testing** — next work stream (user-directed, 2026-08-16).
   Scope to be set by the user: platform `src/broadway/stats` testing vs.
-  hypothesis tests on the Amazon dataset vs. tutorial continuation. Do not start
+  hypothesis tests on the Olist dataset vs. tutorial continuation. Do not start
   until the specific direction is given.
 
 Standing rules live in `agents/ledger/HANDOFF.md` / `agents/contracts/WORKER_CONTRACT.md` (config

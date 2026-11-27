@@ -1,0 +1,37 @@
+# olist_hpo — the tuning contract for the Olist champion (next unit executes it).
+# Same feature plan, target and split as experiment/olist.yaml; only the search
+# space and metric direction live here. PR-AUC is maximized because the binary
+# target is imbalanced (14.7% bad); the holdout is never read by the hpo step.
+data_source:
+  loader: canonical
+  version: null
+  schema_contract: engineered
+feature_plan: project.features.olist:plan
+model:
+  type: rf
+  params:
+    n_estimators: 300
+    min_samples_leaf: 2
+split:
+  type: stratified
+  validation_size: 0.2
+random_state: 2026
+target_metric: pr_auc
+hpo:
+  engine: optuna
+  direction: maximize
+  target_metric: pr_auc
+  total_trials: 30
+  initial_trials_per_model: 30
+  top_k: 1
+  models:
+    - name: rf
+      search_space:
+        n_estimators: [100, 600]
+        max_depth: [3, 20]
+        min_samples_leaf: [1, 10]
+        min_samples_split: [2, 20]
+        max_samples: [0.5, 1.0]
+preprocessing: []
+target_transforms: []
+calibration: null

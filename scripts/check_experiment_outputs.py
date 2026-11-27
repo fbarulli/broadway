@@ -28,15 +28,15 @@ DEFAULT_EXPERIMENTS = ROOT / "project" / "experiments"
 PROJECT_EVIDENCE_STEPS: tuple[str, ...] = ("eda",)
 
 # Ratchet: a series joins this list once every step complies. An entry is
-# retired only with its dataset (the owner-approved Amazon replacement removed
-# the predecessor series; they no longer exist to audit).
-ENFORCED: tuple[str, ...] = ("amazon_survey",)
+# retired only with its dataset (the Olist replacement removed the predecessor
+# survey series; it no longer exists to audit). The Olist substrate publishes
+# its evidence through the pipeline steps below, not a script series.
+ENFORCED: tuple[str, ...] = ()
 
 # The decision half of the contract, per step (a step publishes a computed
-# verdict). A step joins this set when it builds a StepOutput with a Decision.
-DECISION_ENFORCED: tuple[tuple[str, str], ...] = (
-    ("amazon_survey", "01_profile"),
-)
+# verdict). Empty until the Olist modelling series lands; the pipeline pairs
+# below carry the enforced decisions today.
+DECISION_ENFORCED: tuple[tuple[str, str], ...] = ()
 
 # Pipeline modules that must publish a decision record (the same contract, one
 # level up from the experiment scripts). Grows as each step is wired; never shrinks.
@@ -60,20 +60,19 @@ PIPELINE_STEPS: tuple[str, ...] = (
 # A record under <results>/pipeline/<step>/ is the ONLY thing that satisfies
 # this set — a StepOutput call in the module is not evidence that a record was
 # published (the AST check below stays advisory).
+#
+# Olist: etl + eda are published. The baseline/features/training/selection/
+# hpo/evaluate records belonged to the predecessor and left with it; the classification
+# modelling chain is the next unit and re-joins this set when it publishes its
+# own records. Deferring them is explicit here, never silent.
 PIPELINE_DECISION_ENFORCED: tuple[str, ...] = (
     "etl",
     "eda",
-    "features",
-    "baseline",
-    "training",
-    "selection",
-    "hpo",
-    "evaluate",
 )
 # Explicit not-applicable rulings, printed on every run: a step is never
 # silently retired from the enforced set.
 PIPELINE_NOT_APPLICABLE: dict[str, str] = {
-    "causal": "the Amazon project has no causal analysis config, so no record can exist",
+    "causal": "the Olist project has no causal analysis config, so no record can exist",
 }
 
 

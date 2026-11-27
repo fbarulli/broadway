@@ -4,16 +4,17 @@ How to run Broadway's data-loading steps and verify their outputs, especially
 the columns. Column correctness is enforced at several boundaries, each with
 its own command.
 
-The project's dataset is the Amazon consumer-behaviour survey
-(`project/config/dataset/amazon.yaml`); the platform's data-agnostic demo uses
-the synthetic `test` dataset (`configs/dataset/test.yaml`).
+The project's dataset is the Olist Brazilian e-commerce order table
+(`project/config/dataset/olist.yaml`, grain `order_id`); the platform's
+data-agnostic demo uses the synthetic `test` dataset
+(`configs/dataset/test.yaml`).
 
 ### Human-readable views
 
 For a human-readable summary of what happened to the data, run:
 
 ```bash
-uv run ds-pipeline audit --dataset amazon
+uv run ds-pipeline audit --dataset olist
 ```
 
 This renders `reports/audit/` (`index.md`, `profile.md`, `transform.md`) from
@@ -21,10 +22,23 @@ the persisted typed evidence — no recompute.
 
 ## Commands to load + verify columns
 
+### 0. Build the order-grain table from the nine raw CSVs
+
+```bash
+uv run python -m project.data
+```
+
+`project/data.py` (the single owner of the pre-join) reads the join/aggregation
+spec `project/config/project/olist.yaml`, writes one row per `order_id` to
+`data/raw/olist/olist_orders.parquet` (the contract's `path`), and writes the
+funnel report `data/raw/olist/olist_build_report.json`. No row is dropped there:
+the 768 orders without a review keep a null target and the ETL removes them with
+an accounted reason.
+
 ### 1. Inspect a source file (read-only, no writes)
 
 ```bash
-uv run ds-pipeline columns --csv data/raw/amazon/amazon_consumer_behavior_survey.csv
+uv run ds-pipeline columns --csv data/raw/olist/olist_orders_dataset.csv
 ```
 
 Lists the columns + dtypes of a source file.
@@ -32,18 +46,18 @@ Lists the columns + dtypes of a source file.
 ### 2. Canonicalize + split (`etl`)
 
 ```bash
-uv run ds-pipeline etl --dataset amazon --experiment amazon
+uv run ds-pipeline etl --dataset olist --experiment olist
 ```
 
-Preserves the raw CSV as the source of record, applies the contract's
-`column_renames` (two trailing-space headers are distinct variables), then
-validates against the config contract. Outputs under
-`data/processed/amazon/` (the dataset-scoped `processed_subdir`):
+Reads the built order-grain parquet, applies the contract's read-time renames
+(none for Olist), validates against the config contract, drops the null target
+with a recorded reason, then writes under `data/processed/olist/` (the
+dataset-scoped `processed_subdir`):
 
-- `amazon_canonical.parquet`
+- `olist_canonical.parquet` (98,673 rows: 14,495 bad / 84,178 good)
 - `train.parquet`
 - `val.parquet`
-- `amazon_clean.json` (structural clean result)
+- `olist_clean.json` (structural clean result)
 - `etl_decision.json` / `etl.md` / `etl.png` (the ETL decision record)
 
 Column presence/dtype is enforced by `build_raw_schema(dataset).validate(df)`
@@ -52,7 +66,7 @@ Column presence/dtype is enforced by `build_raw_schema(dataset).validate(df)`
 ### 3. Contract check (pass/fail on columns + nulls)
 
 ```bash
-uv run ds-pipeline contracts --dataset amazon --experiment amazon
+uv run ds-pipeline contracts --dataset olist --experiment olist
 ```
 
 Checks `check_columns` + `check_nulls` against the dataset contract (null
@@ -61,10 +75,10 @@ threshold 0.05). Implemented in `contracts/module.py`.
 ### 4. Re-profile observed facts (per-column dtypes/nulls)
 
 ```bash
-uv run ds-pipeline profile --dataset amazon
+uv run ds-pipeline profile --dataset olist
 ```
 
-Writes `artifacts/discover/amazon/profile.json` (the dataset's artifact
+Writes `artifacts/discover/olist/profile.json` (the dataset's artifact
 namespace).
 
 ### 5. Infer a contract from a new file
@@ -83,12 +97,13 @@ uv run pytest -q
 
 ## Key column facts (what "correct" means)
 
-- **Contract source of truth:** `project/config/dataset/amazon.yaml` — 23
-  columns, each with `dtype`, `null_count`, and `role`; `Shopping_Satisfaction`
-  is the target, `Timestamp` is ignored.
+- **Contract source of truth:** `project/config/dataset/olist.yaml` — 32
+  columns, each with `dtype`, `null_count`, and `role`; `bad_review` is the
+  target (0/1 from `review_score <= 2`), the ids/timestamps/post-purchase
+  context columns are `ignore`.
 - **Raw-boundary check** (`contracts`) verifies **presence + nulls only**;
   dtype is intentionally deferred (`contracts/checks.py`).
 - **Canonical-boundary check** (`etl`) verifies **strict dtypes** via Pandera
   (`contracts/pandera.py`).
 
-ETL outputs live under `data/processed/amazon/` (git-ignored, regenerable).
+ETL outputs live under `data/processed/olist/` (git-ignored, regenerable).

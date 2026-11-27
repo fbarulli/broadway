@@ -1,13 +1,12 @@
-# Amazon training binding. Rows are exchangeable survey respondents: the
-# cross-sectional geometry is shuffled KFold (5 folds x 5 repeats), never the
-# forward-chaining time geometry. The result + training decision record are
-# committed pipeline evidence.
+# Olist training binding (the modelling chain starts in the next unit).
+# Rows are exchangeable orders, so the geometry is shuffled KFold, never a
+# forward-chaining time split. The fit verdict's fold seed is disjoint from the
+# selection/HPO seeds the next unit declares.
 cv_kind: kfold
 cv_gap: 0
 cv_repeats: 5
-# The fit verdict's fold seed, disjoint from selection (2026) and HPO (7/99).
 cv_random_state: 4242
 output_dir: project/experiments/results/pipeline/training
 fit_decision:
-  owner: amazon
+  owner: olist
   action: "deploy the fitted model behind the evaluate promotion gate"

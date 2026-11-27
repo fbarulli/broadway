@@ -149,7 +149,7 @@ class ArtifactStore:
 
     Each artifact directory (``artifacts/discover``, ``artifacts/tracking``,
     ``artifacts/evaluation``) nests the dataset under its ``artifacts_subdir``
-    when declared (``artifacts/discover/amazon/...``), so two datasets sharing
+    when declared (``artifacts/discover/olist/...``), so two datasets sharing
     one environment never overwrite each other's evidence.
     """
 

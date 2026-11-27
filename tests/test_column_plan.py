@@ -25,7 +25,7 @@ from broadway.config.schema import (
 from broadway.features.plan import ColumnOp, ColumnPlan, resolve_plan
 from broadway.utils import eligible_feature_columns
 
-# The Amazon reference contract lives in the project overlay; the path is split
+# The Olist reference contract lives in the project overlay; the path is split
 # so the platform-hygiene guard can distinguish this config-only equivalence
 # test (generated frames, no project imports/data reads) from demo coupling.
 _PROJECT_CONFIG = Path("project") / "config"
@@ -36,14 +36,14 @@ def _shipped_cfg(dataset: str, experiment: str) -> PipelineConfig:
     return load_config("train", dataset=dataset, experiment=experiment)
 
 
-def _amazon_cfg() -> PipelineConfig:
-    """Load the Amazon contract pair as plain config models (no step tree)."""
+def _olist_cfg() -> PipelineConfig:
+    """Load the Olist contract pair as plain config models (no step tree)."""
     dataset = DatasetContract.model_validate(
-        yaml.safe_load((_PROJECT_CONFIG / "dataset" / "amazon.yaml").read_text(encoding="utf-8"))
+        yaml.safe_load((_PROJECT_CONFIG / "dataset" / "olist.yaml").read_text(encoding="utf-8"))
     )
     experiment = ExperimentConfig.model_validate(
         yaml.safe_load(
-            (_PROJECT_CONFIG / "experiment" / "amazon.yaml").read_text(encoding="utf-8")
+            (_PROJECT_CONFIG / "experiment" / "olist.yaml").read_text(encoding="utf-8")
         )
     )
     experiment.bind_plan(resolve_plan(experiment.feature_plan, dataset))
@@ -90,8 +90,32 @@ def test_plan_apply_matches_eligible_surface_and_manifest(
     _assert_plan_matches(cfg)
 
 
-def test_plan_apply_matches_eligible_surface_for_the_amazon_contract() -> None:
-    _assert_plan_matches(_amazon_cfg())
+def test_plan_apply_matches_eligible_surface_for_the_olist_contract() -> None:
+    _assert_plan_matches(_olist_cfg())
+
+
+def test_olist_plan_excludes_every_non_feature_role() -> None:
+    """The role boundary is the leakage boundary: only role=feature enters."""
+    cfg = _olist_cfg()
+    assert cfg.dataset is not None and cfg.experiment is not None
+    plan = ColumnPlan.from_config(cfg.dataset, cfg.experiment)
+    excluded = {
+        name
+        for name, column in cfg.dataset.columns.items()
+        if column.role.value != "feature"
+    }
+    features = {
+        name
+        for name, column in cfg.dataset.columns.items()
+        if column.role.value == "feature"
+    }
+    assert "delivery_days" in excluded and "review_score" in excluded
+    assert not (excluded & set(plan.names))
+    declared = {op.name for op in plan.columns if op.op == "source"} | {
+        source for op in plan.columns for source in op.sources
+    }
+    assert declared == features
+    assert plan.target == cfg.dataset.target
 
 
 def _assert_plan_matches(cfg: PipelineConfig) -> None:
