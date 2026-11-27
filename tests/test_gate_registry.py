@@ -650,9 +650,14 @@ def test_query_modes_leave_registry_and_rendered_views_byte_identical(capsys):
 
 def test_legacy_render_path_still_byte_idempotent(tmp_path):
     renderer = _renderer()
+    # The default render path stamps meta.head from git, so render a scratch copy:
+    # a test must never rewrite the tracked registry it is verifying.
+    scratch_gates = tmp_path / "gates.yaml"
+    scratch_gates.write_bytes(GATES_YAML.read_bytes())
     scratch_digest = tmp_path / "digest.md"
     scratch_index = tmp_path / "idx"
-    argv = ["--digest", str(scratch_digest), "--index-dir", str(scratch_index)]
+    argv = ["--gates", str(scratch_gates), "--digest", str(scratch_digest),
+            "--index-dir", str(scratch_index)]
     assert renderer.main(argv) == 0
     first = {p.name: p.read_bytes() for p in
              [scratch_digest, *scratch_index.iterdir()]}
