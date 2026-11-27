@@ -7,9 +7,12 @@ import os
 import re
 from pathlib import Path
 
+import pandas as pd
+from pydantic import BaseModel, ConfigDict
+
 from broadway.cleaning.models import StructuralCleanResult
 from broadway.cleaning.structural import CoercionAuditReport, CoercionRecord
-from broadway.config.schema import PipelineConfig
+from broadway.config.schema import PipelineConfig, TaskType
 from broadway.contracts.pandera import build_raw_schema
 from broadway.contracts.selectors import datetime_columns, numeric_columns
 from broadway.data.cleaner import canonicalize
@@ -26,6 +29,9 @@ from broadway.reports.step_output import StepOutput
 from broadway.tracking.manifest import tracking_dir, write_etl_manifest
 
 logger = logging.getLogger(__name__)
+
+# The ETL's class-balance evidence file (named in the decision's provenance).
+CLASS_BALANCE_FILE = "class_balance.csv"
 
 # Loaders whose data etl can ingest from the raw source. Experiments bound to
 # pre-built loaders (named_sample, pinned) consume immutable artifacts and
@@ -62,6 +68,67 @@ def _assert_data_source_supported(cfg: PipelineConfig) -> None:
         )
 
 
+class ClassBalance(BaseModel):
+    """The binary target's class balance at the ETL boundary.
+
+    ``bad``/``good`` are measured on the PRODUCED canonical frame (positive is
+    target == 1, negative target == 0); ``missing`` is the target-null count in
+    the input frame that the ETL's accounted drop removed. ``bad_share`` is
+    bad / kept, so the 768 pre-ETL nulls cannot deflate the kept-frame rate.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    bad: int
+    good: int
+    missing: int
+    total: int
+    kept: int
+    bad_share: float
+
+    @classmethod
+    def binary(
+        cls, raw: pd.DataFrame, produced: pd.DataFrame, target: str
+    ) -> ClassBalance | None:
+        """Build the balance for a 0/1 target; ``None`` for any other shape."""
+        observed = set(raw[target].dropna().unique())
+        if not observed <= {0, 1}:
+            logger.info(
+                "etl: target %r is not binary (values=%s); no class balance table",
+                target,
+                sorted(str(value) for value in observed),
+            )
+            return None
+        bad = int((produced[target] == 1).sum())
+        good = int((produced[target] == 0).sum())
+        kept = len(produced)
+        return cls(
+            bad=bad,
+            good=good,
+            missing=int(raw[target].isna().sum()),
+            total=len(raw),
+            kept=kept,
+            bad_share=bad / kept if kept else 0.0,
+        )
+
+    def frame(self) -> pd.DataFrame:
+        """The tall evidence table the story reads (``class`` + ``count``)."""
+        share = (
+            [self.bad / self.kept, self.good / self.kept, self.missing / self.kept]
+            if self.kept
+            else [0.0, 0.0, 0.0]
+        )
+        return pd.DataFrame(
+            {
+                "class": ["bad", "good", "missing"],
+                "count": [self.bad, self.good, self.missing],
+                "share": share,
+                "total": [self.total] * 3,
+                "kept": [self.kept] * 3,
+            }
+        )
+
+
 class EtlDecision:
     """Publish the row-drop decision: did the ingest lose more than the contract allows?
 
@@ -70,10 +137,18 @@ class EtlDecision:
     The explained drops are the evidence slices, not the headline.
     """
 
-    def __init__(self, cfg: PipelineConfig, audit: TransformAudit) -> None:
+    def __init__(
+        self,
+        cfg: PipelineConfig,
+        audit: TransformAudit,
+        balance: ClassBalance | None = None,
+        balance_file: str | None = None,
+    ) -> None:
         assert cfg.dataset is not None and cfg.etl is not None
         self._cfg = cfg
         self._audit = audit
+        self._balance = balance
+        self._balance_file = balance_file
 
     def rule(self) -> DecisionRule:
         assert self._cfg.dataset is not None and self._cfg.etl is not None
@@ -93,6 +168,15 @@ class EtlDecision:
         rows_in = max(audit.rows_in, 1)
         unexplained = audit.rows_dropped_unexplained / rows_in
         explained = max(audit.rows_dropped_total - audit.rows_dropped_unexplained, 0) / rows_in
+        provenance = {
+            "artifact": "canonical.parquet",
+            "dataset": self._cfg.dataset.name if self._cfg.dataset else "",
+            "rows_in": str(audit.rows_in),
+            "rows_out": str(audit.rows_out),
+            "reasons": "; ".join(audit.reasons) or "none",
+        }
+        if self._balance is not None and self._balance_file is not None:
+            provenance["class_balance"] = self._balance_file
         evidence = Evidence(
             baseline="contract-clean ingest: every dropped row carries a recorded reason",
             segments=[
@@ -108,13 +192,7 @@ class EtlDecision:
                 f"rows_out_n{audit.rows_out}": float(audit.rows_out),
             },
             falsifier="the unexplained-share interval clears the configured drop ceiling",
-            provenance={
-                "artifact": "canonical.parquet",
-                "dataset": self._cfg.dataset.name if self._cfg.dataset else "",
-                "rows_in": str(audit.rows_in),
-                "rows_out": str(audit.rows_out),
-                "reasons": "; ".join(audit.reasons) or "none",
-            },
+            provenance=provenance,
         )
         return Decision.evaluate(
             rule=self.rule(),
@@ -128,6 +206,19 @@ class EtlDecision:
 
     def publish(self, out_dir: Path) -> Decision:
         """Write the decision record + row-funnel figure next to the processed data."""
+        target = Path(self._cfg.etl.output_dir) if self._cfg.etl and self._cfg.etl.output_dir else out_dir
+        if self._balance is not None and self._balance_file is not None:
+            target.mkdir(parents=True, exist_ok=True)
+            balance_path = target / self._balance_file
+            self._balance.frame().to_csv(balance_path, index=False)
+            logger.info(
+                "etl: class balance %d bad / %d good / %d missing (kept %d) -> %s",
+                self._balance.bad,
+                self._balance.good,
+                self._balance.missing,
+                self._balance.kept,
+                balance_path,
+            )
         decision = self.decision()
         import matplotlib
 
@@ -150,7 +241,6 @@ class EtlDecision:
             )
         axis.set_ylabel("rows")
         axis.set_title("ETL row funnel")
-        target = Path(self._cfg.etl.output_dir) if self._cfg.etl and self._cfg.etl.output_dir else out_dir
         output = StepOutput(
             results_dir=target,
             stem="etl",
@@ -184,6 +274,7 @@ def run(cfg: PipelineConfig) -> None:
 
     numeric_map = {col: dataset.columns[col].dtype for col in numeric_columns(dataset)}
     coercions: list[CoercionRecord] = []
+    raw = df
     df, clean_reasons, parse_failures, observed_missing = canonicalize(
         df,
         target=dataset.target,
@@ -193,6 +284,11 @@ def run(cfg: PipelineConfig) -> None:
         coercions=coercions,
     )
     reasons.extend(clean_reasons)
+    balance = (
+        ClassBalance.binary(raw, df, dataset.target)
+        if dataset.task is TaskType.CLASSIFICATION
+        else None
+    )
 
     out_dir = ProcessedStore.from_config(cfg).directory
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -230,7 +326,12 @@ def run(cfg: PipelineConfig) -> None:
         columns_removed=sorted(set(columns_before) - set(columns_after)),
     )
     enforce_drop_fraction(audit, cfg.etl.max_drop_fraction)
-    decision = EtlDecision(cfg, audit).publish(out_dir)
+    decision = EtlDecision(
+        cfg,
+        audit,
+        balance=balance,
+        balance_file=CLASS_BALANCE_FILE if balance is not None else None,
+    ).publish(out_dir)
     logger.info(
         "etl decision: %s — unexplained drop share %.4f (ceiling %.4f)",
         decision.verdict,

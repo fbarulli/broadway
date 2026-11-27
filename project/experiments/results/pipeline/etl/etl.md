@@ -39,6 +39,7 @@ the unexplained-share interval clears the configured drop ceiling
 - rows_in: 99441
 - rows_out: 98673
 - reasons: null target: -768 rows
+- class_balance: class_balance.csv
 
 ## tables
 

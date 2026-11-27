@@ -30,6 +30,7 @@
         "sample_size": 99441
       }
     ],
+    "uncovered": 0,
     "sensitivity": {
       "total_drop_share_n99441": 0.0077231725344676745,
       "rows_out_n98673": 98673.0
@@ -40,7 +41,8 @@
       "dataset": "olist",
       "rows_in": "99441",
       "rows_out": "98673",
-      "reasons": "null target: -768 rows"
+      "reasons": "null target: -768 rows",
+      "class_balance": "class_balance.csv"
     }
   }
 }

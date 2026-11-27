@@ -14,12 +14,13 @@ from broadway.cleaning.structural import (
     standardize_missing,
 )
 from broadway.config.loader import load_config
-from broadway.config.schema import ColumnRole, ColumnSchema, DataSourceRef, LookupSpec
+from broadway.config.schema import ColumnRole, ColumnSchema, DataSourceRef, LookupSpec, TaskType
 from broadway.contracts.pandera import is_numeric_dtype
 from broadway.data.cleaner import canonicalize
 from broadway.lineage import records
 from broadway.lineage.ids import node_id
 from broadway.lineage.models import LineageRecord
+from broadway.reports.decision import Decision
 
 
 def test_parse_datetime_records_failures() -> None:
@@ -244,6 +245,65 @@ def test_etl_module_writes_canonical_and_result(
     assert result.audit.rows_out == 3
     assert result.canonical_path == str(canonical_path)
     assert result.parse_failures == []
+
+
+def test_etl_publishes_a_class_balance_named_by_the_record(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """The story reads ONE file named in the record; its counts match the frame."""
+    cfg = load_config("etl", dataset="test", experiment="baseline")
+    cfg = cfg.model_copy(
+        update={
+            "environment": cfg.environment.model_copy(
+                update={"data_dir": str(tmp_path)}
+            ),
+            "dataset": cfg.dataset.model_copy(
+                update={
+                    "task": TaskType.CLASSIFICATION,
+                    "columns": {
+                        **cfg.dataset.columns,
+                        cfg.dataset.target: cfg.dataset.columns[
+                            cfg.dataset.target
+                        ].model_copy(update={"dtype": "float64"}),
+                    },
+                }
+            ),
+            "etl": cfg.etl.model_copy(update={"output_dir": str(tmp_path / "results")}),
+        }
+    )
+    monkeypatch.setattr(records, "LINEAGE_DIR", tmp_path / "lineage")
+    monkeypatch.setenv("BROADWAY_TRACKING_DIR", str(tmp_path / "tracking"))
+
+    feats, target = frame_slots(cfg.dataset)
+    df = pd.DataFrame(
+        {
+            feats[0]: [2, 2, 3, 3, 4, 4],
+            feats[1]: [100, 101, 102, 103, 104, 105],
+            feats[2]: ["a", "a", "b", "b", "c", "c"],
+            target: [1.0, 1.0, 0.0, 0.0, 0.0, None],
+        }
+    )
+    monkeypatch.setattr(etl_module, "load_with_audit", lambda dataset: (df.copy(), [], []))
+
+    etl_module.run(cfg)
+
+    results = tmp_path / "results"
+    balance_path = results / "class_balance.csv"
+    assert balance_path.exists()
+    record = Decision.model_validate_json(
+        (results / "etl_decision.json").read_text(encoding="utf-8")
+    )
+    assert record.evidence.provenance["class_balance"] == "class_balance.csv"
+
+    balance = pd.read_csv(balance_path)
+    assert dict(zip(balance["class"], balance["count"])) == {
+        "bad": 2,
+        "good": 3,
+        "missing": 1,
+    }
+    assert set(balance["total"]) == {6}
+    assert set(balance["kept"]) == {5}
+    assert balance.loc[balance["class"] == "bad", "share"].item() == pytest.approx(0.4)
 
 
 def _etl_record_path(tmp_path: Path) -> Path:
