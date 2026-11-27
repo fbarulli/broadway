@@ -263,8 +263,10 @@ class SelectionRun:
             frame,
             id_column="candidate",
             metrics={
-                self._step.metric: MetricDirection.MINIMIZE,
-                self._step.secondary_metric: MetricDirection.MINIMIZE,
+                self._step.metric: MetricDirection(self._step.metric_direction),
+                self._step.secondary_metric: MetricDirection(
+                    self._step.secondary_direction
+                ),
             },
         )
 
@@ -284,7 +286,7 @@ class SelectionRun:
                 low, high = intervals[candidate.name]
                 selected = ChampionDecision(
                     metric=self._step.metric,
-                    direction=MetricDirection.MINIMIZE,
+                    direction=MetricDirection(self._step.metric_direction),
                     champion=candidate.name,
                     value=value,
                     interval_low=min(low, value),

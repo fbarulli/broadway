@@ -189,6 +189,29 @@ def test_a_decision_cannot_disagree_with_its_measurement() -> None:
     assert plain.threshold == rule.min_effect
 
 
+def test_a_biased_bootstrap_is_recorded_and_cannot_act() -> None:
+    measured = Measurement(
+        statistic="mean_y",
+        value=0.10,
+        interval_low=0.20,
+        interval_high=0.30,
+        bootstrap_biased=True,
+        sample_size=100,
+        seed=1,
+        resampling="iid",
+        iterations=10,
+        confidence=0.95,
+    )
+
+    decision = measured.to_decision(
+        _rule(min_effect=0.05), question="q", evidence=_evidence()
+    )
+
+    assert decision.bootstrap_biased is True
+    assert decision.verdict == "investigate"
+    assert "bootstrap" in decision.action
+
+
 @pytest.mark.parametrize(
     "fields",
     [

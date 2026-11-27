@@ -303,7 +303,11 @@ def test_etl_publishes_a_class_balance_named_by_the_record(
     }
     assert set(balance["total"]) == {6}
     assert set(balance["kept"]) == {5}
-    assert balance.loc[balance["class"] == "bad", "share"].item() == pytest.approx(0.4)
+    assert balance["share_of_total"].sum() == pytest.approx(1.0)
+    kept = balance.set_index("class")["share_of_kept"]
+    assert kept["bad"] == pytest.approx(0.4)
+    assert kept["good"] == pytest.approx(0.6)
+    assert pd.isna(kept["missing"])
 
 
 def _etl_record_path(tmp_path: Path) -> Path:

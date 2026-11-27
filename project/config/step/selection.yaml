@@ -1,11 +1,19 @@
 # Olist model selection (the chain is deferred to the next unit).
-# Rows are exchangeable orders, so the geometry is repeated SHUFFLED KFold
-# (5 x 5); every candidate scores on the identical folds. The metric is PR-AUC
-# (average precision) and F1, not accuracy, because 14.7% of orders are bad.
-# The reserved `naive_mean` reference is regression-only; the next unit replaces
-# it with the no-skill prevalence reference before this step runs.
+# Rows are exchangeable at the ORDER level only after grouping by customer:
+# random folds leak repeat buyers and memorise the 6.6-rows-per-zip cardinality.
+# The next unit must group by customer_unique_id (GroupKFold) or drop the id from
+# features and group the split, then re-check the zip encoding.
+#
+# Prerequisites for the deferred classification run:
+#  - metric = pr_auc / secondary = f1 with `metric_direction: max` and
+#    `secondary_direction: max` (declared below; the code reads them, never MINIMIZE);
+#  - replace the regression `naive_mean` reference with the no-skill prevalence
+#    candidate (`model: naive_prevalence`); running classification with naive_mean
+#    fails loud in CandidateSet until it lands.
 metric: pr_auc
 secondary_metric: f1
+metric_direction: max
+secondary_direction: max
 cv:
   folds: 5
   repeats: 5

@@ -450,6 +450,10 @@ class EdaStep(BaseModel):
     output_file: str
     max_categories: int = Field(ge=1)
     max_plots: int = Field(ge=1)
+    # Nominal columns above this many levels publish the bias-corrected
+    # Cramér's V as the effect (the raw value stays in sensitivity); a
+    # high-cardinality shuffle null is dominated by degrees of freedom.
+    max_categorical_levels: int = Field(ge=2)
     iqr_multiplier: float = Field(gt=0.0)
     z_threshold: float = Field(gt=0.0)
     imbalance_min_share: float = Field(gt=0.0, le=1.0)
@@ -860,6 +864,9 @@ class SelectionStep(BaseModel):
 
     metric: str
     secondary_metric: str
+    # Each metric's ranking direction is declared here, never inferred in code.
+    metric_direction: Literal["min", "max"]
+    secondary_direction: Literal["min", "max"]
     cv: CVGeometry
     sensitivity_random_state: int
     # How the champion is chosen from the CV table: the point-estimate leader

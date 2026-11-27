@@ -20,8 +20,12 @@ leakage_notes:
   the target's source and is excluded from both the plan and the profiler
 - order_status is a post-purchase outcome, not a purchase-time input, and is
   excluded from the feature plan and the profiler
-- the split is stratified random on the target because rows are exchangeable
-  orders, not a time series; no future row can leak into training
+- the split is stratified random on the target today, but orders are NOT fully
+  exchangeable: `customer_unique_id` repeats (repeat buyers) and customer_zip
+  has ~6.6 rows per level, so random folds leak a person across train/val and
+  let the model memorise geography. The next unit must use GroupKFold by
+  `customer_unique_id` (or drop the id from features and group the split), and
+  re-check whether the zip/city encodings survive that grouped evidence
 success_criterion: publish the EDA feature/outlier/comparison decisions with
   n, a 95% interval and the permutation null at n≈98,673; the next unit's model
   must beat the no-skill bad-review prevalence on PR-AUC (the metric for this

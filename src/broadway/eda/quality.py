@@ -37,11 +37,15 @@ class QualityAnalyzer:
         frame: pd.DataFrame,
         task: TaskType,
         target: str,
+        roles: dict[str, str] | None = None,
     ) -> QualityResult:
+        roles = roles or {}
         numeric = [
             name
             for name in frame.columns
-            if not pd.api.types.is_bool_dtype(frame[name])
+            if str(name) != target
+            and roles.get(str(name), "feature") != "target"
+            and not pd.api.types.is_bool_dtype(frame[name])
             and pd.api.types.is_numeric_dtype(frame[name])
         ]
         duplicates = int(frame.duplicated().sum())

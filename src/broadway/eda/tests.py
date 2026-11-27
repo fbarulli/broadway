@@ -46,6 +46,7 @@ EffectName = Literal[
 
 _MIN_ROWS = 3
 _MIN_GROUP_SIZE = 2
+_CONTEXT_ACTION = "context only — measured for interpretation; never a predictor"
 _EFFECT_NAMES: dict[TestName, EffectName] = {
     "spearman": "abs_spearman_r",
     "welch": "point_biserial_r",
@@ -64,11 +65,14 @@ class EffectStatistic:
     so a resample (bootstrap or shuffle) is just another frame.
     """
 
-    def __init__(self, test: TestName, values: str, labels: str) -> None:
+    def __init__(
+        self, test: TestName, values: str, labels: str, corrected: bool = False
+    ) -> None:
         self.test = test
         self.effect_name = _EFFECT_NAMES[test]
         self._values = values
         self._labels = labels
+        self._corrected = corrected
 
     def __call__(self, frame: pd.DataFrame) -> float:
         values = frame[self._values].to_numpy(dtype=float)
@@ -89,6 +93,8 @@ class EffectStatistic:
             return self.eta_squared(values, labels)
         if self.test == "kruskal":
             return self.epsilon_squared(values, labels)
+        if self._corrected:
+            return self.cramers_v_corrected(values, labels)
         return self.cramers_v(values, labels)
 
     @staticmethod
@@ -258,10 +264,17 @@ class FeatureTest:
 class FeatureTestFactory:
     """Chooses the measure by dtype and shape (Factory Method + Strategy)."""
 
-    def __init__(self, alpha: float, shapiro_sample: int, random_state: int) -> None:
+    def __init__(
+        self,
+        alpha: float,
+        shapiro_sample: int,
+        random_state: int,
+        max_categorical_levels: int,
+    ) -> None:
         self._alpha = alpha
         self._shapiro_sample = shapiro_sample
         self._random_state = random_state
+        self._max_categorical_levels = max_categorical_levels
 
     def build(
         self,
@@ -348,17 +361,21 @@ class FeatureTestFactory:
     ) -> FeatureTest | None:
         feature_codes = feature_values.to_numpy(dtype=float)
         target_codes = target_values.to_numpy(dtype=float)
-        if np.unique(feature_codes).size < 2 or np.unique(target_codes).size < 2:
+        levels = int(np.unique(feature_codes).size)
+        if levels < 2 or np.unique(target_codes).size < 2:
             return None
         table = EffectStatistic.contingency(feature_codes, target_codes)
         _statistic, p_value, _dof, _expected = stats.chi2_contingency(table)
-        statistic = EffectStatistic("chi2", feature, target)
-        return FeatureTest(
-            statistic,
-            self._finite_p(p_value),
-            "cramers_v_corrected",
-            EffectStatistic.cramers_v_corrected(feature_codes, target_codes),
-        )
+        # Above the declared cardinality cap the raw Cramér's V is mostly degrees
+        # of freedom (a 14,994-level zip scores ~0.39 on shuffled labels). The
+        # published effect is the bias-corrected V; the raw value stays in the
+        # decision's sensitivity so the reader can see both.
+        corrected = levels > self._max_categorical_levels
+        statistic = EffectStatistic("chi2", feature, target, corrected=corrected)
+        raw = EffectStatistic.cramers_v(feature_codes, target_codes)
+        adjusted = EffectStatistic.cramers_v_corrected(feature_codes, target_codes)
+        alternative = ("cramers_v", raw) if corrected else ("cramers_v_corrected", adjusted)
+        return FeatureTest(statistic, self._finite_p(p_value), *alternative)
 
     def _normal(self, groups: dict[str, np.ndarray]) -> bool:
         """Parametric only when no group's normality is rejected at ``alpha``."""
@@ -381,7 +398,10 @@ class FeatureTestAnalyzer:
         self._step = step
         self._task = task
         self._factory = FeatureTestFactory(
-            step.alpha, step.shapiro_sample, step.random_state
+            step.alpha,
+            step.shapiro_sample,
+            step.random_state,
+            step.max_categorical_levels,
         )
         self._correction = MultipleTestingCorrection(step.correction)
         self._estimator = MeasurementEstimator()
@@ -392,8 +412,10 @@ class FeatureTestAnalyzer:
         target: str,
         provenance: dict[str, str],
         plan: SegmentPlan,
+        roles: dict[str, str] | None = None,
     ) -> FeatureTestBundle:
-        """Test every testable feature against the target and publish the decisions."""
+        """Test every testable column; only role=feature decisions can summarize."""
+        roles = roles or {}
         frame = frame.reset_index(drop=True)
         if target not in frame.columns:
             return self._empty(
@@ -418,13 +440,22 @@ class FeatureTestAnalyzer:
         ranked = sorted(zip(tests, rows), key=lambda entry: (-entry[1].effect, entry[0][0]))
         results: list[FeatureTestResult] = []
         decisions: list[Decision] = []
+        feature_decisions: list[Decision] = []
         for position, ((feature, _kind, test, pair, positions), row) in enumerate(ranked):
             if position < self._step.max_features:
+                role = roles.get(feature, "feature")
                 decision = self._decide(
-                    feature, test, pair, positions, row, plan, provenance, target, frame
+                    feature, test, pair, positions, row, plan, provenance, target, frame, role
                 )
                 decisions.append(decision)
-                row = row.model_copy(update={"verdict": decision.verdict})
+                if role == "feature":
+                    feature_decisions.append(decision)
+                row = row.model_copy(
+                    update={
+                        "verdict": decision.verdict,
+                        "null_threshold": decision.null_threshold,
+                    }
+                )
             results.append(row)
         return FeatureTestBundle(
             target=target,
@@ -434,7 +465,7 @@ class FeatureTestAnalyzer:
             features=results,
             skipped=skipped,
             decisions=decisions,
-            summary=self._summary(decisions, rows),
+            summary=self._summary(decisions, rows, feature_decisions),
         )
 
     def _tests(
@@ -491,6 +522,7 @@ class FeatureTestAnalyzer:
         provenance: dict[str, str],
         target: str,
         family: pd.DataFrame,
+        role: str,
     ) -> Decision:
         measurement = self._estimator.estimate(
             pair,
@@ -525,6 +557,7 @@ class FeatureTestAnalyzer:
             provenance={
                 **provenance,
                 "feature": feature,
+                "role": role,
                 "test": test.name,
                 "rows": str(measurement.sample_size),
                 "seed": str(measurement.seed),
@@ -532,12 +565,17 @@ class FeatureTestAnalyzer:
                 "segments": plan.rule,
             },
         )
+        context = role != "feature"
         rule = DecisionRule(
             metric=f"association_{feature}",
             direction="max",
-            min_effect=self._step.min_effect,
+            # A context column is measured for interpretation, never acted on:
+            # a 1.0 ceiling makes `act` unreachable (every effect is <= 1).
+            min_effect=1.0 if context else self._step.min_effect,
             min_sample_size=self._step.min_sample_size,
-            action=self._step.decisions.features.action,
+            action=(
+                _CONTEXT_ACTION if context else self._step.decisions.features.action
+            ),
             owner=self._step.decisions.features.owner,
         )
         return measurement.to_decision(
@@ -570,20 +608,25 @@ class FeatureTestAnalyzer:
         ]
 
     def _summary(
-        self, decisions: list[Decision], rows: list[FeatureTestResult]
+        self,
+        decisions: list[Decision],
+        rows: list[FeatureTestResult],
+        eligible: list[Decision],
     ) -> Decision | None:
-        """The family aggregate: act if any act, else the strongest investigate.
+        """The family aggregate over FEATURE decisions only.
 
-        The verdict is not typed: the family rule selects which feature's
-        *computed* decision is representative (the largest margin over its own
-        threshold) and the record states the family counts in its provenance.
-        The chosen feature's effect name becomes the record's ``unit`` — the
-        metric is a test statistic whose scale a reader must know.
+        Context columns (delivery_days/late/estimated_days) are measured but can
+        never be the selected feature; the family counts still report every
+        decided column. ``None`` when no feature-role column was decided.
         """
-        if not decisions:
+        if not decisions or not eligible:
             return None
-        acting = [item for item in decisions if item.verdict == "act"]
-        pool = acting or [item for item in decisions if item.verdict == "investigate"] or decisions
+        acting = [item for item in eligible if item.verdict == "act"]
+        pool = (
+            acting
+            or [item for item in eligible if item.verdict == "investigate"]
+            or eligible
+        )
         chosen = max(
             pool,
             key=lambda item: (
@@ -603,8 +646,11 @@ class FeatureTestAnalyzer:
                     # the 12 that got a bootstrap/permutation decision.
                     "family_size": str(len(rows)),
                     "decided": str(len(decisions)),
-                    "acted": str(len(acting)),
-                    "investigated": str(sum(1 for item in decisions if item.verdict == "investigate")),
+                    "feature_decided": str(len(eligible)),
+                    "acted": str(sum(1 for item in decisions if item.verdict == "act")),
+                    "investigated": str(
+                        sum(1 for item in decisions if item.verdict == "investigate")
+                    ),
                     "selected_feature": chosen.metric,
                     "effect_name": effect_name or chosen.metric,
                 }

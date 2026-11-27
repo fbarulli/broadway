@@ -134,6 +134,40 @@ def test_decision_segments_plus_uncovered_cover_n_and_publish_the_tested_family(
     assert bundle.summary.evidence.uncovered == 1
 
 
+def test_context_columns_are_labeled_and_never_summarized() -> None:
+    """A role=ignore association is measured but can neither act nor be the headline."""
+    step = _step(permutations=10, max_features=4, min_sample_size=10)
+    n = 80
+    rng = np.random.default_rng(3)
+    target = rng.integers(0, 2, n)
+    frame = pd.DataFrame(
+        {
+            "signal": rng.normal(size=n),
+            "noise": rng.normal(size=n),
+            "context": target * 3.0 + rng.normal(0, 0.1, n),
+            "group": ["a"] * (n - 1) + ["b"],
+            "target": target,
+        }
+    )
+    roles = {
+        "signal": "feature",
+        "noise": "feature",
+        "context": "ignore",
+        "group": "feature",
+    }
+    bundle = FeatureTestAnalyzer(step, TaskType.CLASSIFICATION).analyze(
+        frame, "target", _PROVENANCE, _plan(frame), roles
+    )
+
+    context = [item for item in bundle.decisions if item.metric == "association_context"]
+    assert context
+    assert all(item.verdict != "act" for item in context)
+    assert all("context only" in item.action for item in context)
+    assert bundle.summary is not None
+    assert bundle.summary.evidence.provenance["selected_feature"] != "association_context"
+    assert bundle.summary.evidence.provenance["feature_decided"] == "3"
+
+
 def test_time_and_single_group_columns_are_skipped_not_tested() -> None:
     step = _step(permutations=20)
     frame = _frame(300).assign(

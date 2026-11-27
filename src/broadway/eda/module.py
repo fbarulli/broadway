@@ -91,7 +91,7 @@ class EdaRunner:
                     self._step.iqr_multiplier,
                     self._step.z_threshold,
                     self._step.imbalance_min_share,
-                ).analyze(profile, self._dataset.task, self._dataset.target)
+                ).analyze(profile, self._dataset.task, self._dataset.target, self._roles())
                 provenance = self._provenance(profile)
                 compare = EtlComparator(
                     _PRE_SPLIT_LABEL, _POST_SPLIT_LABEL, self._step
@@ -111,9 +111,9 @@ class EdaRunner:
                 )
                 feature_tests = FeatureTestAnalyzer(
                     self._step, self._dataset.task
-                ).analyze(profile, self._dataset.target, provenance, plan)
+                ).analyze(profile, self._dataset.target, provenance, plan, self._roles())
                 outliers = OutlierDecisionAnalyzer(self._step).analyze(
-                    quality, profile, provenance, plan
+                    quality, profile, provenance, plan, self._roles()
                 )
             with phase("figures"):
                 figures = self._figures(

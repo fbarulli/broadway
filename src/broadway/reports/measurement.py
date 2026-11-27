@@ -104,6 +104,9 @@ class Measurement(BaseModel):
     interval_low: float
     interval_high: float
     null_threshold: float | None = None
+    # True when the bootstrap interval excludes the point estimate (a biased
+    # resample); the decision is then never `act`.
+    bootstrap_biased: bool = False
     sample_size: int = Field(gt=0)
     seed: int = Field(ge=0)
     resampling: str = Field(min_length=1)
@@ -125,8 +128,12 @@ class Measurement(BaseModel):
                 raise ValueError(f"{name} must be finite, got {number!r}")
         if self.interval_low > self.interval_high:
             raise ValueError("interval_low must not exceed interval_high")
-        if not self.interval_low <= self.value <= self.interval_high:
-            raise ValueError("value must lie inside its interval")
+        inside = self.interval_low <= self.value <= self.interval_high
+        if inside == self.bootstrap_biased:
+            raise ValueError(
+                "bootstrap_biased must be true exactly when the point estimate "
+                "lies outside its interval"
+            )
         return self
 
     def to_decision(
@@ -164,6 +171,7 @@ class Measurement(BaseModel):
             null_values=null_values,
             reference=reference,
             unit=self.unit,
+            bootstrap_biased=self.bootstrap_biased,
         )
 
 
@@ -194,7 +202,7 @@ class MeasurementEstimator:
         draw = self._draw(frame, spec)
         label = name if name is not None else self._label(statistic)
         value = self._evaluate(statistic, draw, f"statistic {label!r}")
-        low, high = self._interval(draw, statistic, spec, value)
+        low, high = self._interval(draw, statistic, spec)
         null_threshold = self._null_threshold(draw, statistic, spec)
         return Measurement(
             statistic=label,
@@ -202,6 +210,7 @@ class MeasurementEstimator:
             interval_low=low,
             interval_high=high,
             null_threshold=null_threshold,
+            bootstrap_biased=not (low <= value <= high),
             sample_size=len(draw),
             seed=spec.seed,
             resampling=self._resampling(spec),
@@ -258,9 +267,14 @@ class MeasurementEstimator:
         draw: pd.DataFrame,
         statistic: Statistic,
         spec: MeasurementSpec,
-        value: float,
     ) -> tuple[float, float]:
-        """Percentile bootstrap interval; the point estimate is always inside."""
+        """Percentile bootstrap interval; never clamped to contain the point.
+
+        A bootstrap that lies entirely above (or below) the observed statistic
+        is a real signal of resample bias. Clamping it to contain the point
+        would report an interval the data never produced and hide the bias;
+        the caller records ``bootstrap_biased`` instead.
+        """
         generator = np.random.default_rng([spec.seed, _BOOTSTRAP_STREAM])
         draws = np.empty(spec.iterations)
         if spec.bootstrap == "iid":
@@ -269,7 +283,7 @@ class MeasurementEstimator:
             self._block_draws(draw, statistic, spec, generator, draws)
         tail = (1.0 - spec.confidence) / 2.0 * 100.0
         low, high = np.percentile(draws, [tail, 100.0 - tail])
-        return min(float(low), value), max(float(high), value)
+        return float(low), float(high)
 
     def _iid_draws(
         self,

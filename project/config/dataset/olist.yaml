@@ -148,8 +148,10 @@ columns:
     role: target
 lookup_tables: {}
 # Ids, the post-purchase status and timestamps, and the target's source column.
-# delivery_days/late stay profiled: they are the expected context finding, never
-# predictors (the feature plan is the leakage boundary, not the profiler).
+# delivery_days/late/estimated_days stay in the profiled frame as CONTEXT ONLY:
+# quality/outliers screen them but never let them act (the role rule caps a
+# context verdict at no_action). The target is excluded from quality/outliers by
+# role, not from the frame: the association tests need it.
 exclude_from_profiling:
 - order_id
 - customer_id

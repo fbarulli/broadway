@@ -257,6 +257,9 @@ class FeatureTestResult(BaseModel):
     n: int
     significant: bool
     verdict: Verdict | None
+    # The decision's calibrated floor (max(min_effect, null band)) when the
+    # feature received a bootstrap/permutation decision; None otherwise.
+    null_threshold: float | None = None
 
 
 class FeatureTestBundle(BaseModel):
@@ -281,6 +284,7 @@ class OutlierVerdict(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     column: str
+    role: str
     n: int
     iqr_count: int
     iqr_share: float

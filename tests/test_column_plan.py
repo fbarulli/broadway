@@ -109,8 +109,21 @@ def test_olist_plan_excludes_every_non_feature_role() -> None:
         for name, column in cfg.dataset.columns.items()
         if column.role.value == "feature"
     }
-    assert "delivery_days" in excluded and "review_score" in excluded
     assert not (excluded & set(plan.names))
+    post_purchase = {
+        "delivery_days",
+        "late",
+        "estimated_days",
+        "review_score",
+        "order_purchase_timestamp",
+        "order_approved_at",
+        "order_delivered_carrier_date",
+        "order_delivered_customer_date",
+        "order_estimated_delivery_date",
+        "order_status",
+    }
+    assert post_purchase <= excluded
+    assert cfg.dataset.target in excluded
     declared = {op.name for op in plan.columns if op.op == "source"} | {
         source for op in plan.columns for source in op.sources
     }

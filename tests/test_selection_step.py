@@ -38,6 +38,7 @@ from broadway.lineage import records
 from broadway.reports.decision import Decision
 from broadway.selection import module as selection_module
 from broadway.selection import tuning
+from broadway.selection.candidates import CandidateSet
 from broadway.training import module as training_module
 
 
@@ -121,6 +122,8 @@ def _selection_step(tmp_path: Path) -> SelectionStep:
     return SelectionStep(
         metric="rmse",
         secondary_metric="mae",
+        metric_direction="min",
+        secondary_direction="min",
         cv=CVGeometry(folds=3, repeats=2, random_state=5),
         bootstrap=BootstrapConfig(iterations=200, seed=1, level=0.95),
         sensitivity_random_state=6,
@@ -138,6 +141,22 @@ def _selection_step(tmp_path: Path) -> SelectionStep:
         output_dir=str(tmp_path / "results" / "selection"),
         output_file=str(tmp_path / "results" / "selection" / "selection_champion.json"),
     )
+
+
+def test_classification_selection_rejects_the_regression_naive_mean(
+    tmp_path: Path,
+) -> None:
+    cfg = PipelineConfig(
+        dataset=_dataset().model_copy(update={"task": TaskType.CLASSIFICATION}),
+        environment=_environment(tmp_path),
+        experiment=_experiment(),
+    )
+    candidates = [
+        CandidateSpec(name="naive_mean", model="naive_mean", params={}),
+        CandidateSpec(name="linear", model="linear", params={}),
+    ]
+    with pytest.raises(ValueError, match="naive_prevalence"):
+        CandidateSet(cfg, candidates)
 
 
 def test_selection_publishes_the_champion_and_its_paired_improvement(

@@ -155,6 +155,7 @@ class EdaArtifactWriter:
                 "n": [row.n for row in tests.features],
                 "alpha": [tests.alpha for _ in tests.features],
                 "min_effect": [tests.min_effect for _ in tests.features],
+                "null_threshold": [row.null_threshold for row in tests.features],
                 "verdict": [row.verdict or "" for row in tests.features],
             }
         )
@@ -196,6 +197,7 @@ class EdaArtifactWriter:
         return pd.DataFrame(
             {
                 "column": [item.column for item in outliers.columns],
+                "role": [item.role for item in outliers.columns],
                 "n": [item.n for item in outliers.columns],
                 "iqr_count": [item.iqr_count for item in outliers.columns],
                 "iqr_share": [round(item.iqr_share, _DECIMALS) for item in outliers.columns],

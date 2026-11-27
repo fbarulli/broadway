@@ -112,17 +112,24 @@ class ClassBalance(BaseModel):
         )
 
     def frame(self) -> pd.DataFrame:
-        """The tall evidence table the story reads (``class`` + ``count``)."""
-        share = (
-            [self.bad / self.kept, self.good / self.kept, self.missing / self.kept]
-            if self.kept
-            else [0.0, 0.0, 0.0]
-        )
+        """The tall evidence table the story reads (``class`` + ``count``).
+
+        ``share_of_total`` sums to 1 over all input rows; ``share_of_kept`` is
+        defined for the modelled bad/good classes only (missing is a pre-ETL
+        bucket, so its kept share is null).
+        """
+        total = self.total or 1
+        kept = self.kept or 1
         return pd.DataFrame(
             {
                 "class": ["bad", "good", "missing"],
                 "count": [self.bad, self.good, self.missing],
-                "share": share,
+                "share_of_total": [
+                    self.bad / total,
+                    self.good / total,
+                    self.missing / total,
+                ],
+                "share_of_kept": [self.bad / kept, self.good / kept, None],
                 "total": [self.total] * 3,
                 "kept": [self.kept] * 3,
             }

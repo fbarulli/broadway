@@ -15,6 +15,7 @@
   "sample_size": 99441,
   "unit": "share",
   "min_sample_size": 1,
+  "bootstrap_biased": false,
   "evidence": {
     "baseline": "contract-clean ingest: every dropped row carries a recorded reason",
     "delta": null,
@@ -30,7 +31,7 @@
         "sample_size": 99441
       }
     ],
-    "uncovered": 0,
+    "uncovered": null,
     "sensitivity": {
       "total_drop_share_n99441": 0.0077231725344676745,
       "rows_out_n98673": 98673.0

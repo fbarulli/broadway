@@ -24,6 +24,11 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_valida
 Verdict = Literal["act", "investigate", "no_action", "insufficient"]
 Direction = Literal["max", "min"]
 
+_BIASED_ACTION = (
+    "the bootstrap interval excludes the point estimate (bootstrap-biased); "
+    "re-measure with a larger resample before acting"
+)
+
 
 class DecisionRuleError(ValueError):
     """A step's decision rule is absent or invalid in the experiment config."""
@@ -56,7 +61,8 @@ class Evidence(BaseModel):
     # Rows inside the decision's n that no published segment covers: the EDA
     # drops segment levels with <2 rows (a one-row level cannot be measured),
     # so `sum(segment.sample_size) + uncovered == n` is the acceptance identity.
-    uncovered: int = Field(default=0, ge=0)
+    # None means "not computed here" (non-EDA steps), which is not zero.
+    uncovered: int | None = Field(default=None, ge=0)
     sensitivity: dict[str, float] = Field(min_length=1)
     falsifier: str = Field(min_length=1)
     provenance: dict[str, str] = Field(min_length=1)
@@ -138,14 +144,21 @@ class Decision(BaseModel):
     sample_size: int = Field(gt=0)
     unit: str | None = None
     min_sample_size: int | None = None
+    # True when the bootstrap interval excludes the point estimate (the
+    # resample is biased); such a record can never act.
+    bootstrap_biased: bool = False
     evidence: Evidence
 
     @model_validator(mode="after")
     def _ordered_interval(self) -> Decision:
         if self.interval_low > self.interval_high:
             raise ValueError("interval_low must not exceed interval_high")
-        if not self.interval_low <= self.value <= self.interval_high:
-            raise ValueError("value must lie inside its interval")
+        inside = self.interval_low <= self.value <= self.interval_high
+        if inside == self.bootstrap_biased:
+            raise ValueError(
+                "bootstrap_biased must be true exactly when the point estimate "
+                "lies outside its interval"
+            )
         return self
 
     @classmethod
@@ -161,6 +174,7 @@ class Decision(BaseModel):
         null_values: Sequence[float] | None = None,
         reference: float | None = None,
         unit: str | None = None,
+        bootstrap_biased: bool = False,
     ) -> Decision:
         """Compute the verdict from the interval vs the calibrated threshold.
 
@@ -168,6 +182,9 @@ class Decision(BaseModel):
         permutation at this sample size; absent, the threshold is the declared
         ``min_effect`` alone (a small-sample run then usually lands in
         ``insufficient`` or ``investigate``, which is the honest outcome).
+        ``bootstrap_biased`` records that the bootstrap interval excludes the
+        point estimate; such a decision is downgraded from ``act`` to
+        ``investigate`` (the bias, not the threshold, is the problem).
         """
         low, high = interval
         null_threshold = None
@@ -197,6 +214,9 @@ class Decision(BaseModel):
             else:
                 verdict = "no_action"
             action = rule.action
+        if bootstrap_biased and verdict == "act":
+            verdict = "investigate"
+            action = _BIASED_ACTION
         return cls(
             question=question,
             metric=rule.metric,
@@ -214,5 +234,6 @@ class Decision(BaseModel):
             sample_size=sample_size,
             unit=unit,
             min_sample_size=rule.min_sample_size,
+            bootstrap_biased=bootstrap_biased,
             evidence=evidence,
         )

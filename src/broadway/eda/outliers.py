@@ -24,6 +24,7 @@ from broadway.reports.measurement import MeasurementEstimator, MeasurementSpec
 
 _QUARTILES = (0.25, 0.75)
 _PERCENT = 100.0
+_CONTEXT_ACTION = "context only — measured for interpretation; never a predictor"
 
 
 class OutlierShareStatistic:
@@ -61,16 +62,21 @@ class OutlierDecisionAnalyzer:
         frame: pd.DataFrame,
         provenance: dict[str, str],
         plan: SegmentPlan,
+        roles: dict[str, str] | None = None,
     ) -> OutlierResult:
         """Decide every screened numeric column; the IQR share is the metric."""
+        roles = roles or {}
         verdicts: list[OutlierVerdict] = []
         decisions: list[Decision] = []
         for item in quality.outliers:
-            decision = self._decide(item, frame, provenance, plan)
-            decisions.append(decision)
+            role = roles.get(item.column, "feature")
+            decision = self._decide(item, frame, provenance, plan, role)
+            if role == "feature":
+                decisions.append(decision)
             verdicts.append(
                 OutlierVerdict(
                     column=item.column,
+                    role=role,
                     n=item.n,
                     iqr_count=item.iqr_count,
                     iqr_share=item.iqr_rate,
@@ -88,6 +94,7 @@ class OutlierDecisionAnalyzer:
         frame: pd.DataFrame,
         provenance: dict[str, str],
         plan: SegmentPlan,
+        role: str,
     ) -> Decision:
         lower, upper = self._fences(item)
         segments = self._segments(frame, item, lower, upper, plan)
@@ -104,12 +111,18 @@ class OutlierDecisionAnalyzer:
         )
         uncovered = max(measurement.sample_size - sum(s.sample_size for s in segments), 0)
         null = self._binomial_null(measurement.sample_size)
+        # Context columns are measured but never act: their share is a fact about
+        # the outcome window, not a preprocessing instruction for the model. A
+        # 1.0 ceiling makes `act` unreachable (a share cannot exceed 1).
+        context = role != "feature"
         rule = DecisionRule(
             metric=f"outlier_share_{item.column}",
             direction="max",
-            min_effect=self._max_share,
+            min_effect=1.0 if context else self._max_share,
             min_sample_size=self._step.min_sample_size,
-            action=self._step.decisions.outliers.action,
+            action=(
+                _CONTEXT_ACTION if context else self._step.decisions.outliers.action
+            ),
             owner=self._step.decisions.outliers.owner,
         )
         evidence = Evidence(
@@ -117,7 +130,7 @@ class OutlierDecisionAnalyzer:
                 "binomial null at this n around the share a Gaussian reference "
                 f"produces at iqr_multiplier={self._step.iqr_multiplier:g}"
             ),
-            segments=self._segments(frame, item, lower, upper, plan),
+            segments=segments,
             uncovered=uncovered,
             sensitivity={
                 "z_score_share": item.z_rate,
@@ -131,6 +144,7 @@ class OutlierDecisionAnalyzer:
             provenance={
                 **provenance,
                 "column": item.column,
+                "role": role,
                 "rows": str(measurement.sample_size),
                 "seed": str(measurement.seed),
                 "resampling": measurement.resampling,

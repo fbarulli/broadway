@@ -6,6 +6,7 @@ output_dir: artifacts/reports
 output_file: eda.html
 max_categories: 20          # top values / missingness patterns shown per column
 max_plots: 12               # numeric/categorical columns plotted per figure
+max_categorical_levels: 200 # above this a nominal column uses bias-corrected Cramér's V
 iqr_multiplier: 1.5         # IQR fence: q25/q75 +/- multiplier * IQR
 z_threshold: 3.0            # |x - mean| > threshold * std
 imbalance_min_share: 0.2    # classification minority share below this is flagged
