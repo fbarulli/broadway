@@ -14,7 +14,10 @@ from __future__ import annotations
 
 import json
 import logging
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
+
+from fastapi.testclient import TestClient
 
 from broadway.reports import experiments_dashboard as ui
 from broadway.reports import story_page
@@ -43,11 +46,12 @@ PLANNED = (
 )
 
 
-def _configure_map(monkeypatch) -> None:
+def _configure_map(monkeypatch, progress_dir: Path) -> None:
     config = StoryConfig.fallback().model_copy(
         update={"steps": StoryStepMap(configured=CONFIGURED, planned=PLANNED)}
     )
     monkeypatch.setattr(story_page, "_CONFIG", config)
+    monkeypatch.setenv("BROADWAY_PROGRESS_DIR", str(progress_dir))
 
 
 def _decision(**overrides: object) -> dict[str, object]:
@@ -135,7 +139,7 @@ def test_pipeline_series_lists_steps_and_renders_step_pages(
             Decision.model_validate(_decision(metric=stem)).model_dump(mode="json"),
         )
 
-    _configure_map(monkeypatch)
+    _configure_map(monkeypatch, tmp_path / "progress")
     monkeypatch.setattr(ui, "EXPERIMENTS_ROOT", root)
 
     assert ui.list_series() == ["alpha", "pipeline"]
@@ -242,7 +246,7 @@ def test_pipeline_map_lists_pending_and_fills_when_a_lane_runs(
             pipeline / step / f"{step}_decision.json",
             Decision.model_validate(_decision(metric=step)).model_dump(mode="json"),
         )
-    _configure_map(monkeypatch)
+    _configure_map(monkeypatch, tmp_path / "progress")
     monkeypatch.setattr(ui, "EXPERIMENTS_ROOT", root)
 
     rows = ui.census_rows("pipeline")
@@ -265,7 +269,7 @@ def test_pipeline_map_lists_pending_and_fills_when_a_lane_runs(
     response = ui.experiment_page("evaluate", "pipeline")
     assert response.status_code == 200
     body = bytes(response.body).decode()
-    assert "not run yet — this step will publish" in body
+    assert 'class="not-run">not run yet' in body
     assert "<table" not in body
     assert "<img" not in body
 
@@ -285,3 +289,83 @@ def test_pipeline_map_lists_pending_and_fills_when_a_lane_runs(
     body = bytes(page.body).decode()
     assert "findings — features" in body
     assert "association_clean" in body
+
+
+def test_pipeline_heartbeats_drive_live_status(
+    monkeypatch, tmp_path: Path, caplog
+) -> None:
+    root = tmp_path / "experiments"
+    pipeline = root / "results" / "pipeline"
+    pipeline.mkdir(parents=True)
+    progress = tmp_path / "progress"
+    progress.mkdir()
+    _configure_map(monkeypatch, progress)
+    monkeypatch.setattr(ui, "EXPERIMENTS_ROOT", root)
+    monkeypatch.setattr(story_page, "_ROOT_PROVIDER", lambda: root)
+
+    now = datetime.now(UTC)
+
+    def beat(step: str, state: str, minutes: int, phase: str = "", message: str = "") -> None:
+        (progress / f"{step}.json").write_text(
+            json.dumps(
+                {
+                    "step": step,
+                    "state": state,
+                    "phase": phase,
+                    "message": message,
+                    "updated_at": (now - timedelta(minutes=minutes)).isoformat(),
+                }
+            ),
+            encoding="utf-8",
+        )
+
+    beat("features", "running", 2, "fitting")
+    beat("baseline", "blocked", 0, message="waiting for etl")
+    beat("train", "running", 11, "fitting")
+    beat("hpo", "done", 0)
+    beat("selection", "done", 0)
+    _write(
+        pipeline / "selection" / "selection_decision.json",
+        Decision.model_validate(
+            _decision(metric="improvement_over_naive_rmse")
+        ).model_dump(mode="json"),
+    )
+    (progress / "eda.json").write_text("{not json", encoding="utf-8")
+
+    with caplog.at_level(logging.ERROR):
+        rows = {row["experiment"]: row for row in ui.census_rows("pipeline")}
+        pages = {
+            step: ui.experiment_page(step, "pipeline")
+            for step in ("features", "baseline", "train", "hpo", "selection", "evaluate", "eda")
+        }
+
+    assert str(rows["features"]["status"]).startswith("running — fitting — updated ")
+    assert str(rows["features"]["status"]).endswith("m ago")
+    assert rows["baseline"]["status"] == "blocked — waiting for etl"
+    assert str(rows["train"]["status"]).startswith("unknown — last update ")
+    assert rows["hpo"]["status"] == "done — record not published yet"
+    assert rows["evaluate"]["status"] == "not run yet"
+    assert rows["eda"]["status"] == "not run yet"
+    assert rows["selection"]["status"] == "act"
+
+    features_html = bytes(pages["features"].body).decode()
+    assert "running — fitting — updated" in features_html
+    assert 'class="progress running"' in features_html
+    assert "<table" not in features_html
+    baseline_html = bytes(pages["baseline"].body).decode()
+    assert "blocked — waiting for etl" in baseline_html
+    assert 'class="progress blocked"' in baseline_html
+    train_html = bytes(pages["train"].body).decode()
+    assert "unknown — last update" in train_html
+    hpo_html = bytes(pages["hpo"].body).decode()
+    assert "done — record not published yet" in hpo_html
+    assert 'class="decision act"' in bytes(pages["selection"].body).decode()
+    assert "not run yet" in bytes(pages["evaluate"].body).decode()
+    assert caplog.text.count("unreadable progress") == 1
+
+    story = TestClient(ui.app).get("/story").text
+    assert "features — running — fitting — updated" in story
+    assert "baseline — blocked — waiting for etl" in story
+    assert "train — unknown — last update" in story
+    assert "hpo — done — record not published yet" in story
+    assert "evaluate — not run yet" in story

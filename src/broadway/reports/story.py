@@ -46,7 +46,6 @@ from matplotlib.figure import Figure
 from broadway.reports import story_figures as figures
 from broadway.reports.decision import Decision
 from broadway.reports.pipeline_evidence import (
-    PLANNED_STATUS,
     PipelineRecord,
     PipelineSeries,
     findings_from_sidecar,
@@ -197,20 +196,20 @@ class Story:
                 f"{len(planned_pending)} planned lanes not configured."
             )
         ]
+        def label(step: str, is_planned: bool) -> str:
+            has_record = self._record(step) is not None
+            status = self._pipeline.status(step, has_record=has_record)
+            if status.kind == "record":
+                return "done (planned lane)" if is_planned else "done"
+            return status.text
+
         numbers: list[str] = []
         for step in configured:
-            status = "done" if step in done else "not run yet"
-            numbers.append(f"{step} — {status}")
+            numbers.append(f"{step} — {label(step, False)}")
         for step in planned:
-            status = (
-                "done (planned lane)"
-                if self._record(step) is not None
-                else PLANNED_STATUS
-            )
-            numbers.append(f"{step} — {status}")
+            numbers.append(f"{step} — {label(step, True)}")
         for step in extras:
-            status = "done" if self._record(step) is not None else "not run yet"
-            numbers.append(f"{step} — {status}")
+            numbers.append(f"{step} — {label(step, False)}")
         return Section(title="The step map", conclusions=tuple(conclusions), numbers=tuple(numbers))
 
     def _question(self) -> Section:

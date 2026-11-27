@@ -112,6 +112,7 @@ def _configure(monkeypatch, root: Path, dataset: str) -> None:
     monkeypatch.setattr(story_page, "_CONFIG", _config(dataset))
     monkeypatch.setattr(story_page, "_ROOT_PROVIDER", lambda: root)
     monkeypatch.setattr(ui, "EXPERIMENTS_ROOT", root)
+    monkeypatch.setenv("BROADWAY_PROGRESS_DIR", str(root.parent / "progress"))
 
 
 def test_story_leads_with_conclusions_and_skips_bad_records(

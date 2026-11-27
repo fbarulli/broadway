@@ -45,7 +45,6 @@ from fastapi.staticfiles import StaticFiles
 
 from broadway.reports.pipeline_evidence import (
     PIPELINE_FOCUS,
-    PLANNED_STATUS,
     Finding,
     PipelineRecord,
     PipelineSeries,
@@ -770,6 +769,9 @@ def _render_step_page(title: str, question: str, body: str, focus: str, series: 
   .numbers li {{ margin: 0.12rem 0; }}
   .record-link {{ color: #666; font-size: 0.8rem; }}
   .not-run {{ color: #777; font-style: italic; }}
+  .progress {{ margin: 1rem 0; padding: 0.6rem 0.9rem; border-left: 6px solid #999; background: #f4f4f4; font-size: 0.95rem; }}
+  .progress.running {{ border-color: #0072B2; background: #e8f1f8; }}
+  .progress.blocked {{ border-color: #c0362c; background: #fde7e5; font-weight: 600; }}
   .story-nav {{ font-size: 0.85rem; }}
 </style>
 </head>
@@ -836,17 +838,19 @@ def _render_pipeline_step_page(step: str, series: list[str]) -> str:
     pipeline = _pipeline_series()
     records = pipeline.records(step)
     primary = pipeline.primary(step)
+    status = pipeline.status(step, has_record=bool(records))
+    banner = ""
+    if status.kind in {"blocked", "running", "unknown"}:
+        css = {"blocked": "progress blocked", "running": "progress running"}.get(
+            status.kind, "not-run"
+        )
+        banner = f'<p class="{css}">{html.escape(status.text)}</p>'
     if not records:
-        if pipeline.is_planned(step):
-            body = (
-                f'<p class="not-run">{html.escape(PLANNED_STATUS)}. This lane will publish '
-                "its decision record, findings, figures and code here when it is configured "
-                "and runs.</p>"
-            )
-        else:
-            body = (
-                '<p class="not-run">not run yet — this step will publish its decision '
-                "record, per-item findings, figures and producing code here when it runs.</p>"
+        body = banner or f'<p class="not-run">{html.escape(status.text)}</p>'
+        if status.kind == "planned":
+            body += (
+                '<p class="not-run">This lane will publish its decision record, findings, '
+                "figures and code here when it is configured and runs.</p>"
             )
         return _render_step_page(step, "", body, PIPELINE_FOCUS, series)
     strips = "\n".join(_render_pipeline_record(record, len(records) > 1) for record in records)
@@ -858,6 +862,7 @@ def _render_pipeline_step_page(step: str, series: list[str]) -> str:
         else "<p>No producing module for this step.</p>"
     )
     body = f"""
+{banner}
 {strips}
 {_render_findings(findings)}
 {_render_figures(pipeline.artifacts(step), PIPELINE_FOCUS)}

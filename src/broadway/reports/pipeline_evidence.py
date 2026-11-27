@@ -18,10 +18,13 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
+from typing import Literal
 
-from pydantic import ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from broadway.config.loader import STEP_MODULES
 from broadway.reports.decision import Decision
@@ -33,6 +36,11 @@ PIPELINE_FOCUS = "pipeline"
 
 #: A planned lane that has not been configured is labelled, not counted as pending.
 PLANNED_STATUS = "planned lane — not configured yet"
+
+#: Worker heartbeats: written at start, at each milestone and at completion.
+PROGRESS_DIR_ENV = "BROADWAY_PROGRESS_DIR"
+#: A heartbeat older than this is "unknown", never "running".
+PROGRESS_STALE_SECONDS = 600
 
 _RECORD_SUFFIX = "_decision.json"
 #: Sidecar keys that are step metadata, not per-item conclusions.
@@ -50,6 +58,43 @@ class Finding:
 
     section: str
     decision: Decision
+
+
+class ProgressRecord(BaseModel):
+    """One worker heartbeat (``artifacts/progress/<step>.json``)."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    step: str = Field(min_length=1)
+    state: Literal["running", "blocked", "done"]
+    phase: str = ""
+    message: str = ""
+    updated_at: datetime
+
+
+@dataclass(frozen=True)
+class StepProgress:
+    """A validated heartbeat with its age helpers."""
+
+    step: str
+    state: str
+    phase: str
+    message: str
+    updated_at: datetime
+
+    def age_seconds(self, now: datetime) -> float:
+        return max(0.0, (now - self.updated_at).total_seconds())
+
+    def age_minutes(self, now: datetime) -> int:
+        return int(self.age_seconds(now) // 60)
+
+
+@dataclass(frozen=True)
+class StepStatus:
+    """The live status of one step: kind for styling, text for the human."""
+
+    kind: str
+    text: str
 
 
 @dataclass(frozen=True)
@@ -140,11 +185,17 @@ class PipelineSeries:
         results_root: Path,
         configured: tuple[str, ...] = (),
         planned: tuple[str, ...] = (),
+        progress_dir: Path | None = None,
     ) -> None:
         self._results_root = Path(results_root)
         self._pipeline_root = self._results_root / PIPELINE_FOCUS
         self._configured = tuple(configured)
         self._planned = tuple(planned)
+        self._progress_root = (
+            Path(progress_dir)
+            if progress_dir is not None
+            else Path(os.environ.get(PROGRESS_DIR_ENV, "artifacts/progress"))
+        )
 
     @classmethod
     def from_experiments_root(
@@ -152,9 +203,12 @@ class PipelineSeries:
         experiments_root: Path,
         configured: tuple[str, ...] = (),
         planned: tuple[str, ...] = (),
+        progress_dir: Path | None = None,
     ) -> PipelineSeries:
         """Build the series for the dashboard's configured experiments root."""
-        return cls(Path(experiments_root) / "results", configured, planned)
+        return cls(
+            Path(experiments_root) / "results", configured, planned, progress_dir
+        )
 
     @property
     def exists(self) -> bool:
@@ -175,6 +229,53 @@ class PipelineSeries:
     def is_planned(self, step: str) -> bool:
         """Whether the step is a planned lane that is not configured yet."""
         return step in self._planned and step not in self._configured
+
+    def progress(self, step: str) -> StepProgress | None:
+        """The step's live heartbeat, or None when absent/malformed (logged once)."""
+        path = self._progress_root / f"{step}.json"
+        if not path.is_file():
+            return None
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            record = ProgressRecord.model_validate(payload)
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError, ValidationError):
+            if path not in _LOGGED_UNREADABLE:
+                _LOGGED_UNREADABLE.add(path)
+                logger.exception("pipeline evidence: unreadable progress at %s", path)
+            return None
+        updated = record.updated_at
+        if updated.tzinfo is None:
+            updated = updated.replace(tzinfo=UTC)
+        return StepProgress(
+            step=step,
+            state=record.state,
+            phase=record.phase,
+            message=record.message,
+            updated_at=updated,
+        )
+
+    def status(self, step: str, has_record: bool) -> StepStatus:
+        """Live heartbeat wins while running/blocked; a done heartbeat defers to the record."""
+        progress = self.progress(step)
+        if progress is None:
+            if has_record:
+                return StepStatus("record", "")
+            if self.is_planned(step):
+                return StepStatus("planned", PLANNED_STATUS)
+            return StepStatus("not_run", "not run yet")
+        now = datetime.now(UTC)
+        minutes = progress.age_minutes(now)
+        if progress.age_seconds(now) > PROGRESS_STALE_SECONDS:
+            return StepStatus("unknown", f"unknown — last update {minutes}m ago")
+        if progress.state == "running":
+            phase = f" — {progress.phase}" if progress.phase else ""
+            return StepStatus("running", f"running{phase} — updated {minutes}m ago")
+        if progress.state == "blocked":
+            detail = progress.message or progress.phase or "no message"
+            return StepStatus("blocked", f"blocked — {detail}")
+        if has_record:
+            return StepStatus("record", "")
+        return StepStatus("done", "done — record not published yet")
 
     def step_dir(self, step: str) -> Path | None:
         """The step's existing directory, or None when it has not run."""
@@ -210,18 +311,17 @@ class PipelineSeries:
         rows: list[dict[str, str | int]] = []
         for step in self.steps():
             record = self.primary(step)
-            status: str
-            if record is not None:
-                status = record.decision.verdict
-            elif self.is_planned(step):
-                status = PLANNED_STATUS
-            else:
-                status = "not run yet"
+            status = self.status(step, has_record=record is not None)
+            display = (
+                record.decision.verdict
+                if status.kind == "record" and record is not None
+                else status.text
+            )
             rows.append(
                 {
                     "experiment": step,
                     "question": record.decision.question if record is not None else "",
-                    "status": status,
+                    "status": display,
                     "artifacts": len(self.artifacts(step)),
                 }
             )
