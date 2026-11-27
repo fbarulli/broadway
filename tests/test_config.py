@@ -46,6 +46,17 @@ def stats_cfg():
     return cfg.stats
 
 
+def test_olist_analysis_contract_parses_through_load_config() -> None:
+    """The project analysis is valid YAML and a valid AnalysisContract."""
+    import project  # noqa: F401 — activates the project config overlay
+
+    cfg = load_config("train", dataset="olist", experiment="olist", analysis="olist")
+
+    assert cfg.analysis is not None
+    assert cfg.analysis.name == "olist"
+    assert cfg.analysis.mode.value == "prediction"
+
+
 def test_load_train_config(train_cfg) -> None:
     assert train_cfg.model_file
     assert train_cfg.random_state

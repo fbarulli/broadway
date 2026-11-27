@@ -83,8 +83,13 @@ class EdaRunner:
                 plan = SegmentPlan.build(
                     profile, self._dataset.datetime_column, self._step.max_categories
                 )
+                descriptive = (
+                    profile.drop(columns=[self._dataset.target])
+                    if self._dataset.target in profile.columns
+                    else profile
+                )
                 summary = SummaryAnalyzer(self._step.max_categories).analyze(
-                    profile, self._roles()
+                    descriptive, self._roles()
                 )
                 missing = MissingnessAnalyzer(self._step.max_categories).analyze(profile)
                 quality = QualityAnalyzer(
@@ -104,10 +109,12 @@ class EdaRunner:
                     notes,
                     plan,
                     provenance,
+                    target=self._dataset.target,
+                    roles=self._roles(),
                 )
             with phase("decide"):
                 correlation = CorrelationAnalyzer(self._step).analyze(
-                    profile, self._dataset.target
+                    profile, self._dataset.target, self._roles()
                 )
                 feature_tests = FeatureTestAnalyzer(
                     self._step, self._dataset.task

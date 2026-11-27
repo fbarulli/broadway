@@ -70,7 +70,8 @@
       "investigated": "3",
       "selected_feature": "association_total_freight",
       "effect_name": "rank_biserial_r",
-      "correlation": "measured over 13 numeric columns"
+      "bootstrap_note": "for high-cardinality nominal columns (e.g. zip/city) the row bootstrap changes the occupied level count; the interval is not centred on the corrected V, so those decisions are investigate, not act",
+      "correlation": "measured over 12 numeric columns"
     }
   }
 }

@@ -226,7 +226,16 @@ run_bg configs bash scripts/uv.sh run --extra dev python -c "
 from pathlib import Path
 from broadway.config.loader import load_config
 ps = sorted(Path('configs/experiment').glob('*.yaml')); assert ps, 'no configs'
-[load_config('train', dataset='test', experiment=p.stem) or print(f'OK {p.stem}') for p in ps]"
+[load_config('train', dataset='test', experiment=p.stem) or print(f'OK {p.stem}') for p in ps]
+if Path('project/config').is_dir():
+    import project
+    import yaml
+    from broadway.analysis.contracts import AnalysisContract
+    analyses = sorted(Path('project/config/analysis').glob('*.yaml'))
+    assert analyses, 'no project analysis configs'
+    [AnalysisContract(**yaml.safe_load(p.read_text(encoding='utf-8'))) for p in analyses]
+    load_config('train', dataset='olist', experiment='olist', analysis='olist')
+    print('OK project olist (dataset + experiment + analysis)')"
 # Gate-divergence law: keep command-identical to ci.yml's 'Shell scripts' step.
 # shellcheck disable=SC2016  # single quotes intended: globs must expand under bash -c
 run_bg shell-scripts bash -c 'for f in k8s/optuna/*.sh scripts/*.sh; do bash -n "$f"; done; shellcheck k8s/optuna/*.sh scripts/*.sh'

@@ -32,12 +32,22 @@ class CorrelationAnalyzer:
         self._max_features = step.max_features
         self._correction = MultipleTestingCorrection(step.correction)
 
-    def analyze(self, frame: pd.DataFrame, target: str) -> CorrelationResult:
-        """Rank the numeric features against the target, then correlate the top set."""
+    def analyze(
+        self,
+        frame: pd.DataFrame,
+        target: str,
+        roles: dict[str, str] | None = None,
+    ) -> CorrelationResult:
+        """Rank the numeric features against the target, then correlate the top set.
+
+        The target ranks the features but never enters the correlation table:
+        it is the outcome, and its distribution belongs to the class balance.
+        """
+        roles = roles or {}
         numeric = self._numeric_columns(frame)
         ranking, reason = self._ranking(frame, numeric, target)
         selected = self._selected(numeric, ranking, target)
-        pairs = self._pairs(frame, selected)
+        pairs = self._pairs(frame, selected, roles)
         return CorrelationResult(
             target=target,
             method=self._method,
@@ -60,10 +70,10 @@ class CorrelationAnalyzer:
     def _selected(
         self, numeric: list[str], ranking: list[TargetCorrelation], target: str
     ) -> list[str]:
-        """The target plus its top-ranked features (the bounded correlation set)."""
+        """The top-ranked features only; the target ranks them but is not a column."""
         ranked = [item.feature for item in ranking][: self._max_features]
-        chosen = [target, *ranked] if target in numeric else numeric[: self._max_features]
-        return [name for name in numeric if name in chosen]
+        chosen = ranked if target in numeric else numeric[: self._max_features]
+        return [name for name in numeric if name in chosen and name != target]
 
     def _ranking(
         self, frame: pd.DataFrame, numeric: list[str], target: str
@@ -110,9 +120,15 @@ class CorrelationAnalyzer:
             n=n,
         )
 
-    def _pairs(self, frame: pd.DataFrame, columns: list[str]) -> list[CorrelationPair]:
+    def _pairs(
+        self,
+        frame: pd.DataFrame,
+        columns: list[str],
+        roles: dict[str, str] | None = None,
+    ) -> list[CorrelationPair]:
+        roles = roles or {}
         pairs = [
-            self._pair(frame, left, right)
+            self._pair(frame, left, right, roles)
             for left, right in itertools.combinations(columns, 2)
         ]
         pearson_q = self._correction.adjust(
@@ -126,12 +142,20 @@ class CorrelationAnalyzer:
             for item, pq, sq in zip(pairs, pearson_q, spearman_q)
         ]
 
-    def _pair(self, frame: pd.DataFrame, left: str, right: str) -> CorrelationPair:
+    def _pair(
+        self,
+        frame: pd.DataFrame,
+        left: str,
+        right: str,
+        roles: dict[str, str] | None = None,
+    ) -> CorrelationPair:
+        roles = roles or {}
         values = self._complete(frame, left, right)
         n = len(values)
         if n < _MIN_PAIR_ROWS:
             return CorrelationPair(
-                left=left, right=right, n=n,
+                left=left, right=right,
+                left_role=roles.get(left), right_role=roles.get(right), n=n,
                 pearson=None, pearson_p=None, pearson_q=None,
                 spearman=None, spearman_p=None, spearman_q=None,
             )
@@ -139,7 +163,8 @@ class CorrelationAnalyzer:
         second = values[right].to_numpy(dtype=float)
         if np.unique(first).size < 2 or np.unique(second).size < 2:
             return CorrelationPair(
-                left=left, right=right, n=n,
+                left=left, right=right,
+                left_role=roles.get(left), right_role=roles.get(right), n=n,
                 pearson=None, pearson_p=None, pearson_q=None,
                 spearman=None, spearman_p=None, spearman_q=None,
             )
@@ -148,6 +173,8 @@ class CorrelationAnalyzer:
         return CorrelationPair(
             left=left,
             right=right,
+            left_role=roles.get(left),
+            right_role=roles.get(right),
             n=n,
             pearson=self._coefficient(float(pearson)),
             pearson_p=self._p_value(float(pearson_p)),

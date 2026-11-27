@@ -152,6 +152,7 @@ class ColumnShift(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     column: str
+    role: str | None = None
     before_mean: float | None
     after_mean: float | None
     before_median: float | None
@@ -197,6 +198,8 @@ class CorrelationPair(BaseModel):
 
     left: str
     right: str
+    left_role: str | None = None
+    right_role: str | None = None
     n: int
     pearson: float | None
     pearson_p: float | None
@@ -260,6 +263,11 @@ class FeatureTestResult(BaseModel):
     # The decision's calibrated floor (max(min_effect, null band)) when the
     # feature received a bootstrap/permutation decision; None otherwise.
     null_threshold: float | None = None
+    # The alternative (raw/uncorrected) effect and whether the bootstrap interval
+    # excludes the point; None when no decision was measured.
+    raw_effect_name: str | None = None
+    raw_effect: float | None = None
+    bootstrap_biased: bool | None = None
 
 
 class FeatureTestBundle(BaseModel):

@@ -79,6 +79,8 @@ class EtlComparator:
         notes: list[str],
         plan: SegmentPlan,
         provenance: dict[str, str],
+        target: str | None = None,
+        roles: dict[str, str] | None = None,
     ) -> CompareResult:
         notes = list(notes)
         if before is None or after is None:
@@ -105,16 +107,22 @@ class EtlComparator:
             for name in common
             if str(before[name].dtype) != str(after[name].dtype)
         }
+        roles = roles or {}
         numeric = [
             name
             for name in common
-            if not pd.api.types.is_bool_dtype(before[name])
+            if name != target
+            and roles.get(name) != "target"
+            and not pd.api.types.is_bool_dtype(before[name])
             and pd.api.types.is_numeric_dtype(before[name])
             and not pd.api.types.is_bool_dtype(after[name])
             and pd.api.types.is_numeric_dtype(after[name])
         ]
-        shifts = [self._shift(before[name], after[name], name) for name in numeric]
-        decision = self._decide(before, after, numeric, plan, provenance)
+        shifts = [
+            self._shift(before[name], after[name], name, roles.get(name))
+            for name in numeric
+        ]
+        decision = self._decide(before, after, numeric, plan, provenance, roles)
         return CompareResult(
             available=True,
             skip_reason=None,
@@ -131,7 +139,13 @@ class EtlComparator:
             decision=decision,
         )
 
-    def _shift(self, before: pd.Series, after: pd.Series, name: str) -> ColumnShift:
+    def _shift(
+        self,
+        before: pd.Series,
+        after: pd.Series,
+        name: str,
+        role: str | None = None,
+    ) -> ColumnShift:
         before_mean, before_median = self._mean(before), self._median(before)
         after_mean, after_median = self._mean(after), self._median(after)
         stacked = self._stacked(before, after)
@@ -139,6 +153,7 @@ class EtlComparator:
         median_delta = self._delta_interval(stacked, DeltaStatistic("median"))
         return ColumnShift(
             column=name,
+            role=role,
             before_mean=before_mean,
             after_mean=after_mean,
             before_median=before_median,
@@ -162,6 +177,7 @@ class EtlComparator:
         numeric: list[str],
         plan: SegmentPlan,
         provenance: dict[str, str],
+        roles: dict[str, str] | None = None,
     ) -> Decision | None:
         """One decision on the column whose standardized shift is largest."""
         shifts = {
@@ -204,6 +220,7 @@ class EtlComparator:
             provenance={
                 **provenance,
                 "column": column,
+                "role": (roles or {}).get(column, "undeclared"),
                 "before": self._before_label,
                 "after": self._after_label,
                 "rows": str(measurement.sample_size),

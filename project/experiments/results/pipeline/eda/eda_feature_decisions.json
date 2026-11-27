@@ -72,7 +72,8 @@
         "investigated": "3",
         "selected_feature": "association_total_freight",
         "effect_name": "rank_biserial_r",
-        "correlation": "measured over 13 numeric columns"
+        "bootstrap_note": "for high-cardinality nominal columns (e.g. zip/city) the row bootstrap changes the occupied level count; the interval is not centred on the corrected V, so those decisions are investigate, not act",
+        "correlation": "measured over 12 numeric columns"
       }
     }
   },
@@ -141,6 +142,7 @@
         "seed": "42",
         "exclusions": "pairwise-complete rows per feature; exclude_from_profiling dropped",
         "column": "estimated_days",
+        "role": "ignore",
         "before": "canonical (pre-split)",
         "after": "train+val (post-split)",
         "rows": "197346",
@@ -423,7 +425,8 @@
           "test": "chi2",
           "rows": "98673",
           "resampling": "iid+shuffle",
-          "segments": "levels of dominant_payment_type"
+          "segments": "levels of dominant_payment_type",
+          "bootstrap_note": "for high-cardinality nominal columns (e.g. zip/city) the row bootstrap changes the occupied level count; the interval is not centred on the corrected V, so those decisions are investigate, not act"
         }
       }
     },
@@ -710,7 +713,8 @@
           "test": "chi2",
           "rows": "98673",
           "resampling": "iid+shuffle",
-          "segments": "levels of dominant_payment_type"
+          "segments": "levels of dominant_payment_type",
+          "bootstrap_note": "for high-cardinality nominal columns (e.g. zip/city) the row bootstrap changes the occupied level count; the interval is not centred on the corrected V, so those decisions are investigate, not act"
         }
       }
     },

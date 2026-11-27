@@ -282,7 +282,11 @@ def test_correlation_ranks_the_target_and_keeps_pairwise_counts() -> None:
     degenerate = {item.feature: item for item in result.ranking}
     assert degenerate["constant"].value == 0.0 and degenerate["constant"].p_value == 1.0
     assert degenerate["sparse"].n == 1 and degenerate["sparse"].value == 0.0
-    pair = next(pair for pair in result.pairs if {pair.left, pair.right} == {"unrelated", "target"})
+    assert "target" not in result.columns
+    assert all("target" not in {pair.left, pair.right} for pair in result.pairs)
+    pair = next(
+        pair for pair in result.pairs if {pair.left, pair.right} == {"unrelated", "driving"}
+    )
     assert pair.n == n - len(frame.loc[::10])
     assert pair.pearson is not None and pair.spearman_q is not None
     constant_pair = next(
@@ -346,7 +350,20 @@ def test_eda_step_publishes_every_decision_artifact(tmp_path: Path) -> None:
 
     effects = pd.read_csv(reports / "eda_effects.csv")
     assert list(effects.columns[:4]) == ["feature", "feature_kind", "target_kind", "test"]
+    assert {
+        "raw_effect_name",
+        "raw_effect",
+        "null_threshold",
+        "bootstrap_biased",
+    } <= set(effects.columns)
+    assert "target" not in set(effects["feature"])
     assert effects.loc[effects["feature"] == "signal", "verdict"].item() == "act"
+    correlations = pd.read_csv(reports / "eda_correlations.csv")
+    assert "target" not in set(correlations["left"]) | set(correlations["right"])
+    assert {"left_role", "right_role"} <= set(correlations.columns)
+    comparison = pd.read_csv(reports / "eda_comparison.csv")
+    assert "target" not in set(comparison["column"])
+    assert "role" in comparison.columns
     decision = json.loads((reports / "eda_decision.json").read_text(encoding="utf-8"))
     assert decision["verdict"] == "act"
     assert decision["metric"] == "association_signal"

@@ -149,6 +149,15 @@ class EdaArtifactWriter:
                 "test": [row.test for row in tests.features],
                 "effect_name": [row.effect_name for row in tests.features],
                 "effect": [round(row.effect, _DECIMALS) for row in tests.features],
+                "raw_effect_name": [row.raw_effect_name or "" for row in tests.features],
+                "raw_effect": [
+                    None if row.raw_effect is None else round(row.raw_effect, _DECIMALS)
+                    for row in tests.features
+                ],
+                "bootstrap_biased": [
+                    "" if row.bootstrap_biased is None else row.bootstrap_biased
+                    for row in tests.features
+                ],
                 "p_value": [round(row.p_value, _DECIMALS) for row in tests.features],
                 "q_value": [round(row.q_value, _DECIMALS) for row in tests.features],
                 "significant": [row.significant for row in tests.features],
@@ -166,6 +175,8 @@ class EdaArtifactWriter:
             {
                 "left": [pair.left for pair in rows],
                 "right": [pair.right for pair in rows],
+                "left_role": [pair.left_role or "" for pair in rows],
+                "right_role": [pair.right_role or "" for pair in rows],
                 "n": [pair.n for pair in rows],
                 "pearson": [self._rounded(pair.pearson) for pair in rows],
                 "pearson_p": [self._rounded(pair.pearson_p) for pair in rows],
@@ -181,6 +192,7 @@ class EdaArtifactWriter:
         return pd.DataFrame(
             {
                 "column": [item.column for item in rows],
+                "role": [item.role or "" for item in rows],
                 "before_mean": [self._rounded(item.before_mean) for item in rows],
                 "after_mean": [self._rounded(item.after_mean) for item in rows],
                 "mean_delta": [self._rounded(item.mean_delta) for item in rows],

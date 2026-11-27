@@ -47,6 +47,11 @@ EffectName = Literal[
 _MIN_ROWS = 3
 _MIN_GROUP_SIZE = 2
 _CONTEXT_ACTION = "context only — measured for interpretation; never a predictor"
+_BIAS_NOTE = (
+    "for high-cardinality nominal columns (e.g. zip/city) the row bootstrap "
+    "changes the occupied level count; the interval is not centred on the "
+    "corrected V, so those decisions are investigate, not act"
+)
 _EFFECT_NAMES: dict[TestName, EffectName] = {
     "spearman": "abs_spearman_r",
     "welch": "point_biserial_r",
@@ -454,6 +459,7 @@ class FeatureTestAnalyzer:
                     update={
                         "verdict": decision.verdict,
                         "null_threshold": decision.null_threshold,
+                        "bootstrap_biased": decision.bootstrap_biased,
                     }
                 )
             results.append(row)
@@ -497,6 +503,7 @@ class FeatureTestAnalyzer:
         q_value: float,
         target_kind: TargetKind,
     ) -> FeatureTestResult:
+        alternative_name, alternative_value = test.alternative()
         return FeatureTestResult(
             feature=feature,
             feature_kind=kind,
@@ -504,6 +511,8 @@ class FeatureTestAnalyzer:
             test=test.name,
             effect_name=test.effect_name,
             effect=test.statistic(pair),
+            raw_effect_name=alternative_name,
+            raw_effect=alternative_value,
             p_value=test.p_value(),
             q_value=q_value,
             n=len(pair),
@@ -563,6 +572,7 @@ class FeatureTestAnalyzer:
                 "seed": str(measurement.seed),
                 "resampling": measurement.resampling,
                 "segments": plan.rule,
+                **({"bootstrap_note": _BIAS_NOTE} if measurement.bootstrap_biased else {}),
             },
         )
         context = role != "feature"
@@ -653,6 +663,11 @@ class FeatureTestAnalyzer:
                     ),
                     "selected_feature": chosen.metric,
                     "effect_name": effect_name or chosen.metric,
+                    **(
+                        {"bootstrap_note": _BIAS_NOTE}
+                        if any(item.bootstrap_biased for item in decisions)
+                        else {}
+                    ),
                 }
             }
         )
