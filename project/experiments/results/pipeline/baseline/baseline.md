@@ -6,7 +6,7 @@ Does the linear reference beat the naive mean on the holdout?
 
 ## decision — act
 
-- metric: improvement_over_naive_mae = 0.2861 [0.1480, 0.3350] 95% (n=121, unit=relative_improvement)
+- metric: improvement_over_naive_mae = 0.2861 [0.1737, 0.3933] 95% (n=121, unit=relative_improvement)
 - rule: max 0.0200
 - action (amazon): treat the naive mean as the bar the champion must clear on the holdout
 
@@ -38,6 +38,7 @@ the linear reference's paired MAE improvement interval falls at or below the con
 ### provenance
 
 - dataset: amazon
+- target: ordinal 1-5 treated as interval-scale
 - artifact: baseline.json
 - seed: 7
 - rows: 121

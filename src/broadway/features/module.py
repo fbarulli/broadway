@@ -18,6 +18,7 @@ from broadway.lineage.ids import node_id
 from broadway.lineage.models import TransformAudit
 from broadway.lineage.records import enforce_drop_fraction, write_record
 from broadway.reports.decision import Decision, DecisionRule, Evidence, SegmentEvidence
+from broadway.reports.decision_log import DecisionLog
 from broadway.reports.step_output import StepOutput
 
 logger = logging.getLogger(__name__)
@@ -161,7 +162,10 @@ class FeaturesDecision:
         axis.set_ylabel("columns")
         axis.set_title("feature surface: keep / drop / transform")
         output = StepOutput(
-            results_dir=Path(self._cfg.features.output_dir), stem="features", decision=decision
+            results_dir=Path(self._cfg.features.output_dir),
+            stem="features",
+            decision=decision,
+            log=DecisionLog(tracking_uri=self._cfg.environment.mlflow_tracking_uri),
         )
         output.save_figure(figure)
         plt.close("all")

@@ -12,14 +12,16 @@ import pandas as pd
 from broadway.analysis.contracts import AnalysisMode
 from broadway.baseline import causal, hypothesis, prediction
 from broadway.baseline.contracts import BaselineResult, load_result, save_result
-from broadway.config.schema import PipelineConfig
+from broadway.config.schema import TARGET_NOTE, PipelineConfig
 from broadway.data.loader import ProcessedStore, load
+from broadway.evaluate.contracts import BootstrapConfig
 from broadway.evaluate.metrics import MetricBootstrap, compute_metrics
 from broadway.features.generic import validate_engineered_frame
 from broadway.features.plan import ColumnPlan
 from broadway.lineage.ids import node_id
 from broadway.lineage.records import write_record
 from broadway.reports.decision import Decision, DecisionRule, Evidence, SegmentEvidence
+from broadway.reports.decision_log import DecisionLog
 from broadway.reports.measurement import MeasurementEstimator, MeasurementSpec
 from broadway.reports.step_output import StepOutput
 from broadway.trace import ArtifactTrace
@@ -201,7 +203,12 @@ class BaselineDecision:
             )
         axis.set_ylabel("holdout MAE")
         axis.set_title("naive baselines: mean vs median")
-        output = StepOutput(results_dir=out_dir, stem="baseline", decision=decision)
+        output = StepOutput(
+            results_dir=out_dir,
+            stem="baseline",
+            decision=decision,
+            log=DecisionLog(tracking_uri=self._cfg.environment.mlflow_tracking_uri),
+        )
         output.save_figure(figure)
         plt.close("all")
         output.write()
@@ -249,6 +256,8 @@ def _holdout_reference(
     y_train = train[cfg.dataset.target]
     truth = val[cfg.dataset.target].to_numpy(dtype=float)
     naive = np.full(truth.shape, float(y_train.mean()))
+    if cfg.baseline.linear_reference_model is None:
+        raise ValueError("baseline.linear_reference_model is not configured")
     model = build_model_pipeline(
         cfg, cfg.baseline.linear_reference_model, cfg.experiment.model.params
     )
@@ -258,7 +267,7 @@ def _holdout_reference(
 
 
 def _bootstrap(cfg: PipelineConfig) -> MetricBootstrap:
-    assert cfg.baseline is not None
+    assert cfg.baseline is not None and cfg.baseline.bootstrap is not None
     return MetricBootstrap(cfg.baseline.bootstrap)
 
 
@@ -275,9 +284,33 @@ class LinearReferenceDecision:
         self, cfg: PipelineConfig, result: BaselineResult, reference: HoldoutReference
     ) -> None:
         assert cfg.dataset is not None and cfg.baseline is not None
+        baseline = cfg.baseline
+        if (
+            baseline.linear_reference_model is None
+            or baseline.bootstrap is None
+            or baseline.min_effect is None
+            or baseline.min_sample_size is None
+            or baseline.action is None
+            or baseline.owner is None
+        ):
+            raise ValueError(
+                "the linear-reference baseline needs linear_reference_model, bootstrap, "
+                "min_effect, min_sample_size, action and owner in step/baseline.yaml"
+            )
         self._cfg = cfg
         self._result = result
         self._reference = reference
+        self._bootstrap_spec: BootstrapConfig = baseline.bootstrap
+        self._model = baseline.linear_reference_model
+        self._output_file = baseline.output_file
+        self._rule = DecisionRule(
+            metric="improvement_over_naive_mae",
+            direction="max",
+            min_effect=baseline.min_effect,
+            min_sample_size=baseline.min_sample_size,
+            action=baseline.action,
+            owner=baseline.owner,
+        )
 
     def _mae(self, prediction: np.ndarray, rows: slice | np.ndarray) -> float:
         truth = self._reference.truth[rows]
@@ -292,9 +325,9 @@ class LinearReferenceDecision:
         measured = _bootstrap(self._cfg).improvement_interval(
             reference.truth, reference.linear_prediction, reference.naive_prediction, metric="mae"
         )
-        low, high = measured.lower, measured.upper
+        low, high = measured.lower / naive_mae, measured.upper / naive_mae
         sensitivity = MetricBootstrap(
-            self._cfg.baseline.bootstrap.model_copy(update={"level": 0.90})
+            self._bootstrap_spec.model_copy(update={"level": 0.90})
         ).improvement_interval(
             reference.truth, reference.linear_prediction, reference.naive_prediction, metric="mae"
         )
@@ -326,23 +359,17 @@ class LinearReferenceDecision:
             ),
             provenance={
                 "dataset": self._cfg.dataset.name,
-                "artifact": self._cfg.baseline.output_file,
-                "seed": str(self._cfg.baseline.bootstrap.seed),
+                "target": TARGET_NOTE,
+                "artifact": self._output_file,
+                "seed": str(self._bootstrap_spec.seed),
                 "rows": str(len(reference.truth)),
                 "resampling": "paired row bootstrap on the holdout",
             },
         )
         return Decision.evaluate(
-            rule=DecisionRule(
-                metric="improvement_over_naive_mae",
-                direction="max",
-                min_effect=self._cfg.baseline.min_effect,
-                min_sample_size=self._cfg.baseline.min_sample_size,
-                action=self._cfg.baseline.action,
-                owner=self._cfg.baseline.owner,
-            ),
+            rule=self._rule,
             value=value,
-            interval=(min(low, value), max(high, value)),
+            interval=(low, high),
             sample_size=len(reference.truth),
             question="Does the linear reference beat the naive mean on the holdout?",
             evidence=evidence,
@@ -383,7 +410,10 @@ class LinearReferenceDecision:
         axis.set_ylabel("holdout MAE")
         axis.set_title("naive mean vs linear reference (holdout)")
         output = StepOutput(
-            results_dir=Path(self._cfg.baseline.output_dir), stem="baseline", decision=decision
+            results_dir=Path(self._cfg.baseline.output_dir),
+            stem="baseline",
+            decision=decision,
+            log=DecisionLog(tracking_uri=self._cfg.environment.mlflow_tracking_uri),
         )
         output.save_figure(figure)
         plt.close("all")

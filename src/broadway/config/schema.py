@@ -279,6 +279,10 @@ PRE_PARAM_PREFIX = "pre__"
 # folds as every candidate for the paired improvement to mean anything.
 NAIVE_REFERENCE = "naive_mean"
 
+# Every modelling record carries the target's scale so a reader cannot mistake
+# the regression RMSE/MAE for a calibrated ordinal model.
+TARGET_NOTE = "ordinal 1-5 treated as interval-scale"
+
 
 class ExperimentConfig(BaseModel):
     data_source: DataSourceRef
@@ -687,6 +691,9 @@ class TrainStep(BaseModel):
     # Independent shuffles for a cross-sectional cv_kind='kfold' (the deployed
     # fit's repeated-CV score); a time-aware kind always uses one pass.
     cv_repeats: int = Field(default=1, ge=1)
+    # The fit verdict's own fold seed — never experiment.random_state, so the
+    # training score is not read on the selection/HPO partitions.
+    cv_random_state: int = Field(default=0)
     # Rows dropped between a training prefix and its validation block (the
     # purge gap); a forecast horizon h requires cv_gap >= h.
     cv_gap: int = Field(default=0, ge=0)
@@ -777,14 +784,17 @@ class BaselineStep(BaseModel):
     predictor.
     """
 
+    # Optional: a checkout with no feature plan publishes the mean/median
+    # fallback and needs none of these; the linear-reference path fails loud
+    # when the rule is absent.
     output_dir: str
     output_file: str
-    linear_reference_model: str
-    bootstrap: BootstrapConfig
-    min_effect: float = Field(gt=0.0)
-    min_sample_size: int = Field(ge=1)
-    action: str = Field(min_length=1)
-    owner: str = Field(min_length=1)
+    linear_reference_model: str | None = None
+    bootstrap: BootstrapConfig | None = None
+    min_effect: float | None = Field(default=None, gt=0.0)
+    min_sample_size: int | None = Field(default=None, ge=1)
+    action: str | None = None
+    owner: str | None = None
 
 
 class CVGeometry(BaseModel):
@@ -799,16 +809,6 @@ class CVGeometry(BaseModel):
     folds: int = Field(ge=2)
     repeats: int = Field(ge=1)
     random_state: int
-
-
-class BootstrapSpec(BaseModel):
-    """Percentile bootstrap for fold-level and paired intervals."""
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-    iterations: int = Field(ge=100)
-    seed: int
-    level: float = Field(gt=0.0, lt=1.0)
 
 
 class CandidateSpec(BaseModel):
@@ -862,7 +862,10 @@ class SelectionStep(BaseModel):
     secondary_metric: str
     cv: CVGeometry
     sensitivity_random_state: int
-    bootstrap: BootstrapSpec
+    # How the champion is chosen from the CV table: the point-estimate leader
+    # or the simplest candidate within one standard error of the best mean.
+    selection_rule: Literal["point", "one_se"]
+    bootstrap: BootstrapConfig
     baseline_candidate: str
     linear_reference: str
     candidates: list[CandidateSpec] = Field(min_length=2)
@@ -899,8 +902,10 @@ class HpoStep(BaseModel):
 
     metric: str
     cv: CVGeometry
-    sensitivity_random_state: int
-    bootstrap: BootstrapSpec
+    # Search folds vs report folds are disjoint: the tuned score is read on a
+    # partition the search never optimized against.
+    report_random_state: int
+    bootstrap: BootstrapConfig
     selection_record: str
     min_effect: float = Field(gt=0.0)
     min_sample_size: int = Field(ge=1)

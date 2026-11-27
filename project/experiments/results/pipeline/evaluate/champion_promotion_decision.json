@@ -1,0 +1,49 @@
+{
+  "question": "Does the candidate beat the champion on rmse by more than 5.0% on the holdout?",
+  "metric": "improvement_rmse",
+  "value": 0.23121387283237002,
+  "interval_low": 0.11401235798285828,
+  "interval_high": 0.3257923061590592,
+  "reference": null,
+  "delta": null,
+  "threshold": 0.05,
+  "null_threshold": null,
+  "direction": "max",
+  "verdict": "act",
+  "action": "promote the candidate to champion",
+  "owner": "amazon",
+  "sample_size": 121,
+  "unit": "relative_improvement",
+  "min_sample_size": 100,
+  "evidence": {
+    "baseline": "champion naive training-mean on the same holdout",
+    "delta": 0.23121387283237002,
+    "segments": [
+      {
+        "segment": "first_half",
+        "value": 0.2918825561312608,
+        "sample_size": 60
+      },
+      {
+        "segment": "second_half",
+        "value": 0.1796829125073401,
+        "sample_size": 61
+      }
+    ],
+    "sensitivity": {
+      "level_90pct_low": 0.13533984452860273,
+      "level_90pct_high": 0.30845126569663145,
+      "absolute_improvement_low": 0.1144,
+      "absolute_improvement_high": 0.3269
+    },
+    "falsifier": "the 95% improvement interval's lower bound falls below the 5.0% threshold",
+    "provenance": {
+      "dataset": "amazon",
+      "target": "ordinal 1-5 treated as interval-scale",
+      "champion": "naive training-mean",
+      "seed": "42",
+      "rows": "121",
+      "resampling": "paired row bootstrap on the holdout"
+    }
+  }
+}

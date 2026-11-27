@@ -7,6 +7,8 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+
 from broadway.reports.decision import Decision
 
 _ROOT = Path(__file__).resolve().parents[1]
@@ -77,12 +79,12 @@ def test_project_checkout_without_results_root_still_enforces_eda(
 
     monkeypatch.setattr(module, "resolve_project_layout", lambda: layout)
     assert module.main() == 1
-    assert "FAIL pipeline/eda: missing decision record" in capsys.readouterr().out
+    assert "FAIL pipeline/eda: missing published decision record" in capsys.readouterr().out
 
     skipped = module.ProjectLayout(None, None, "project unavailable")
     monkeypatch.setattr(module, "resolve_project_layout", lambda: skipped)
     assert module.main() == 0
-    assert "note pipeline/eda: decision record not enforced" in capsys.readouterr().out
+    assert "no record is enforced (advisory)" in capsys.readouterr().out
 
 
 def test_audit_flags_a_step_without_a_figure(tmp_path: Path) -> None:
@@ -107,6 +109,90 @@ def test_pipeline_audit_reports_missing_decisions(tmp_path: Path) -> None:
     )
 
     assert audit.status() == {"eda": False}
+
+
+def test_pipeline_enforced_set_is_pinned() -> None:
+    """The enforced set is explicit: a step leaves it only with its dataset."""
+    module = _audit_module()
+
+    assert module.PIPELINE_DECISION_ENFORCED == (
+        "etl",
+        "eda",
+        "features",
+        "baseline",
+        "training",
+        "selection",
+        "hpo",
+        "evaluate",
+    )
+    assert len(module.PIPELINE_DECISION_ENFORCED) == 8
+    assert module.PIPELINE_NOT_APPLICABLE == {
+        "causal": "the Amazon project has no causal analysis config, so no record can exist"
+    }
+
+
+def test_a_code_call_alone_does_not_satisfy_the_record_gate(tmp_path: Path) -> None:
+    """The loophole: a StepOutput call without a published record must fail."""
+    module = tmp_path / "eda"
+    module.mkdir()
+    (module / "module.py").write_text(
+        "def run(cfg):\n"
+        "    StepOutput(results_dir='x', stem='eda', decision=None)\n"
+        "    return cfg\n",
+        encoding="utf-8",
+    )
+    audit = _audit_module().PipelineDecisionAudit(
+        tmp_path, results_root=tmp_path / "results"
+    )
+
+    assert audit.code_publishes_decision("eda") is True
+    assert audit.status() == {"eda": False}
+
+
+def test_deleting_a_pipeline_record_turns_the_gate_red(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    module = _audit_module()
+    experiments = tmp_path / "experiments"
+    experiments.mkdir()
+    results = tmp_path / "results"
+    payload = json.dumps(_decision())
+    for step in module.PIPELINE_DECISION_ENFORCED:
+        record = results / "pipeline" / step / f"{step}_decision.json"
+        record.parent.mkdir(parents=True)
+        record.write_text(payload, encoding="utf-8")
+    layout = module.ProjectLayout(experiments=experiments, results=results)
+    monkeypatch.setattr(module, "resolve_project_layout", lambda: layout)
+
+    assert module.main() == 0
+    assert "FAIL" not in capsys.readouterr().out
+
+    (results / "pipeline" / "eda" / "eda_decision.json").unlink()
+    assert module.main() == 1
+    assert "FAIL pipeline/eda: missing published decision record" in capsys.readouterr().out
+
+
+def test_a_missing_non_eda_record_turns_the_gate_red(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The step module is resolved via STEP_MODULES, so hpo's tuning.py is checked."""
+    module = _audit_module()
+    experiments = tmp_path / "experiments"
+    experiments.mkdir()
+    results = tmp_path / "results"
+    payload = json.dumps(_decision())
+    for step in module.PIPELINE_DECISION_ENFORCED:
+        if step == "hpo":
+            continue
+        record = results / "pipeline" / step / f"{step}_decision.json"
+        record.parent.mkdir(parents=True)
+        record.write_text(payload, encoding="utf-8")
+    layout = module.ProjectLayout(experiments=experiments, results=results)
+    monkeypatch.setattr(module, "resolve_project_layout", lambda: layout)
+
+    assert module.main() == 1
+    assert "FAIL pipeline/hpo: missing published decision record" in capsys.readouterr().out
+
 
 
 def test_pipeline_audit_accepts_only_a_canonical_published_record(tmp_path: Path) -> None:

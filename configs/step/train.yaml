@@ -9,6 +9,8 @@ cv_folds: 5
 # rows it scores (leakage on time-ordered data), so the config and
 # the PipelineConfig validator both refuse kfold for a time split.
 cv_kind: expanding
+# Independent shuffles for cv_kind='kfold' (cross-sectional rows).
+cv_repeats: 1
 # Rows dropped between a training prefix and its validation block.
 cv_gap: 1
 # Time-series CV geometry (this dataset is cross-sectional rows, so the
@@ -26,6 +28,18 @@ colsample_bytree: 0.8
 quantile_tail: 0.9
 output_dir: artifacts/training
 output_file: training_result.json
+# The deployed fit's training-only repeated-CV verdict vs the naive reference.
+fit_decision:
+  metric: improvement_over_naive_rmse
+  direction: max
+  min_effect: 0.02
+  min_sample_size: 100
+  action: "deploy the fitted model behind the evaluate promotion gate"
+  owner: training
+bootstrap:
+  iterations: 2000
+  seed: 42
+  level: 0.95
 # Training-size curve: metric vs fraction of the deployed fit slice, run after
 # HPO and the calibration split and BEFORE the full fit. Reports the smallest
 # fraction within the tolerance band — the minimum-data answer. COST: every

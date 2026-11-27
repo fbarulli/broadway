@@ -123,7 +123,7 @@ def test_promotion_needs_the_interval_to_clear_the_threshold(tmp_path: Path) -> 
     decision = PromotionDecision.measure(
         cfg, "mae", 1.0, 5.0, "models:/champion/1", truth, candidate, champion
     )
-    published = decision.publish(Path(cfg.evaluate.output_dir))
+    published = decision.publish(Path(cfg.evaluate.output_dir), "promotion")
 
     assert decision.promote is True
     assert published.verdict == "act"

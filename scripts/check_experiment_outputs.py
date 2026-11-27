@@ -15,6 +15,7 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
+from broadway.config.loader import STEP_MODULES
 from broadway.reports.decision import Decision
 
 logger = logging.getLogger(__name__)
@@ -47,6 +48,8 @@ PIPELINE_STEPS: tuple[str, ...] = (
     "training",
     "evaluate",
     "baseline",
+    "selection",
+    "hpo",
     "causal",
     # tracking has no step module yet; it joins the decision gate with the
     # serve feed that makes a train-vs-serve drift verdict measurable.
@@ -54,15 +57,24 @@ PIPELINE_STEPS: tuple[str, ...] = (
 )
 # Steps that now publish a computed Decision/StepOutput. An entry is added
 # once it complies; never removed.
+# A record under <results>/pipeline/<step>/ is the ONLY thing that satisfies
+# this set — a StepOutput call in the module is not evidence that a record was
+# published (the AST check below stays advisory).
 PIPELINE_DECISION_ENFORCED: tuple[str, ...] = (
     "etl",
     "eda",
     "features",
-    "training",
-    "evaluate",
     "baseline",
-    "causal",
+    "training",
+    "selection",
+    "hpo",
+    "evaluate",
 )
+# Explicit not-applicable rulings, printed on every run: a step is never
+# silently retired from the enforced set.
+PIPELINE_NOT_APPLICABLE: dict[str, str] = {
+    "causal": "the Amazon project has no causal analysis config, so no record can exist",
+}
 
 
 @dataclass(frozen=True)
@@ -242,14 +254,27 @@ class PipelineDecisionAudit:
         self._root = root
         self._results_root = results_root
 
+    def _module(self, step: str) -> Path | None:
+        """Resolve the step's module through STEP_MODULES (the loader SSOT)."""
+        reference = STEP_MODULES.get(step)
+        if reference is None:
+            return None
+        return self._root / Path(*reference.split(".")[1:]).with_suffix(".py")
+
     def status(self) -> dict[str, bool]:
+        """Whether a step has a validated record — the code call never counts."""
         status = {}
         for step in PIPELINE_STEPS:
-            module = self._root / step / "module.py"
-            if not module.is_file():
+            module = self._module(step)
+            if module is None or not module.is_file():
                 continue
-            status[step] = self._publishes_in_code(module) or self._publishes_record(step)
+            status[step] = self._publishes_record(step)
         return status
+
+    def code_publishes_decision(self, step: str) -> bool:
+        """Advisory: the module contains a StepOutput/Decision.evaluate call."""
+        module = self._module(step)
+        return module is not None and module.is_file() and self._publishes_in_code(module)
 
     @staticmethod
     def _publishes_in_code(module: Path) -> bool:
@@ -291,9 +316,9 @@ def _enforced_pipeline_steps(layout: ProjectLayout) -> tuple[str, ...]:
     """
     if layout.experiments is not None and layout.experiments.is_dir():
         return PIPELINE_DECISION_ENFORCED
-    return tuple(
-        step for step in PIPELINE_DECISION_ENFORCED if step not in PROJECT_EVIDENCE_STEPS
-    )
+    # A platform-only checkout has no project evidence surface: nothing is
+    # enforced, and every step is reported as advisory instead.
+    return ()
 
 
 def main() -> int:
@@ -316,7 +341,8 @@ def main() -> int:
         for step in PROJECT_EVIDENCE_STEPS
         if step in PIPELINE_DECISION_ENFORCED and step not in enforced_pipeline
     )
-    pipeline = PipelineDecisionAudit(results_root=layout.pipeline_results).status()
+    pipeline_audit = PipelineDecisionAudit(results_root=layout.pipeline_results)
+    pipeline = pipeline_audit.status()
     for pipeline_step, publishes in sorted(pipeline.items()):
         if publishes:
             continue
@@ -327,11 +353,24 @@ def main() -> int:
             )
             continue
         enforced = pipeline_step in enforced_pipeline
-        print(
-            f"{'FAIL' if enforced else 'note'} pipeline/{pipeline_step}: "
-            f"{'missing' if enforced else 'no'} decision record"
-            + ("" if enforced else " (not yet enforced)")
-        )
+        if enforced:
+            print(
+                f"FAIL pipeline/{pipeline_step}: missing published decision record at "
+                f"{layout.pipeline_results / pipeline_step if layout.pipeline_results else '<results>'}"
+                " (a StepOutput call in code is not evidence — publish the record)"
+            )
+        elif pipeline_step in PIPELINE_NOT_APPLICABLE:
+            print(
+                f"note pipeline/{pipeline_step}: not applicable — "
+                f"{PIPELINE_NOT_APPLICABLE[pipeline_step]}"
+            )
+        elif pipeline_audit.code_publishes_decision(pipeline_step):
+            print(
+                f"note pipeline/{pipeline_step}: code publishes a decision but no "
+                "record is enforced (advisory)"
+            )
+        else:
+            print(f"note pipeline/{pipeline_step}: no decision record (not enforced)")
     if violations or any(
         pipeline_step in enforced_pipeline
         for pipeline_step in pipeline

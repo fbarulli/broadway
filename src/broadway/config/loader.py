@@ -75,6 +75,13 @@ STEP_MODULES = {
 # by the step modules themselves (require_mode / presence checks).
 _TOP_LEVEL_SECTIONS: frozenset[str] = frozenset({"environment", "dataset", "experiment", "analysis"})
 
+# Sibling sections a step reads only when the project supplies them: the
+# baseline's linear reference needs the feature-split files, but a checkout
+# whose step tree has no etl binding still runs the naive mean/median baseline.
+_OPTIONAL_STEP_SECTIONS: dict[str, tuple[str, ...]] = {
+    "baseline": ("etl",),
+}
+
 # Single source of truth for standalone step configs: step name -> sibling
 # sections the step module reads at runtime (verified per module). Step
 # sections (e.g. "etl", "train") are attached here from step/<name>.yaml and
@@ -83,8 +90,8 @@ _STEP_SECTION_REQUIREMENTS: dict[str, tuple[str, ...]] = {
     "eda": ("environment", "dataset", "etl"),
     "features": ("environment", "dataset", "experiment", "etl"),
     "train": ("environment", "dataset", "experiment", "etl", "analysis"),
-    "evaluate": ("environment", "dataset", "experiment", "etl", "train", "analysis"),
-    "baseline": ("analysis", "dataset", "etl"),
+    "evaluate": ("environment", "dataset", "experiment", "etl", "train", "analysis", "baseline"),
+    "baseline": ("analysis", "dataset"),
     "selection": ("environment", "dataset", "experiment", "etl"),
     "hpo": ("environment", "dataset", "experiment", "etl"),
     "stats": ("environment", "dataset", "analysis"),
@@ -194,6 +201,11 @@ def _build_config(merged: dict, step: str) -> PipelineConfig:
     validate_preprocessing_columns(config)
     for section in _STEP_SECTION_REQUIREMENTS.get(step, ()):
         if section in _TOP_LEVEL_SECTIONS or section == step:
+            continue
+        raw = _load_yaml(f"step/{section}.yaml")
+        setattr(config, section, STEP_MODELS[section](**resolve_values(raw)))
+    for section in _OPTIONAL_STEP_SECTIONS.get(step, ()):
+        if not config_path(f"step/{section}.yaml").exists():
             continue
         raw = _load_yaml(f"step/{section}.yaml")
         setattr(config, section, STEP_MODELS[section](**resolve_values(raw)))

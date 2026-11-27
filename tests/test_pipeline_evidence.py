@@ -135,3 +135,20 @@ def test_dashboard_root_renders_pipeline_records_and_skips_malformed(
     for skipped in ("bad_list", "bad_overflow", "bad_interval", "bad_direction"):
         assert f"<td>{skipped}</td>" not in body
     assert caplog.text.count("unreadable decision record") == 4
+
+
+def test_every_record_in_a_step_is_rendered(tmp_path: Path) -> None:
+    """Two records in one step dir (evaluate: champion + tuned) both render."""
+    step = tmp_path / "experiments" / "results" / "pipeline" / "evaluate"
+    step.mkdir(parents=True)
+    for stem in ("champion_promotion", "tuned_promotion"):
+        (step / f"{stem}_decision.json").write_text(
+            json.dumps(_decision(metric=stem)), encoding="utf-8"
+        )
+
+    section = ui.PipelineEvidenceSection.from_experiments_root(tmp_path / "experiments")
+    rendered = section.render()
+
+    assert rendered.count("<tr>") - 1 == 2
+    assert "champion_promotion" in rendered
+    assert "tuned_promotion" in rendered

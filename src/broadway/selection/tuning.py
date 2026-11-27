@@ -1,10 +1,12 @@
 """HPO step — tune the selected champion on training-only repeated CV.
 
 The search space and trial budget come from the experiment's ``hpo`` block;
-the folds come from ``step/hpo.yaml`` and are seeded independently of the
-folds that selected the champion, so the tuned score is never read on the
-partition that picked the winner. The holdout split is never touched here: the
-published best-vs-default interval is a paired bootstrap over the HPO folds.
+the search folds come from ``step/hpo.yaml`` and the report is measured on a
+DISJOINT fold seed (``report_random_state``), so the tuned score is never read
+on the partition the search optimized or the partition that selected the
+champion. The holdout split is never touched here: the published
+best-vs-default interval is the canonical paired row-level bootstrap on the
+out-of-fold predictions.
 """
 
 from __future__ import annotations
@@ -20,8 +22,14 @@ import pandas as pd
 from pydantic import BaseModel, ConfigDict
 from sklearn.base import BaseEstimator
 
-from broadway.config.schema import HpoStep, ModelHPOSpec, PipelineConfig
-from broadway.evaluate.metrics import compute_metrics
+from broadway.config.schema import (
+    TARGET_NOTE,
+    BootstrapConfig,
+    HpoStep,
+    ModelHPOSpec,
+    PipelineConfig,
+)
+from broadway.evaluate.metrics import MetricBootstrap, compute_metrics
 from broadway.evaluate.repeated_cv import CVResult, RepeatedCV
 from broadway.observability.profiling import timed
 from broadway.reports.decision import Decision, DecisionRule, Evidence, SegmentEvidence
@@ -57,7 +65,6 @@ class TuningDecision:
         best: CVResult,
         default: CVResult,
         truth: np.ndarray,
-        sensitivity: float,
         trials: int,
         best_params: dict[str, float | int | str],
     ) -> None:
@@ -67,20 +74,32 @@ class TuningDecision:
         self._best = best
         self._default = default
         self._truth = truth
-        self._sensitivity = sensitivity
         self._trials = trials
         self._best_params = best_params
 
     def decision(self) -> Decision:
         assert self._cfg.dataset is not None
         step = self._step
-        value, low, high = self._best.paired_improvement(self._default, step.bootstrap)
+        best_prediction = self._best.out_of_fold_prediction()
+        default_prediction = self._default.out_of_fold_prediction()
+        value, low, high = _improvement(
+            self._truth, best_prediction, default_prediction, step.metric, step.bootstrap
+        )
+        default_value = float(
+            compute_metrics(self._truth, default_prediction, metrics=(step.metric,))[step.metric]
+        )
+        level_90 = MetricBootstrap(
+            step.bootstrap.model_copy(update={"level": 0.90})
+        ).improvement_interval(
+            self._truth, best_prediction, default_prediction, metric=step.metric
+        )
         evidence = Evidence(
-            baseline="the experiment's default params on the identical HPO folds",
+            baseline="the experiment's default params on the identical report folds",
             delta=value,
             segments=self._segments(),
             sensitivity={
-                f"second_seed_improvement_seed{step.sensitivity_random_state}": self._sensitivity,
+                "level_90pct_low": level_90.lower / default_value,
+                "level_90pct_high": level_90.upper / default_value,
                 f"best_cv_{step.metric}_n{len(self._truth)}": self._best.mean,
                 f"default_cv_{step.metric}_n{len(self._truth)}": self._default.mean,
             },
@@ -90,12 +109,14 @@ class TuningDecision:
             ),
             provenance={
                 "dataset": self._cfg.dataset.name,
-                "seed": str(step.cv.random_state),
-                "folds": f"{step.cv.repeats}x{step.cv.folds} shuffled KFold (HPO seed)",
+                "target": TARGET_NOTE,
+                "search_seed": str(step.cv.random_state),
+                "report_seed": str(step.report_random_state),
+                "folds": f"{step.cv.repeats}x{step.cv.folds} shuffled KFold on the report seed",
                 "trials": str(self._trials),
                 "model": self._best.model,
                 "best_params": str(self._best_params),
-                "resampling": "paired fold bootstrap",
+                "resampling": "paired row bootstrap on out-of-fold predictions",
             },
         )
         return Decision.evaluate(
@@ -108,7 +129,7 @@ class TuningDecision:
                 owner=step.owner,
             ),
             value=value,
-            interval=(min(low, value), max(high, value)),
+            interval=(low, high),
             sample_size=len(self._truth),
             question=(
                 "Do the HPO-best params beat the declared defaults on training-only "
@@ -119,7 +140,8 @@ class TuningDecision:
         )
 
     def _segments(self) -> list[SegmentEvidence]:
-        prediction, default_prediction = self._best.paired_rows(self._default)
+        prediction = self._best.out_of_fold_prediction()
+        default_prediction = self._default.out_of_fold_prediction()
         split = float(np.median(self._truth))
         segments: list[SegmentEvidence] = []
         for label, mask in (
@@ -239,41 +261,34 @@ class TuningRun:
             elapsed(),
         )
         best_params = dict(study.best_params)
-        best = objective.evaluate(best_params)
-        default = objective.evaluate(self._cfg.experiment.model.params)
-        return best, default, len(study.trials), best_params
-
-    def sensitivity(self, best_params: dict[str, float | int | str]) -> float:
-        """Best-vs-default improvement under a second fold seed."""
-        X, y = load_selection_frame(self._cfg)
-        geometry = self._step.cv.model_copy(
-            update={"random_state": self._step.sensitivity_random_state}
+        # Report on a fold seed the search never optimized against.
+        report_geometry = self._step.cv.model_copy(
+            update={"random_state": self._step.report_random_state}
         )
-        cv = RepeatedCV(geometry, self._step.metric, self._step.metric)
-        best = cv.run(self._spec.name, _factory(self._cfg, self._spec.name, best_params), X, y)
-        assert self._cfg.experiment is not None
-        default = cv.run(
+        report = RepeatedCV(report_geometry, self._step.metric, self._step.metric)
+        best = report.run(
+            self._spec.name, _factory(self._cfg, self._spec.name, best_params), X, y
+        )
+        default = report.run(
             self._spec.name,
             _factory(self._cfg, self._spec.name, self._cfg.experiment.model.params),
             X,
             y,
         )
-        improvement, _, _ = best.paired_improvement(default, self._step.bootstrap)
-        return improvement
+        return best, default, len(study.trials), best_params
 
     def publish(
         self,
         best: CVResult,
         default: CVResult,
         trials: int,
-        sensitivity: float,
         best_params: dict[str, float | int | str],
     ) -> Decision:
         step = self._step
         _, y = load_selection_frame(self._cfg)
         truth = y.to_numpy(dtype=float)
         decision = TuningDecision(
-            self._cfg, step, best, default, truth, sensitivity, trials, best_params
+            self._cfg, step, best, default, truth, trials, best_params
         ).decision()
         output = StepOutput(
             results_dir=Path(step.output_dir),
@@ -314,6 +329,24 @@ class TuningRun:
         return decision
 
 
+def _improvement(
+    truth: np.ndarray,
+    candidate: np.ndarray,
+    reference: np.ndarray,
+    metric: str,
+    bootstrap: BootstrapConfig,
+) -> tuple[float, float, float]:
+    """Paired row-level improvement of ``candidate`` over ``reference`` on the OOF rows."""
+    candidate_value = float(compute_metrics(truth, candidate, metrics=(metric,))[metric])
+    reference_value = float(compute_metrics(truth, reference, metrics=(metric,))[metric])
+    if reference_value <= 0.0:
+        raise ValueError(f"reference {metric} must be positive for a relative delta")
+    interval = MetricBootstrap(bootstrap).improvement_interval(
+        truth, candidate, reference, metric=metric
+    )
+    value = (reference_value - candidate_value) / reference_value
+    return value, interval.lower / reference_value, interval.upper / reference_value
+
 
 def _figure(best: CVResult, default: CVResult, metric: str) -> object:
     import matplotlib
@@ -343,8 +376,7 @@ def run(cfg: PipelineConfig) -> None:
         raise ValueError("hpo step requires the hpo and experiment config")
     tuning = TuningRun(cfg)
     best, default, trials, best_params = tuning.run()
-    sensitivity = tuning.sensitivity(best_params)
-    decision = tuning.publish(best, default, trials, sensitivity, best_params)
+    decision = tuning.publish(best, default, trials, best_params)
     logger.info(
         "hpo decision: %s — best-vs-default %.4f [%.4f, %.4f]",
         decision.verdict,

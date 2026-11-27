@@ -3,8 +3,9 @@
 A time split gets the forward-chaining geometry in ``evaluate.validation``;
 this owner is the other case: rows are exchangeable survey respondents, so a
 shuffled KFold repeated with independent seeds is the honest estimator. Every
-candidate is scored on the *same* folds (same seed, same n), which is what
-makes the paired improvement interval below a like-for-like comparison.
+candidate is scored on the *same* folds (same seed, same n), and the paired
+improvement interval is measured on the out-of-fold rows by the canonical
+``MetricBootstrap`` — never on the (correlated) fold scores.
 """
 
 from __future__ import annotations
@@ -17,7 +18,8 @@ from pydantic import BaseModel, ConfigDict, Field
 from sklearn.base import BaseEstimator, RegressorMixin
 from sklearn.model_selection import KFold
 
-from broadway.config.schema import BootstrapSpec, CVGeometry
+from broadway.config.schema import CVGeometry
+from broadway.evaluate.contracts import BootstrapConfig
 from broadway.evaluate.metrics import compute_metrics
 
 
@@ -52,69 +54,39 @@ class CVResult(BaseModel):
     def secondary_mean(self) -> float:
         return float(np.mean([fold.values[self.secondary_metric] for fold in self.folds]))
 
-    def interval(self, bootstrap: BootstrapSpec) -> tuple[float, float]:
-        """Percentile bootstrap over fold scores (folds are correlated: optimistic)."""
+    @property
+    def standard_error(self) -> float:
+        """One standard error of the mean fold score (the one-SE selection unit)."""
+        scores = np.asarray([fold.values[self.metric] for fold in self.folds], dtype=float)
+        return float(np.std(scores, ddof=1) / np.sqrt(scores.size))
+
+    def interval(self, bootstrap: BootstrapConfig) -> tuple[float, float]:
+        """Fold-score interval for the candidate's own CV score (optimistic)."""
         draws = self._bootstrap(
             np.asarray([fold.values[self.metric] for fold in self.folds], dtype=float),
             bootstrap,
         )
-        return _percentile(draws, bootstrap.level)
+        tail = (1.0 - bootstrap.level) / 2.0
+        return (
+            float(np.percentile(draws, tail * 100.0)),
+            float(np.percentile(draws, (1.0 - tail) * 100.0)),
+        )
 
-    def paired_improvement(
-        self, reference: CVResult, bootstrap: BootstrapSpec
-    ) -> tuple[float, float, float]:
-        """Relative paired improvement over ``reference`` on identical folds.
-
-        Positive means this candidate's error is lower. The fold pairs are
-        bootstrapped as units because the same fold rows score both models.
-        """
-        relative, _ = self._paired(reference)
-        draws = self._bootstrap(relative, bootstrap)
-        low, high = _percentile(draws, bootstrap.level)
-        return float(np.mean(relative)), low, high
-
-    def paired_rows(self, reference: CVResult) -> tuple[np.ndarray, np.ndarray]:
-        """Out-of-fold truth/prediction arrays for the primary repeat pair."""
-        repeat = min(self.out_of_fold)
-        prediction = np.asarray(self.out_of_fold[repeat], dtype=float)
-        reference_prediction = np.asarray(reference.out_of_fold[repeat], dtype=float)
-        return prediction, reference_prediction
-
-    def _paired(
-        self, reference: CVResult
-    ) -> tuple[np.ndarray, list[tuple[int, int]]]:
-        mine = {(fold.repeat, fold.fold): fold.values[self.metric] for fold in self.folds}
-        theirs = {
-            (fold.repeat, fold.fold): fold.values[self.metric] for fold in reference.folds
-        }
-        keys = sorted(mine)
-        if keys != sorted(theirs):
-            raise ValueError(
-                f"candidate '{self.model}' and reference '{reference.model}' were "
-                "scored on different folds — the paired interval is undefined"
-            )
-        mine_values = np.asarray([mine[key] for key in keys], dtype=float)
-        their_values = np.asarray([theirs[key] for key in keys], dtype=float)
-        if np.any(their_values <= 0.0):
-            raise ValueError("reference fold scores must be positive for a relative delta")
-        return (their_values - mine_values) / their_values, keys
+    def out_of_fold_prediction(self) -> np.ndarray:
+        """Row-level OOF prediction, averaged over the independent repeats."""
+        return np.mean(
+            np.asarray([self.out_of_fold[repeat] for repeat in sorted(self.out_of_fold)]),
+            axis=0,
+        )
 
     @staticmethod
-    def _bootstrap(values: np.ndarray, bootstrap: BootstrapSpec) -> np.ndarray:
+    def _bootstrap(values: np.ndarray, bootstrap: BootstrapConfig) -> np.ndarray:
         generator = np.random.default_rng(bootstrap.seed)
         draws = np.empty(bootstrap.iterations)
         for index in range(bootstrap.iterations):
             sample = generator.integers(0, values.size, size=values.size)
             draws[index] = float(np.mean(values[sample]))
         return draws
-
-
-def _percentile(draws: np.ndarray, level: float) -> tuple[float, float]:
-    tail = (1.0 - level) / 2.0
-    return (
-        float(np.percentile(draws, tail * 100.0)),
-        float(np.percentile(draws, (1.0 - tail) * 100.0)),
-    )
 
 
 class RepeatedCV:

@@ -30,7 +30,7 @@ from broadway.config.schema import (
 )
 from broadway.evaluate import module as evaluate_module
 from broadway.evaluate.comparison import compare_models
-from broadway.evaluate.contracts import EvaluationResult, ModelComparison
+from broadway.evaluate.contracts import BootstrapConfig, EvaluationResult, ModelComparison
 from broadway.evaluate.promotion import should_promote
 from broadway.evaluate.validation import cross_validate, residual_summary
 from broadway.features.plan import resolve_plan
@@ -295,6 +295,12 @@ def _make_config(tmp_path: Path) -> PipelineConfig:
     baseline_step = BaselineStep(
         output_dir=str(tmp_path / "artifacts" / "baseline"),
         output_file="baseline.json",
+        linear_reference_model="linear",
+        bootstrap=BootstrapConfig(iterations=100, seed=7, level=0.95),
+        min_effect=0.02,
+        min_sample_size=100,
+        action="build the model surface",
+        owner="baseline",
     )
     return PipelineConfig(
         dataset=dataset,
@@ -443,15 +449,20 @@ def test_module_run_promotes_only_after_persistence(
     monkeypatch.setattr(records, "LINEAGE_DIR", tmp_path / "lineage")
     out_dir = Path(cfg.environment.data_dir) / cfg.environment.processed_subdir
     out_dir.mkdir(parents=True, exist_ok=True)
+    rows = 500
     df = pd.DataFrame(
         {
-            "rooms": np.arange(1, 41),
-            "area": np.arange(40, 80),
-            "price": np.arange(1, 41) * 100.0,
+            "rooms": np.arange(1, rows + 1),
+            "area": np.arange(40, 40 + rows),
+            "price": np.arange(1, rows + 1) * 100.0,
         }
     )
     df.to_parquet(out_dir / cfg.etl.train_features_file, index=False)
-    df.tail(10).to_parquet(out_dir / cfg.etl.val_features_file, index=False)
+    # n >= the promotion rule's minimum so this test exercises the ordering of
+    # a real promotion, not an `insufficient` verdict at tiny n.
+    df.sample(n=150, random_state=0).to_parquet(
+        out_dir / cfg.etl.val_features_file, index=False
+    )
 
     result_path = Path(cfg.evaluate.output_dir) / cfg.evaluate.output_file
     promote_events: list[str] = []

@@ -9,6 +9,7 @@ interval_source: conformal
 # week must never be read as a coverage collapse (complete-bucket rule).
 min_period_rows: 100
 output_dir: artifacts/evaluation
+record_stem: promotion
 output_file: metrics.json
 # Error analysis ("where the model fails"): every holdout row is tracked with
 # its truth, prediction, residual and segment columns. Paths live here, never

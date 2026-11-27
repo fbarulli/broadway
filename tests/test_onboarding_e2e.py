@@ -105,6 +105,8 @@ def test_init_and_run_external_dataset(
         }
     )
     for attr, dirname in (
+        ("etl", "etl"),
+        ("features", "features"),
         ("baseline", "baseline"),
         ("train", "training"),
         ("evaluate", "evaluation"),
@@ -112,7 +114,7 @@ def test_init_and_run_external_dataset(
         ("causal", "causal"),
     ):
         step_cfg = getattr(cfg, attr)
-        if step_cfg is not None:
+        if step_cfg is not None and hasattr(step_cfg, "output_dir"):
             setattr(
                 cfg,
                 attr,

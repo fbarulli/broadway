@@ -31,6 +31,13 @@ project/experiments/results/**
 !project/experiments/results/**/*_feature_decisions.json
 # The selected/tuned champion handoff (model + params + CV interval).
 !project/experiments/results/**/*_champion.json
+# Evaluate evidence behind the final promotion (aggregates only; the per-row
+# error ledger stays machine state and is never committed).
+!project/experiments/results/pipeline/evaluate/metrics.json
+# The references evaluate consumes, so a fresh checkout keeps the naive
+# comparison and the candidate params instead of silently losing them.
+!project/experiments/results/pipeline/baseline/baseline.json
+!project/experiments/results/pipeline/training/training_result.json
 !project/experiments/results/**/*.md
 *.png
 !reports/figures/*.png

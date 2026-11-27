@@ -1,49 +1,52 @@
 {
   "question": "Do the HPO-best params beat the declared defaults on training-only repeated CV?",
   "metric": "improvement_over_default_rmse",
-  "value": 0.01421836018396466,
-  "interval_low": 0.009646639804010343,
-  "interval_high": 0.01857282437997488,
+  "value": 0.005950935146951683,
+  "interval_low": -0.0019431624969638087,
+  "interval_high": 0.013723585134806896,
   "reference": null,
   "delta": null,
   "threshold": 0.01,
   "null_threshold": null,
   "direction": "max",
   "verdict": "investigate",
-  "action": "adopt the HPO-best params for the tuned champion",
+  "action": "adopt the HPO-best params only when the interval clears the floor",
   "owner": "amazon",
   "sample_size": 481,
   "unit": "relative_improvement",
   "min_sample_size": 400,
   "evidence": {
-    "baseline": "the experiment's default params on the identical HPO folds",
-    "delta": 0.01421836018396466,
+    "baseline": "the experiment's default params on the identical report folds",
+    "delta": 0.005950935146951683,
     "segments": [
       {
         "segment": "low_target_half",
-        "value": 0.025851506983582462,
+        "value": 0.0016537336216765905,
         "sample_size": 253
       },
       {
         "segment": "high_target_half",
-        "value": 0.01300510915002321,
+        "value": 0.01008111239860955,
         "sample_size": 228
       }
     ],
     "sensitivity": {
-      "second_seed_improvement_seed99": 0.009359620004631083,
-      "best_cv_rmse_n481": 0.8256266666666665,
-      "default_cv_rmse_n481": 0.8372133333333334
+      "level_90pct_low": -0.0007286859363614281,
+      "level_90pct_high": 0.012994899198445469,
+      "best_cv_rmse_n481": 0.8206,
+      "default_cv_rmse_n481": 0.8285466666666667
     },
     "falsifier": "the paired best-vs-default interval's lower bound falls at or below the configured effect floor",
     "provenance": {
       "dataset": "amazon",
-      "seed": "7",
-      "folds": "3x5 shuffled KFold (HPO seed)",
-      "trials": "40",
+      "target": "ordinal 1-5 treated as interval-scale",
+      "search_seed": "7",
+      "report_seed": "99",
+      "folds": "3x5 shuffled KFold on the report seed",
+      "trials": "30",
       "model": "rf",
       "best_params": "{'n_estimators': 570, 'max_depth': 14, 'min_samples_leaf': 2, 'min_samples_split': 5, 'max_samples': 0.5416264327961499}",
-      "resampling": "paired fold bootstrap"
+      "resampling": "paired row bootstrap on out-of-fold predictions"
     }
   }
 }

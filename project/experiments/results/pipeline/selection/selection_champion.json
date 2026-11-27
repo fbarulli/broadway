@@ -9,6 +9,7 @@
   "cv_mean": 0.8355439999999998,
   "interval_low": 0.8043425999999999,
   "interval_high": 0.8651337000000001,
-  "baseline": "naive_mean",
-  "baseline_cv_mean": 1.013424
+  "selection_rule": "point",
+  "rule_fired": "point (leaderboard top)",
+  "vs_linear_improvement": 0.009317883168080179
 }

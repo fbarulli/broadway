@@ -19,17 +19,25 @@ from broadway.baseline.module import load_persisted
 from broadway.calibration import CALIBRATION_FILE
 from broadway.calibration.conformal import SplitConformal
 from broadway.calibration.contracts import CalibrationConfig, CalibrationSummary
-from broadway.config.schema import PipelineConfig, TaskType
+from broadway.config.schema import (
+    NAIVE_REFERENCE,
+    TARGET_NOTE,
+    CVGeometry,
+    PipelineConfig,
+    TaskType,
+)
 from broadway.data.loader import ArtifactStore, ProcessedStore
 from broadway.data.splitter import calibration_split, split
 from broadway.evaluate.contracts import BootstrapConfig
 from broadway.evaluate.metrics import MetricBootstrap, compute_metrics
+from broadway.evaluate.repeated_cv import CVResult, NaiveMeanRegressor, RepeatedCV
 from broadway.features.generic import validate_engineered_frame
 from broadway.features.plan import ColumnPlan
 from broadway.lineage.ids import node_id
 from broadway.lineage.records import write_record
 from broadway.observability.profiling import phase
 from broadway.reports.decision import Decision, DecisionRule, Evidence, SegmentEvidence
+from broadway.reports.decision_log import DecisionLog
 from broadway.reports.step_output import StepOutput
 from broadway.tracking.bundle import TrackingBundle
 from broadway.tracking.manifest import MANIFEST_FILENAME, tracking_dir
@@ -334,7 +342,7 @@ class TrainingDecision:
                 owner=self._cfg.dataset.name,
             ),
             value=self.relative_value,
-            interval=(min(low, self.relative_value), max(high, self.relative_value)),
+            interval=(low, high),
             sample_size=len(self._truth),
             question="Do the HPO-best params beat the declared defaults on validation?",
             evidence=evidence,
@@ -366,7 +374,188 @@ class TrainingDecision:
         axis.set_ylabel(self._target_metric)
         axis.set_title("HPO best vs declared defaults (validation)")
         output = StepOutput(
-            results_dir=Path(self._cfg.train.output_dir), stem="training", decision=decision
+            results_dir=Path(self._cfg.train.output_dir),
+            stem="training",
+            decision=decision,
+            log=DecisionLog(tracking_uri=self._cfg.environment.mlflow_tracking_uri),
+        )
+        output.save_figure(figure)
+        plt.close("all")
+        output.write()
+        return decision
+
+
+class TrainingFitDecision:
+    """Publish the deployed fit's paired improvement over the naive reference.
+
+    Training-only repeated CV on the fit slice: no holdout row is read and no
+    HPO selection happens here (that is the hpo step's job). The verdict says
+    whether the params about to be deployed beat a constant training-mean
+    forecast on identical shuffled folds; the record is the ``training`` row of
+    EXPERIMENT_OUTPUT.md.
+    """
+
+    def __init__(
+        self,
+        cfg: PipelineConfig,
+        X_train: pd.DataFrame,
+        y_train: pd.Series,
+        params: dict[str, float | int | str],
+    ) -> None:
+        assert cfg.experiment is not None and cfg.train is not None and cfg.dataset is not None
+        self._cfg = cfg
+        self._params = params
+        self._truth = y_train.to_numpy(dtype=float)
+        self._X = X_train
+        self._y = y_train
+        self._metric = cfg.experiment.target_metric
+        expected = f"improvement_over_naive_{self._metric}"
+        if cfg.train.fit_decision is None:
+            raise ValueError("train.fit_decision is not configured")
+        if cfg.train.fit_decision.metric != expected:
+            raise ValueError(
+                f"train.fit_decision.metric '{cfg.train.fit_decision.metric}' does not "
+                f"match the experiment's '{expected}'"
+            )
+
+    def _bootstrap(self, level: float | None = None) -> BootstrapConfig:
+        assert self._cfg.train is not None
+        configured = self._cfg.train.bootstrap
+        if level is None:
+            return configured
+        return configured.model_copy(update={"level": level})
+
+    def _measure(self) -> tuple[CVResult, CVResult]:
+        assert self._cfg.experiment is not None and self._cfg.train is not None
+        geometry = CVGeometry(
+            folds=self._cfg.train.cv_folds,
+            repeats=self._cfg.train.cv_repeats,
+            random_state=self._cfg.train.cv_random_state,
+        )
+        cv = RepeatedCV(geometry, self._metric, self._metric)
+        model = self._cfg.experiment.model.type
+        fitted = cv.run(
+            model,
+            lambda: build_model_pipeline(self._cfg, model, self._params),
+            self._X,
+            self._y,
+        )
+        naive = cv.run(NAIVE_REFERENCE, NaiveMeanRegressor, self._X, self._y)
+        return fitted, naive
+
+    def _segments(self, fitted: CVResult, naive: CVResult) -> list[SegmentEvidence]:
+        prediction = fitted.out_of_fold_prediction()
+        naive_prediction = naive.out_of_fold_prediction()
+        split = float(np.median(self._truth))
+        segments: list[SegmentEvidence] = []
+        for label, mask in (
+            ("low_target_half", self._truth <= split),
+            ("high_target_half", self._truth > split),
+        ):
+            if int(mask.sum()) < 2:
+                continue
+            fitted_error = float(
+                compute_metrics(self._truth[mask], prediction[mask], metrics=(self._metric,))[
+                    self._metric
+                ]
+            )
+            naive_error = float(
+                compute_metrics(
+                    self._truth[mask], naive_prediction[mask], metrics=(self._metric,)
+                )[self._metric]
+            )
+            segments.append(
+                SegmentEvidence(
+                    segment=label,
+                    value=(naive_error - fitted_error) / naive_error,
+                    sample_size=int(mask.sum()),
+                )
+            )
+        return segments
+
+    def decision(self, fitted: CVResult, naive: CVResult) -> Decision:
+        assert self._cfg.train is not None and self._cfg.dataset is not None
+        rule = self._cfg.train.fit_decision
+        assert rule is not None
+        fitted_prediction = fitted.out_of_fold_prediction()
+        naive_prediction = naive.out_of_fold_prediction()
+        fitted_value = float(
+            compute_metrics(self._truth, fitted_prediction, metrics=(self._metric,))[self._metric]
+        )
+        naive_value = float(
+            compute_metrics(self._truth, naive_prediction, metrics=(self._metric,))[self._metric]
+        )
+        if naive_value <= 0.0:
+            raise ValueError(f"naive {self._metric} must be positive for a relative delta")
+        value = (naive_value - fitted_value) / naive_value
+        measured = MetricBootstrap(self._bootstrap()).improvement_interval(
+            self._truth, fitted_prediction, naive_prediction, metric=self._metric
+        )
+        low, high = measured.lower / naive_value, measured.upper / naive_value
+        level_90 = MetricBootstrap(self._bootstrap(0.90)).improvement_interval(
+            self._truth, fitted_prediction, naive_prediction, metric=self._metric
+        )
+        evidence = Evidence(
+            baseline="naive training-mean predictor on the identical shuffled folds",
+            delta=value,
+            segments=self._segments(fitted, naive),
+            sensitivity={
+                "level_90pct_low": level_90.lower / naive_value,
+                "level_90pct_high": level_90.upper / naive_value,
+                f"fitted_cv_{self._metric}_n{len(self._truth)}": fitted.mean,
+                f"naive_cv_{self._metric}_n{len(self._truth)}": naive.mean,
+            },
+            falsifier=(
+                "the paired improvement interval's lower bound falls at or below the "
+                "configured effect floor"
+            ),
+            provenance={
+                "dataset": self._cfg.dataset.name,
+                "target": TARGET_NOTE,
+                "seed": str(self._cfg.train.cv_random_state),
+                "folds": f"{self._cfg.train.cv_repeats}x{self._cfg.train.cv_folds} shuffled KFold",
+                "params": str(self._params),
+                "resampling": "paired row bootstrap on out-of-fold predictions",
+            },
+        )
+        return Decision.evaluate(
+            rule=rule,
+            value=value,
+            interval=(low, high),
+            sample_size=len(self._truth),
+            question="Does the deployed fit beat the naive reference on training-only CV?",
+            evidence=evidence,
+            unit="relative_improvement",
+        )
+
+    def publish(self) -> Decision:
+        assert self._cfg.train is not None
+        fitted, naive = self._measure()
+        decision = self.decision(fitted, naive)
+        import matplotlib
+
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+
+        figure, axis = plt.subplots(figsize=(6, 3.6), constrained_layout=True)
+        values = [naive.mean, fitted.mean]
+        bars = axis.bar(["naive mean", "deployed fit"], values, color=["#9ecae1", "#08519c"])
+        for bar in bars:
+            axis.text(
+                bar.get_x() + bar.get_width() / 2,
+                bar.get_height(),
+                f"{bar.get_height():,.4f}",
+                ha="center",
+                va="bottom",
+                fontsize=9,
+            )
+        axis.set_ylabel(self._metric)
+        axis.set_title("deployed fit vs naive reference (training CV)")
+        output = StepOutput(
+            results_dir=Path(self._cfg.train.output_dir),
+            stem="training",
+            decision=decision,
+            log=DecisionLog(tracking_uri=self._cfg.environment.mlflow_tracking_uri),
         )
         output.save_figure(figure)
         plt.close("all")
@@ -684,3 +873,12 @@ def run(cfg: PipelineConfig) -> None:
     artifact_path = _log_training(cfg, fitted, train_df, val_df, curve, bundle)
     result = fitted.result.model_copy(update={"artifact_path": artifact_path})
     _persist(cfg, result, fitted.summary)
+    if cfg.experiment.hpo is None and cfg.train.fit_decision is not None:
+        # HPO runs publish the best-vs-default training decision themselves; a
+        # directly configured fit publishes its own train-vs-naive verdict.
+        decision = TrainingFitDecision(cfg, fitted.X_train, fitted.y_train, fitted.params).publish()
+        logger.info(
+            "training decision: %s — improvement over naive %.4f",
+            decision.verdict,
+            decision.value,
+        )

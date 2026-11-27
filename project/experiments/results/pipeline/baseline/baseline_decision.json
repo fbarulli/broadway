@@ -2,8 +2,8 @@
   "question": "Does the linear reference beat the naive mean on the holdout?",
   "metric": "improvement_over_naive_mae",
   "value": 0.2861000234796901,
-  "interval_low": 0.148,
-  "interval_high": 0.335,
+  "interval_low": 0.17374970650387414,
+  "interval_high": 0.39328480864052595,
   "reference": null,
   "delta": null,
   "threshold": 0.02,
@@ -39,6 +39,7 @@
     "falsifier": "the linear reference's paired MAE improvement interval falls at or below the configured effect floor",
     "provenance": {
       "dataset": "amazon",
+      "target": "ordinal 1-5 treated as interval-scale",
       "artifact": "baseline.json",
       "seed": "7",
       "rows": "121",

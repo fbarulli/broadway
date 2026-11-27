@@ -3,11 +3,11 @@
 Cross-sectional survey rows are exchangeable, so the folds are a repeated
 shuffled KFold (never the forward-chaining time geometry). Every configured
 candidate and the naive mean reference score on the identical folds; the
-champion is the leaderboard's best on the primary metric and the published
-decision is its paired improvement over the naive reference, with a 95%
-interval and a verdict computed by ``Decision.evaluate`` against the
-config-declared effect floor. The champion manifest is the handoff the HPO
-step tunes.
+champion is chosen by the configured rule (point-estimate leaderboard or the
+simplest candidate within one standard error) and the published decision is its
+paired row-level improvement over the naive reference, with a 95% interval from
+the canonical ``MetricBootstrap``. The champion-vs-linear interval is evidence
+in the same record, and the champion manifest is the HPO handoff.
 """
 
 from __future__ import annotations
@@ -20,10 +20,10 @@ import numpy as np
 import pandas as pd
 from pydantic import BaseModel, ConfigDict
 
-from broadway.config.schema import PipelineConfig, SelectionStep
+from broadway.config.schema import TARGET_NOTE, BootstrapConfig, PipelineConfig, SelectionStep
 from broadway.data.loader import ProcessedStore
 from broadway.evaluate.leaderboard import ChampionDecision, MetricDirection, MetricLeaderboard
-from broadway.evaluate.metrics import compute_metrics
+from broadway.evaluate.metrics import MetricBootstrap, compute_metrics
 from broadway.evaluate.repeated_cv import CVResult, RepeatedCV
 from broadway.features.generic import validate_engineered_frame
 from broadway.features.plan import ColumnPlan
@@ -34,7 +34,6 @@ from broadway.reports.step_output import StepOutput
 from broadway.selection.candidates import CandidateSet
 
 logger = logging.getLogger(__name__)
-
 
 class ChampionRecord(BaseModel):
     """The selected candidate and the folds it was selected on (config handoff)."""
@@ -48,8 +47,9 @@ class ChampionRecord(BaseModel):
     cv_mean: float
     interval_low: float
     interval_high: float
-    baseline: str
-    baseline_cv_mean: float
+    selection_rule: str
+    rule_fired: str
+    vs_linear_improvement: float
 
 
 def load_selection_frame(cfg: PipelineConfig) -> tuple[pd.DataFrame, pd.Series]:
@@ -63,15 +63,31 @@ def load_selection_frame(cfg: PipelineConfig) -> tuple[pd.DataFrame, pd.Series]:
     return X, frame[cfg.dataset.target]
 
 
-class SelectionDecision:
-    """Publish the champion's paired improvement over the naive reference.
+def _metric(truth: np.ndarray, prediction: np.ndarray, metric: str) -> float:
+    return float(compute_metrics(truth, prediction, metrics=(metric,))[metric])
 
-    The interval is a bootstrap over the paired per-fold deltas of the SAME
-    folds (positive = the champion's error is lower). Segments re-measure the
-    improvement on the low/high halves of the observed target — a slice that
-    would expose a champion that only wins for satisfied respondents — and the
-    sensitivity re-runs the pair under a second fold seed.
-    """
+
+def _relative_improvement(
+    truth: np.ndarray,
+    candidate: np.ndarray,
+    reference: np.ndarray,
+    metric: str,
+    bootstrap: BootstrapConfig,
+) -> tuple[float, float, float]:
+    """Paired row-level improvement of ``candidate`` over ``reference`` on the OOF rows."""
+    candidate_value = _metric(truth, candidate, metric)
+    reference_value = _metric(truth, reference, metric)
+    if reference_value <= 0.0:
+        raise ValueError(f"reference {metric} must be positive for a relative delta")
+    interval = MetricBootstrap(bootstrap).improvement_interval(
+        truth, candidate, reference, metric=metric
+    )
+    value = (reference_value - candidate_value) / reference_value
+    return value, interval.lower / reference_value, interval.upper / reference_value
+
+
+class SelectionDecision:
+    """Publish the champion's paired row-level improvement over the references."""
 
     def __init__(
         self,
@@ -79,6 +95,8 @@ class SelectionDecision:
         step: SelectionStep,
         results: dict[str, CVResult],
         champion: str,
+        rule_fired: str,
+        one_se_alternative: str,
         truth: np.ndarray,
         sensitivity_improvement: float,
     ) -> None:
@@ -87,27 +105,45 @@ class SelectionDecision:
         self._step = step
         self._results = results
         self._champion = champion
+        self._rule_fired = rule_fired
+        self._one_se_alternative = one_se_alternative
         self._truth = truth
         self._sensitivity = sensitivity_improvement
+
+    def _improvement(self, candidate: str, reference: str) -> tuple[float, float, float]:
+        step = self._step
+        return _relative_improvement(
+            self._truth,
+            self._results[candidate].out_of_fold_prediction(),
+            self._results[reference].out_of_fold_prediction(),
+            step.metric,
+            step.bootstrap,
+        )
 
     def decision(self) -> Decision:
         assert self._cfg.dataset is not None
         step = self._step
         champion = self._results[self._champion]
         reference = self._results[step.baseline_candidate]
-        value, low, high = champion.paired_improvement(reference, step.bootstrap)
-        linear = self._results[step.linear_reference]
-        linear_value, _, _ = linear.paired_improvement(reference, step.bootstrap)
+        value, low, high = self._improvement(self._champion, step.baseline_candidate)
+        if self._champion == step.linear_reference:
+            linear_value, linear_low, linear_high = 0.0, 0.0, 0.0
+        else:
+            linear_value, linear_low, linear_high = self._improvement(
+                self._champion, step.linear_reference
+            )
         evidence = Evidence(
             baseline=(
                 f"naive training-mean predictor '{reference.model}' on the identical "
                 f"{step.cv.repeats}x{step.cv.folds} shuffled folds"
             ),
             delta=value,
-            segments=self._segments(champion, reference),
+            segments=self._segments(),
             sensitivity={
+                f"champion_vs_linear_{step.metric}": linear_value,
+                f"champion_vs_linear_{step.metric}_low": linear_low,
+                f"champion_vs_linear_{step.metric}_high": linear_high,
                 f"second_seed_improvement_seed{step.sensitivity_random_state}": self._sensitivity,
-                f"linear_reference_improvement_{step.metric}": linear_value,
                 f"champion_cv_{step.metric}_n{len(self._truth)}": champion.mean,
                 f"naive_cv_{step.metric}_n{len(self._truth)}": reference.mean,
             },
@@ -117,11 +153,15 @@ class SelectionDecision:
             ),
             provenance={
                 "dataset": self._cfg.dataset.name,
+                "target": TARGET_NOTE,
                 "seed": str(step.cv.random_state),
                 "folds": f"{step.cv.repeats}x{step.cv.folds} shuffled KFold",
+                "selection_rule": step.selection_rule,
+                "rule_fired": self._rule_fired,
+                "one_se_would_pick": self._one_se_alternative,
                 "candidates": ", ".join(candidate.name for candidate in step.candidates),
                 "champion_params": str(self._champion_params()),
-                "resampling": "paired fold bootstrap",
+                "resampling": "paired row bootstrap on out-of-fold predictions",
             },
         )
         return Decision.evaluate(
@@ -134,7 +174,7 @@ class SelectionDecision:
                 owner=step.owner,
             ),
             value=value,
-            interval=(min(low, value), max(high, value)),
+            interval=(low, high),
             sample_size=len(self._truth),
             question=(
                 f"Does the selected {step.metric} champion beat the naive reference on "
@@ -150,9 +190,11 @@ class SelectionDecision:
                 return candidate.params
         raise ValueError(f"champion '{self._champion}' is not a configured candidate")
 
-    def _segments(self, champion: CVResult, reference: CVResult) -> list[SegmentEvidence]:
+    def _segments(self) -> list[SegmentEvidence]:
         """Re-measure the improvement on the low and high target halves."""
-        prediction, reference_prediction = champion.paired_rows(reference)
+        step = self._step
+        prediction = self._results[self._champion].out_of_fold_prediction()
+        reference_prediction = self._results[step.baseline_candidate].out_of_fold_prediction()
         split = float(np.median(self._truth))
         segments: list[SegmentEvidence] = []
         for label, mask in (
@@ -161,9 +203,9 @@ class SelectionDecision:
         ):
             if int(mask.sum()) < 2:
                 continue
-            champion_error = _metric(self._truth[mask], prediction[mask], champion.metric)
+            champion_error = _metric(self._truth[mask], prediction[mask], step.metric)
             reference_error = _metric(
-                self._truth[mask], reference_prediction[mask], champion.metric
+                self._truth[mask], reference_prediction[mask], step.metric
             )
             segments.append(
                 SegmentEvidence(
@@ -173,10 +215,6 @@ class SelectionDecision:
                 )
             )
         return segments
-
-
-def _metric(truth: np.ndarray, prediction: np.ndarray, metric: str) -> float:
-    return float(compute_metrics(truth, prediction, metrics=(metric,))[metric])
 
 
 class SelectionRun:
@@ -230,11 +268,54 @@ class SelectionRun:
             },
         )
 
-    def champion(self, results: dict[str, CVResult]) -> ChampionDecision:
-        return self._leaderboard(results).champion(self._step.metric, self._intervals(results))
+    def _one_se(
+        self, results: dict[str, CVResult], leaderboard: MetricLeaderboard
+    ) -> tuple[ChampionDecision, str]:
+        decision = leaderboard.champion(self._step.metric, self._intervals(results))
+        best = results[decision.champion]
+        ceiling = best.mean + best.standard_error
+        intervals = self._intervals(results)
+        n_runs = len(results) - 1
+        for candidate in self._step.candidates:
+            if candidate.name == self._step.baseline_candidate:
+                continue
+            value = results[candidate.name].mean
+            if value <= ceiling:
+                low, high = intervals[candidate.name]
+                selected = ChampionDecision(
+                    metric=self._step.metric,
+                    direction=MetricDirection.MINIMIZE,
+                    champion=candidate.name,
+                    value=value,
+                    interval_low=min(low, value),
+                    interval_high=max(high, value),
+                    runner_up=decision.champion,
+                    margin=value - best.mean,
+                    n_runs=n_runs,
+                )
+                return selected, (
+                    "one_se (simplest within one standard error; "
+                    f"best {decision.champion} {best.mean:.4f}, "
+                    f"ceiling {ceiling:.4f}, chosen {candidate.name} {value:.4f})"
+                )
+        return decision, "one_se (no simpler candidate inside one standard error)"
 
-    def sensitivity(self, results: dict[str, CVResult]) -> float:
-        """Re-run champion vs reference under a second fold seed."""
+    def select(
+        self, results: dict[str, CVResult]
+    ) -> tuple[ChampionDecision, str, str]:
+        """Apply the configured rule; also report what the one-SE rule would pick."""
+        leaderboard = self._leaderboard(results)
+        one_se, one_se_note = self._one_se(results, leaderboard)
+        if self._step.selection_rule == "one_se":
+            return one_se, one_se_note, one_se.champion
+        decision = leaderboard.champion(self._step.metric, self._intervals(results))
+        return decision, "point (leaderboard top)", one_se.champion
+
+    def champion(self, results: dict[str, CVResult]) -> ChampionDecision:
+        return self.select(results)[0]
+
+    def sensitivity(self, results: dict[str, CVResult], truth: np.ndarray) -> float:
+        """Re-run champion vs reference under a second fold seed (row-level)."""
         X, y = load_selection_frame(self._cfg)
         factories = CandidateSet(self._cfg, self._step.candidates)
         geometry = self._step.cv.model_copy(
@@ -249,14 +330,20 @@ class SelectionRun:
             X,
             y,
         )
-        improvement, _, _ = candidate.paired_improvement(reference, self._step.bootstrap)
-        return improvement
+        value, _, _ = _relative_improvement(
+            truth,
+            candidate.out_of_fold_prediction(),
+            reference.out_of_fold_prediction(),
+            self._step.metric,
+            self._step.bootstrap,
+        )
+        return value
 
     def publish(
         self, results: dict[str, CVResult], truth: np.ndarray, sensitivity: float
     ) -> Decision:
         step = self._step
-        selected = self.champion(results)
+        selected, rule_fired, one_se = self.select(results)
         intervals = self._intervals(results)
         table = pd.DataFrame(
             [
@@ -265,6 +352,7 @@ class SelectionRun:
                     step.metric: result.mean,
                     f"{step.metric}_low": intervals[name][0],
                     f"{step.metric}_high": intervals[name][1],
+                    f"{step.metric}_se": result.standard_error,
                     step.secondary_metric: result.secondary_mean,
                     "role": _role(name, step),
                     "folds": len(result.folds),
@@ -273,7 +361,14 @@ class SelectionRun:
             ]
         )
         decision = SelectionDecision(
-            self._cfg, step, results, selected.champion, truth, sensitivity
+            self._cfg,
+            step,
+            results,
+            selected.champion,
+            rule_fired,
+            one_se,
+            truth,
+            sensitivity,
         ).decision()
         output = StepOutput(
             results_dir=Path(step.output_dir),
@@ -288,10 +383,16 @@ class SelectionRun:
         )
         output.add_table("candidates", table)
         output.write()
-        self._write_manifest(selected, results)
+        self._write_manifest(selected, rule_fired, results, decision)
         return decision
 
-    def _write_manifest(self, selected: ChampionDecision, results: dict[str, CVResult]) -> None:
+    def _write_manifest(
+        self,
+        selected: ChampionDecision,
+        rule_fired: str,
+        results: dict[str, CVResult],
+        decision: Decision,
+    ) -> None:
         step = self._step
         spec = next(
             candidate for candidate in step.candidates if candidate.name == selected.champion
@@ -304,8 +405,11 @@ class SelectionRun:
             cv_mean=results[selected.champion].mean,
             interval_low=selected.interval_low,
             interval_high=selected.interval_high,
-            baseline=step.baseline_candidate,
-            baseline_cv_mean=results[step.baseline_candidate].mean,
+            selection_rule=step.selection_rule,
+            rule_fired=rule_fired,
+            vs_linear_improvement=float(
+                decision.evidence.sensitivity[f"champion_vs_linear_{step.metric}"]
+            ),
         )
         Path(step.output_file).write_text(
             json.dumps(record.model_dump(), indent=2) + "\n", encoding="utf-8"
@@ -325,7 +429,7 @@ def run(cfg: PipelineConfig) -> None:
         raise ValueError("selection step requires the selection and experiment config")
     selection = SelectionRun(cfg)
     results, truth = selection.results()
-    sensitivity = selection.sensitivity(results)
+    sensitivity = selection.sensitivity(results, truth)
     decision = selection.publish(results, truth, sensitivity)
     logger.info(
         "selection decision: %s — improvement %.4f [%.4f, %.4f]",

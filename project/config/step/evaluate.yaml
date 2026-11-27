@@ -1,0 +1,12 @@
+# Amazon evaluate binding: holdout promotion evidence on the tracked pipeline
+# surface. Cross-sectional rows have no time CV, so the time-series cv_decision
+# block is explicitly nulled (the base config's expanding-CV verdict does not
+# apply); the binary decision block is nulled too — the target is ordinal and
+# this chain makes no classification claim.
+target_metric: rmse
+promotion_threshold: 0.05
+record_stem: promotion
+output_dir: project/experiments/results/pipeline/evaluate
+output_file: metrics.json
+cv_decision: null
+decision: null

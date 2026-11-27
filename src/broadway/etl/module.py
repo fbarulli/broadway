@@ -21,6 +21,7 @@ from broadway.lineage.ids import node_id
 from broadway.lineage.models import TransformAudit
 from broadway.lineage.records import enforce_drop_fraction, records_dir, write_record
 from broadway.reports.decision import Decision, DecisionRule, Evidence, SegmentEvidence
+from broadway.reports.decision_log import DecisionLog
 from broadway.reports.step_output import StepOutput
 from broadway.tracking.manifest import tracking_dir, write_etl_manifest
 
@@ -109,6 +110,7 @@ class EtlDecision:
             falsifier="the unexplained-share interval clears the configured drop ceiling",
             provenance={
                 "artifact": "canonical.parquet",
+                "dataset": self._cfg.dataset.name if self._cfg.dataset else "",
                 "rows_in": str(audit.rows_in),
                 "rows_out": str(audit.rows_out),
                 "reasons": "; ".join(audit.reasons) or "none",
@@ -148,7 +150,13 @@ class EtlDecision:
             )
         axis.set_ylabel("rows")
         axis.set_title("ETL row funnel")
-        output = StepOutput(results_dir=out_dir, stem="etl", decision=decision)
+        target = Path(self._cfg.etl.output_dir) if self._cfg.etl and self._cfg.etl.output_dir else out_dir
+        output = StepOutput(
+            results_dir=target,
+            stem="etl",
+            decision=decision,
+            log=DecisionLog(tracking_uri=self._cfg.environment.mlflow_tracking_uri),
+        )
         output.save_figure(figure)
         plt.close("all")
         output.write()

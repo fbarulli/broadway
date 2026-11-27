@@ -23,8 +23,8 @@ hpo:
   engine: optuna
   direction: minimize
   target_metric: rmse
-  total_trials: 40
-  initial_trials_per_model: 40
+  total_trials: 30
+  initial_trials_per_model: 30
   top_k: 1
   models:
     - name: rf

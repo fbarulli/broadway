@@ -32,8 +32,8 @@ from broadway.calibration.metrics import (
     mean_width,
 )
 from broadway.calibration.quantile import QuantileInterval
-from broadway.config.schema import PipelineConfig
-from broadway.data.loader import ArtifactStore, ProcessedStore
+from broadway.config.schema import TARGET_NOTE, PipelineConfig
+from broadway.data.loader import ProcessedStore
 from broadway.evaluate.comparison import compare_models
 from broadway.evaluate.contracts import (
     LEDGER_RESIDUAL_COLUMN,
@@ -59,6 +59,7 @@ from broadway.lineage.ids import node_id
 from broadway.lineage.records import write_record
 from broadway.observability.profiling import timed
 from broadway.reports.decision import Decision, DecisionRule, Evidence, SegmentEvidence
+from broadway.reports.decision_log import DecisionLog
 from broadway.reports.step_output import StepOutput
 from broadway.training.contracts import TrainingResult
 from broadway.training.mlflow_utils import (
@@ -126,6 +127,13 @@ def _load_candidate(result: TrainingResult) -> Any:
 
 def _load_champion(model_uri: str) -> Any:
     return mlflow.pyfunc.load_model(model_uri)
+
+
+def _record_stem(cfg: PipelineConfig) -> str:
+    """The record/table stem, prefixed by the experiment's evidence tag."""
+    assert cfg.evaluate is not None
+    tag = cfg.experiment.evaluation_tag if cfg.experiment is not None else None
+    return cfg.evaluate.record_stem if not tag else f"{tag}_{cfg.evaluate.record_stem}"
 
 
 def _period_coverage(
@@ -389,6 +397,7 @@ class PromotionDecision:
             ),
             provenance={
                 "dataset": self._cfg.dataset.name,
+                "target": TARGET_NOTE,
                 "champion": self._champion_uri,
                 "seed": str(self._cfg.evaluate.bootstrap.seed),
                 "rows": str(len(self._truth)),
@@ -405,6 +414,9 @@ class PromotionDecision:
                 owner=self._cfg.dataset.name,
             ),
             value=self.relative_value,
+            # The promotion interval is the shipping gate: a tiny holdout whose
+            # bootstrap does not bracket the point still gets a decision record
+            # (the verdict then reads the widened interval), never a crash.
             interval=(min(low, self.relative_value), max(high, self.relative_value)),
             sample_size=len(self._truth),
             question=(
@@ -415,11 +427,33 @@ class PromotionDecision:
             unit="relative_improvement",
         )
 
-    def publish(self, eval_dir: Path) -> Decision:
-        """Write promotion.md/.png and ``promotion_decision.json``; return the record."""
+    def publish(self, eval_dir: Path, stem: str) -> Decision:
+        """Write the promotion report/figure/record and its value table."""
         decision = self.decision()
-        output = StepOutput(results_dir=eval_dir, stem="promotion", decision=decision)
+        output = StepOutput(
+            results_dir=eval_dir,
+            stem=stem,
+            decision=decision,
+            log=DecisionLog(tracking_uri=self._cfg.environment.mlflow_tracking_uri),
+        )
         output.save_figure(self._figure(decision))
+        output.add_table(
+            "values",
+            pd.DataFrame(
+                [
+                    {
+                        "metric": decision.metric,
+                        "value": decision.value,
+                        "interval_low": decision.interval_low,
+                        "interval_high": decision.interval_high,
+                        "threshold": decision.threshold,
+                        "verdict": decision.verdict,
+                        "sample_size": decision.sample_size,
+                        "reference": self._champion_uri,
+                    }
+                ]
+            ),
+        )
         output.write()
         return decision
 
@@ -635,11 +669,27 @@ def run(cfg: PipelineConfig) -> None:
         champion_pred = np.asarray(champion.predict(X_val), dtype=float)
         champion_metrics = compute_metrics(y_true, champion_pred)
 
+    X_train, y_train, train_dates = _load_train_features(cfg)
+    if champion_pred is None:
+        # No registry champion yet: the promotion reference is the naive
+        # training-mean predictor on the same holdout rows, so the first run's
+        # verdict is still an interval-vs-threshold decision (and it registers
+        # the candidate, making the next run a champion-vs-candidate test).
+        champion_pred = np.full(y_true.shape, float(y_train.mean()))
+        champion_metrics = compute_metrics(y_true, champion_pred)
+        champion_uri = "naive training-mean"
+        warnings.append(
+            "no champion model found — promotion reference is the naive training-mean "
+            "predictor on the holdout"
+        )
+
+    assert champion_metrics is not None and champion_uri is not None
+    assert champion_pred is not None
     comparison = compare_models(candidate_metrics, champion_metrics)
     logger.debug("evaluate: champion comparison=%s", comparison)
 
     target_metric = cfg.evaluate.target_metric
-    champion_score = champion_metrics[target_metric] if champion_metrics is not None else None
+    champion_score = champion_metrics[target_metric]
     # Reading 1 (T-BUG-2): the promotion DECISION keeps the pre-existing
     # champion-vs-holdout semantics — it is made here, before CV, and CV
     # results are recorded but never gate promotion. The reorder changes only
@@ -648,47 +698,37 @@ def run(cfg: PipelineConfig) -> None:
     #
     # The verdict is interval-based: the paired bootstrap's LOWER bound must
     # clear the declared relative threshold, so a point-estimate lead that
-    # noise could erase does not ship. The record is published beside the
-    # evaluation result as promotion_decision.json.
+    # noise could erase does not ship. The record stem comes from config (the
+    # experiment's evaluation tag keeps a champion run and a tuned run apart).
     promotion: PromotionDecision | None = None
-    if champion_uri is not None and champion_score is not None and champion_pred is not None:
-        try:
-            promotion = PromotionDecision.measure(
-                cfg,
-                target_metric,
-                candidate_metrics[target_metric],
-                champion_score,
-                champion_uri,
-                y_true,
-                y_pred,
-                champion_pred,
-            )
-            decision = promotion.decision()
-            promote = decision.verdict == "act"
-            reason = (
-                f"{decision.verdict}: {decision.metric}="
-                f"{decision.value:.4f} [{decision.interval_low:.4f}, "
-                f"{decision.interval_high:.4f}] vs threshold "
-                f"{cfg.evaluate.promotion_threshold:.1%}"
-            )
-        except ValueError as error:
-            promotion = None
-            promote, reason = should_promote(
-                candidate_metrics[target_metric],
-                champion_score,
-                cfg.evaluate.promotion_threshold,
-            )
-            warnings.append(f"interval-based promotion unavailable: {error}")
-    else:
+    try:
+        promotion = PromotionDecision.measure(
+            cfg,
+            target_metric,
+            candidate_metrics[target_metric],
+            champion_score,
+            champion_uri,
+            y_true,
+            y_pred,
+            champion_pred,
+        )
+        decision = promotion.decision()
+        promote = decision.verdict == "act"
+        reason = (
+            f"{decision.verdict}: {decision.metric}="
+            f"{decision.value:.4f} [{decision.interval_low:.4f}, "
+            f"{decision.interval_high:.4f}] vs threshold "
+            f"{cfg.evaluate.promotion_threshold:.1%}"
+        )
+    except ValueError as error:
+        promotion = None
         promote, reason = should_promote(
             candidate_metrics[target_metric],
             champion_score,
             cfg.evaluate.promotion_threshold,
         )
-        if champion_uri is None:
-            warnings.append("no champion model found — candidate compared against none")
+        warnings.append(f"interval-based promotion unavailable: {error}")
 
-    X_train, y_train, train_dates = _load_train_features(cfg)
     # Score the same composed Pipeline shape train/HPO fit (preprocessing +
     # registry model), so CV reflects the deployed pipeline rather than a bare
     # estimator; build_model_pipeline re-seeds from cfg.experiment.random_state.
@@ -740,12 +780,10 @@ def run(cfg: PipelineConfig) -> None:
         )
     residuals = residual_summary(y_true, y_pred)
 
-    eval_dir = ArtifactStore.from_contract(
-        cfg.dataset, Path(cfg.evaluate.output_dir)
-    ).directory
+    eval_dir = Path(cfg.evaluate.output_dir)
     eval_dir.mkdir(parents=True, exist_ok=True)
     if promotion is not None:
-        published = promotion.publish(eval_dir)
+        published = promotion.publish(eval_dir, _record_stem(cfg))
         logger.info(
             "evaluate: promotion decision %s — %s %.4f [%.4f, %.4f]",
             published.verdict,

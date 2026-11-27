@@ -1,0 +1,118 @@
+{
+  "metrics": {
+    "mae": 0.5867,
+    "rmse": 0.7714,
+    "r2": 0.3982,
+    "mape": 0.2863,
+    "max_error": 2.4262,
+    "median_ae": 0.5469,
+    "explained_var": 0.4082
+  },
+  "promote": true,
+  "reason": "act: improvement_rmse=0.2312 [0.1140, 0.3258] vs threshold 5.0%",
+  "cv_metrics": {
+    "mae": 0.6262,
+    "rmse": 0.8169,
+    "r2": 0.3432,
+    "mape": 0.3436,
+    "max_error": 2.4359,
+    "median_ae": 0.5068,
+    "explained_var": 0.345
+  },
+  "cv_detail": null,
+  "cv_decision": null,
+  "residuals": {
+    "mean_residual": -0.09935444269535185,
+    "mean_abs_residual": 0.5866903559403561,
+    "signed_bias": -0.038655587029381266,
+    "std_residual": 0.7649926166695037,
+    "max_abs_residual": 2.426208994708995
+  },
+  "residual_diagnostics": {
+    "n_obs": 121,
+    "acf_lags": {
+      "1": -0.10096741086911493,
+      "2": 0.015225858394283786,
+      "3": 0.17632689485321867
+    },
+    "ljung_box_lags": 3,
+    "ljung_box_statistic": 5.214796802851226,
+    "ljung_box_p_value": 0.156727630417109,
+    "jarque_bera_statistic": 3.017038437600318,
+    "jarque_bera_p_value": 0.2212373396172745,
+    "jarque_bera_skew": -0.325841709805598,
+    "jarque_bera_kurtosis": 3.4168087903717885,
+    "qq_correlation": 0.991421506979709
+  },
+  "metric_intervals": {
+    "rmse": {
+      "lower": 0.68,
+      "upper": 0.8833
+    },
+    "mae": {
+      "lower": 0.5147,
+      "upper": 0.6787
+    },
+    "mape": {
+      "lower": 0.2338,
+      "upper": 0.3611
+    }
+  },
+  "comparison": {
+    "metrics": {
+      "mae": {
+        "candidate": 0.5867,
+        "champion": 0.8518,
+        "delta": -0.2651,
+        "delta_pct": -0.31122329185254755
+      },
+      "rmse": {
+        "candidate": 0.7714,
+        "champion": 1.0034,
+        "delta": -0.2320000000000001,
+        "delta_pct": -0.23121387283237002
+      },
+      "r2": {
+        "candidate": 0.3982,
+        "champion": -0.0181,
+        "delta": 0.4163,
+        "delta_pct": -23.0
+      },
+      "mape": {
+        "candidate": 0.2863,
+        "champion": 0.4298,
+        "delta": -0.14350000000000002,
+        "delta_pct": -0.3338762214983714
+      },
+      "max_error": {
+        "candidate": 2.4262,
+        "champion": 2.5634,
+        "delta": -0.1372,
+        "delta_pct": -0.053522665210267606
+      },
+      "median_ae": {
+        "candidate": 0.5469,
+        "champion": 0.5634,
+        "delta": -0.01649999999999996,
+        "delta_pct": -0.02928647497337586
+      },
+      "explained_var": {
+        "candidate": 0.4082,
+        "champion": 0.0,
+        "delta": 0.4082,
+        "delta_pct": null
+      }
+    }
+  },
+  "baseline": {
+    "metric": "mae",
+    "baseline_value": 0.8518,
+    "candidate_value": 0.5867,
+    "delta": -0.2651,
+    "improvement": 0.31122329185254755
+  },
+  "calibration": null,
+  "warnings": [
+    "no champion model found — promotion reference is the naive training-mean predictor on the holdout"
+  ]
+}

@@ -14,6 +14,10 @@ bootstrap:
   iterations: 2000
   seed: 2026
   level: 0.95
+# `point` takes the leaderboard top; `one_se` takes the simplest declared
+# candidate within one standard error of the best mean (with overlapping
+# intervals it can pick the linear reference). The record states which fired.
+selection_rule: point
 baseline_candidate: naive_mean
 linear_reference: linear
 candidates:
@@ -35,14 +39,6 @@ candidates:
       learning_rate: 0.05
       num_leaves: 31
       max_depth: 6
-      subsample: 0.8
-      colsample_bytree: 0.8
-  - name: xgb
-    model: xgb
-    params:
-      n_estimators: 200
-      learning_rate: 0.05
-      max_depth: 4
       subsample: 0.8
       colsample_bytree: 0.8
 min_effect: 0.02
