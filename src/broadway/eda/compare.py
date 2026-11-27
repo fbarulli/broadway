@@ -173,6 +173,7 @@ class EtlComparator:
             return None
         column = max(shifts, key=lambda name: (shifts[name], name))
         stacked = self._stacked(before[column], after[column])
+        segments = self._segments(before, after, column, plan)
         measurement = self._estimator.estimate(
             stacked,
             StandardizedShiftStatistic(),
@@ -186,9 +187,11 @@ class EtlComparator:
             ),
             name=f"standardized_shift_{column}",
         )
+        uncovered = max(measurement.sample_size - sum(s.sample_size for s in segments), 0)
         evidence = Evidence(
             baseline=f"{self._before_label} distribution (no ETL transformation applied)",
-            segments=self._segments(before, after, column, plan),
+            segments=segments,
+            uncovered=uncovered,
             sensitivity={
                 "mean_delta": float(after[column].mean() - before[column].mean()),
                 "median_delta": float(after[column].median() - before[column].median()),

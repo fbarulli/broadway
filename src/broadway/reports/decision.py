@@ -53,6 +53,10 @@ class Evidence(BaseModel):
     baseline: str = Field(min_length=1)
     delta: float | None = None
     segments: list[SegmentEvidence] = Field(min_length=1)
+    # Rows inside the decision's n that no published segment covers: the EDA
+    # drops segment levels with <2 rows (a one-row level cannot be measured),
+    # so `sum(segment.sample_size) + uncovered == n` is the acceptance identity.
+    uncovered: int = Field(default=0, ge=0)
     sensitivity: dict[str, float] = Field(min_length=1)
     falsifier: str = Field(min_length=1)
     provenance: dict[str, str] = Field(min_length=1)

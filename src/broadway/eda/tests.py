@@ -505,10 +505,13 @@ class FeatureTestAnalyzer:
             ),
             name=f"association_{feature}",
         )
+        segments = self._segments(test, pair, positions, plan, family)
+        uncovered = max(measurement.sample_size - sum(s.sample_size for s in segments), 0)
         alternative_name, alternative_value = test.alternative()
         evidence = Evidence(
             baseline="no-effect shuffle of the target at this n",
-            segments=self._segments(test, pair, positions, plan, family),
+            segments=segments,
+            uncovered=uncovered,
             sensitivity={
                 alternative_name: alternative_value,
                 "iterations": float(self._step.permutations),
@@ -596,7 +599,10 @@ class FeatureTestAnalyzer:
             update={
                 "provenance": {
                     **chosen.evidence.provenance,
-                    "family_size": str(len(decisions)),
+                    # The correction family is every TESTED feature (21), not only
+                    # the 12 that got a bootstrap/permutation decision.
+                    "family_size": str(len(rows)),
+                    "decided": str(len(decisions)),
                     "acted": str(len(acting)),
                     "investigated": str(sum(1 for item in decisions if item.verdict == "investigate")),
                     "selected_feature": chosen.metric,

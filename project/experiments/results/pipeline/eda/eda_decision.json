@@ -40,6 +40,7 @@
         "sample_size": 1845
       }
     ],
+    "uncovered": 1,
     "sensitivity": {
       "point_biserial_r": 0.31157910724460175,
       "iterations": 200.0,
@@ -60,7 +61,8 @@
       "rows": "95830",
       "resampling": "iid+shuffle",
       "segments": "levels of dominant_payment_type",
-      "family_size": "12",
+      "family_size": "21",
+      "decided": "12",
       "acted": "11",
       "investigated": "1",
       "selected_feature": "association_delivery_days",

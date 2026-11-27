@@ -90,6 +90,7 @@ class OutlierDecisionAnalyzer:
         plan: SegmentPlan,
     ) -> Decision:
         lower, upper = self._fences(item)
+        segments = self._segments(frame, item, lower, upper, plan)
         measurement = self._estimator.estimate(
             frame[[item.column]].dropna(),
             OutlierShareStatistic(item.column, lower, upper),
@@ -101,6 +102,7 @@ class OutlierDecisionAnalyzer:
             ),
             name=f"outlier_share_{item.column}",
         )
+        uncovered = max(measurement.sample_size - sum(s.sample_size for s in segments), 0)
         null = self._binomial_null(measurement.sample_size)
         rule = DecisionRule(
             metric=f"outlier_share_{item.column}",
@@ -116,6 +118,7 @@ class OutlierDecisionAnalyzer:
                 f"produces at iqr_multiplier={self._step.iqr_multiplier:g}"
             ),
             segments=self._segments(frame, item, lower, upper, plan),
+            uncovered=uncovered,
             sensitivity={
                 "z_score_share": item.z_rate,
                 "iqr_multiplier": float(self._step.iqr_multiplier),

@@ -7,7 +7,8 @@
 #
 # Grain: one row per order_id. Orders without a review keep a null target and
 # are dropped by the ETL's accounted "null target" rule; orders without item
-# rows keep null item aggregates (755 of 99,441). No row is dropped here.
+# rows keep null item aggregates (775 of 99,441; 756 of them have a review).
+# No row is dropped here.
 name: olist
 source_dir: data/raw/olist
 output: data/raw/olist/olist_orders.parquet

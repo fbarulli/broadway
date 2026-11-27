@@ -101,6 +101,39 @@ def test_categorical_test_survives_a_top_code_in_one_target_class() -> None:
     assert [row.feature for row in bundle.features] == ["city"]
 
 
+def test_decision_segments_plus_uncovered_cover_n_and_publish_the_tested_family() -> None:
+    """Every EDA decision accounts for all n: segments + uncovered == n."""
+    step = _step(permutations=10, max_features=2, min_sample_size=10)
+    n = 60
+    rng = np.random.default_rng(0)
+    frame = pd.DataFrame(
+        {
+            "signal": rng.normal(size=n),
+            "noise": rng.normal(size=n),
+            # one-row level: SegmentPlan.groups drops it, so it must be uncovered
+            "group": ["a"] * 30 + ["c"] * 29 + ["b"],
+            "target": rng.integers(0, 2, n),
+        }
+    )
+    bundle = FeatureTestAnalyzer(step, TaskType.CLASSIFICATION).analyze(
+        frame, "target", _PROVENANCE, _plan(frame)
+    )
+
+    assert len(bundle.features) == 3
+    assert len(bundle.decisions) == 2
+    decisions = [*bundle.decisions, *([bundle.summary] if bundle.summary else [])]
+    for decision in decisions:
+        assert (
+            sum(segment.sample_size for segment in decision.evidence.segments)
+            + decision.evidence.uncovered
+            == decision.sample_size
+        )
+    assert bundle.summary is not None
+    assert int(bundle.summary.evidence.provenance["family_size"]) == 3
+    assert int(bundle.summary.evidence.provenance["decided"]) == 2
+    assert bundle.summary.evidence.uncovered == 1
+
+
 def test_time_and_single_group_columns_are_skipped_not_tested() -> None:
     step = _step(permutations=20)
     frame = _frame(300).assign(

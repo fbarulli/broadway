@@ -42,6 +42,7 @@
           "sample_size": 1845
         }
       ],
+      "uncovered": 1,
       "sensitivity": {
         "point_biserial_r": 0.31157910724460175,
         "iterations": 200.0,
@@ -62,7 +63,8 @@
         "rows": "95830",
         "resampling": "iid+shuffle",
         "segments": "levels of dominant_payment_type",
-        "family_size": "12",
+        "family_size": "21",
+        "decided": "12",
         "acted": "11",
         "investigated": "1",
         "selected_feature": "association_delivery_days",
@@ -118,6 +120,7 @@
           "sample_size": 3948
         }
       ],
+      "uncovered": 2,
       "sensitivity": {
         "mean_delta": -3.552713678800501e-15,
         "median_delta": 0.0,
@@ -190,6 +193,7 @@
             "sample_size": 1974
           }
         ],
+        "uncovered": 1,
         "sensitivity": {
           "cramers_v_corrected": 0.14833911426691138,
           "iterations": 200.0,
@@ -255,6 +259,7 @@
             "sample_size": 1845
           }
         ],
+        "uncovered": 1,
         "sensitivity": {
           "point_biserial_r": 0.31157910724460175,
           "iterations": 200.0,
@@ -320,6 +325,7 @@
             "sample_size": 1845
           }
         ],
+        "uncovered": 1,
         "sensitivity": {
           "point_biserial_r": 0.36372987124511635,
           "iterations": 200.0,
@@ -390,6 +396,7 @@
             "sample_size": 1974
           }
         ],
+        "uncovered": 1,
         "sensitivity": {
           "cramers_v_corrected": 0.08087244508649172,
           "iterations": 200.0,
@@ -455,6 +462,7 @@
             "sample_size": 1890
           }
         ],
+        "uncovered": 1,
         "sensitivity": {
           "point_biserial_r": 0.08655356645040051,
           "iterations": 200.0,
@@ -525,6 +533,7 @@
             "sample_size": 1974
           }
         ],
+        "uncovered": 0,
         "sensitivity": {
           "point_biserial_r": 0.05605011224332769,
           "iterations": 200.0,
@@ -590,6 +599,7 @@
             "sample_size": 1890
           }
         ],
+        "uncovered": 1,
         "sensitivity": {
           "point_biserial_r": 0.047342469586664854,
           "iterations": 200.0,
@@ -660,6 +670,7 @@
             "sample_size": 1974
           }
         ],
+        "uncovered": 1,
         "sensitivity": {
           "cramers_v_corrected": 0.08460526034998304,
           "iterations": 200.0,
@@ -730,6 +741,7 @@
             "sample_size": 1974
           }
         ],
+        "uncovered": 1,
         "sensitivity": {
           "point_biserial_r": 0.08341260507272577,
           "iterations": 200.0,
@@ -800,6 +812,7 @@
             "sample_size": 1974
           }
         ],
+        "uncovered": 1,
         "sensitivity": {
           "point_biserial_r": 0.042826857939497115,
           "iterations": 200.0,
@@ -865,6 +878,7 @@
             "sample_size": 1864
           }
         ],
+        "uncovered": 1,
         "sensitivity": {
           "cramers_v_corrected": 0.059318397448100996,
           "iterations": 200.0,
@@ -935,6 +949,7 @@
             "sample_size": 1974
           }
         ],
+        "uncovered": 0,
         "sensitivity": {
           "point_biserial_r": 0.03546200997592971,
           "iterations": 200.0,
@@ -1002,6 +1017,7 @@
             "sample_size": 1845
           }
         ],
+        "uncovered": 1,
         "sensitivity": {
           "z_score_share": 0.016414,
           "iqr_multiplier": 1.5,
@@ -1071,6 +1087,7 @@
             "sample_size": 1974
           }
         ],
+        "uncovered": 1,
         "sensitivity": {
           "z_score_share": 0.010388,
           "iqr_multiplier": 1.5,
@@ -1135,6 +1152,7 @@
             "sample_size": 1845
           }
         ],
+        "uncovered": 1,
         "sensitivity": {
           "z_score_share": 0.079954,
           "iqr_multiplier": 1.5,
@@ -1204,6 +1222,7 @@
             "sample_size": 1974
           }
         ],
+        "uncovered": 1,
         "sensitivity": {
           "z_score_share": 0.022803,
           "iqr_multiplier": 1.5,
@@ -1273,6 +1292,7 @@
             "sample_size": 1974
           }
         ],
+        "uncovered": 1,
         "sensitivity": {
           "z_score_share": 0.020472,
           "iqr_multiplier": 1.5,
@@ -1342,6 +1362,7 @@
             "sample_size": 1974
           }
         ],
+        "uncovered": 1,
         "sensitivity": {
           "z_score_share": 0.040062,
           "iqr_multiplier": 1.5,
@@ -1406,6 +1427,7 @@
             "sample_size": 1890
           }
         ],
+        "uncovered": 1,
         "sensitivity": {
           "z_score_share": 0.01726,
           "iqr_multiplier": 1.5,
@@ -1470,6 +1492,7 @@
             "sample_size": 1890
           }
         ],
+        "uncovered": 1,
         "sensitivity": {
           "z_score_share": 0.016044,
           "iqr_multiplier": 1.5,
@@ -1534,6 +1557,7 @@
             "sample_size": 1890
           }
         ],
+        "uncovered": 1,
         "sensitivity": {
           "z_score_share": 0.017903,
           "iqr_multiplier": 1.5,
@@ -1598,6 +1622,7 @@
             "sample_size": 1889
           }
         ],
+        "uncovered": 1,
         "sensitivity": {
           "z_score_share": 0.025618,
           "iqr_multiplier": 1.5,
@@ -1662,6 +1687,7 @@
             "sample_size": 1864
           }
         ],
+        "uncovered": 1,
         "sensitivity": {
           "z_score_share": 0.014823,
           "iqr_multiplier": 1.5,
@@ -1726,6 +1752,7 @@
             "sample_size": 1864
           }
         ],
+        "uncovered": 1,
         "sensitivity": {
           "z_score_share": 0.024374,
           "iqr_multiplier": 1.5,
@@ -1795,6 +1822,7 @@
             "sample_size": 1974
           }
         ],
+        "uncovered": 0,
         "sensitivity": {
           "z_score_share": 0.017381,
           "iqr_multiplier": 1.5,
@@ -1864,6 +1892,7 @@
             "sample_size": 1974
           }
         ],
+        "uncovered": 0,
         "sensitivity": {
           "z_score_share": 0.003172,
           "iqr_multiplier": 1.5,
@@ -1933,6 +1962,7 @@
             "sample_size": 1974
           }
         ],
+        "uncovered": 0,
         "sensitivity": {
           "z_score_share": 0.02257,
           "iqr_multiplier": 1.5,
@@ -2002,6 +2032,7 @@
             "sample_size": 1974
           }
         ],
+        "uncovered": 1,
         "sensitivity": {
           "z_score_share": 0.0,
           "iqr_multiplier": 1.5,
