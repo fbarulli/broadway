@@ -1,8 +1,10 @@
-"""Public behavior of the dashboard's pipeline-evidence section.
+"""Public behavior of pipeline steps on the experiment dashboard.
 
-One synthetic checkout with no experiment series: the dashboard root must still
-render a committed pipeline decision (and its links), while malformed records
-are skipped with a logged error instead of failing the page.
+A synthetic checkout with one script series plus a published pipeline tree: the
+dashboard must list ``pipeline`` after the script series, show one
+``experiment | question | status | artifacts`` row per pipeline step (linked to its
+step page), render that page with the decision, figure, table, report and code, and
+skip a malformed record with one logged traceback instead of failing the page.
 """
 
 from __future__ import annotations
@@ -51,104 +53,91 @@ def _write(path: Path, payload: object) -> None:
     path.write_text(json.dumps(payload), encoding="utf-8")
 
 
-def test_dashboard_root_renders_pipeline_records_and_skips_malformed(
+def test_pipeline_series_lists_steps_and_renders_step_pages(
     monkeypatch, tmp_path: Path, caplog
 ) -> None:
     root = tmp_path / "experiments"
-    pipeline = root / "results" / "pipeline"
+    (root / "alpha").mkdir(parents=True)
+    (root / "alpha" / "01_step.py").write_text('"""01: A script step."""', encoding="utf-8")
 
+    step = root / "results" / "pipeline" / "etl"
     _write(
-        pipeline / "eda" / "eda_decision.json",
+        step / "etl_decision.json",
         Decision.model_validate(_decision()).model_dump(mode="json"),
     )
-    (pipeline / "eda" / "eda_effects.png").write_bytes(b"png")
-    (pipeline / "eda" / "eda_feature_decisions.json").write_text("{}", encoding="utf-8")
-    _write(
-        pipeline / "features" / "features_decision.json",
-        Decision.model_validate(
-            _decision(
-                metric="missing_share",
-                value=0.01,
-                interval_low=0.005,
-                interval_high=0.02,
-                threshold=0.9,
-                null_threshold=None,
-                direction="min",
-                verdict="no_action",
-            )
-        ).model_dump(mode="json"),
-    )
-    no_dataset = _decision(metric="no_dataset_metric")
-    no_dataset["evidence"] = {
-        **no_dataset["evidence"],
-        "provenance": {"seed": "42"},
-    }
-    _write(
-        pipeline / "no_dataset" / "no_dataset_decision.json",
-        Decision.model_validate(no_dataset).model_dump(mode="json"),
-    )
+    (step / "etl_effects.png").write_bytes(b"png")
+    (step / "etl_effects.csv").write_text("stat,value\ncount,1\n", encoding="utf-8")
+    (step / "etl.md").write_text("# ETL report\n", encoding="utf-8")
 
-    (pipeline / "bad_list").mkdir(parents=True)
-    (pipeline / "bad_list" / "bad_list_decision.json").write_text("[]", encoding="utf-8")
-    overflow = json.dumps(
-        Decision.model_validate(_decision()).model_dump(mode="json")
-    ).replace('"sample_size": 50000', '"sample_size": 1e999')
-    (pipeline / "bad_overflow").mkdir(parents=True)
-    (pipeline / "bad_overflow" / "bad_overflow_decision.json").write_text(
-        overflow, encoding="utf-8"
-    )
-    _write(
-        pipeline / "bad_interval" / "bad_interval_decision.json",
-        _decision(value=0.5, interval_low=0.9, interval_high=0.1),
-    )
-    _write(
-        pipeline / "bad_direction" / "bad_direction_decision.json",
-        _decision(direction="sideways"),
-    )
+    bad = root / "results" / "pipeline" / "bad"
+    bad.mkdir(parents=True)
+    (bad / "bad_decision.json").write_text("[]", encoding="utf-8")
 
-    monkeypatch.setattr(ui, "EXPERIMENTS_ROOT", root)
-    with caplog.at_level(logging.WARNING):
-        response = ui.index(focus="")
-        ui.index(focus="")
-
-    assert response.status_code == 200
-    assert ui.index(focus="../..").status_code == 404
-    assert ui.index(focus="alpha").status_code == 404
-    body = response.body.decode()
-    assert '<td>eda<br><span class="dataset">synthetic</span></td>' in body
-    assert "association_&lt;x&gt;" in body
-    assert "association_<x>" not in body
-    assert "0.9400 [0.9300, 0.9500]" in body
-    assert "> 0.0500" in body
-    assert "0.0089" in body
-    assert "50,000" in body
-    assert ">act<" in body
-    assert "/results/pipeline/eda/eda_effects.png" in body
-    assert "/results/pipeline/eda/eda_feature_decisions.json" in body
-    assert "/results/pipeline/eda/eda_decision.json" in body
-
-    assert '<td>features<br><span class="dataset">synthetic</span></td>' in body
-    assert "< 0.9000" in body
-    assert ">no_action<" in body
-    assert "<td>no_dataset</td>" in body
-
-    for skipped in ("bad_list", "bad_overflow", "bad_interval", "bad_direction"):
-        assert f"<td>{skipped}</td>" not in body
-    assert caplog.text.count("unreadable decision record") == 4
-
-
-def test_every_record_in_a_step_is_rendered(tmp_path: Path) -> None:
-    """Two records in one step dir (evaluate: champion + tuned) both render."""
-    step = tmp_path / "experiments" / "results" / "pipeline" / "evaluate"
-    step.mkdir(parents=True)
+    evaluate = root / "results" / "pipeline" / "evaluate"
     for stem in ("champion_promotion", "tuned_promotion"):
-        (step / f"{stem}_decision.json").write_text(
-            json.dumps(_decision(metric=stem)), encoding="utf-8"
+        _write(
+            evaluate / f"{stem}_decision.json",
+            Decision.model_validate(_decision(metric=stem)).model_dump(mode="json"),
         )
 
-    section = ui.PipelineEvidenceSection.from_experiments_root(tmp_path / "experiments")
-    rendered = section.render()
+    monkeypatch.setattr(ui, "EXPERIMENTS_ROOT", root)
 
-    assert rendered.count("<tr>") - 1 == 2
-    assert "champion_promotion" in rendered
-    assert "tuned_promotion" in rendered
+    assert ui.list_series() == ["alpha", "pipeline"]
+    rows = ui.census_rows("pipeline")
+    assert all(set(row) == {"experiment", "question", "status", "artifacts"} for row in rows)
+    assert rows[0] == {
+        "experiment": "bad",
+        "question": "",
+        "status": "no record",
+        "artifacts": 1,
+    }
+    assert rows[1] == {
+        "experiment": "etl",
+        "question": "Does the metric clear its threshold?",
+        "status": "act",
+        "artifacts": 4,
+    }
+    assert rows[2] == {
+        "experiment": "evaluate",
+        "question": "Does the metric clear its threshold?",
+        "status": "act",
+        "artifacts": 2,
+    }
+
+    with caplog.at_level(logging.ERROR):
+        dashboard = ui.index("pipeline")
+        ui.index("pipeline")
+        step_page = ui.experiment_page("etl", "pipeline")
+        bad_page = ui.experiment_page("bad", "pipeline")
+        multi_record_page = ui.experiment_page("evaluate", "pipeline")
+
+    assert dashboard.status_code == 200
+    dashboard_html = dashboard.body.decode()
+    assert "<tr><th>experiment</th><th>question</th><th>status</th><th>artifacts</th></tr>" in (
+        dashboard_html
+    )
+    assert (
+        '<tr><td><a href="/experiments/etl?focus=pipeline">etl</a></td>'
+        "<td>Does the metric clear its threshold?</td><td>act</td><td>4</td></tr>"
+    ) in dashboard_html
+    assert "pipeline evidence" not in dashboard_html
+
+    assert step_page.status_code == 200
+    page = step_page.body.decode()
+    assert 'class="decision act"' in page
+    assert "association_&lt;x&gt;" in page
+    assert "dataset: synthetic \u00b7 seed: 42" in page
+    assert '<img src="/results/pipeline/etl/etl_effects.png"' in page
+    assert '<table class="evidence">' in page
+    assert "<td>count</td>" in page
+    assert "ETL report" in page
+    assert "show code — module.py" in page
+    assert '<a href="/results/pipeline/etl/etl_decision.json">etl_decision.json</a>' in page
+
+    multi_record = multi_record_page.body.decode()
+    assert "<h2>champion_promotion</h2>" in multi_record
+    assert "<h2>tuned_promotion</h2>" in multi_record
+    assert multi_record.count('class="decision act"') == 2
+
+    assert bad_page.status_code == 200
+    assert caplog.text.count("unreadable decision record") == 1

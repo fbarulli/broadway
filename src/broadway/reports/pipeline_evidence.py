@@ -1,18 +1,20 @@
-"""Pipeline step evidence on the experiment dashboard.
+"""Pipeline steps as a dashboard series.
 
-Pipeline steps (``etl``, ``eda``, ...) are not experiment series: they publish
-their decision record and evidence under
-``<experiments root>/results/pipeline/<step>/``. The dashboard only discovers
-numbered series scripts, so those records were unreachable from a fresh
-checkout. This section scans the pipeline result folders for
-``*_decision.json``, validates each one through the canonical ``Decision``
-model, and renders one compact, fully escaped row per record, linking the
-record, its per-feature evidence and the figures it was read from.
+Pipeline steps (``etl``, ``eda``, ...) are not script series: they publish their
+decision record and evidence under
+``<experiments root>/results/pipeline/<step>/``. The dashboard exposes them through
+the normal series surface — one ``experiment | question | status | artifacts`` row per
+step, opening a step page — instead of a bespoke section. This module owns the data:
+the step list, the validated ``Decision`` records, the files a step produced, the
+static URLs and the producing module source. Rendering stays in the dashboard.
+
+Every ``*_decision.json`` is validated through the canonical ``Decision`` model; a
+malformed record is skipped (logged once per path with its full traceback) instead of
+failing the page.
 """
 
 from __future__ import annotations
 
-import html
 import logging
 from dataclasses import dataclass
 from pathlib import Path
@@ -20,13 +22,17 @@ from urllib.parse import quote
 
 from pydantic import ValidationError
 
+from broadway.config.loader import STEP_MODULES
 from broadway.reports.decision import Decision
 
 logger = logging.getLogger(__name__)
 
+#: The series id under which ``results/pipeline`` is served.
+PIPELINE_FOCUS = "pipeline"
+
 _RECORD_SUFFIX = "_decision.json"
-_FIGURE_SUFFIX = ".png"
-_DECIMALS = 4
+#: ``src/broadway`` — the owner of every step module named by ``STEP_MODULES``.
+_PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 # A permanently malformed record is skipped on every request; log its full
 # traceback once so the contract's traceback rule does not become log bloat.
 _LOGGED_UNREADABLE: set[Path] = set()
@@ -34,15 +40,15 @@ _LOGGED_UNREADABLE: set[Path] = set()
 
 @dataclass(frozen=True)
 class PipelineRecord:
-    """One validated decision record plus the files that carry its evidence."""
+    """One validated decision record for a pipeline step."""
 
     step: str
     record: Path
     decision: Decision
-    figures: tuple[Path, ...]
 
     @property
     def stem(self) -> str:
+        """The record's filename stem (``evaluate/champion_promotion`` -> ``champion_promotion``)."""
         return self.record.name[: -len(_RECORD_SUFFIX)]
 
     @property
@@ -57,112 +63,88 @@ class PipelineRecord:
         except (OSError, UnicodeDecodeError, ValidationError):
             if record not in _LOGGED_UNREADABLE:
                 _LOGGED_UNREADABLE.add(record)
-                logger.exception(
-                    "pipeline evidence: unreadable decision record at %s", record
-                )
+                logger.exception("pipeline evidence: unreadable decision record at %s", record)
             return None
-        return cls(
-            step=record.parent.name,
-            record=record,
-            decision=decision,
-            figures=cls._figures(record.parent, record.name[: -len(_RECORD_SUFFIX)]),
-        )
-
-    @staticmethod
-    def _figures(directory: Path, stem: str) -> tuple[Path, ...]:
-        """The step's figure(s): ``<stem>.png`` first, then ``<stem>_*.png``."""
-        found: list[Path] = []
-        candidates = (
-            directory / f"{stem}{_FIGURE_SUFFIX}",
-            *sorted(directory.glob(f"{stem}_*{_FIGURE_SUFFIX}")),
-        )
-        for candidate in candidates:
-            if candidate.is_file() and candidate not in found:
-                found.append(candidate)
-        return tuple(found)
+        return cls(step=record.parent.name, record=record, decision=decision)
 
 
-class PipelineEvidenceSection:
-    """Render every pipeline step's decision record as one HTML table section."""
+class PipelineSeries:
+    """The ``results/pipeline`` tree read as one dashboard series (one row per step)."""
 
     def __init__(self, results_root: Path) -> None:
         self._results_root = Path(results_root)
-        self._pipeline_root = self._results_root / "pipeline"
+        self._pipeline_root = self._results_root / PIPELINE_FOCUS
 
     @classmethod
-    def from_experiments_root(cls, experiments_root: Path) -> PipelineEvidenceSection:
-        """Build the section for the dashboard's configured experiments root."""
+    def from_experiments_root(cls, experiments_root: Path) -> PipelineSeries:
+        """Build the series for the dashboard's configured experiments root."""
         return cls(Path(experiments_root) / "results")
 
-    def render(self) -> str:
-        """Return the section, or nothing when no pipeline record is published."""
-        records = [PipelineRecord.from_path(path) for path in self._record_paths()]
-        rows = [self._row(record) for record in records if record is not None]
-        if not rows:
-            return ""
-        return (
-            '<section class="pipeline-evidence">'
-            "<h2>pipeline evidence</h2>"
-            "<table><thead><tr>"
-            "<th>step</th><th>metric</th><th>value [95%]</th><th>rule</th>"
-            "<th>null band</th><th>n</th><th>verdict</th><th>evidence</th>"
-            "</tr></thead><tbody>"
-            f"{''.join(rows)}"
-            "</tbody></table></section>"
-        )
+    @property
+    def exists(self) -> bool:
+        """Whether the checkout published any pipeline step."""
+        return self._pipeline_root.is_dir()
 
-    def _record_paths(self) -> list[Path]:
-        if not self._pipeline_root.is_dir():
+    def steps(self) -> list[str]:
+        """Step ids: the directories under ``results/pipeline``, sorted."""
+        if not self.exists:
             return []
-        return [
-            record
-            for step_dir in sorted(self._pipeline_root.iterdir())
-            if step_dir.is_dir()
-            for record in sorted(step_dir.glob(f"*{_RECORD_SUFFIX}"))
-        ]
+        return sorted(path.name for path in self._pipeline_root.iterdir() if path.is_dir())
 
-    def _row(self, record: PipelineRecord) -> str:
-        decision = record.decision
-        null_band = (
-            "—" if decision.null_threshold is None else f"{decision.null_threshold:,.{_DECIMALS}f}"
+    def step_dir(self, step: str) -> Path | None:
+        """The step's directory, or None when the step is unknown."""
+        return self._pipeline_root / step if step in self.steps() else None
+
+    def artifacts(self, step: str) -> list[Path]:
+        """Every file the step produced, sorted (records, figures, tables, reports)."""
+        directory = self.step_dir(step)
+        if directory is None:
+            return []
+        return sorted(path for path in directory.iterdir() if path.is_file())
+
+    def records(self, step: str) -> list[PipelineRecord]:
+        """The step's validated decision records, in filename order."""
+        directory = self.step_dir(step)
+        if directory is None:
+            return []
+        validated = (
+            PipelineRecord.from_path(path) for path in sorted(directory.glob(f"*{_RECORD_SUFFIX}"))
         )
-        comparator = ">" if decision.direction == "max" else "<"
-        dataset = decision.evidence.provenance.get("dataset", "")
-        dataset_label = (
-            f'<br><span class="dataset">{html.escape(dataset)}</span>' if dataset else ""
-        )
-        return (
-            "<tr>"
-            f"<td>{html.escape(record.step)}{dataset_label}</td>"
-            f"<td>{html.escape(decision.metric)}</td>"
-            f"<td>{decision.value:,.{_DECIMALS}f} "
-            f"[{decision.interval_low:,.{_DECIMALS}f}, "
-            f"{decision.interval_high:,.{_DECIMALS}f}]</td>"
-            f"<td>{comparator} {decision.threshold:,.{_DECIMALS}f}</td>"
-            f"<td>{null_band}</td>"
-            f"<td>{decision.sample_size:,}</td>"
-            f'<td class="verdict">{html.escape(decision.verdict)}</td>'
-            f"<td>{self._links(record)}</td>"
-            "</tr>"
+        return [record for record in validated if record is not None]
+
+    def primary(self, step: str) -> PipelineRecord | None:
+        """The record a step is summarised by: ``<step>_decision.json``, else the first."""
+        records = self.records(step)
+        return next(
+            (record for record in records if record.stem == step), records[0] if records else None
         )
 
-    def _links(self, record: PipelineRecord) -> str:
-        links = []
-        for figure in record.figures:
-            label = (
-                "figure"
-                if figure.stem == record.stem
-                else figure.stem[len(record.stem) + 1 :].replace("_", " ")
+    def census_rows(self) -> list[dict[str, str | int]]:
+        """One dashboard row per step: experiment | question | status | artifacts."""
+        rows: list[dict[str, str | int]] = []
+        for step in self.steps():
+            record = self.primary(step)
+            rows.append(
+                {
+                    "experiment": step,
+                    "question": record.decision.question if record is not None else "",
+                    "status": record.decision.verdict if record is not None else "no record",
+                    "artifacts": len(self.artifacts(step)),
+                }
             )
-            links.append(
-                f'<a href="{html.escape(self._url(figure))}">{html.escape(label)}</a>'
-            )
-        if record.sidecar.is_file():
-            links.append(
-                f'<a href="{html.escape(self._url(record.sidecar))}">feature decisions</a>'
-            )
-        links.append(f'<a href="{html.escape(self._url(record.record))}">record</a>')
-        return " · ".join(links)
+        return rows
 
-    def _url(self, path: Path) -> str:
+    def url(self, path: Path) -> str:
+        """The static URL serving one file of this series."""
         return "/results/" + quote(path.relative_to(self._results_root).as_posix(), safe="/")
+
+    def module_source(self, step: str) -> Path | None:
+        """The step's producing module: ``STEP_MODULES`` (the SSOT), else ``<step>/module.py``."""
+        reference = STEP_MODULES.get(step)
+        relative = (
+            Path(*reference.split(".")[1:]).with_suffix(".py")
+            if reference is not None
+            else Path(step) / "module.py"
+        )
+        candidate = _PACKAGE_ROOT / relative
+        return candidate if candidate.is_file() else None

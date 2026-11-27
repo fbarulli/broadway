@@ -8,7 +8,9 @@ parameter on every page. The default is the first discovered series unless
 
 To add a series: drop a folder with numbered ``NN_*.py`` scripts under the
 configured experiment root; its results live under that root's ``results`` directory and
-its dashboard becomes reachable at ``/?focus=<series id>``.
+its dashboard becomes reachable at ``/?focus=<series id>``. The pipeline steps published
+under ``results/pipeline/<step>/`` are the ``pipeline`` series (listed after the script
+series); each step opens its own page from ``/experiments/<step>?focus=pipeline``.
 
 Each step page renders a bare-bones HTML pipeline graph (upstream -> this
 step -> downstream consumers of the datasets it writes), the step's result
@@ -30,6 +32,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 from urllib.parse import parse_qs, quote
 
 import pandas as pd
@@ -37,7 +40,7 @@ from fastapi import FastAPI, Query, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
-from broadway.reports.pipeline_evidence import PipelineEvidenceSection
+from broadway.reports.pipeline_evidence import PIPELINE_FOCUS, PipelineRecord, PipelineSeries
 
 logger = logging.getLogger(__name__)
 
@@ -126,13 +129,17 @@ def _h(path: str, focus: str) -> str:
 
 
 def list_series() -> list[str]:
-    """Return series ids: folders under ``experiments/`` with a numbered ``NN_*.py``, sorted."""
+    """Return series ids: numbered-script folders (sorted), then ``pipeline``."""
     found: set[str] = set()
     for script in EXPERIMENTS_ROOT.rglob("*.py"):
         if script.name.startswith("_") or not _NN_PREFIX.match(script.name):
             continue
         found.add(script.relative_to(EXPERIMENTS_ROOT).parent.as_posix())
-    return sorted(found)
+    series = sorted(found)
+    pipeline = PipelineSeries.from_experiments_root(EXPERIMENTS_ROOT)
+    if PIPELINE_FOCUS not in found and pipeline.exists:
+        series.append(PIPELINE_FOCUS)
+    return series
 
 
 def _resolve_focus(focus: str) -> str:
@@ -167,7 +174,9 @@ def series_profiles(focus: str) -> dict[str, ScriptProfile]:
 
 
 def census_rows(focus: str) -> list[dict[str, str | int]]:
-    """Build one dashboard row per focused-series script (experiment | question | status | artifacts)."""
+    """Build one dashboard row per step (experiment | question | status | artifacts)."""
+    if focus == PIPELINE_FOCUS:
+        return PipelineSeries.from_experiments_root(EXPERIMENTS_ROOT).census_rows()
     rows: list[dict[str, str | int]] = []
     for script in series_scripts(focus):
         stem = script.stem
@@ -290,6 +299,8 @@ _MAX_TEXT_PREVIEW = 100_000
 
 def _artifact_url(path: Path, focus: str) -> str:
     """Return the static URL for one result artifact."""
+    if focus == PIPELINE_FOCUS:
+        return f"/results/{PIPELINE_FOCUS}/{quote(path.parent.name)}/{quote(path.name)}"
     return f"/results/{quote(focus, safe='/')}/{quote(path.name)}"
 
 
@@ -348,8 +359,16 @@ def _render_figure(stem: str, focus: str) -> str:
     return f'<figure><img src="{url}" alt="{html.escape(png.name)}"></figure>'
 
 
+def _provenance_line(provenance: dict[str, Any]) -> str:
+    """One compact line: the data the step ran on (from the decision provenance)."""
+    if not provenance:
+        return ""
+    parts = [f"{key}: {value}" for key, value in provenance.items()]
+    return f'<p class="data-used">{html.escape(" \u00b7 ".join(parts))}</p>'
+
+
 def _render_data_used(stem: str, focus: str) -> str:
-    """One compact line: what data the step ran on (from the decision provenance)."""
+    """The step's data-used line, read from its decision record."""
     path = _results_dir(focus) / f"{stem}_decision.json"
     if not path.is_file():
         return ""
@@ -358,19 +377,12 @@ def _render_data_used(stem: str, focus: str) -> str:
         provenance = payload.get("evidence", {}).get("provenance", {})
     except (OSError, ValueError, AttributeError, json.JSONDecodeError):
         return ""
-    if not provenance:
-        return ""
-    parts = [f"{key}: {value}" for key, value in provenance.items()]
-    return f'<p class="data-used">{html.escape(" \u00b7 ".join(parts))}</p>'
+    return _provenance_line(provenance if isinstance(provenance, dict) else {})
 
 
-def _render_decision(stem: str, focus: str) -> str:
-    """Render the step's decision record (metric + 95% interval vs the rule)."""
-    path = _results_dir(focus) / f"{stem}_decision.json"
-    if not path.is_file():
-        return ""
+def _render_decision_strip(payload: dict[str, Any]) -> str:
+    """Render a decision payload as the verdict strip (metric + 95% interval vs the rule)."""
     try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
         value = float(payload["value"])
         low = float(payload["interval_low"])
         high = float(payload["interval_high"])
@@ -384,8 +396,7 @@ def _render_decision(stem: str, focus: str) -> str:
             if isinstance(payload.get("null_threshold"), (int, float))
             else ""
         )
-    except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError):
-        logger.warning("dashboard: unreadable decision record at %s", path, exc_info=True)
+    except (ValueError, KeyError, TypeError):
         return ""
     return (
         f'<section class="decision {html.escape(verdict)}">'
@@ -399,22 +410,40 @@ def _render_decision(stem: str, focus: str) -> str:
     )
 
 
+def _render_decision(stem: str, focus: str) -> str:
+    """Render the step's decision record (metric + 95% interval vs the rule)."""
+    path = _results_dir(focus) / f"{stem}_decision.json"
+    if not path.is_file():
+        return ""
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError, json.JSONDecodeError):
+        logger.warning("dashboard: unreadable decision record at %s", path, exc_info=True)
+        return ""
+    return _render_decision_strip(payload if isinstance(payload, dict) else {})
+
+
+def _source_block(source: Path, raw_href: str = "") -> str:
+    """Render a source file as an escaped, line-numbered code block."""
+    try:
+        lines = source.read_text(encoding="utf-8").splitlines()
+    except (OSError, UnicodeDecodeError):
+        return "<p>Could not read this step's source.</p>"
+    numbered = "\n".join(f"{number:4d}  {line}" for number, line in enumerate(lines, 1))
+    raw = f' · <a href="{html.escape(raw_href)}">raw .py</a>' if raw_href else ""
+    return (
+        f'<details class="code-block"><summary>show code — {html.escape(source.name)}'
+        f" ({len(lines)} lines){raw}</summary>"
+        f'<pre class="text-preview">{html.escape(numbered)}</pre></details>'
+    )
+
+
 def _render_code(stem: str, focus: str) -> str:
     """Render the step's source with line numbers (the code the step runs)."""
     script = _script_for(stem, focus)
     if script is None:
         return "<p>No script for this step.</p>"
-    try:
-        lines = script.read_text(encoding="utf-8").splitlines()
-    except (OSError, UnicodeDecodeError):
-        return "<p>Could not read this step's source.</p>"
-    numbered = "\n".join(f"{number:4d}  {line}" for number, line in enumerate(lines, 1))
-    raw = html.escape(_h(f"/experiments/{stem}/source", focus))
-    return (
-        f'<details class="code-block"><summary>show code — {html.escape(script.name)}'
-        f" ({len(lines)} lines) · <a href=\"{raw}\">raw .py</a></summary>"
-        f'<pre class="text-preview">{html.escape(numbered)}</pre></details>'
-    )
+    return _source_block(script, _h(f"/experiments/{stem}/source", focus))
 
 
 def _render_artifacts(stem: str, focus: str, selected: str = "") -> str:
@@ -671,10 +700,6 @@ def _render_dashboard_page(
   th, td {{ border: 1px solid #ccc; padding: 0.4rem 0.6rem; text-align: left; vertical-align: top; }}
   th {{ background: #f0f0f0; }}
   tr:nth-child(even) td {{ background: #fafafa; }}
-  .pipeline-evidence {{ margin-top: 2rem; }}
-  .pipeline-evidence h2 {{ font-size: 1.1rem; }}
-  .pipeline-evidence .verdict {{ font-weight: 600; }}
-  .pipeline-evidence .dataset {{ color: #666; font-size: 0.85em; }}
 </style>
 </head>
 <body>
@@ -689,39 +714,18 @@ def _render_dashboard_page(
 {table_rows}
 </tbody>
 </table>
-{PipelineEvidenceSection.from_experiments_root(EXPERIMENTS_ROOT).render()}
 </body>
 </html>
 """
 
 
-def _render_experiment_page(
-    stem: str,
-    question: str,
-    stems: list[str],
-    profiles: dict[str, ScriptProfile],
-    focus: str,
-    series: list[str],
-    artifact: str = "",
-) -> str:
-    """Render the full per-experiment HTML page (strip, graph, artifacts, observation form)."""
-    prev_href, next_href = _prev_next_hrefs(stems, stem, "/experiments/")
-    prev_href = _h(prev_href, focus) if prev_href else ""
-    next_href = _h(next_href, focus) if next_href else ""
-    strip = _series_strip(
-        stems, stem, lambda s: _h(f"/experiments/{s}", focus), prev_href, next_href
-    )
-    nav = (
-        "<p>"
-        f'<a href="{html.escape(_h(f"/series?from={stem}", focus))}">show with next</a>'
-        f' | <a href="{html.escape(_h(f"/experiments/{stem}/new", focus))}">＋ new step after this</a>'
-        "</p>"
-    )
+def _render_step_page(title: str, question: str, body: str, focus: str, series: list[str]) -> str:
+    """The shared step-page frame: title, question, series selector, then the body sections."""
     return f"""<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>{html.escape(stem)} — Broadway experiments</title>
+<title>{html.escape(title)} — Broadway experiments</title>
 <style>
   body {{ font-family: system-ui, sans-serif; margin: 2rem; color: #222; }}
   h1 {{ font-size: 1.4rem; }}
@@ -758,12 +762,41 @@ def _render_experiment_page(
 </style>
 </head>
 <body>
-<h1>{html.escape(stem)}</h1>
+<h1>{html.escape(title)}</h1>
 <p class="question">{html.escape(question)}</p>
+{_series_selector(series, focus)}
+{body}
+</body>
+</html>
+"""
+
+
+def _render_experiment_page(
+    stem: str,
+    question: str,
+    stems: list[str],
+    profiles: dict[str, ScriptProfile],
+    focus: str,
+    series: list[str],
+    artifact: str = "",
+) -> str:
+    """Render the full per-experiment HTML page (strip, graph, artifacts, observation form)."""
+    prev_href, next_href = _prev_next_hrefs(stems, stem, "/experiments/")
+    prev_href = _h(prev_href, focus) if prev_href else ""
+    next_href = _h(next_href, focus) if next_href else ""
+    strip = _series_strip(
+        stems, stem, lambda s: _h(f"/experiments/{s}", focus), prev_href, next_href
+    )
+    nav = (
+        "<p>"
+        f'<a href="{html.escape(_h(f"/series?from={stem}", focus))}">show with next</a>'
+        f' | <a href="{html.escape(_h(f"/experiments/{stem}/new", focus))}">＋ new step after this</a>'
+        "</p>"
+    )
+    body = f"""
 {_render_decision(stem, focus)}
 {_render_data_used(stem, focus)}
 {_render_figure(stem, focus)}
-{_series_selector(series, focus)}
 <details class="panel"><summary>steps taken in the pipeline</summary>
 {strip}
 {nav}
@@ -779,9 +812,68 @@ def _render_experiment_page(
 <details class="panel"><summary>observations</summary>
 {_render_observations_form(stem, load_observations(stem), focus)}
 </details>
-</body>
-</html>
 """
+    return _render_step_page(stem, question, body, focus, series)
+
+
+def _render_pipeline_record(record: PipelineRecord, labelled: bool) -> str:
+    """One step's decision strip, labelled by record stem when the step has several."""
+    strip = _render_decision_strip(record.decision.model_dump(mode="json"))
+    return f"<h2>{html.escape(record.stem)}</h2>{strip}" if labelled else strip
+
+
+def _render_pipeline_step_page(step: str, series: list[str]) -> str:
+    """Render one pipeline step: decision(s), data used, figures, tables, report, code, links."""
+    pipeline = PipelineSeries.from_experiments_root(EXPERIMENTS_ROOT)
+    records = pipeline.records(step)
+    primary = pipeline.primary(step)
+    artifacts = pipeline.artifacts(step)
+    strips = "\n".join(_render_pipeline_record(record, len(records) > 1) for record in records)
+    figures = "\n".join(
+        _render_artifact_preview(path, PIPELINE_FOCUS)
+        for path in artifacts
+        if path.suffix.lower() in _IMAGE_SUFFIXES
+    )
+    tables = "\n".join(
+        _render_csv_preview(path) for path in artifacts if path.suffix.lower() == ".csv"
+    )
+    reports = "\n".join(
+        f'<details class="panel"><summary>report — {html.escape(path.name)}</summary>'
+        f"{_render_artifact_preview(path, PIPELINE_FOCUS)}</details>"
+        for path in artifacts
+        if path.suffix.lower() == ".md"
+    )
+    links = " · ".join(
+        f'<a href="{html.escape(pipeline.url(path))}">{html.escape(path.name)}</a>'
+        for path in artifacts
+    )
+    module = pipeline.module_source(step)
+    code = (
+        _source_block(module) if module is not None else "<p>No producing module for this step.</p>"
+    )
+    strip = _series_strip(
+        pipeline.steps(), step, lambda other: _h(f"/experiments/{other}", PIPELINE_FOCUS), "", ""
+    )
+    body = f"""
+{strips}
+{_provenance_line(primary.decision.evidence.provenance) if primary is not None else ""}
+{figures}
+<details class="panel"><summary>steps taken in the pipeline</summary>
+{strip}
+</details>
+<details class="panel"><summary>evidence tables</summary>
+{tables or '<p class="preview-note">No CSV evidence yet.</p>'}
+</details>
+{reports or '<p class="preview-note">No report yet.</p>'}
+<details class="panel"><summary>code</summary>
+{code}
+</details>
+<details class="panel"><summary>artifacts</summary>
+<p>{links or "—"}</p>
+</details>
+"""
+    question = primary.decision.question if primary is not None else ""
+    return _render_step_page(step, question, body, PIPELINE_FOCUS, series)
 
 
 def _render_series_cards(
@@ -1012,6 +1104,11 @@ def experiment_page(
     focus = _resolve_focus(focus)
     if focus not in list_series():
         return PlainTextResponse("unknown series", status_code=404)
+    if focus == PIPELINE_FOCUS:
+        pipeline = PipelineSeries.from_experiments_root(EXPERIMENTS_ROOT)
+        if name not in pipeline.steps():
+            return PlainTextResponse("unknown experiment", status_code=404)
+        return HTMLResponse(_render_pipeline_step_page(name, list_series()))
     script = _script_for(name, focus)
     if script is None:
         return PlainTextResponse("unknown experiment", status_code=404)
