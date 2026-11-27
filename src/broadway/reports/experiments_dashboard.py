@@ -40,7 +40,7 @@ from urllib.parse import parse_qs, quote
 
 import pandas as pd
 from fastapi import FastAPI, Query, Request
-from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from broadway.reports.pipeline_evidence import (
@@ -50,6 +50,7 @@ from broadway.reports.pipeline_evidence import (
     PipelineSeries,
     findings_from_sidecar,
 )
+from broadway.reports.story import STORY_TITLE, Story, configured_dataset
 
 logger = logging.getLogger(__name__)
 
@@ -687,10 +688,13 @@ def _render_dashboard_page(
   th, td {{ border: 1px solid #ccc; padding: 0.4rem 0.6rem; text-align: left; vertical-align: top; }}
   th {{ background: #f0f0f0; }}
   tr:nth-child(even) td {{ background: #fafafa; }}
+  .story-banner {{ padding: 0.7rem 1rem; border-left: 6px solid #2a7; background: #e3f4e8; font-size: 0.95rem; }}
 </style>
 </head>
 <body>
 <h1>Broadway experiments</h1>
+<p class="story-banner"><a href="/story">Read the project story →</a> — the question, the
+data, what we found, what we changed, the model, and what comes next.</p>
 <p><a href="/canvas">maps</a> — annotated canvases (tldraw) over diagrams/ + results</p>
 {_series_selector(series, focus) if series else ""}
 <table>
@@ -746,12 +750,20 @@ def _render_step_page(title: str, question: str, body: str, focus: str, series: 
   .evidence {{ border-collapse: collapse; width: 100%; font-size: 0.9rem; }}
   .evidence th, .evidence td {{ border: 1px solid #ccc; padding: 0.4rem 0.6rem; text-align: left; vertical-align: top; }}
   .evidence th {{ background: #f0f0f0; }}
+  .story-section {{ margin: 2.2rem 0; }}
+  .story-section h2 {{ font-size: 1.12rem; border-bottom: 1px solid #ddd; padding-bottom: 0.25rem; }}
+  .takeaway {{ font-size: 1rem; line-height: 1.45; }}
+  .numbers {{ color: #444; font-size: 0.85rem; padding-left: 1.1rem; }}
+  .numbers li {{ margin: 0.12rem 0; }}
+  .record-link {{ color: #666; font-size: 0.8rem; }}
+  .not-run {{ color: #777; font-style: italic; }}
+  .story-nav {{ font-size: 0.85rem; }}
 </style>
 </head>
 <body>
 <h1>{html.escape(title)}</h1>
 <p class="question">{html.escape(question)}</p>
-{_series_selector(series, focus)}
+{_series_selector(series, focus) if series else ""}
 {body}
 </body>
 </html>
@@ -827,6 +839,11 @@ def _render_pipeline_step_page(step: str, series: list[str]) -> str:
 """
     question = primary.decision.question if primary is not None else ""
     return _render_step_page(step, question, body, PIPELINE_FOCUS, series)
+
+
+def _render_story_page(builder: Story) -> str:
+    """Wrap the project story in the shared conclusions-first page frame."""
+    return _render_step_page(STORY_TITLE, builder.question, builder.page_body(), "", [])
 
 
 def _render_series_cards(
@@ -1032,6 +1049,23 @@ def index(focus: str = Query(default=DEFAULT_SERIES)) -> HTMLResponse | PlainTex
         return PlainTextResponse("unknown series", status_code=404)
     rows = census_rows(focus) if focus else []
     return HTMLResponse(_render_dashboard_page(rows, focus, series))
+
+
+@app.get("/story", response_model=None)
+def story_page() -> HTMLResponse:
+    """Serve the project story: conclusions first, graphs, numbers, record links."""
+    builder = Story.from_experiments_root(EXPERIMENTS_ROOT, configured_dataset())
+    return HTMLResponse(_render_story_page(builder))
+
+
+@app.get("/story/figure/{name}", response_model=None)
+def story_figure(name: str) -> Response | PlainTextResponse:
+    """Serve one story graph, rendered in memory from the current records."""
+    builder = Story.from_experiments_root(EXPERIMENTS_ROOT, configured_dataset())
+    png = builder.figure_png(name)
+    if png is None:
+        return PlainTextResponse("unknown story figure", status_code=404)
+    return Response(content=png, media_type="image/png")
 
 
 @app.get("/experiments/{name}/source", response_model=None)
