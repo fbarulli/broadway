@@ -35,7 +35,7 @@ from broadway.observability.profiling import timed
 from broadway.reports.decision import Decision, DecisionRule, Evidence, SegmentEvidence
 from broadway.reports.decision_log import DecisionLog
 from broadway.reports.step_output import StepOutput
-from broadway.selection.module import ChampionRecord, load_selection_frame
+from broadway.selection.module import ChampionRecord, SelectionFrame
 from broadway.training.hpo import suggest_params
 from broadway.training.trainer import build_model_pipeline
 
@@ -180,12 +180,14 @@ class CvObjective:
         model: ModelHPOSpec,
         X: pd.DataFrame,
         y: pd.Series,
+        groups: pd.Series | None = None,
     ) -> None:
         self._cfg = cfg
         self._step = step
         self._model = model
         self._X = X
         self._y = y
+        self._groups = groups
         self._cv = RepeatedCV(step.cv, step.metric, step.metric)
 
     def __call__(self, trial: optuna.Trial) -> float:
@@ -195,6 +197,7 @@ class CvObjective:
             _factory(self._cfg, self._model.name, params),
             self._X,
             self._y,
+            self._groups,
         )
         trial.set_user_attr("cv_mean", result.mean)
         return result.mean
@@ -205,6 +208,7 @@ class CvObjective:
             _factory(self._cfg, self._model.name, params),
             self._X,
             self._y,
+            self._groups,
         )
 
 
@@ -245,8 +249,10 @@ class TuningRun:
 
     def run(self) -> tuple[CVResult, CVResult, int, dict[str, float | int | str]]:
         assert self._cfg.experiment is not None and self._cfg.experiment.hpo is not None
-        X, y = load_selection_frame(self._cfg)
-        objective = CvObjective(self._cfg, self._step, self._spec, X, y)
+        frame = SelectionFrame.from_config(self._cfg)
+        objective = CvObjective(
+            self._cfg, self._step, self._spec, frame.X, frame.y, frame.groups
+        )
         study = optuna.create_study(
             direction=self._cfg.experiment.hpo.direction,
             sampler=optuna.samplers.TPESampler(seed=self._step.cv.random_state),
@@ -267,13 +273,18 @@ class TuningRun:
         )
         report = RepeatedCV(report_geometry, self._step.metric, self._step.metric)
         best = report.run(
-            self._spec.name, _factory(self._cfg, self._spec.name, best_params), X, y
+            self._spec.name,
+            _factory(self._cfg, self._spec.name, best_params),
+            frame.X,
+            frame.y,
+            frame.groups,
         )
         default = report.run(
             self._spec.name,
             _factory(self._cfg, self._spec.name, self._cfg.experiment.model.params),
-            X,
-            y,
+            frame.X,
+            frame.y,
+            frame.groups,
         )
         return best, default, len(study.trials), best_params
 
@@ -285,8 +296,7 @@ class TuningRun:
         best_params: dict[str, float | int | str],
     ) -> Decision:
         step = self._step
-        _, y = load_selection_frame(self._cfg)
-        truth = y.to_numpy(dtype=float)
+        truth = SelectionFrame.from_config(self._cfg).y.to_numpy(dtype=float)
         decision = TuningDecision(
             self._cfg, step, best, default, truth, trials, best_params
         ).decision()

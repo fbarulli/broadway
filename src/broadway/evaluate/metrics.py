@@ -9,6 +9,7 @@ import numpy as np
 from sklearn.metrics import (
     average_precision_score,
     explained_variance_score,
+    f1_score,
     max_error,
     mean_absolute_error,
     mean_squared_error,
@@ -32,8 +33,14 @@ METRIC_DECIMALS: int = 4
 # A consumer that needs percent multiplies by this constant, never a literal.
 MAPE_PERCENT_SCALE: float = 100.0
 
-# The holdout metrics the bootstrap pass reports intervals for.
+# The holdout metrics the bootstrap pass reports intervals for. The default
+# vocabulary stays regression-only (see ``_DEFAULT_METRICS``); a classification
+# caller names its metric explicitly.
 BOOTSTRAP_METRICS: tuple[str, ...] = ("rmse", "mae", "mape")
+
+# The binary score cutoff the scalar ``f1`` vocabulary member applies to a
+# continuous score. It is the metric's own definition, not an analysis knob.
+BINARY_DECISION_THRESHOLD: float = 0.5
 
 _TUNING_OBJECTIVES: frozenset[str] = frozenset(get_args(TuningObjective))
 
@@ -169,7 +176,7 @@ def require_mape_defined(y_true: np.ndarray) -> None:
 # One definition per metric name: the holdout scorer, the CV blocks, and the
 # bootstrap all execute these functions, so a metric can never drift between
 # paths (the sklearn CV subset lives in validation._SCORING and is parity-pinned).
-_METRIC_FUNCTIONS: dict[str, Callable[[np.ndarray, np.ndarray], float]] = {
+_REGRESSION_METRICS: dict[str, Callable[[np.ndarray, np.ndarray], float]] = {
     "mae": lambda truth, prediction: float(mean_absolute_error(truth, prediction)),
     "rmse": lambda truth, prediction: float(
         np.sqrt(mean_squared_error(truth, prediction))
@@ -183,9 +190,63 @@ _METRIC_FUNCTIONS: dict[str, Callable[[np.ndarray, np.ndarray], float]] = {
     ),
 }
 
+
+def _pr_auc(truth: np.ndarray, score: np.ndarray) -> float:
+    """Average precision under the binary truth (the imbalanced-target metric)."""
+    labels, scores = _validated_binary_pair(truth, score)
+    return float(average_precision_score(labels, scores))
+
+
+def _f1(truth: np.ndarray, score: np.ndarray) -> float:
+    """Positive-class F1 at the declared binary score cutoff."""
+    labels, scores = _validated_binary_pair(truth, score)
+    return float(
+        f1_score(
+            labels.astype(int), (scores >= BINARY_DECISION_THRESHOLD).astype(int)
+        )
+    )
+
+
+# Classification members stay out of the default vocabulary (a regression call
+# must not silently score a binary metric on continuous truth); they are named
+# explicitly by the classification callers.
+_CLASSIFICATION_METRICS: dict[str, Callable[[np.ndarray, np.ndarray], float]] = {
+    "pr_auc": _pr_auc,
+    "f1": _f1,
+}
+
+_METRIC_FUNCTIONS: dict[str, Callable[[np.ndarray, np.ndarray], float]] = {
+    **_REGRESSION_METRICS,
+    **_CLASSIFICATION_METRICS,
+}
+
 # The metric vocabulary as a set, for callers that validate a configured name
 # before scoring (e.g. a CV decision rule naming its metric).
 METRIC_NAMES: frozenset[str] = frozenset(_METRIC_FUNCTIONS)
+
+# Which end of each metric is better — the single declaration every ranking
+# reads, so a new metric cannot be ranked by a hardcoded default direction.
+METRIC_DIRECTIONS: dict[str, str] = {
+    "mae": "min",
+    "rmse": "min",
+    "r2": "max",
+    "mape": "min",
+    "max_error": "min",
+    "median_ae": "min",
+    "explained_var": "max",
+    "pr_auc": "max",
+    "f1": "max",
+}
+if set(METRIC_DIRECTIONS) != set(_METRIC_FUNCTIONS):
+    raise RuntimeError(
+        "METRIC_DIRECTIONS and _METRIC_FUNCTIONS disagree: "
+        f"{sorted(set(METRIC_DIRECTIONS) ^ set(_METRIC_FUNCTIONS))}"
+    )
+
+# The metrics ``compute_metrics`` returns when the caller names none: the
+# regression vocabulary, unchanged from the pre-classification behaviour.
+_DEFAULT_METRICS: tuple[str, ...] = tuple(_REGRESSION_METRICS)
+
 
 
 def compute_metrics(
@@ -208,7 +269,7 @@ def compute_metrics(
     if not np.all(np.isfinite(y_pred)):
         raise ValueError("y_pred contains NaN or infinite values")
     if metrics is None:
-        selected = dict(_METRIC_FUNCTIONS)
+        selected = {name: _METRIC_FUNCTIONS[name] for name in _DEFAULT_METRICS}
     else:
         unknown = sorted(set(metrics) - set(_METRIC_FUNCTIONS))
         if unknown:
@@ -278,11 +339,12 @@ class MetricBootstrap:
 
         Both predictions are scored on the same resampled rows, so the interval
         describes the improvement itself (positive = the candidate beats the
-        reference), not two independent intervals. Used by the CV decision.
+        reference), not two independent intervals. Used by the CV decision and
+        the classification baseline.
         """
-        if metric not in BOOTSTRAP_METRICS:
+        if metric not in _METRIC_FUNCTIONS:
             raise ValueError(
-                f"improvement metric must be one of {sorted(BOOTSTRAP_METRICS)}, "
+                f"improvement metric must be one of {sorted(_METRIC_FUNCTIONS)}, "
                 f"got {metric!r}"
             )
         truth = np.asarray(y_true, dtype=float)
@@ -299,7 +361,8 @@ class MetricBootstrap:
             and np.all(np.isfinite(reference))
         ):
             raise ValueError("y_true, y_pred and y_reference must be finite")
-        require_mape_defined(truth)
+        if metric == "mape":
+            require_mape_defined(truth)
         function = _METRIC_FUNCTIONS[metric]
         generator = np.random.default_rng(self._config.seed)
         draws = np.empty(self._config.iterations)

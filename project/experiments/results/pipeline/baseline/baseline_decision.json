@@ -1,0 +1,54 @@
+{
+  "question": "Does the fitted linear reference beat the no-skill bad-review prevalence on pr_auc?",
+  "metric": "improvement_over_naive_pr_auc",
+  "value": 0.5779441797140912,
+  "interval_low": 0.4976174268209666,
+  "interval_high": 0.6637168141592921,
+  "reference": null,
+  "delta": null,
+  "threshold": 0.28842750170183795,
+  "null_threshold": 0.28842750170183795,
+  "direction": "max",
+  "verdict": "act",
+  "action": "beat the no-skill bad-review prevalence on PR-AUC before a model ships",
+  "owner": "olist",
+  "sample_size": 19735,
+  "unit": "relative_improvement",
+  "min_sample_size": 100,
+  "bootstrap_biased": false,
+  "evidence": {
+    "baseline": "naive training prevalence on the holdout rows (a constant score's PR-AUC equals the prevalence)",
+    "delta": 0.5779441797140912,
+    "segments": [
+      {
+        "segment": "first_half",
+        "value": 0.6544943820224719,
+        "sample_size": 9867
+      },
+      {
+        "segment": "second_half",
+        "value": 0.5151915455746366,
+        "sample_size": 9868
+      }
+    ],
+    "uncovered": null,
+    "sensitivity": {
+      "level_90pct_low": 0.5119128658951668,
+      "level_90pct_high": 0.6528250510551395,
+      "prevalence_n19735": 0.1469,
+      "linear_pr_auc_n19735": 0.2318
+    },
+    "falsifier": "the paired improvement interval's lower bound falls at or below the permutation null / configured effect floor",
+    "provenance": {
+      "dataset": "olist",
+      "target": "binary 0/1 classification target",
+      "artifact": "baseline.json",
+      "seed": "7",
+      "rows": "19735",
+      "prevalence": "0.146900",
+      "model": "linear",
+      "null_iterations": "100",
+      "resampling": "paired row bootstrap on the holdout; label permutation null"
+    }
+  }
+}

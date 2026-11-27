@@ -10,9 +10,9 @@ import numpy as np
 import pandas as pd
 
 from broadway.analysis.contracts import AnalysisMode
-from broadway.baseline import causal, hypothesis, prediction
+from broadway.baseline import causal, classification, hypothesis, prediction
 from broadway.baseline.contracts import BaselineResult, load_result, save_result
-from broadway.config.schema import TARGET_NOTE, PipelineConfig
+from broadway.config.schema import TARGET_NOTE, PipelineConfig, TaskType
 from broadway.data.loader import ProcessedStore, load
 from broadway.evaluate.contracts import BootstrapConfig
 from broadway.evaluate.metrics import MetricBootstrap, compute_metrics
@@ -452,37 +452,76 @@ def _persisted_prediction_result(
     return result.model_copy(update={"value": holdout_mae, "details": details})
 
 
+def _run_classification(
+    cfg: PipelineConfig,
+    splits: tuple[pd.DataFrame, pd.DataFrame] | None,
+    out_path: Path,
+) -> BaselineResult:
+    """Persist and publish the no-skill prevalence baseline for a binary target."""
+    assert cfg.baseline is not None and cfg.dataset is not None
+    if splits is None:
+        raise ValueError(
+            "the classification baseline requires the features step's train/val "
+            "splits (run features first)"
+        )
+    train, val = splits
+    reference = classification.build_reference(cfg, train, val)
+    result = _compute_baseline(cfg, train)
+    result = classification.persist(cfg, result, reference)
+    result = result.model_copy(update={"trace": _build_trace(cfg)})
+    save_result(result, out_path)
+    decision = classification.ClassificationBaselineDecision(
+        cfg, reference, train, val
+    ).publish()
+    logger.info(
+        "baseline decision: %s — linear %s vs prevalence %.4f = %.4f [%.4f, %.4f]",
+        decision.verdict,
+        decision.metric,
+        reference.prevalence_value,
+        decision.value,
+        decision.interval_low,
+        decision.interval_high,
+    )
+    logger.info(
+        "baseline: %s %s=%.4f -> %s", result.strategy, result.metric, result.value, out_path
+    )
+    return result
+
+
 def run(cfg: PipelineConfig) -> None:
     if not cfg.analysis:
         raise ValueError("baseline step requires an analysis contract (--analysis)")
     if not cfg.baseline:
         raise ValueError("baseline step requires baseline config")
     splits = _load_feature_splits(cfg)
-    reference = _holdout_reference(cfg, *splits) if splits is not None else None
-    result = _compute_baseline(cfg, splits[0] if splits is not None else None)
-    if reference is not None:
-        result = _persisted_prediction_result(cfg, result, reference)
-    result = result.model_copy(update={"trace": _build_trace(cfg)})
     out_dir = Path(cfg.baseline.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / cfg.baseline.output_file
-    save_result(result, out_path)
-    if result.mode == AnalysisMode.PREDICTION and cfg.dataset is not None:
+    if cfg.dataset is not None and cfg.dataset.task is TaskType.CLASSIFICATION:
+        result = _run_classification(cfg, splits, out_path)
+    else:
+        reference = _holdout_reference(cfg, *splits) if splits is not None else None
+        result = _compute_baseline(cfg, splits[0] if splits is not None else None)
         if reference is not None:
-            decision = LinearReferenceDecision(cfg, result, reference).publish()
-            logger.info(
-                "baseline decision: %s — linear vs naive improvement %.4f",
-                decision.verdict,
-                decision.value,
-            )
-        else:
-            decision = BaselineDecision(cfg, result, load(cfg.dataset)).publish(out_dir)
-            logger.info(
-                "baseline decision: %s — mean/median MAE ratio %.4f",
-                decision.verdict,
-                decision.value,
-            )
-    logger.info(f"baseline: {result.strategy} {result.metric}={result.value:.4f} -> {out_path}")
+            result = _persisted_prediction_result(cfg, result, reference)
+        result = result.model_copy(update={"trace": _build_trace(cfg)})
+        save_result(result, out_path)
+        if result.mode == AnalysisMode.PREDICTION and cfg.dataset is not None:
+            if reference is not None:
+                decision = LinearReferenceDecision(cfg, result, reference).publish()
+                logger.info(
+                    "baseline decision: %s — linear vs naive improvement %.4f",
+                    decision.verdict,
+                    decision.value,
+                )
+            else:
+                decision = BaselineDecision(cfg, result, load(cfg.dataset)).publish(out_dir)
+                logger.info(
+                    "baseline decision: %s — mean/median MAE ratio %.4f",
+                    decision.verdict,
+                    decision.value,
+                )
+        logger.info(f"baseline: {result.strategy} {result.metric}={result.value:.4f} -> {out_path}")
     parents = (
         [node_id("analysis", cfg.analysis.name), node_id("profile", cfg.dataset.name)]
         if cfg.dataset is not None

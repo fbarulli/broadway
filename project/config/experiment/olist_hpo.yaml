@@ -32,6 +32,31 @@ hpo:
         min_samples_leaf: [1, 10]
         min_samples_split: [2, 20]
         max_samples: [0.5, 1.0]
-preprocessing: []
+# Every plan column is numeric; the ETL leaves real nulls in the item/payment
+# aggregates (orders without item lines). Median imputation is fitted on the
+# train split inside the model pipeline, so the holdout never informs it.
+preprocessing:
+  - type: imputation
+    columns:
+      - items_count
+      - sellers_count
+      - products_count
+      - total_price
+      - total_freight
+      - mean_item_price
+      - mean_product_weight_g
+      - mean_product_photos_qty
+      - mean_product_description_length
+      - total_payment
+      - max_installments
+      - payment_type_count
+      - customer_state_frequency_enc
+      - customer_city_frequency_enc
+      - customer_zip_code_prefix_frequency_enc
+      - dominant_payment_type_frequency_enc
+      - dominant_category_frequency_enc
+      - seller_state_frequency_enc
+    params:
+      strategy: median
 target_transforms: []
 calibration: null

@@ -165,6 +165,14 @@ def test_bandit_allocate_zero_top_k() -> None:
     assert bandit_allocate({"a": 1.0}, 10, 0) == {}
 
 
+def test_bandit_allocate_reads_the_configured_maximize_direction() -> None:
+    # PR-AUC studies maximize: the budget must follow the best value, not the
+    # lowest one (the old hardcoded-minimize behaviour).
+    assert bandit_allocate({"a": 0.10, "b": 0.90, "c": 0.50}, 6, 1, "maximize") == {
+        "b": 6
+    }
+
+
 # --- make_objective ----------------------------------------------------------
 
 

@@ -1,7 +1,10 @@
-# Olist baseline binding (deferred to the modelling unit).
-# The regression naive-mean reference in configs/step/baseline.yaml does not
-# apply to a binary target; the classification baseline is the no-skill
-# prevalence. This record is not published until that unit replaces the rule.
+# Olist baseline binding: the no-skill prevalence on the binary target.
+#
+# The persisted value is the naive prevalence's PR-AUC on the holdout rows, so
+# evaluate compares the candidate on the same rows. The linear reference is the
+# simpler model that must itself beat the prevalence before the model surface
+# is worth building. null_iterations is the label-permutation band at this n.
 output_dir: project/experiments/results/pipeline/baseline
+null_iterations: 100
 owner: olist
 action: "beat the no-skill bad-review prevalence on PR-AUC before a model ships"

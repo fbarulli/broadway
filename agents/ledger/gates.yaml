@@ -20,7 +20,7 @@ retired:
   # dataset surface. Preserved as history; no longer bind a live surface.
   history_rows_retained: ['GATE-TRAIN-32', 'GATE-CFG-104', 'GATE-CFG-111', 'GATE-CFG-112', 'GATE-INFRA-122', 'GATE-INFRA-129', 'GATE-INFRA-180', 'GATE-CUST-149', 'GATE-CUST-152']
 meta:
-  head: '030dc63'
+  head: 'df8daea'
   assembled: '2026-11-26'
   source_fragments:
   - agents/ledger/gates/01-ingest.md

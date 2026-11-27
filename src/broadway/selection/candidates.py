@@ -1,10 +1,12 @@
-"""Candidate factories for model selection: registry models + the naive mean.
+"""Candidate factories for model selection: registry models + the naive references.
 
 Every candidate exposes ``fit(X, y) -> predict(X)``. Registry models are
 composed through ``training.trainer.build_model_pipeline`` so selection scores
 the exact pipeline the trainer deploys (preprocessing included, when an
-experiment declares any). The naive mean is not a registry model: it predicts
-the training target mean for every row — the reference the champion must beat.
+experiment declares any). The references are not registry models: the
+regression ``naive_mean`` predicts the training target mean and the
+classification ``naive_prevalence`` predicts the training prevalence — the
+no-skill values the champion must beat on the experiment's target metric.
 """
 
 from __future__ import annotations
@@ -13,11 +15,15 @@ from collections.abc import Callable
 
 from sklearn.base import BaseEstimator
 
-from broadway.config.schema import NAIVE_REFERENCE, CandidateSpec, PipelineConfig, TaskType
-from broadway.evaluate.repeated_cv import NaiveMeanRegressor
+from broadway.config.schema import (
+    NAIVE_PREVALENCE_REFERENCE,
+    NAIVE_REFERENCE,
+    CandidateSpec,
+    PipelineConfig,
+    TaskType,
+)
+from broadway.evaluate.repeated_cv import NaiveMeanRegressor, NaivePrevalencePredictor
 from broadway.training.trainer import build_model_pipeline
-
-_CLASSIFICATION_REFERENCE = "naive_prevalence"
 
 
 class CandidateSet:
@@ -26,21 +32,29 @@ class CandidateSet:
     def __init__(self, cfg: PipelineConfig, candidates: list[CandidateSpec]) -> None:
         if cfg.experiment is None:
             raise ValueError("model selection requires an experiment config")
-        if cfg.dataset is not None and cfg.dataset.task is TaskType.CLASSIFICATION:
-            naive = [
-                candidate.name
-                for candidate in candidates
-                if candidate.model == NAIVE_REFERENCE
-            ]
-            if naive:
-                raise ValueError(
-                    "classification selection cannot use the regression naive_mean "
-                    f"reference ({naive}); replace it with the no-skill prevalence "
-                    f"candidate (model: '{_CLASSIFICATION_REFERENCE}') — the "
-                    "classification reference is the next unit"
-                )
+        self._task = (
+            TaskType.REGRESSION if cfg.dataset is None else cfg.dataset.task
+        )
+        self._require_task_reference(candidates)
         self._cfg = cfg
         self._candidates = candidates
+
+    def _require_task_reference(self, candidates: list[CandidateSpec]) -> None:
+        """Refuse the other task's naive reference (a classification run with naive_mean)."""
+        regression = [c.name for c in candidates if c.model == NAIVE_REFERENCE]
+        prevalence = [c.name for c in candidates if c.model == NAIVE_PREVALENCE_REFERENCE]
+        if self._task is TaskType.CLASSIFICATION and regression:
+            raise ValueError(
+                "classification selection cannot use the regression naive_mean "
+                f"reference ({regression}); use the no-skill prevalence candidate "
+                f"(model: '{NAIVE_PREVALENCE_REFERENCE}')"
+            )
+        if self._task is TaskType.REGRESSION and prevalence:
+            raise ValueError(
+                "regression selection cannot use the classification naive_prevalence "
+                f"reference ({prevalence}); use the naive training-mean candidate "
+                f"(model: '{NAIVE_REFERENCE}')"
+            )
 
     def factories(self) -> dict[str, Callable[[], BaseEstimator]]:
         return {candidate.name: self._factory(candidate) for candidate in self._candidates}
@@ -54,4 +68,6 @@ class CandidateSet:
     def _factory(self, candidate: CandidateSpec) -> Callable[[], BaseEstimator]:
         if candidate.model == NAIVE_REFERENCE:
             return NaiveMeanRegressor
+        if candidate.model == NAIVE_PREVALENCE_REFERENCE:
+            return NaivePrevalencePredictor
         return lambda: build_model_pipeline(self._cfg, candidate.model, candidate.params)

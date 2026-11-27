@@ -68,6 +68,8 @@ PIPELINE_STEPS: tuple[str, ...] = (
 PIPELINE_DECISION_ENFORCED: tuple[str, ...] = (
     "etl",
     "eda",
+    "features",
+    "baseline",
 )
 # Explicit not-applicable rulings, printed on every run: a step is never
 # silently retired from the enforced set.

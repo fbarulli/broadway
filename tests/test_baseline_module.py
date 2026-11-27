@@ -5,13 +5,14 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from broadway.analysis.contracts import AnalysisMode
+from broadway.analysis.contracts import AnalysisContract, AnalysisMode
 from broadway.baseline import causal, hypothesis, module, prediction
 from broadway.baseline.contracts import BaselineResult, load_result, save_result
 from broadway.baseline.improvement import improvement_vs_baseline
 from broadway.config.loader import load_config
-from broadway.config.schema import CausalStep, TaskType
+from broadway.config.schema import CausalStep, PipelineConfig, TaskType
 from broadway.lineage import records
+from broadway.reports.decision import Decision
 
 
 def test_contract_round_trip(tmp_path: Path) -> None:
@@ -38,11 +39,13 @@ def test_prediction_regression_baseline() -> None:
 
 
 def test_prediction_classification_baseline() -> None:
-    df = pd.DataFrame({"t": ["a", "a", "b"]})
+    df = pd.DataFrame({"t": [0.0, 0.0, 1.0]})
     r = prediction.run(df, "t", TaskType.CLASSIFICATION)
-    assert r.strategy == "majority_class"
-    assert r.metric == "accuracy"
-    assert r.value == pytest.approx(2 / 3)
+    assert r.strategy == "naive_prevalence"
+    assert r.metric == "pr_auc"
+    assert r.value == pytest.approx(1 / 3)
+    assert r.details["prevalence"] == pytest.approx(1 / 3)
+    assert r.details["bad"] == 1
 
 
 def test_hypothesis_baseline() -> None:
@@ -226,3 +229,135 @@ def test_improvement_zero_baseline_returns_none() -> None:
         notes=[],
     )
     assert improvement_vs_baseline(1.0, b, TaskType.REGRESSION) is None
+
+
+def _classification_baseline_cfg(tmp_path: Path) -> PipelineConfig:
+    from broadway.config.schema import (
+        BaselineStep,
+        BootstrapConfig,
+        ColumnRole,
+        ColumnSchema,
+        DatasetContract,
+        DataSourceRef,
+        EnvironmentConfig,
+        EtlStep,
+        ExperimentConfig,
+        ModelConfig,
+        SplitConfig,
+    )
+    from broadway.features.plan import resolve_plan
+
+    dataset = DatasetContract(
+        name="synthetic_cls",
+        path="synthetic.parquet",
+        target="bad",
+        task=TaskType.CLASSIFICATION,
+        datetime_column=None,
+        columns={
+            "rooms": ColumnSchema(dtype="int64", null_count=0, role=ColumnRole.FEATURE),
+            "area": ColumnSchema(dtype="int64", null_count=0, role=ColumnRole.FEATURE),
+            "bad": ColumnSchema(dtype="float64", null_count=0, role=ColumnRole.TARGET),
+        },
+        lookup_tables={},
+    )
+    experiment = ExperimentConfig(
+        data_source=DataSourceRef(loader="canonical", schema_contract="engineered"),
+        feature_plan="broadway.features.plans:contract_numeric_features",
+        model=ModelConfig(type="linear", params={}),
+        split=SplitConfig(type="stratified", validation_size=0.2),
+        random_state=42,
+        target_metric="pr_auc",
+    ).bind_plan(resolve_plan("broadway.features.plans:contract_numeric_features", dataset))
+    environment = EnvironmentConfig(
+        log_level="INFO",
+        data_dir=str(tmp_path / "data"),
+        raw_subdir="raw",
+        processed_subdir="processed",
+        mlflow_tracking_uri=str(tmp_path / "mlruns"),
+        database_user="user",
+        database_password="pass",
+        database_name="db",
+        database_host="localhost",
+        database_port=5432,
+        sample_size_ci=1000,
+        sample_size_stats=10000,
+        api_replicas_min=1,
+        api_replicas_max=3,
+        api_hpa_cpu_threshold=80,
+    )
+    baseline = BaselineStep(
+        output_dir=str(tmp_path / "baseline"),
+        output_file="baseline.json",
+        linear_reference_model="linear",
+        bootstrap=BootstrapConfig(iterations=30, seed=1, level=0.95),
+        null_iterations=3,
+        min_effect=0.01,
+        min_sample_size=10,
+        action="ship only a model that clears the prevalence floor",
+        owner="synthetic",
+    )
+    return PipelineConfig(
+        analysis=AnalysisContract(
+            name="synthetic_cls",
+            mode=AnalysisMode.PREDICTION,
+            goal="predict a binary outcome",
+            row_definition="one row per entity",
+            decision_moment="before the outcome",
+            available_info=["rooms", "area"],
+            leakage_notes=["post-outcome columns are excluded"],
+            success_criterion="beat the prevalence on pr_auc",
+        ),
+        dataset=dataset,
+        environment=environment,
+        experiment=experiment,
+        etl=EtlStep(
+            ci_sample_size=0,
+            max_drop_fraction=0.5,
+            random_state=42,
+            train_file="train.parquet",
+            val_file="val.parquet",
+            training_data_file="training_data.parquet",
+            train_features_file="train_features.parquet",
+            val_features_file="val_features.parquet",
+            missing_encodings=[""],
+        ),
+        baseline=baseline,
+    )
+
+
+def test_classification_baseline_publishes_prevalence_and_pr_auc(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import numpy as np
+
+    cfg = _classification_baseline_cfg(tmp_path)
+    directory = tmp_path / "data" / "processed"
+    directory.mkdir(parents=True)
+    rng = np.random.default_rng(0)
+    rooms = rng.integers(1, 6, 300)
+    area = rng.integers(40, 120, 300)
+    bad = (rooms >= 4).astype(float)
+    frame = pd.DataFrame({"rooms": rooms, "area": area, "bad": bad})
+    frame.iloc[:240].to_parquet(directory / "train_features.parquet", index=False)
+    frame.iloc[240:].to_parquet(directory / "val_features.parquet", index=False)
+    monkeypatch.setattr(records, "LINEAGE_DIR", tmp_path / "lineage")
+
+    module.run(cfg)
+
+    assert cfg.baseline is not None
+    result = load_result(tmp_path / "baseline" / "baseline.json")
+    assert result.metric == "pr_auc"
+    assert result.details["holdout_rows"] == 60
+    assert 0.0 < result.value < 1.0
+    record = Decision.model_validate_json(
+        (tmp_path / "baseline" / "baseline_decision.json").read_text(encoding="utf-8")
+    )
+    assert record.metric == "improvement_over_naive_pr_auc"
+    assert record.direction == "max"
+    assert record.sample_size == 60
+    assert record.null_threshold is not None
+    assert {segment.segment for segment in record.evidence.segments} == {
+        "first_half",
+        "second_half",
+    }
+    assert record.evidence.provenance["prevalence"]

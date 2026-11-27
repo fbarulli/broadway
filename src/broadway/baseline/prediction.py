@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-from sklearn.metrics import accuracy_score, mean_absolute_error
+from sklearn.metrics import mean_absolute_error
 
 from broadway.analysis.contracts import AnalysisMode
 from broadway.baseline.contracts import BaselineResult
@@ -12,16 +12,24 @@ from broadway.config.schema import TaskType
 def run(df: pd.DataFrame, target: str, task: TaskType) -> BaselineResult:
     y = df[target]
     if task == TaskType.CLASSIFICATION:
-        majority = y.mode().iloc[0]
-        preds = np.full(len(y), majority)
-        value = float(accuracy_score(y, preds))
+        prevalence = float(y.mean())
         return BaselineResult(
             mode=AnalysisMode.PREDICTION,
-            strategy="majority_class",
-            metric="accuracy",
-            value=value,
-            details={"majority_class": str(majority), "support": len(y)},
-            notes=[f"majority-class baseline: predict '{majority}' for every row"],
+            strategy="naive_prevalence",
+            metric="pr_auc",
+            value=prevalence,
+            details={
+                "prevalence": prevalence,
+                "bad": int((y == 1).sum()),
+                "good": int((y == 0).sum()),
+                "support": len(y),
+            },
+            notes=[
+                (
+                    "no-skill prevalence baseline: a constant prevalence score has "
+                    "PR-AUC equal to the prevalence a model must beat"
+                )
+            ],
         )
     mean = float(y.mean())
     median = float(y.median())

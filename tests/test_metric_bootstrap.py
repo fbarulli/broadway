@@ -43,7 +43,7 @@ def test_paired_improvement_interval_brackets_the_point_improvement() -> None:
     point = compute_metrics(truth, baseline)["rmse"] - compute_metrics(truth, candidate)["rmse"]
     assert interval.lower <= point <= interval.upper
     with pytest.raises(ValueError, match="improvement metric"):
-        MetricBootstrap(config).improvement_interval(truth, candidate, baseline, "r2")
+        MetricBootstrap(config).improvement_interval(truth, candidate, baseline, "bogus")
     with pytest.raises(ValueError, match="same shape"):
         MetricBootstrap(config).improvement_interval(truth, candidate[:-1], baseline, "rmse")
     with pytest.raises(ValueError, match="must be finite"):

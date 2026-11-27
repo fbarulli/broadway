@@ -1,0 +1,24 @@
+{
+  "mode": "prediction",
+  "strategy": "naive_prevalence",
+  "metric": "pr_auc",
+  "value": 0.1469,
+  "details": {
+    "prevalence": 0.14690009881172567,
+    "bad": 11596,
+    "good": 67342,
+    "support": 78938,
+    "holdout_prevalence": 0.1469,
+    "holdout_linear_pr_auc": 0.2318,
+    "holdout_rows": 19735
+  },
+  "notes": [
+    "no-skill prevalence baseline: a constant prevalence score has PR-AUC equal to the prevalence a model must beat"
+  ],
+  "trace": {
+    "created_at": "2026-11-27T19:31:34.548616Z",
+    "commit": "df8daead2c13e71e52d8606a26a5587631954f26",
+    "dataset": "olist",
+    "analysis_goal": "predict, at purchase, which orders will draw a bad review (review_score <= 2) so the storefront and logistics teams can intervene before shipping instead of learning from the review after delivery"
+  }
+}

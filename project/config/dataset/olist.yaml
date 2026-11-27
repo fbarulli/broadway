@@ -15,6 +15,10 @@ path: data/raw/olist/olist_orders.parquet
 target: bad_review
 task: classification
 datetime_column: null
+# Repeat buyers must never straddle train/validation folds: the selection CV
+# groups on this entity (the contract column has role ignore, so it never
+# enters the feature plan).
+group_column: customer_unique_id
 processed_subdir: processed/olist
 artifacts_subdir: olist
 columns:

@@ -186,18 +186,29 @@ def bandit_allocate(
     leaderboard: dict[str, float],
     remaining: int,
     top_k: int,
+    direction: str = "minimize",
 ) -> dict[str, int]:
-    """Allocate the remaining trial budget to the top-k models (minimize).
+    """Allocate the remaining trial budget to the top-k models.
 
-    Pure function: leaderboard maps model name to best objective value (lower
-    is better). The budget is split evenly across the top-k, with the remainder
-    going to the best model; models outside the top-k get no allocation.
-    Guards: top_k >= len selects everyone, remaining <= 0 or an empty
-    leaderboard yields an empty allocation.
+    Pure function: leaderboard maps model name to best objective value; which
+    end is better comes from the study's configured ``direction``. The budget
+    is split evenly across the top-k, with the remainder going to the best
+    model; models outside the top-k get no allocation. Guards: top_k >= len
+    selects everyone, remaining <= 0 or an empty leaderboard yields an empty
+    allocation.
     """
     if remaining <= 0 or not leaderboard or top_k <= 0:
         return {}
-    ranked = [name for name, _ in sorted(leaderboard.items(), key=lambda item: item[1])]
+    if direction not in ("minimize", "maximize"):
+        raise ValueError(
+            f"bandit direction must be 'minimize' or 'maximize', got {direction!r}"
+        )
+    ranked = [
+        name
+        for name, _ in sorted(
+            leaderboard.items(), key=lambda item: item[1], reverse=direction == "maximize"
+        )
+    ]
     selected = ranked[: min(top_k, len(ranked))]
     base, remainder = divmod(remaining, len(selected))
     allocation = {name: base for name in selected}
@@ -291,7 +302,9 @@ def run_hpo(
     to the top-k models via bandit_allocate and appends their trials. Returns
     {"models": {name: {best_params, best_value, n_trials}}, "best_model",
     "best_params", "best_value"}; models without a valid trial are omitted.
-    The leaderboard and bandit allocation assume the minimize direction.
+    The leaderboard, the bandit allocation and the best-model pick all read the
+    study's configured ``hpo.direction`` (the search space's own declaration),
+    so a maximize study (e.g. PR-AUC) allocates and selects at the right end.
     With mlflow_tracking, every COMPLETE trial across both rounds is logged as
     a nested mlflow run tagged with the model plus the caller's mlflow_tags
     (e.g. {"experiment": ...}); the tracking URI stays ambient.
@@ -305,7 +318,7 @@ def run_hpo(
     studies = _initial_round(hpo, objectives, random_state, mlflow_tracking, mlflow_tags)
     leaderboard = _leaderboard(studies)
     remaining = hpo.total_trials - hpo.initial_trials_per_model * len(hpo.models)
-    allocation = bandit_allocate(leaderboard, remaining, hpo.top_k)
+    allocation = bandit_allocate(leaderboard, remaining, hpo.top_k, hpo.direction)
     if allocation:
         _bandit_round(hpo, objectives, studies, allocation, mlflow_tracking, mlflow_tags)
     if not leaderboard:
@@ -319,7 +332,11 @@ def run_hpo(
         for name, study in studies.items()
         if name in leaderboard
     }
-    best_model = min(leaderboard, key=lambda name: leaderboard[name])
+    best_model = (
+        max(leaderboard, key=lambda name: leaderboard[name])
+        if hpo.direction == "maximize"
+        else min(leaderboard, key=lambda name: leaderboard[name])
+    )
     return {
         "models": models,
         "best_model": best_model,

@@ -28,6 +28,7 @@ from broadway.config.schema import (
     PipelineConfig,
     SelectionStep,
     StatsStep,
+    TimeseriesStep,
     TrainStep,
 )
 from broadway.features.recipe import validate_preprocessing_columns
@@ -51,8 +52,14 @@ STEP_MODELS = {
     "baseline": BaselineStep,
     "selection": SelectionStep,
     "hpo": HpoStep,
+    "08_timeseries": TimeseriesStep,
     "full": FullStep,
 }
+
+# A step id is a CLI name, not necessarily a Python identifier. A numbered
+# experiment lane (08_timeseries) names the PipelineConfig field it populates
+# here, once, so no caller has to translate the id.
+_STEP_CONFIG_FIELDS: dict[str, str] = {"08_timeseries": "timeseries"}
 
 STEP_MODULES = {
     "discover": "broadway.discover.module",
@@ -67,7 +74,13 @@ STEP_MODULES = {
     "baseline": "broadway.baseline.module",
     "selection": "broadway.selection.module",
     "hpo": "broadway.selection.tuning",
+    "08_timeseries": "broadway.timeseries.module",
 }
+
+
+def _config_field(step: str) -> str:
+    """The PipelineConfig attribute a step id populates (identity by default)."""
+    return _STEP_CONFIG_FIELDS.get(step, step)
 
 # Sections loaded from configs/{section}/<name>.yaml via CLI args (--dataset,
 # --experiment, --analysis) rather than from step/<name>.yaml. The loader
@@ -95,6 +108,7 @@ _STEP_SECTION_REQUIREMENTS: dict[str, tuple[str, ...]] = {
     "selection": ("environment", "dataset", "experiment", "etl"),
     "hpo": ("environment", "dataset", "experiment", "etl"),
     "stats": ("environment", "dataset", "analysis"),
+    "08_timeseries": ("environment", "dataset"),
 }
 
 
@@ -196,7 +210,7 @@ def _build_config(merged: dict, step: str) -> PipelineConfig:
         dataset=dataset,
         environment=EnvironmentConfig(**merged["environment"]),
         experiment=experiment,
-        **{step: step_model(**merged["step"])},
+        **{_config_field(step): step_model(**merged["step"])},
     )
     validate_preprocessing_columns(config)
     for section in _STEP_SECTION_REQUIREMENTS.get(step, ()):
@@ -215,7 +229,7 @@ def _build_config(merged: dict, step: str) -> PipelineConfig:
                 continue
             raw = _load_yaml(f"step/{sub_step}.yaml")
             resolved = resolve_values(raw)
-            setattr(config, sub_step, STEP_MODELS[sub_step](**resolved))
+            setattr(config, _config_field(sub_step), STEP_MODELS[sub_step](**resolved))
     return config
 
 

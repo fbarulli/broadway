@@ -33,6 +33,7 @@ from broadway.config.schema import (
     TaskType,
     TrainStep,
 )
+from broadway.evaluate.repeated_cv import RepeatedCV
 from broadway.features.plan import resolve_plan
 from broadway.lineage import records
 from broadway.reports.decision import Decision
@@ -157,6 +158,54 @@ def test_classification_selection_rejects_the_regression_naive_mean(
     ]
     with pytest.raises(ValueError, match="naive_prevalence"):
         CandidateSet(cfg, candidates)
+
+
+def test_classification_selection_resolves_the_prevalence_reference(
+    tmp_path: Path,
+) -> None:
+    cfg = PipelineConfig(
+        dataset=_dataset().model_copy(update={"task": TaskType.CLASSIFICATION}),
+        environment=_environment(tmp_path),
+        experiment=_experiment(),
+    )
+    candidates = [
+        CandidateSpec(name="naive_prevalence", model="naive_prevalence", params={}),
+        CandidateSpec(name="linear", model="linear", params={}),
+    ]
+    factories = CandidateSet(cfg, candidates).factories()
+    estimator = factories["naive_prevalence"]()
+    estimator.fit(pd.DataFrame({"rooms": [1, 2, 3, 4]}), pd.Series([0.0, 0.0, 1.0, 1.0]))
+    assert estimator.predict(pd.DataFrame({"rooms": [1, 2]})).tolist() == [0.5, 0.5]
+
+
+def test_grouped_cv_never_places_a_group_in_both_train_and_validation() -> None:
+    from sklearn.base import BaseEstimator, RegressorMixin
+
+    seen: list[tuple[set[int], set[int]]] = []
+
+    class _Recorder(BaseEstimator, RegressorMixin):
+        def fit(self, X: pd.DataFrame, y: pd.Series) -> _Recorder:
+            self._train_groups = set(X["g"].tolist())
+            return self
+
+        def predict(self, X: pd.DataFrame) -> np.ndarray:
+            seen.append((self._train_groups, set(X["g"].tolist())))
+            return np.zeros(len(X))
+
+    rng = np.random.default_rng(0)
+    rows = 60
+    groups = np.repeat(np.arange(20), 3)
+    frame = pd.DataFrame({"x": rng.normal(size=rows), "g": groups})
+    truth = pd.Series(rng.integers(0, 2, rows).astype(float))
+    geometry = CVGeometry(folds=4, repeats=2, random_state=5)
+    result = RepeatedCV(geometry, "pr_auc", "f1").run(
+        "recorder", _Recorder, frame, truth, pd.Series(groups, name="customer")
+    )
+    assert result.grouping.startswith("grouped by 'customer'")
+    assert seen
+    for train_groups, validation_groups in seen:
+        assert train_groups.isdisjoint(validation_groups)
+    assert not np.isnan(result.out_of_fold_prediction()).any()
 
 
 def test_selection_publishes_the_champion_and_its_paired_improvement(

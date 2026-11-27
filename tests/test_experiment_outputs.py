@@ -118,8 +118,8 @@ def test_pipeline_enforced_set_is_pinned() -> None:
     """The enforced set is explicit: a step leaves it only with its dataset."""
     module = _audit_module()
 
-    assert module.PIPELINE_DECISION_ENFORCED == ("etl", "eda")
-    assert len(module.PIPELINE_DECISION_ENFORCED) == 2
+    assert module.PIPELINE_DECISION_ENFORCED == ("etl", "eda", "features", "baseline")
+    assert len(module.PIPELINE_DECISION_ENFORCED) == 4
     assert module.PIPELINE_NOT_APPLICABLE == {
         "causal": "the Olist project has no causal analysis config, so no record can exist"
     }

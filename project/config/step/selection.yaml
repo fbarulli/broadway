@@ -1,15 +1,15 @@
-# Olist model selection (the chain is deferred to the next unit).
+# Olist model selection (execution deferred to the next unit).
 # Rows are exchangeable at the ORDER level only after grouping by customer:
 # random folds leak repeat buyers and memorise the 6.6-rows-per-zip cardinality.
-# The next unit must group by customer_unique_id (GroupKFold) or drop the id from
-# features and group the split, then re-check the zip encoding.
+# The dataset contract declares `group_column: customer_unique_id`, so the
+# repeated CV below is a GroupKFold and the grouping is recorded in the record's
+# provenance.
 #
-# Prerequisites for the deferred classification run:
+# Prerequisites (now met by the platform):
 #  - metric = pr_auc / secondary = f1 with `metric_direction: max` and
-#    `secondary_direction: max` (declared below; the code reads them, never MINIMIZE);
-#  - replace the regression `naive_mean` reference with the no-skill prevalence
-#    candidate (`model: naive_prevalence`); running classification with naive_mean
-#    fails loud in CandidateSet until it lands.
+#    `secondary_direction: max` (read from this config, never a hardcoded MINIMIZE);
+#  - the no-skill prevalence candidate (`model: naive_prevalence`) replaces the
+#    regression naive_mean reference.
 metric: pr_auc
 secondary_metric: f1
 metric_direction: max
@@ -24,11 +24,11 @@ bootstrap:
   seed: 2026
   level: 0.95
 selection_rule: point
-baseline_candidate: naive_mean
+baseline_candidate: naive_prevalence
 linear_reference: linear
 candidates:
-  - name: naive_mean
-    model: naive_mean
+  - name: naive_prevalence
+    model: naive_prevalence
     params: {}
   - name: linear
     model: linear

@@ -1,0 +1,36 @@
+# Daily time-series forecast lane (platform knobs; the project binds the data).
+#
+# Baseline first: same-weekday seasonal naive (lag 7). The model is a weekly-
+# seasonal AutoARIMA when the optional statsforecast extra is installed; the
+# always-available SARIMAX owner is the documented deterministic fallback with
+# the order declared below. Every fold is chronological and whole weeks only.
+model: auto_arima
+season_length: 7
+alpha: 0.05
+order: [1, 1, 1]
+seasonal_order: [1, 1, 1, 7]
+
+cv:
+  kind: expanding       # forward chaining: train on the prefix, score the next block
+  folds: 12
+  gap: 0                # the forecast origin is the last training day
+  train_size: null      # only required for rolling
+  seasonal_period: 7    # a fold boundary never splits a week
+
+bootstrap:
+  iterations: 2000
+  seed: 2026
+  level: 0.95
+
+permutation:
+  iterations: 2000
+  seed: 2026
+
+rule:
+  metric: relative_mae_improvement
+  direction: max
+  min_effect: 0.05
+  null_quantile: 0.95
+  min_sample_size: 28
+  action: "adopt the weekly-seasonal forecast only where it clears the no-skill null; keep the seasonal-naive baseline otherwise"
+  owner: timeseries

@@ -1,0 +1,57 @@
+{
+  "question": "Does a weekly-seasonal forecast beat a same-weekday seasonal-naive baseline for daily orders?",
+  "metric": "relative_mae_improvement",
+  "value": -0.08432289517415709,
+  "interval_low": -0.22844462504385876,
+  "interval_high": 0.06258572796786913,
+  "reference": 0.0,
+  "delta": -0.08432289517415709,
+  "threshold": 0.05,
+  "null_threshold": 0.046640766072594646,
+  "direction": "max",
+  "verdict": "investigate",
+  "action": "adopt the weekly-seasonal forecast only where it clears the no-skill null; keep the seasonal-naive baseline otherwise",
+  "owner": "olist",
+  "sample_size": 504,
+  "unit": "mean fold relative MAE improvement",
+  "min_sample_size": 28,
+  "bootstrap_biased": false,
+  "evidence": {
+    "baseline": "same-weekday seasonal naive (lag 7), recursive over the test block",
+    "delta": -0.08432289517415709,
+    "segments": [
+      {
+        "segment": "weekday",
+        "value": -0.005419636760140421,
+        "sample_size": 360
+      },
+      {
+        "segment": "weekend",
+        "value": -0.4080716011112507,
+        "sample_size": 144
+      }
+    ],
+    "uncovered": null,
+    "sensitivity": {
+      "pooled_relative_improvement": 0.05600731185804772,
+      "rmse_relative_improvement": 0.08084645186063168,
+      "first_week_relative_improvement": -0.012368792199869494
+    },
+    "falsifier": "the mean fold-improvement interval falls at or below max(min_effect, the paired sign-flip null at this n) — the model would be indistinguishable from the seasonal-naive baseline",
+    "provenance": {
+      "dataset": "olist",
+      "artifact": "olist_canonical.parquet",
+      "series": "orders",
+      "aggregation": "count",
+      "column": "",
+      "datetime_column": "order_purchase_timestamp",
+      "grain_column": "order_id",
+      "window": "2017-01-01..2018-08-31",
+      "share_sha256": "2a66016bf971bab4",
+      "model_backend": "auto_arima",
+      "seed": "2026",
+      "folds": "12",
+      "exclusions": "2016-09 is the launch month (4 orders on its first day) and 2016-11 has no orders, so the series starts at 2017-01-01 to estimate a weekly cycle on complete months. The 2018-09/10 tail is partial (16 and 4 orders), so 2018-08-31 is the final complete day and the tail is excluded."
+    }
+  }
+}

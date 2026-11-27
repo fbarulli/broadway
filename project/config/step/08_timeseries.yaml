@@ -1,0 +1,28 @@
+# Olist daily time-series lane: the order-count and revenue series.
+#
+# The dataset contract's datetime_column is null (the purchase timestamp is
+# context, not a model feature); this binding declares the canonical table's
+# timestamp as the series source. Grain stays one row per order_id.
+output_dir: project/experiments/results/pipeline/08_timeseries
+datetime_column: order_purchase_timestamp
+grain_column: order_id
+start: 2017-01-01
+end: 2018-08-31
+primary_series: orders
+series:
+  orders:
+    label: daily orders
+    unit: orders/day
+    aggregation: count
+  revenue:
+    label: daily revenue
+    unit: BRL/day
+    aggregation: sum
+    column: total_payment
+window_note: >-
+  2016-09 is the launch month (4 orders on its first day) and 2016-11 has no
+  orders, so the series starts at 2017-01-01 to estimate a weekly cycle on
+  complete months. The 2018-09/10 tail is partial (16 and 4 orders), so
+  2018-08-31 is the final complete day and the tail is excluded.
+rule:
+  owner: olist

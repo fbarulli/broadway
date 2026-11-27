@@ -52,3 +52,15 @@ def test_metric_subset_selects_only_requested_metrics() -> None:
     assert set(subset) == {"rmse", "mae"}
     with pytest.raises(ValueError, match="unknown metric"):
         compute_metrics(truth, prediction, metrics=("bogus",))
+
+
+def test_classification_vocabulary_scores_pr_auc_and_f1() -> None:
+    from broadway.evaluate.metrics import METRIC_DIRECTIONS
+
+    truth = np.array([0.0, 0.0, 1.0, 1.0])
+    score = np.array([0.1, 0.2, 0.8, 0.9])
+    metrics = compute_metrics(truth, score, metrics=("pr_auc", "f1"))
+    assert metrics["pr_auc"] == pytest.approx(1.0)
+    assert metrics["f1"] == pytest.approx(1.0)
+    assert METRIC_DIRECTIONS["pr_auc"] == "max"
+    assert METRIC_DIRECTIONS["f1"] == "max"

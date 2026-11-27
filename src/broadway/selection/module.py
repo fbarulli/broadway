@@ -14,14 +14,23 @@ from __future__ import annotations
 
 import json
 import logging
+from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 from pydantic import BaseModel, ConfigDict
 
-from broadway.config.schema import TARGET_NOTE, BootstrapConfig, PipelineConfig, SelectionStep
+from broadway.config.schema import (
+    NAIVE_PREVALENCE_REFERENCE,
+    TARGET_NOTE,
+    BootstrapConfig,
+    PipelineConfig,
+    SelectionStep,
+    TaskType,
+)
 from broadway.data.loader import ProcessedStore
+from broadway.data.target import TargetCaster
 from broadway.evaluate.leaderboard import ChampionDecision, MetricDirection, MetricLeaderboard
 from broadway.evaluate.metrics import MetricBootstrap, compute_metrics
 from broadway.evaluate.repeated_cv import CVResult, RepeatedCV
@@ -34,6 +43,33 @@ from broadway.reports.step_output import StepOutput
 from broadway.selection.candidates import CandidateSet
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class SelectionFrame:
+    """The persisted train features, their target, and the grouping column."""
+
+    X: pd.DataFrame
+    y: pd.Series
+    groups: pd.Series | None
+
+    @classmethod
+    def from_config(cls, cfg: PipelineConfig) -> SelectionFrame:
+        """Read the persisted train features through the experiment's column plan."""
+        assert cfg.dataset is not None and cfg.experiment is not None and cfg.etl is not None
+        out_dir = ProcessedStore.from_config(cfg).directory
+        frame = pd.read_parquet(out_dir / cfg.etl.train_features_file)
+        validate_engineered_frame(cfg, frame)
+        frame = TargetCaster.from_config(cfg).cast(frame)
+        plan = ColumnPlan.from_config(cfg.dataset, cfg.experiment)
+        X, _ = plan.apply(frame)
+        groups = (
+            None
+            if cfg.dataset.group_column is None
+            else frame[cfg.dataset.group_column].rename(cfg.dataset.group_column)
+        )
+        return cls(X=X, y=frame[cfg.dataset.target], groups=groups)
+
 
 class ChampionRecord(BaseModel):
     """The selected candidate and the folds it was selected on (config handoff)."""
@@ -50,17 +86,6 @@ class ChampionRecord(BaseModel):
     selection_rule: str
     rule_fired: str
     vs_linear_improvement: float
-
-
-def load_selection_frame(cfg: PipelineConfig) -> tuple[pd.DataFrame, pd.Series]:
-    """Read the persisted train features through the experiment's column plan."""
-    assert cfg.dataset is not None and cfg.experiment is not None and cfg.etl is not None
-    out_dir = ProcessedStore.from_config(cfg).directory
-    frame = pd.read_parquet(out_dir / cfg.etl.train_features_file)
-    validate_engineered_frame(cfg, frame)
-    plan = ColumnPlan.from_config(cfg.dataset, cfg.experiment)
-    X, _ = plan.apply(frame)
-    return X, frame[cfg.dataset.target]
 
 
 def _metric(truth: np.ndarray, prediction: np.ndarray, metric: str) -> float:
@@ -99,6 +124,8 @@ class SelectionDecision:
         one_se_alternative: str,
         truth: np.ndarray,
         sensitivity_improvement: float,
+        grouping: str,
+        features: pd.DataFrame | None = None,
     ) -> None:
         assert cfg.dataset is not None
         self._cfg = cfg
@@ -109,6 +136,16 @@ class SelectionDecision:
         self._one_se_alternative = one_se_alternative
         self._truth = truth
         self._sensitivity = sensitivity_improvement
+        self._grouping = grouping
+        self._features = features
+        self._task = cfg.dataset.task
+
+    def _reference_label(self) -> str:
+        """Name the no-skill reference the paired improvement is measured against."""
+        model = self._results[self._step.baseline_candidate].model
+        if model == NAIVE_PREVALENCE_REFERENCE or self._task is TaskType.CLASSIFICATION:
+            return f"naive training-prevalence predictor '{model}'"
+        return f"naive training-mean predictor '{model}'"
 
     def _improvement(self, candidate: str, reference: str) -> tuple[float, float, float]:
         step = self._step
@@ -134,8 +171,8 @@ class SelectionDecision:
             )
         evidence = Evidence(
             baseline=(
-                f"naive training-mean predictor '{reference.model}' on the identical "
-                f"{step.cv.repeats}x{step.cv.folds} shuffled folds"
+                f"{self._reference_label()} on the identical "
+                f"{step.cv.repeats}x{step.cv.folds} folds ({self._grouping})"
             ),
             delta=value,
             segments=self._segments(),
@@ -155,7 +192,8 @@ class SelectionDecision:
                 "dataset": self._cfg.dataset.name,
                 "target": TARGET_NOTE,
                 "seed": str(step.cv.random_state),
-                "folds": f"{step.cv.repeats}x{step.cv.folds} shuffled KFold",
+                "folds": f"{step.cv.repeats}x{step.cv.folds} — {self._grouping}",
+                "group_column": self._cfg.dataset.group_column or "none",
                 "selection_rule": step.selection_rule,
                 "rule_fired": self._rule_fired,
                 "one_se_would_pick": self._one_se_alternative,
@@ -191,16 +229,25 @@ class SelectionDecision:
         raise ValueError(f"champion '{self._champion}' is not a configured candidate")
 
     def _segments(self) -> list[SegmentEvidence]:
-        """Re-measure the improvement on the low and high target halves."""
+        """Re-measure the improvement on two slices of the scored rows.
+
+        A regression target splits at its median; a binary target has only two
+        values, so the slice is the first plan feature's median (a dimension
+        that could hide a failure) and is named from that column.
+        """
         step = self._step
         prediction = self._results[self._champion].out_of_fold_prediction()
         reference_prediction = self._results[step.baseline_candidate].out_of_fold_prediction()
-        split = float(np.median(self._truth))
+        if self._task is TaskType.CLASSIFICATION:
+            slices = self._feature_slices()
+        else:
+            split = float(np.median(self._truth))
+            slices = (
+                ("low_target_half", self._truth <= split),
+                ("high_target_half", self._truth > split),
+            )
         segments: list[SegmentEvidence] = []
-        for label, mask in (
-            ("low_target_half", self._truth <= split),
-            ("high_target_half", self._truth > split),
-        ):
+        for label, mask in slices:
             if int(mask.sum()) < 2:
                 continue
             champion_error = _metric(self._truth[mask], prediction[mask], step.metric)
@@ -216,6 +263,21 @@ class SelectionDecision:
             )
         return segments
 
+    def _feature_slices(self) -> tuple[tuple[str, np.ndarray], ...]:
+        """Two halves of the first plan feature (classification target is binary)."""
+        if self._features is None or self._features.empty:
+            raise ValueError(
+                "classification selection segments need the feature frame (pass "
+                "features= to SelectionDecision)"
+            )
+        column = str(self._features.columns[0])
+        values = self._features[column].to_numpy(dtype=float)
+        split = float(np.nanmedian(values))
+        return (
+            (f"low_{column}", values <= split),
+            (f"high_{column}", values > split),
+        )
+
 
 class SelectionRun:
     """Run every candidate, rank them, and publish the selection evidence."""
@@ -225,22 +287,25 @@ class SelectionRun:
             raise ValueError("selection step requires the selection and experiment config")
         self._cfg = cfg
         self._step: SelectionStep = cfg.selection
+        self._frame: SelectionFrame | None = None
 
     def results(self) -> tuple[dict[str, CVResult], np.ndarray]:
-        X, y = load_selection_frame(self._cfg)
-        truth = y.to_numpy(dtype=float)
+        frame = SelectionFrame.from_config(self._cfg)
+        self._frame = frame
+        truth = frame.y.to_numpy(dtype=float)
         factories = CandidateSet(self._cfg, self._step.candidates).factories()
         cv = RepeatedCV(self._step.cv, self._step.metric, self._step.secondary_metric)
         results: dict[str, CVResult] = {}
         for name, factory in factories.items():
             with timed() as elapsed:
-                results[name] = cv.run(name, factory, X, y)
+                results[name] = cv.run(name, factory, frame.X, frame.y, frame.groups)
             logger.info(
-                "selection: %s %s=%.4f in %.2fs",
+                "selection: %s %s=%.4f in %.2fs (%s)",
                 name,
                 self._step.metric,
                 results[name].mean,
                 elapsed(),
+                results[name].grouping,
             )
         return results, truth
 
@@ -318,19 +383,22 @@ class SelectionRun:
 
     def sensitivity(self, results: dict[str, CVResult], truth: np.ndarray) -> float:
         """Re-run champion vs reference under a second fold seed (row-level)."""
-        X, y = load_selection_frame(self._cfg)
+        frame = SelectionFrame.from_config(self._cfg)
         factories = CandidateSet(self._cfg, self._step.candidates)
         geometry = self._step.cv.model_copy(
             update={"random_state": self._step.sensitivity_random_state}
         )
         cv = RepeatedCV(geometry, self._step.metric, self._step.secondary_metric)
         champion = self.champion(results).champion
-        candidate = cv.run(champion, factories.reference(champion), X, y)
+        candidate = cv.run(
+            champion, factories.reference(champion), frame.X, frame.y, frame.groups
+        )
         reference = cv.run(
             self._step.baseline_candidate,
             factories.reference(self._step.baseline_candidate),
-            X,
-            y,
+            frame.X,
+            frame.y,
+            frame.groups,
         )
         value, _, _ = _relative_improvement(
             truth,
@@ -371,6 +439,8 @@ class SelectionRun:
             one_se,
             truth,
             sensitivity,
+            grouping=results[selected.champion].grouping,
+            features=None if self._frame is None else self._frame.X,
         ).decision()
         output = StepOutput(
             results_dir=Path(step.output_dir),

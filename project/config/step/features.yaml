@@ -10,7 +10,7 @@ output_dir: project/experiments/results/pipeline/features
 imputation_study:
   strategies: [median, mean, mode, knn]
   scalings: [none, standard]
-  metric_direction: minimize
+  metric_direction: maximize
   sample_size: 10000
   knn_neighbors: 5
   missing_injection:

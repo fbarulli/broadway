@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date
 from enum import Enum, StrEnum
 from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING, Literal
@@ -90,6 +91,10 @@ class DatasetContract(BaseModel):
     lookup_tables: dict[str, LookupSpec]
     exclude_from_profiling: list[str] = []
     column_renames: dict[str, str] = {}
+    # The entity whose rows must never straddle a train/validation fold (a
+    # person, a household). ``None`` means rows are exchangeable; a declared
+    # name turns the selection CV into a grouped split.
+    group_column: str | None = None
     processed_subdir: str | None = None
     artifacts_subdir: str | None = None
 
@@ -129,6 +134,15 @@ class DatasetContract(BaseModel):
             raise ValueError(f"column_renames target(s) are not unique: {duplicated}")
         return self
 
+    @model_validator(mode="after")
+    def _validate_group_column(self) -> DatasetContract:
+        """A grouping column must be a declared contract column (fail at parse)."""
+        if self.group_column is not None and self.group_column not in self.columns:
+            raise ValueError(
+                f"group_column '{self.group_column}' is not a declared contract "
+                f"column (declared: {sorted(self.columns)})"
+            )
+        return self
 
 class EnvironmentConfig(BaseModel):
     log_level: str
@@ -279,9 +293,17 @@ PRE_PARAM_PREFIX = "pre__"
 # folds as every candidate for the paired improvement to mean anything.
 NAIVE_REFERENCE = "naive_mean"
 
+# Reserved candidate model key for the classification no-skill reference: it
+# predicts the training prevalence, so its PR-AUC is the prevalence a candidate
+# must beat.
+NAIVE_PREVALENCE_REFERENCE = "naive_prevalence"
+
 # Every modelling record carries the target's scale so a reader cannot mistake
 # the regression RMSE/MAE for a calibrated ordinal model.
 TARGET_NOTE = "ordinal 1-5 treated as interval-scale"
+
+# The binary classification target's note: a 0/1 label, never a regression scale.
+BINARY_TARGET_NOTE = "binary 0/1 classification target"
 
 
 class ExperimentConfig(BaseModel):
@@ -481,6 +503,114 @@ class EdaStep(BaseModel):
     def stem(self) -> str:
         """Artifact stem shared by the report, its tables, figures and decisions."""
         return Path(self.output_file).stem
+
+
+class SeriesSpec(BaseModel):
+    """One daily series the forecast lane measures.
+
+    ``count`` counts canonical rows per day (the dataset contract declares one
+    row per grain); ``sum`` sums ``column`` per day. A day with no rows is
+    zero-filled on the calendar grid, so a gap is a zero, never a missing
+    observation the model has to interpolate.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    label: str = Field(min_length=1)
+    unit: str = ""
+    aggregation: Literal["count", "sum"]
+    column: str | None = None
+
+    @model_validator(mode="after")
+    def _sum_needs_a_column(self) -> SeriesSpec:
+        if self.aggregation == "sum" and not self.column:
+            raise ValueError("series aggregation='sum' requires a column")
+        return self
+
+
+class TimeseriesCv(BaseModel):
+    """Chronological cross-validation geometry for a daily series.
+
+    ``expanding`` trains on the prefix and validates the next block; ``rolling``
+    keeps a fixed ``train_size``. ``seasonal_period`` trims fold boundaries to
+    whole weekly cycles, so a fold never splits a week.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["expanding", "rolling"]
+    folds: int = Field(ge=1)
+    gap: int = Field(default=0, ge=0)
+    train_size: int | None = Field(default=None, ge=1)
+    seasonal_period: int = Field(ge=2)
+
+    @model_validator(mode="after")
+    def _rolling_needs_a_window(self) -> TimeseriesCv:
+        if self.kind == "rolling" and self.train_size is None:
+            raise ValueError("cv kind='rolling' requires train_size")
+        return self
+
+
+class PermutationConfig(BaseModel):
+    """Seeded paired sign-flip null for the no-skill verdict band."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    iterations: int = Field(ge=10)
+    seed: int
+
+
+class TimeseriesStep(BaseModel):
+    """Daily-series forecast lane: seasonal-naive baseline, weekly-seasonal model.
+
+    The datetime source is declared here because a dataset contract may leave
+    ``datetime_column`` null (the timestamp is context, not a model feature).
+    ``rule`` is the canonical :class:`DecisionRule`, so the verdict threshold,
+    direction, action and owner live in config exactly once.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    output_dir: str
+    datetime_column: str = Field(min_length=1)
+    grain_column: str = Field(min_length=1)
+    start: date
+    end: date
+    primary_series: str = Field(min_length=1)
+    series: dict[str, SeriesSpec] = Field(min_length=1)
+    model: Literal["auto_arima", "sarima"]
+    season_length: int = Field(ge=2)
+    alpha: float = Field(gt=0.0, lt=1.0)
+    order: tuple[int, int, int]
+    seasonal_order: tuple[int, int, int, int]
+    cv: TimeseriesCv
+    bootstrap: BootstrapConfig
+    permutation: PermutationConfig
+    rule: DecisionRule
+    window_note: str = ""
+
+    @model_validator(mode="after")
+    def _validate_lane(self) -> TimeseriesStep:
+        if self.end < self.start:
+            raise ValueError("timeseries window end must not precede start")
+        if self.primary_series not in self.series:
+            raise ValueError(
+                f"primary_series {self.primary_series!r} is not one of "
+                f"{sorted(self.series)}"
+            )
+        if any(value < 0 for value in self.order):
+            raise ValueError(f"forecast order must be non-negative, got {self.order}")
+        if any(value < 0 for value in self.seasonal_order):
+            raise ValueError(
+                f"seasonal_order must be non-negative, got {self.seasonal_order}"
+            )
+        return self
+
+    @property
+    def output_path(self) -> Path:
+        """Report directory, with a relative ``output_dir`` anchored at the repo root."""
+        directory = Path(self.output_dir)
+        return directory if directory.is_absolute() else repo_root() / directory
 
 
 class MissingInjectionConfig(BaseModel):
@@ -795,6 +925,10 @@ class BaselineStep(BaseModel):
     output_file: str
     linear_reference_model: str | None = None
     bootstrap: BootstrapConfig | None = None
+    # Label-permutation null draws for the classification baseline's
+    # relative-improvement band (refit on shuffled labels at this n). Ignored
+    # by the regression path.
+    null_iterations: int | None = Field(default=None, ge=1)
     min_effect: float | None = Field(default=None, gt=0.0)
     min_sample_size: int | None = Field(default=None, ge=1)
     action: str | None = None
@@ -833,7 +967,7 @@ class CandidateSpec(BaseModel):
     def _validate_model_params(self) -> CandidateSpec:
         from broadway.training.models.registry import MODEL_META, allowed_params
 
-        if self.model == NAIVE_REFERENCE:
+        if self.model in (NAIVE_REFERENCE, NAIVE_PREVALENCE_REFERENCE):
             if self.params:
                 raise ValueError("the naive reference candidate takes no params")
             return self
@@ -950,6 +1084,7 @@ class PipelineConfig(BaseModel):
     etl: EtlStep | None = None
     contracts: ContractsStep | None = None
     eda: EdaStep | None = None
+    timeseries: TimeseriesStep | None = None
     features: FeaturesStep | None = None
     stats: StatsStep | None = None
     causal: CausalStep | None = None
