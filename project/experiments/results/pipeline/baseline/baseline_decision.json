@@ -1,0 +1,48 @@
+{
+  "question": "Does the linear reference beat the naive mean on the holdout?",
+  "metric": "improvement_over_naive_mae",
+  "value": 0.2861000234796901,
+  "interval_low": 0.148,
+  "interval_high": 0.335,
+  "reference": null,
+  "delta": null,
+  "threshold": 0.02,
+  "null_threshold": null,
+  "direction": "max",
+  "verdict": "act",
+  "action": "treat the naive mean as the bar the champion must clear on the holdout",
+  "owner": "amazon",
+  "sample_size": 121,
+  "unit": "relative_improvement",
+  "min_sample_size": 100,
+  "evidence": {
+    "baseline": "naive training-mean predictor on the holdout rows",
+    "delta": 0.2861000234796901,
+    "segments": [
+      {
+        "segment": "first_half",
+        "value": 0.3437611091361536,
+        "sample_size": 60
+      },
+      {
+        "segment": "second_half",
+        "value": 0.23045602605863197,
+        "sample_size": 61
+      }
+    ],
+    "sensitivity": {
+      "level_90pct_low": 0.1637,
+      "level_90pct_high": 0.3207,
+      "naive_mae_n121": 0.8518,
+      "linear_mae_n121": 0.6081
+    },
+    "falsifier": "the linear reference's paired MAE improvement interval falls at or below the configured effect floor",
+    "provenance": {
+      "dataset": "amazon",
+      "artifact": "baseline.json",
+      "seed": "7",
+      "rows": "121",
+      "resampling": "paired row bootstrap on the holdout"
+    }
+  }
+}

@@ -2,22 +2,28 @@ from __future__ import annotations
 
 import logging
 import subprocess
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 from broadway.analysis.contracts import AnalysisMode
 from broadway.baseline import causal, hypothesis, prediction
 from broadway.baseline.contracts import BaselineResult, load_result, save_result
 from broadway.config.schema import PipelineConfig
-from broadway.data.loader import load
+from broadway.data.loader import ProcessedStore, load
+from broadway.evaluate.metrics import MetricBootstrap, compute_metrics
+from broadway.features.generic import validate_engineered_frame
+from broadway.features.plan import ColumnPlan
 from broadway.lineage.ids import node_id
 from broadway.lineage.records import write_record
 from broadway.reports.decision import Decision, DecisionRule, Evidence, SegmentEvidence
 from broadway.reports.measurement import MeasurementEstimator, MeasurementSpec
 from broadway.reports.step_output import StepOutput
 from broadway.trace import ArtifactTrace
+from broadway.training.trainer import build_model_pipeline
 
 logger = logging.getLogger(__name__)
 
@@ -53,13 +59,15 @@ def load_persisted(cfg: PipelineConfig) -> BaselineResult | None:
     return load_result(path)
 
 
-def _compute_baseline(cfg: PipelineConfig) -> BaselineResult:
+def _compute_baseline(
+    cfg: PipelineConfig, frame: pd.DataFrame | None = None
+) -> BaselineResult:
     assert cfg.analysis is not None
     mode = cfg.analysis.mode
     if mode == AnalysisMode.PREDICTION:
         if not cfg.dataset:
             raise ValueError("prediction baseline requires a dataset config")
-        df = load(cfg.dataset)
+        df = load(cfg.dataset) if frame is None else frame
         return prediction.run(df, cfg.dataset.target, cfg.dataset.task)
     if mode == AnalysisMode.HYPOTHESIS:
         if not cfg.dataset:
@@ -200,24 +208,250 @@ class BaselineDecision:
         return decision
 
 
+@dataclass(frozen=True)
+class HoldoutReference:
+    """The holdout rows the naive and linear references are scored on."""
+
+    truth: np.ndarray
+    naive_prediction: np.ndarray
+    linear_prediction: np.ndarray
+
+
+def _load_feature_splits(cfg: PipelineConfig) -> tuple[pd.DataFrame, pd.DataFrame] | None:
+    """Read the persisted engineered splits, or None when the step has no features.
+
+    The baseline is runnable without a feature plan (the platform's synthetic
+    config); the linear reference exists only once the features step has
+    published the model surface.
+    """
+    if cfg.etl is None or cfg.dataset is None or cfg.experiment is None:
+        return None
+    directory = ProcessedStore.from_config(cfg).directory
+    train_path = directory / cfg.etl.train_features_file
+    val_path = directory / cfg.etl.val_features_file
+    if not train_path.is_file() or not val_path.is_file():
+        return None
+    train = pd.read_parquet(train_path)
+    val = pd.read_parquet(val_path)
+    validate_engineered_frame(cfg, train)
+    validate_engineered_frame(cfg, val)
+    return train, val
+
+
+def _holdout_reference(
+    cfg: PipelineConfig, train: pd.DataFrame, val: pd.DataFrame
+) -> HoldoutReference:
+    """Score the naive mean and the linear reference on the untouched holdout."""
+    assert cfg.dataset is not None and cfg.experiment is not None and cfg.baseline is not None
+    plan = ColumnPlan.from_config(cfg.dataset, cfg.experiment)
+    X_train, _ = plan.apply(train)
+    X_val, _ = plan.apply(val)
+    y_train = train[cfg.dataset.target]
+    truth = val[cfg.dataset.target].to_numpy(dtype=float)
+    naive = np.full(truth.shape, float(y_train.mean()))
+    model = build_model_pipeline(
+        cfg, cfg.baseline.linear_reference_model, cfg.experiment.model.params
+    )
+    model.fit(X_train, y_train)
+    linear = np.asarray(model.predict(X_val), dtype=float)
+    return HoldoutReference(truth=truth, naive_prediction=naive, linear_prediction=linear)
+
+
+def _bootstrap(cfg: PipelineConfig) -> MetricBootstrap:
+    assert cfg.baseline is not None
+    return MetricBootstrap(cfg.baseline.bootstrap)
+
+
+class LinearReferenceDecision:
+    """Publish the linear reference's paired improvement over the naive mean.
+
+    The metric is the relative MAE improvement of the fitted linear reference
+    over a constant training-mean forecast on the same holdout rows. The
+    interval is the paired row bootstrap; segments re-measure both holdout
+    halves; the sensitivity repeats the interval at the 90% level.
+    """
+
+    def __init__(
+        self, cfg: PipelineConfig, result: BaselineResult, reference: HoldoutReference
+    ) -> None:
+        assert cfg.dataset is not None and cfg.baseline is not None
+        self._cfg = cfg
+        self._result = result
+        self._reference = reference
+
+    def _mae(self, prediction: np.ndarray, rows: slice | np.ndarray) -> float:
+        truth = self._reference.truth[rows]
+        return float(compute_metrics(truth, prediction[rows], metrics=("mae",))["mae"])
+
+    def decision(self) -> Decision:
+        assert self._cfg.dataset is not None and self._cfg.baseline is not None
+        reference = self._reference
+        naive_mae = self._mae(reference.naive_prediction, slice(None))
+        linear_mae = self._mae(reference.linear_prediction, slice(None))
+        value = (naive_mae - linear_mae) / naive_mae
+        measured = _bootstrap(self._cfg).improvement_interval(
+            reference.truth, reference.linear_prediction, reference.naive_prediction, metric="mae"
+        )
+        low, high = measured.lower, measured.upper
+        sensitivity = MetricBootstrap(
+            self._cfg.baseline.bootstrap.model_copy(update={"level": 0.90})
+        ).improvement_interval(
+            reference.truth, reference.linear_prediction, reference.naive_prediction, metric="mae"
+        )
+        midpoint = len(reference.truth) // 2
+        segments = [
+            SegmentEvidence(
+                segment=label,
+                value=self._segment(half),
+                sample_size=half.stop - half.start,
+            )
+            for label, half in (
+                ("first_half", slice(0, midpoint)),
+                ("second_half", slice(midpoint, len(reference.truth))),
+            )
+        ]
+        evidence = Evidence(
+            baseline="naive training-mean predictor on the holdout rows",
+            delta=value,
+            segments=segments,
+            sensitivity={
+                "level_90pct_low": sensitivity.lower,
+                "level_90pct_high": sensitivity.upper,
+                f"naive_mae_n{len(reference.truth)}": naive_mae,
+                f"linear_mae_n{len(reference.truth)}": linear_mae,
+            },
+            falsifier=(
+                "the linear reference's paired MAE improvement interval falls at or "
+                "below the configured effect floor"
+            ),
+            provenance={
+                "dataset": self._cfg.dataset.name,
+                "artifact": self._cfg.baseline.output_file,
+                "seed": str(self._cfg.baseline.bootstrap.seed),
+                "rows": str(len(reference.truth)),
+                "resampling": "paired row bootstrap on the holdout",
+            },
+        )
+        return Decision.evaluate(
+            rule=DecisionRule(
+                metric="improvement_over_naive_mae",
+                direction="max",
+                min_effect=self._cfg.baseline.min_effect,
+                min_sample_size=self._cfg.baseline.min_sample_size,
+                action=self._cfg.baseline.action,
+                owner=self._cfg.baseline.owner,
+            ),
+            value=value,
+            interval=(min(low, value), max(high, value)),
+            sample_size=len(reference.truth),
+            question="Does the linear reference beat the naive mean on the holdout?",
+            evidence=evidence,
+            unit="relative_improvement",
+        )
+
+    def _segment(self, half: slice) -> float:
+        reference = self._reference
+        naive = self._mae(reference.naive_prediction, half)
+        linear = self._mae(reference.linear_prediction, half)
+        return (naive - linear) / naive if naive else 0.0
+
+    def publish(self) -> Decision:
+        assert self._cfg.baseline is not None
+        decision = self.decision()
+        import matplotlib
+
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+
+        reference = self._reference
+        figure, axis = plt.subplots(figsize=(6, 3.6), constrained_layout=True)
+        labels = ["naive mean", "linear reference"]
+        values = [
+            self._mae(reference.naive_prediction, slice(None)),
+            self._mae(reference.linear_prediction, slice(None)),
+        ]
+        bars = axis.bar(labels, values, color=["#9ecae1", "#08519c"])
+        for bar in bars:
+            axis.text(
+                bar.get_x() + bar.get_width() / 2,
+                bar.get_height(),
+                f"{bar.get_height():,.4f}",
+                ha="center",
+                va="bottom",
+                fontsize=9,
+            )
+        axis.set_ylabel("holdout MAE")
+        axis.set_title("naive mean vs linear reference (holdout)")
+        output = StepOutput(
+            results_dir=Path(self._cfg.baseline.output_dir), stem="baseline", decision=decision
+        )
+        output.save_figure(figure)
+        plt.close("all")
+        output.write()
+        return decision
+
+
+def _persisted_prediction_result(
+    cfg: PipelineConfig, result: BaselineResult, reference: HoldoutReference
+) -> BaselineResult:
+    """Carry the holdout naive MAE as the persisted reference value.
+
+    ``evaluate`` compares the candidate's holdout MAE with this value, so it
+    must be measured on the same rows; the training-split naive metrics stay in
+    ``details`` as evidence.
+    """
+    holdout_mae = float(
+        compute_metrics(reference.truth, reference.naive_prediction, metrics=("mae",))["mae"]
+    )
+    holdout_rmse = float(
+        compute_metrics(reference.truth, reference.naive_prediction, metrics=("rmse",))["rmse"]
+    )
+    details = dict(result.details)
+    details.update(
+        {
+            "holdout_mean_mae": holdout_mae,
+            "holdout_mean_rmse": holdout_rmse,
+            "holdout_linear_mae": float(
+                compute_metrics(
+                    reference.truth, reference.linear_prediction, metrics=("mae",)
+                )["mae"]
+            ),
+            "holdout_rows": len(reference.truth),
+        }
+    )
+    return result.model_copy(update={"value": holdout_mae, "details": details})
+
+
 def run(cfg: PipelineConfig) -> None:
     if not cfg.analysis:
         raise ValueError("baseline step requires an analysis contract (--analysis)")
     if not cfg.baseline:
         raise ValueError("baseline step requires baseline config")
-    result = _compute_baseline(cfg)
+    splits = _load_feature_splits(cfg)
+    reference = _holdout_reference(cfg, *splits) if splits is not None else None
+    result = _compute_baseline(cfg, splits[0] if splits is not None else None)
+    if reference is not None:
+        result = _persisted_prediction_result(cfg, result, reference)
     result = result.model_copy(update={"trace": _build_trace(cfg)})
     out_dir = Path(cfg.baseline.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / cfg.baseline.output_file
     save_result(result, out_path)
     if result.mode == AnalysisMode.PREDICTION and cfg.dataset is not None:
-        decision = BaselineDecision(cfg, result, load(cfg.dataset)).publish(out_dir)
-        logger.info(
-            "baseline decision: %s — mean/median MAE ratio %.4f",
-            decision.verdict,
-            decision.value,
-        )
+        if reference is not None:
+            decision = LinearReferenceDecision(cfg, result, reference).publish()
+            logger.info(
+                "baseline decision: %s — linear vs naive improvement %.4f",
+                decision.verdict,
+                decision.value,
+            )
+        else:
+            decision = BaselineDecision(cfg, result, load(cfg.dataset)).publish(out_dir)
+            logger.info(
+                "baseline decision: %s — mean/median MAE ratio %.4f",
+                decision.verdict,
+                decision.value,
+            )
     logger.info(f"baseline: {result.strategy} {result.metric}={result.value:.4f} -> {out_path}")
     parents = (
         [node_id("analysis", cfg.analysis.name), node_id("profile", cfg.dataset.name)]

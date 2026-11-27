@@ -274,6 +274,11 @@ class PreprocessingStepConfig(BaseModel):
 # constant, trainer.py imports it — never reversed.
 PRE_PARAM_PREFIX = "pre__"
 
+# Reserved candidate model key for the naive training-mean reference. It is not
+# a registry model (there is nothing to fit), but it must score on the identical
+# folds as every candidate for the paired improvement to mean anything.
+NAIVE_REFERENCE = "naive_mean"
+
 
 class ExperimentConfig(BaseModel):
     data_source: DataSourceRef
@@ -673,6 +678,9 @@ class TrainStep(BaseModel):
     # `time_series_split` is the pre-existing expanding alias. `kfold` is the
     # shuffled split and is refused for a time split below.
     cv_kind: CvKind
+    # Independent shuffles for a cross-sectional cv_kind='kfold' (the deployed
+    # fit's repeated-CV score); a time-aware kind always uses one pass.
+    cv_repeats: int = Field(ge=1)
     # Rows dropped between a training prefix and its validation block (the
     # purge gap); a forecast horizon h requires cv_gap >= h.
     cv_gap: int = Field(default=0, ge=0)
@@ -693,6 +701,10 @@ class TrainStep(BaseModel):
     quantile_tail: float
     output_dir: str
     output_file: str
+    # The deployed fit's training-only CV verdict vs the naive reference (the
+    # training row of EXPERIMENT_OUTPUT.md), plus its paired bootstrap.
+    fit_decision: DecisionRule
+    bootstrap: BootstrapConfig
     learning_curve: LearningCurveConfig | None = None
     tracking: TrackingConfig | None = None
 
@@ -748,6 +760,143 @@ class EvaluateStep(BaseModel):
 
 
 class BaselineStep(BaseModel):
+    """Baseline-step knobs: the naive reference, its interval rule, and output.
+
+    The persisted ``value`` is the naive predictor's holdout metric, so the
+    training/evaluate steps compare against the same rows they score. The rule
+    decides whether the linear reference earns its place over that naive
+    predictor.
+    """
+
+    output_dir: str
+    output_file: str
+    linear_reference_model: str
+    bootstrap: BootstrapConfig
+    min_effect: float = Field(gt=0.0)
+    min_sample_size: int = Field(ge=1)
+    action: str = Field(min_length=1)
+    owner: str = Field(min_length=1)
+
+
+class CVGeometry(BaseModel):
+    """Repeated shuffled K-fold geometry for cross-sectional model selection.
+
+    ``random_state`` seeds the shuffled folds; a repeat uses
+    ``random_state + repeat`` so repeats never reuse the same partition.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    folds: int = Field(ge=2)
+    repeats: int = Field(ge=1)
+    random_state: int
+
+
+class BootstrapSpec(BaseModel):
+    """Percentile bootstrap for fold-level and paired intervals."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    iterations: int = Field(ge=100)
+    seed: int
+    level: float = Field(gt=0.0, lt=1.0)
+
+
+class CandidateSpec(BaseModel):
+    """One model-registry candidate and the params its CV folds fit.
+
+    ``model`` is a registry key, or the reserved ``naive_mean`` reference
+    (``NAIVE_REFERENCE``) that predicts the training mean — the baseline no
+    candidate may fail to beat.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(min_length=1)
+    model: str = Field(min_length=1)
+    params: dict[str, float | int | str] = {}
+
+    @model_validator(mode="after")
+    def _validate_model_params(self) -> CandidateSpec:
+        from broadway.training.models.registry import MODEL_META, allowed_params
+
+        if self.model == NAIVE_REFERENCE:
+            if self.params:
+                raise ValueError("the naive reference candidate takes no params")
+            return self
+        if self.model not in MODEL_META:
+            raise ValueError(
+                f"candidate '{self.name}' names unknown registry model "
+                f"'{self.model}'; known: {sorted(MODEL_META)}"
+            )
+        invalid = set(self.params) - allowed_params(self.model)
+        if invalid:
+            raise ValueError(
+                f"candidate '{self.name}' has invalid params for model "
+                f"'{self.model}': {sorted(invalid)}"
+            )
+        return self
+
+
+class SelectionStep(BaseModel):
+    """Model-selection knobs: the candidate set, CV geometry and the rule.
+
+    The baseline candidate is scored on the identical folds as every model, so
+    the paired improvement is measured on the same rows; ``linear_reference``
+    is the simpler model a champion must also beat. The verdict rule lives here
+    (config SSOT), never in the step module.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    metric: str
+    secondary_metric: str
+    cv: CVGeometry
+    sensitivity_random_state: int
+    bootstrap: BootstrapSpec
+    baseline_candidate: str
+    linear_reference: str
+    candidates: list[CandidateSpec] = Field(min_length=2)
+    min_effect: float = Field(gt=0.0)
+    min_sample_size: int = Field(ge=1)
+    action: str = Field(min_length=1)
+    owner: str = Field(min_length=1)
+    output_dir: str
+    output_file: str
+
+    @model_validator(mode="after")
+    def _validate_candidate_names(self) -> SelectionStep:
+        names = [candidate.name for candidate in self.candidates]
+        if len(set(names)) != len(names):
+            raise ValueError(f"selection candidate names are not unique: {names}")
+        for role in (self.baseline_candidate, self.linear_reference):
+            if role not in names:
+                raise ValueError(
+                    f"selection role '{role}' is not one of the candidates {names}"
+                )
+        return self
+
+
+class HpoStep(BaseModel):
+    """Tuning knobs for the selected champion: CV geometry, rule, output.
+
+    The search space and trial budget belong to the experiment's ``hpo`` block
+    (``project/config/experiment/<experiment>.yaml``); this section owns only
+    the folds the tuned score is read on, which are seeded independently of the
+    folds that selected the champion.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    metric: str
+    cv: CVGeometry
+    sensitivity_random_state: int
+    bootstrap: BootstrapSpec
+    selection_record: str
+    min_effect: float = Field(gt=0.0)
+    min_sample_size: int = Field(ge=1)
+    action: str = Field(min_length=1)
+    owner: str = Field(min_length=1)
     output_dir: str
     output_file: str
 
@@ -785,6 +934,8 @@ class PipelineConfig(BaseModel):
     causal: CausalStep | None = None
     train: TrainStep | None = None
     evaluate: EvaluateStep | None = None
+    selection: SelectionStep | None = None
+    hpo: HpoStep | None = None
     full: FullStep | None = None
 
     @model_validator(mode="after")

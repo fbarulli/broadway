@@ -1,2 +1,14 @@
 output_dir: artifacts/baseline
 output_file: baseline.json
+# A candidate must beat the naive predictor on the same rows; this model is the
+# simpler reference that must itself beat naive before the model surface is
+# worth building.
+linear_reference_model: linear
+bootstrap:
+  iterations: 2000
+  seed: 7
+  level: 0.95
+min_effect: 0.02
+min_sample_size: 100
+action: "keep the naive predictor as the reference and build the model surface"
+owner: baseline

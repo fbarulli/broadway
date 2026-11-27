@@ -24,7 +24,9 @@ from broadway.config.schema import (
     FeaturesStep,
     FlowConfig,
     FullStep,
+    HpoStep,
     PipelineConfig,
+    SelectionStep,
     StatsStep,
     TrainStep,
 )
@@ -47,6 +49,8 @@ STEP_MODELS = {
     "train": TrainStep,
     "evaluate": EvaluateStep,
     "baseline": BaselineStep,
+    "selection": SelectionStep,
+    "hpo": HpoStep,
     "full": FullStep,
 }
 
@@ -61,6 +65,8 @@ STEP_MODULES = {
     "train": "broadway.training.module",
     "evaluate": "broadway.evaluate.module",
     "baseline": "broadway.baseline.module",
+    "selection": "broadway.selection.module",
+    "hpo": "broadway.selection.tuning",
 }
 
 # Sections loaded from configs/{section}/<name>.yaml via CLI args (--dataset,
@@ -78,7 +84,9 @@ _STEP_SECTION_REQUIREMENTS: dict[str, tuple[str, ...]] = {
     "features": ("environment", "dataset", "experiment", "etl"),
     "train": ("environment", "dataset", "experiment", "etl", "analysis"),
     "evaluate": ("environment", "dataset", "experiment", "etl", "train", "analysis"),
-    "baseline": ("analysis", "dataset"),
+    "baseline": ("analysis", "dataset", "etl"),
+    "selection": ("environment", "dataset", "experiment", "etl"),
+    "hpo": ("environment", "dataset", "experiment", "etl"),
     "stats": ("environment", "dataset", "analysis"),
 }
 

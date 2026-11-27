@@ -1,0 +1,5 @@
+# Amazon baseline binding: its record/figure are committed pipeline evidence on
+# the dashboard surface (data/processed keeps only the machine baseline.json).
+output_dir: project/experiments/results/pipeline/baseline
+owner: amazon
+action: "treat the naive mean as the bar the champion must clear on the holdout"
