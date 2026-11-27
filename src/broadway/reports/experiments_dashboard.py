@@ -374,7 +374,14 @@ def _render_decision(stem: str, focus: str) -> str:
         high = float(payload["interval_high"])
         threshold = float(payload["threshold"])
         verdict = str(payload["verdict"])
-        direction = "\u2264" if payload["direction"] == "max" else "\u2265"
+        # A "max" rule acts when the value clears the threshold from above, so
+        # the rule the strip states is "> threshold" (and "<" for a min rule).
+        comparator = ">" if payload["direction"] == "max" else "<"
+        null_band = (
+            f" (null band {float(payload['null_threshold']):,.4f})"
+            if isinstance(payload.get("null_threshold"), (int, float))
+            else ""
+        )
     except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError):
         logger.warning("dashboard: unreadable decision record at %s", path, exc_info=True)
         return ""
@@ -385,7 +392,7 @@ def _render_decision(stem: str, focus: str) -> str:
         f"({html.escape(str(payload.get('owner', '')))})"
         f'<br><span class="metric">{html.escape(str(payload.get("metric", "")))} '
         f"= {value:,.4f} [{low:,.4f}, {high:,.4f}] 95% · "
-        f"rule: must be {direction} {threshold:,.4f}</span>"
+        f"rule: must be {comparator} {threshold:,.4f}{null_band}</span>"
         "</section>"
     )
 

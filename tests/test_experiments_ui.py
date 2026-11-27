@@ -326,6 +326,7 @@ def test_experiment_page_renders_the_decision_record(monkeypatch, tmp_path) -> N
                 "interval_low": 0.011,
                 "interval_high": 0.013,
                 "threshold": 0.01,
+                "null_threshold": 0.0077,
                 "direction": "max",
                 "verdict": "act",
                 "action": "review the policy",
@@ -341,6 +342,7 @@ def test_experiment_page_renders_the_decision_record(monkeypatch, tmp_path) -> N
     assert 'class="decision act"' in body
     assert "ACT" in body
     assert "ks_fare_amount = 0.0120 [0.0110, 0.0130]" in body
+    assert "rule: must be > 0.0100 (null band 0.0077)" in body
     assert "review the policy" in body
 
 
