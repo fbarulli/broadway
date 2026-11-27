@@ -5,9 +5,9 @@ One writer, one stem. ``<stem>.html`` is the human report; ``<stem>_effects.csv`
 are the aggregate evidence tables rendered under the figures;
 ``<stem>_decision.json`` is **the** decision record — singular, the summary
 metric the dashboard reads (``experiments_dashboard`` looks for
-``<stem>_decision.json`` and ``.gitignore`` un-ignores only that name), whose
-provenance points at the per-feature evidence in
-``<stem>_feature_decisions.json``. ``<stem>_<figure>.<format>`` are the three
+``<stem>_decision.json`` and ``.gitignore`` un-ignores only that name).
+``<stem>_feature_decisions.json`` is the per-feature evidence written next to
+it, carrying each family's decision. ``<stem>_<figure>.<format>`` are the three
 figures. Aggregate rows only — a CSV never carries a raw datapoint.
 """
 

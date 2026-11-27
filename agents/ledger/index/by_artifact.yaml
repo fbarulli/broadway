@@ -203,11 +203,13 @@ DerivedFeature(name,func,source):
 : - GATE-SURF-66
 ? 'EDA: EdaResult model (SummaryResult + MissingResult + QualityResult + CompareResult + EmbeddedFigure list) rendered by EdaReportBuilder (eda/models.py:182)'
 : - GATE-SURF-66
-? 'EDA: artifacts/reports/eda.html — one self-contained HTML report (figures embedded as base64) written atomically via <name>.tmp then replace (eda/module.py:179-186)'
-: - GATE-SURF-66
 ? 'EDA: configs/step/eda.yaml knobs (sample_size/plot_format/output_dir/output_file/max_categories/max_plots/iqr_multiplier/z_threshold/imbalance_min_share)'
 : - GATE-SURF-66
 ? 'EDA: pre-split canonical parquet via canonical_path (optional; absent → the compare panel records a skip_reason) (eda/module.py:123-132)'
+: - GATE-SURF-66
+? 'EDA: project/config/step/eda.yaml output_dir overlay, layered over the base step file by broadway.config.loader (a relative output_dir is anchored at repo_root)'
+: - GATE-SURF-66
+? 'EDA: project/experiments/results/pipeline/eda/eda.html — one self-contained HTML report (figures embedded as base64) written atomically via <name>.tmp then replace (eda/module.py:179-186)'
 : - GATE-SURF-66
 'FAIL parity (F1b): origin/sklearn unavailable | legacy pre-D16 checker on track ref':
 - GATE-INFRA-91
@@ -882,6 +884,8 @@ persisted typed evidence JSON artifacts:
 - GATE-SURF-69
 pingouin pairwise_gameshowell frame augmented with cohens_d / hedges_g / effect_size_note columns (:29-31):
 - GATE-STATS-47
+'pipeline evidence: project/experiments/results/pipeline/*/*_decision.json, validated through reports.decision.Decision':
+- GATE-SURF-66
 platform job verdict (parity+ruff+mypy+configs+shell-scripts+pytest+cov≥95+project-tests via SSOT script):
 - GATE-INFRA-99
 post-merge df:
@@ -918,6 +922,8 @@ project/experiments/polynomial_regression_et_all/:
 - GATE-INFRA-129
 project/experiments/results/**/*.csv (tracked):
 - GATE-SURF-68
+? project/experiments/results/pipeline/eda/{eda_decision.json, eda_feature_decisions.json, eda_*.csv, eda_*.png} — committed pipeline evidence rendered by reports/pipeline_evidence.py on the dashboard root
+: - GATE-SURF-66
 project/experiments/results/univariate/fare_amount_trip_distance/ratecode1_sample.parquet|.json (pinned, tracked):
 - GATE-SURF-68
 project/experiments/univariate/fare_amount_trip_distance/:

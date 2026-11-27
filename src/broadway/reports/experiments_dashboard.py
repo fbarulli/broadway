@@ -37,6 +37,8 @@ from fastapi import FastAPI, Query, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
+from broadway.reports.pipeline_evidence import PipelineEvidenceSection
+
 logger = logging.getLogger(__name__)
 
 EXPERIMENTS_ROOT = Path(os.environ.get("BROADWAY_EXPERIMENTS_ROOT", "experiments"))
@@ -669,12 +671,16 @@ def _render_dashboard_page(
   th, td {{ border: 1px solid #ccc; padding: 0.4rem 0.6rem; text-align: left; vertical-align: top; }}
   th {{ background: #f0f0f0; }}
   tr:nth-child(even) td {{ background: #fafafa; }}
+  .pipeline-evidence {{ margin-top: 2rem; }}
+  .pipeline-evidence h2 {{ font-size: 1.1rem; }}
+  .pipeline-evidence .verdict {{ font-weight: 600; }}
+  .pipeline-evidence .dataset {{ color: #666; font-size: 0.85em; }}
 </style>
 </head>
 <body>
 <h1>Broadway experiments</h1>
 <p><a href="/canvas">maps</a> — annotated canvases (tldraw) over diagrams/ + results</p>
-{_series_selector(series, focus)}
+{_series_selector(series, focus) if series else ""}
 <table>
 <thead>
 <tr><th>experiment</th><th>question</th><th>status</th><th>artifacts</th></tr>
@@ -683,6 +689,7 @@ def _render_dashboard_page(
 {table_rows}
 </tbody>
 </table>
+{PipelineEvidenceSection.from_experiments_root(EXPERIMENTS_ROOT).render()}
 </body>
 </html>
 """
@@ -971,11 +978,15 @@ def _script_for(name: str, focus: str) -> Path | None:
 
 @app.get("/", response_model=None)
 def index(focus: str = Query(default=DEFAULT_SERIES)) -> HTMLResponse | PlainTextResponse:
-    """Serve the dashboard for the focused series."""
+    """Serve the dashboard; a pipeline-only checkout still shows its evidence."""
+    series = list_series()
     focus = _resolve_focus(focus)
-    if focus not in list_series():
+    # An explicit (or default-resolved) focus must name a known series. With
+    # no series at all, only the no-focus pipeline-only page is valid.
+    if focus not in series and (series or focus):
         return PlainTextResponse("unknown series", status_code=404)
-    return HTMLResponse(_render_dashboard_page(census_rows(focus), focus, list_series()))
+    rows = census_rows(focus) if focus else []
+    return HTMLResponse(_render_dashboard_page(rows, focus, series))
 
 
 @app.get("/experiments/{name}/source", response_model=None)

@@ -23,6 +23,7 @@ from broadway.evaluate.contracts import (
     ErrorAnalysisConfig,
     ResidualDiagnosticsConfig,
 )
+from broadway.paths import repo_root
 from broadway.reports.decision import DecisionRule
 from broadway.training.models.registry import allowed_params
 
@@ -402,8 +403,11 @@ class EdaStep(BaseModel):
 
     @property
     def output_path(self) -> Path:
-        """Report path (``output_dir/output_file``)."""
-        return Path(self.output_dir) / self.output_file
+        """Report path, with a relative ``output_dir`` anchored at the repo root."""
+        directory = Path(self.output_dir)
+        if not directory.is_absolute():
+            directory = repo_root() / directory
+        return directory / self.output_file
 
     @property
     def stem(self) -> str:

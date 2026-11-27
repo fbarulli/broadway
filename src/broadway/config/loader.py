@@ -106,8 +106,7 @@ def config_path(relative_path: str) -> Path:
     return CONFIGS_DIR / relative_path
 
 
-def _load_yaml(relative_path: str) -> Any:
-    path = config_path(relative_path)
+def _read_yaml(path: Path) -> Any:
     if not path.exists():
         raise FileNotFoundError(f"config file not found: {path}")
     with open(path, encoding="utf-8") as f:
@@ -117,6 +116,25 @@ def _load_yaml(relative_path: str) -> Any:
     if not isinstance(data, dict):
         raise ValueError(f"config file must be a mapping: {path}")
     return data
+
+
+def _load_yaml(relative_path: str) -> Any:
+    """Load one section, layering a project step override over its base file.
+
+    Dataset/experiment/analysis overlays are complete contracts. Step configs
+    are not: the platform file carries every default and the project file names
+    only the knobs it binds, so a step overlay is a deep override of the base
+    file rather than a replacement.
+    """
+    path = config_path(relative_path)
+    data = _read_yaml(path)
+    if not relative_path.startswith("step/"):
+        return data
+    base_path = CONFIGS_DIR / relative_path
+    if path == base_path or not base_path.exists():
+        return data
+    base = _read_yaml(base_path)
+    return _deep_merge(base, data) if isinstance(base, dict) and isinstance(data, dict) else data
 
 
 def _merge_section(merged: dict, section: str, name: str | None, optional: bool) -> None:

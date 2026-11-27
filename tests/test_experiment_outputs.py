@@ -3,10 +3,39 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
 from pathlib import Path
 
+from broadway.reports.decision import Decision
+
 _ROOT = Path(__file__).resolve().parents[1]
+
+
+def _decision() -> dict[str, object]:
+    return {
+        "question": "Does the metric clear its threshold?",
+        "metric": "association_target",
+        "value": 0.94,
+        "interval_low": 0.93,
+        "interval_high": 0.95,
+        "threshold": 0.05,
+        "null_threshold": 0.0089,
+        "direction": "max",
+        "verdict": "act",
+        "action": "keep the feature",
+        "owner": "eda",
+        "sample_size": 50000,
+        "unit": None,
+        "min_sample_size": 100,
+        "evidence": {
+            "baseline": "no-effect shuffle of the target at this n",
+            "segments": [{"segment": "weekday", "value": 0.94, "sample_size": 30000}],
+            "sensitivity": {"half_sample": 0.93},
+            "falsifier": "the interval falls at or below the threshold",
+            "provenance": {"dataset": "synthetic", "seed": "42"},
+        },
+    }
 
 
 def _audit_module():
@@ -30,6 +59,32 @@ def test_enforced_series_steps_publish_a_question_and_a_figure() -> None:
     assert enforced_steps >= 12
 
 
+def test_audit_of_a_missing_experiments_root_is_empty(tmp_path: Path) -> None:
+    audit = _audit_module().ExperimentOutputAudit(tmp_path / "missing")
+
+    assert audit.series() == []
+
+
+def test_project_checkout_without_results_root_still_enforces_eda(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    module = _audit_module()
+    experiments = tmp_path / "experiments"
+    experiments.mkdir()
+    layout = module.ProjectLayout(experiments=experiments, results=tmp_path / "results")
+
+    assert "eda" in module._enforced_pipeline_steps(layout)
+
+    monkeypatch.setattr(module, "resolve_project_layout", lambda: layout)
+    assert module.main() == 1
+    assert "FAIL pipeline/eda: missing decision record" in capsys.readouterr().out
+
+    skipped = module.ProjectLayout(None, None, "project unavailable")
+    monkeypatch.setattr(module, "resolve_project_layout", lambda: skipped)
+    assert module.main() == 0
+    assert "note pipeline/eda: decision record not enforced" in capsys.readouterr().out
+
+
 def test_audit_flags_a_step_without_a_figure(tmp_path: Path) -> None:
     series = tmp_path / "demo"
     series.mkdir()
@@ -47,6 +102,27 @@ def test_pipeline_audit_reports_missing_decisions(tmp_path: Path) -> None:
     module = tmp_path / "eda"
     module.mkdir()
     (module / "module.py").write_text("def run(cfg):\n    return cfg\n", encoding="utf-8")
-    audit = _audit_module().PipelineDecisionAudit(tmp_path)
+    audit = _audit_module().PipelineDecisionAudit(
+        tmp_path, results_root=tmp_path / "results"
+    )
 
+    assert audit.status() == {"eda": False}
+
+
+def test_pipeline_audit_accepts_only_a_canonical_published_record(tmp_path: Path) -> None:
+    module = tmp_path / "eda"
+    module.mkdir()
+    (module / "module.py").write_text("def run(cfg):\n    return cfg\n", encoding="utf-8")
+    results = tmp_path / "results"
+    record = results / "eda" / "eda_decision.json"
+    record.parent.mkdir(parents=True)
+    record.write_text(
+        json.dumps(Decision.model_validate(_decision()).model_dump(mode="json")),
+        encoding="utf-8",
+    )
+    audit = _audit_module().PipelineDecisionAudit(tmp_path, results_root=results)
+
+    assert audit.status() == {"eda": True}
+
+    record.write_text("[]", encoding="utf-8")
     assert audit.status() == {"eda": False}

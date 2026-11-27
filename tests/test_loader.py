@@ -168,6 +168,56 @@ def test_config_overlay_precedes_base_and_falls_back(
     assert load_config("etl", dataset="test", experiment="baseline").dataset.path == "overlay/demo.csv"
 
 
+def test_step_overlay_layers_a_partial_project_file_over_the_base(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    base = tmp_path / "base"
+    overlay = tmp_path / "overlay"
+    _write_yaml(base / "environment" / "development.yaml", _ENVIRONMENT)
+    _write_yaml(base / "dataset" / "test.yaml", _DATASET)
+    _write_yaml(base / "experiment" / "baseline.yaml", _EXPERIMENT)
+    _write_yaml(base / "step" / "etl.yaml", _ETL)
+    _write_yaml(overlay / "step" / "etl.yaml", {"ci_sample_size": 1234})
+
+    monkeypatch.setattr(loader, "CONFIGS_DIR", base)
+    monkeypatch.setenv(loader.CONFIG_OVERLAY_ENV, str(overlay))
+
+    cfg = load_config("etl", dataset="test", experiment="baseline")
+
+    assert cfg.etl.ci_sample_size == 1234
+    assert cfg.etl.max_drop_fraction == _ETL["max_drop_fraction"]
+
+
+def test_step_overlay_deep_merges_a_nested_block(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    base = tmp_path / "base"
+    overlay = tmp_path / "overlay"
+    _write_yaml(base / "environment" / "development.yaml", _ENVIRONMENT)
+    _write_yaml(base / "dataset" / "test.yaml", _DATASET)
+    _write_yaml(base / "experiment" / "baseline.yaml", _EXPERIMENT)
+    _write_yaml(base / "step" / "etl.yaml", _ETL)
+    repo_eda = Path(__file__).resolve().parents[1] / "configs" / "step" / "eda.yaml"
+    eda_base = yaml.safe_load(repo_eda.read_text(encoding="utf-8"))
+    _write_yaml(base / "step" / "eda.yaml", eda_base)
+    _write_yaml(
+        overlay / "step" / "eda.yaml",
+        {"decisions": {"features": {"action": "overlay action"}}},
+    )
+
+    monkeypatch.setattr(loader, "CONFIGS_DIR", base)
+    monkeypatch.setenv(loader.CONFIG_OVERLAY_ENV, str(overlay))
+
+    cfg = load_config("eda", dataset="test", experiment="baseline")
+
+    assert cfg.eda.decisions.features.action == "overlay action"
+    assert cfg.eda.decisions.features.owner == eda_base["decisions"]["features"]["owner"]
+    assert (
+        cfg.eda.decisions.outliers.action
+        == eda_base["decisions"]["outliers"]["action"]
+    )
+
+
 def test_missing_config_overlay_fails_loudly(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

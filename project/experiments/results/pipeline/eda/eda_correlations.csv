@@ -1,0 +1,7 @@
+left,right,n,pearson,pearson_p,pearson_q,spearman,spearman_p,spearman_q
+fare_amount,passenger_count,50000,0.040164,0.0,0.0,0.043179,0.0,0.0
+fare_amount,trip_distance,50000,0.870294,0.0,0.0,0.909006,0.0,0.0
+fare_amount,trip_duration_minutes,50000,0.763125,0.0,0.0,0.93961,0.0,0.0
+passenger_count,trip_distance,50000,0.038833,0.0,0.0,0.039633,0.0,0.0
+passenger_count,trip_duration_minutes,50000,0.03245,0.0,0.0,0.04296,0.0,0.0
+trip_distance,trip_duration_minutes,50000,0.792059,0.0,0.0,0.855222,0.0,0.0

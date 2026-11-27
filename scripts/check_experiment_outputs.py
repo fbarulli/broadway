@@ -8,12 +8,23 @@ listed in ``ENFORCED`` must comply; the rest are counted and reported only.
 from __future__ import annotations
 
 import ast
+import logging
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from pydantic import ValidationError
+
+from broadway.reports.decision import Decision
+
+logger = logging.getLogger(__name__)
+
 ROOT = Path(__file__).resolve().parents[1]
-EXPERIMENTS = ROOT / "project" / "experiments"
+DEFAULT_EXPERIMENTS = ROOT / "project" / "experiments"
+# Pipeline steps whose evidence lives under the project tree. They are only
+# enforced when the project layout (and its results root) is present, so a
+# data-agnostic checkout stays green.
+PROJECT_EVIDENCE_STEPS: tuple[str, ...] = ("eda",)
 
 # Ratchet: a series joins this list once every step complies. Never remove one.
 ENFORCED: tuple[str, ...] = ("fare_prediction", "timeseries")
@@ -55,12 +66,37 @@ PIPELINE_STEPS: tuple[str, ...] = (
 # once it complies; never removed.
 PIPELINE_DECISION_ENFORCED: tuple[str, ...] = (
     "etl",
+    "eda",
     "features",
     "training",
     "evaluate",
     "baseline",
     "causal",
 )
+
+
+@dataclass(frozen=True)
+class ProjectLayout:
+    """The project roots the gate may audit, or why they are unavailable."""
+
+    experiments: Path | None
+    results: Path | None
+    reason: str = ""
+
+    @property
+    def pipeline_results(self) -> Path | None:
+        return None if self.results is None else self.results / "pipeline"
+
+
+def resolve_project_layout() -> ProjectLayout:
+    """Import the project layer lazily so a platform-only checkout stays runnable."""
+    try:
+        from project.paths import load_project_paths
+
+        paths = load_project_paths()
+    except (ImportError, FileNotFoundError, ValueError) as error:
+        return ProjectLayout(None, None, f"project layout unavailable ({error})")
+    return ProjectLayout(paths.experiments, paths.results)
 
 
 @dataclass(frozen=True)
@@ -104,11 +140,15 @@ class SeriesAudit:
 class ExperimentOutputAudit:
     """Walk the experiment tree and classify each step script."""
 
-    def __init__(self, root: Path = EXPERIMENTS, enforced: tuple[str, ...] = ENFORCED) -> None:
+    def __init__(
+        self, root: Path | None = DEFAULT_EXPERIMENTS, enforced: tuple[str, ...] = ENFORCED
+    ) -> None:
         self._root = root
         self._enforced = enforced
 
     def series(self) -> list[SeriesAudit]:
+        if self._root is None or not self._root.is_dir():
+            return []
         audits = []
         for directory in sorted(path for path in self._root.iterdir() if path.is_dir()):
             steps = [
@@ -166,10 +206,15 @@ class ExperimentOutputAudit:
 
 
 class PipelineDecisionAudit:
-    """Which pipeline step modules build a Decision/StepOutput today."""
+    """Which pipeline steps publish a Decision/StepOutput today."""
 
-    def __init__(self, root: Path = ROOT / "src" / "broadway") -> None:
+    def __init__(
+        self,
+        root: Path = ROOT / "src" / "broadway",
+        results_root: Path | None = None,
+    ) -> None:
         self._root = root
+        self._results_root = results_root
 
     def status(self) -> dict[str, bool]:
         status = {}
@@ -177,40 +222,92 @@ class PipelineDecisionAudit:
             module = self._root / step / "module.py"
             if not module.is_file():
                 continue
-            tree = ast.parse(module.read_text(encoding="utf-8"))
-            status[step] = any(
-                isinstance(node, ast.Call)
-                and (
-                    getattr(node.func, "id", None) == "StepOutput"
-                    or getattr(node.func, "attr", None) == "StepOutput"
-                    or (
-                        getattr(node.func, "attr", None) == "evaluate"
-                        and getattr(getattr(node.func, "value", None), "id", None) == "Decision"
-                    )
-                )
-                for node in ast.walk(tree)
-            )
+            status[step] = self._publishes_in_code(module) or self._publishes_record(step)
         return status
+
+    @staticmethod
+    def _publishes_in_code(module: Path) -> bool:
+        tree = ast.parse(module.read_text(encoding="utf-8"))
+        return any(
+            isinstance(node, ast.Call)
+            and (
+                getattr(node.func, "id", None) == "StepOutput"
+                or getattr(node.func, "attr", None) == "StepOutput"
+                or (
+                    getattr(node.func, "attr", None) == "evaluate"
+                    and getattr(getattr(node.func, "value", None), "id", None) == "Decision"
+                )
+            )
+            for node in ast.walk(tree)
+        )
+
+    def _publishes_record(self, step: str) -> bool:
+        """A published record counts only when the canonical Decision validates."""
+        if self._results_root is None:
+            return False
+        for record in sorted((self._results_root / step).glob("*_decision.json")):
+            try:
+                Decision.model_validate_json(record.read_text(encoding="utf-8"))
+            except (OSError, UnicodeDecodeError, ValidationError):
+                logger.warning(
+                    "pipeline audit: unreadable decision record at %s", record, exc_info=True
+                )
+                continue
+            return True
+        return False
+
+
+def _enforced_pipeline_steps(layout: ProjectLayout) -> tuple[str, ...]:
+    """Enforce project evidence whenever this is a project checkout.
+
+    The evidence directory itself is not the signal: a project checkout whose
+    results tree vanished must fail the missing record, not skip it.
+    """
+    if layout.experiments is not None and layout.experiments.is_dir():
+        return PIPELINE_DECISION_ENFORCED
+    return tuple(
+        step for step in PIPELINE_DECISION_ENFORCED if step not in PROJECT_EVIDENCE_STEPS
+    )
 
 
 def main() -> int:
-    audit = ExperimentOutputAudit()
+    layout = resolve_project_layout()
+    if layout.reason:
+        print(f"note project experiments skipped: {layout.reason}")
+    audit = ExperimentOutputAudit(layout.experiments)
     violations = audit.violations()
     advisory = audit.advisory()
     for step in violations:
         print(f"FAIL {step.series}/{step.stem}.py: {step.reason()}")
     for step in advisory:
         print(f"note {step.series}/{step.stem}.py: {step.reason()} (not yet enforced)")
-    pipeline = PipelineDecisionAudit().status()
-    for step, publishes in sorted(pipeline.items()):
-        if not publishes:
-            enforced = step in PIPELINE_DECISION_ENFORCED
+    enforced_pipeline = _enforced_pipeline_steps(layout)
+    skipped_pipeline = tuple(
+        step
+        for step in PROJECT_EVIDENCE_STEPS
+        if step in PIPELINE_DECISION_ENFORCED and step not in enforced_pipeline
+    )
+    pipeline = PipelineDecisionAudit(results_root=layout.pipeline_results).status()
+    for pipeline_step, publishes in sorted(pipeline.items()):
+        if publishes:
+            continue
+        if pipeline_step in skipped_pipeline:
             print(
-                f"{'FAIL' if enforced else 'note'} pipeline/{step}: "
-                f"{'missing' if enforced else 'no'} decision record"
-                + ("" if enforced else " (not yet enforced)")
+                f"note pipeline/{pipeline_step}: decision record not enforced "
+                "(project results root unavailable)"
             )
-    if violations or any(step in PIPELINE_DECISION_ENFORCED for step in pipeline if not pipeline[step]):
+            continue
+        enforced = pipeline_step in enforced_pipeline
+        print(
+            f"{'FAIL' if enforced else 'note'} pipeline/{pipeline_step}: "
+            f"{'missing' if enforced else 'no'} decision record"
+            + ("" if enforced else " (not yet enforced)")
+        )
+    if violations or any(
+        pipeline_step in enforced_pipeline
+        for pipeline_step in pipeline
+        if not pipeline[pipeline_step]
+    ):
         print(
             "EXPERIMENT OUTPUTS RED — every enforced step needs a question (docstring) "
             "and a figure answering it (savefig). See agents/contracts/EXPERIMENT_OUTPUT.md"

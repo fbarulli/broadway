@@ -210,6 +210,7 @@ class EdaRunner:
             pd.util.hash_pandas_object(frame, index=True).to_numpy().tobytes()
         ).hexdigest()[:_HASH_LENGTH]
         return {
+            "dataset": self._dataset.name,
             "artifact": f"{self._etl.train_file}+{self._etl.val_file}",
             "source": self._dataset.path,
             "sample_sha256": digest,

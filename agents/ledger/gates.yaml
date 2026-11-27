@@ -2448,7 +2448,7 @@ gates:
 - id: GATE-SURF-66
   phase: surfaces
   order: 73
-  owner: 'src/broadway/discover/module.py:74 _write_qq_overview() -> src/broadway/discover/qq.py:566 plot_numeric_qq()  # savefig sites qq.py:297/:356/:514/:562; called from module.py:78 (run() :105 and profile() :127) + src/broadway/eda/module.py:27 EdaRunner + src/broadway/eda/report.py:39 EdaReportBuilder + src/broadway/eda/visualize.py:38 FigureRenderer'
+  owner: 'src/broadway/discover/module.py:74 _write_qq_overview() -> src/broadway/discover/qq.py:566 plot_numeric_qq()  # savefig sites qq.py:297/:356/:514/:562; called from module.py:78 (run() :105 and profile() :127) + src/broadway/eda/module.py:27 EdaRunner + src/broadway/eda/report.py:39 EdaReportBuilder + src/broadway/eda/visualize.py:38 FigureRenderer + src/broadway/reports/pipeline_evidence.py:89 PipelineEvidenceSection'
   inputs:
   - raw CSV/parquet frame
   - configs/step/viz.yaml knobs (qq_figure :14, qq_log_figure :15, dist_figure :15, diagnostics.figure :31, dpi, chunk sizes, zones/markers toggles)
@@ -2456,14 +2456,17 @@ gates:
   - 'EDA: ETL split parquets <process_dir>/<etl.train_file> (+ optional val_file) — the step reads the persisted split, never re-runs etl (eda/module.py:98-121)'
   - 'EDA: pre-split canonical parquet via canonical_path (optional; absent → the compare panel records a skip_reason) (eda/module.py:123-132)'
   - 'EDA: configs/step/eda.yaml knobs (sample_size/plot_format/output_dir/output_file/max_categories/max_plots/iqr_multiplier/z_threshold/imbalance_min_share)'
+  - 'EDA: project/config/step/eda.yaml output_dir overlay, layered over the base step file by broadway.config.loader (a relative output_dir is anchored at repo_root)'
   - 'EDA: DatasetContract columns/roles/task/target + exclude_from_profiling; sampling seed = cfg.experiment.random_state else cfg.etl.random_state'
+  - 'pipeline evidence: project/experiments/results/pipeline/*/*_decision.json, validated through reports.decision.Decision'
   outputs:
   - reports/figures/numeric_qq_{n}.png
   - reports/figures/numeric_dist_{n}.png
   - reports/figures/numeric_qq_log_{n}.png
   - reports/figures/numeric_diagnostics.png
   - artifacts/discover/qq_overview.json (figure-name registry consumed by reports/audit)
-  - 'EDA: artifacts/reports/eda.html — one self-contained HTML report (figures embedded as base64) written atomically via <name>.tmp then replace (eda/module.py:179-186)'
+  - 'EDA: project/experiments/results/pipeline/eda/eda.html — one self-contained HTML report (figures embedded as base64) written atomically via <name>.tmp then replace (eda/module.py:179-186)'
+  - 'project/experiments/results/pipeline/eda/{eda_decision.json, eda_feature_decisions.json, eda_*.csv, eda_*.png} — committed pipeline evidence rendered by reports/pipeline_evidence.py on the dashboard root'
   - 'EDA: EdaResult model (SummaryResult + MissingResult + QualityResult + CompareResult + EmbeddedFigure list) rendered by EdaReportBuilder (eda/models.py:182)'
   transforms:
   - compute skew/kurtosis/zero_rate/QQ points while plotting (evidence producer, by design)
@@ -2495,11 +2498,12 @@ gates:
   - tests/test_eda_paths.py::test_eda_report_renders_without_figures_and_with_an_etl_comparison
   - tests/test_eda_paths.py::test_eda_fails_loud_when_the_train_split_is_missing
   - tests/test_eda_paths.py::test_eda_requires_dataset_eda_and_etl_config
+  - tests/test_pipeline_evidence.py::test_dashboard_root_renders_pipeline_records_and_skips_malformed
   if_changed:
   - rerun tests/test_qq.py + tests/test_viz.py
   - regenerate figures then rerun ds-pipeline audit so ../figures links match renamed files
-  - 'configs/step/eda.yaml knobs (read through EdaStep; dispatch through GATE-CFG-103)'
-  - 'artifacts/reports/eda.html consumers + the etl.train_file/val_file split names the step reads'
+  - 'configs/step/eda.yaml knobs + project/config/step/eda.yaml output_dir overlay (read through EdaStep; dispatch through GATE-CFG-103)'
+  - 'project/experiments/results/pipeline/eda/ consumers + the etl.train_file/val_file split names the step reads'
   - 'the compare panel contract (available flag + skip_reason grammar) rendered by EdaReportBuilder'
   findings: []
 - id: GATE-SURF-67

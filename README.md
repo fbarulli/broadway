@@ -326,7 +326,7 @@ Every step except `discover` takes the same three flags.
 | train | `ds-pipeline train --dataset <d> --analysis <a> --experiment <e>` | `TrainingResult` → MLflow model/artifacts | works |
 
 | evaluate | `ds-pipeline evaluate --dataset <d> --analysis <a> --experiment <e>` | `EvaluationResult` + promotion decision | works |
-| eda | `ds-pipeline eda --dataset <d> [--experiment <e>]` | `artifacts/reports/eda.html` + effect/correlation/outlier evidence | works |
+| eda | `ds-pipeline eda --dataset <d> [--experiment <e>]` | `project/experiments/results/pipeline/eda/` (committed decision record, evidence CSVs and PNGs; the rendered `eda.html` is local/ignored) | works |
 | tracking | `ds-pipeline tracking --dataset <d>` | renders `reports/tracking/data_card.md` from the persisted baseline | works (train writes the baseline first) |
 
 | full | `ds-pipeline full --dataset <d> --analysis <a> --experiment <e>` | dispatches to the mode flow (prediction/hypothesis/causal) based on `--analysis` | works |

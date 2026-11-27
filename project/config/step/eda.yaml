@@ -1,0 +1,5 @@
+# Project binding for the EDA step: publish its decision record and evidence
+# on the dashboard's committed results surface. Every other knob stays in
+# configs/step/eda.yaml (the platform default); a step overlay is layered over
+# that base file, not substituted for it.
+output_dir: project/experiments/results/pipeline/eda

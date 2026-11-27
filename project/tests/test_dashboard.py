@@ -3,7 +3,9 @@ from __future__ import annotations
 import os
 from types import SimpleNamespace
 
-import project.dashboard as dashboard
+from broadway.config.loader import load_config
+from project import dashboard
+from project.paths import load_project_paths
 
 
 def test_main_wires_project_paths_into_generic_dashboard(monkeypatch, tmp_path) -> None:
@@ -28,3 +30,11 @@ def test_main_wires_project_paths_into_generic_dashboard(monkeypatch, tmp_path) 
     assert run_calls[0][0].title == "FastAPI"
     assert paths.experiments.as_posix() == os.environ["BROADWAY_EXPERIMENTS_ROOT"]
     assert paths.observations.as_posix() == os.environ["BROADWAY_OBSERVATIONS_DIR"]
+
+
+def test_eda_writes_to_the_layout_results_root() -> None:
+    config = load_config("eda", dataset="taxi")
+    assert config.eda is not None
+    assert config.eda.output_path.parent == (
+        load_project_paths().experiments / "results" / "pipeline" / "eda"
+    )

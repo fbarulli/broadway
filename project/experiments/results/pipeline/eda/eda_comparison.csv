@@ -1,0 +1,7 @@
+column,before_mean,after_mean,mean_delta,mean_delta_low,mean_delta_high,median_delta,median_delta_low,median_delta_high
+fare_amount,18.151553,18.134216,-0.017336,-0.197142,0.192765,0.0,0.0,0.0
+passenger_count,1.3454,1.35574,0.01034,-0.001092,0.021075,0.0,0.0,0.0
+trip_distance,3.318071,3.326314,0.008243,-0.037461,0.065565,0.0,0.0,0.02
+trip_duration_minutes,15.431769,15.510065,0.078296,-0.043345,0.254832,0.0,-0.133333,0.133333
+LocationID,165.9881,165.54896,-0.43914,-1.309911,0.306724,0.0,-0.025,0.0
+LocationID_lookup,165.31816,165.01622,-0.30194,-1.355277,0.452093,0.0,-1.0,0.0
