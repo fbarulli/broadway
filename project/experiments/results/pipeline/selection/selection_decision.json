@@ -1,0 +1,49 @@
+{
+  "question": "Does the selected rmse champion beat the naive reference on identical repeated folds?",
+  "metric": "improvement_over_naive_rmse",
+  "value": 0.17476470380876782,
+  "interval_low": 0.14923859077207816,
+  "interval_high": 0.19802224632361637,
+  "reference": null,
+  "delta": null,
+  "threshold": 0.02,
+  "null_threshold": null,
+  "direction": "max",
+  "verdict": "act",
+  "action": "carry the selected champion into HPO and a holdout promotion check",
+  "owner": "amazon",
+  "sample_size": 481,
+  "unit": "relative_improvement",
+  "min_sample_size": 400,
+  "evidence": {
+    "baseline": "naive training-mean predictor 'naive_mean' on the identical 5x5 shuffled folds",
+    "delta": 0.17476470380876782,
+    "segments": [
+      {
+        "segment": "low_target_half",
+        "value": 0.18350363425682084,
+        "sample_size": 253
+      },
+      {
+        "segment": "high_target_half",
+        "value": 0.19604399667252062,
+        "sample_size": 228
+      }
+    ],
+    "sensitivity": {
+      "second_seed_improvement_seed77": 0.18364742730840736,
+      "linear_reference_improvement_rmse": 0.1708526774994164,
+      "champion_cv_rmse_n481": 0.8355439999999998,
+      "naive_cv_rmse_n481": 1.013424
+    },
+    "falsifier": "the paired improvement interval's lower bound falls at or below the configured effect floor",
+    "provenance": {
+      "dataset": "amazon",
+      "seed": "2026",
+      "folds": "5x5 shuffled KFold",
+      "candidates": "naive_mean, linear, rf, lgbm, xgb",
+      "champion_params": "{'n_estimators': 300, 'min_samples_leaf': 2}",
+      "resampling": "paired fold bootstrap"
+    }
+  }
+}

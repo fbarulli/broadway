@@ -29,6 +29,8 @@ project/experiments/results/**
 !project/experiments/results/**/*_decision.json
 # The per-feature evidence written next to the singular summary record.
 !project/experiments/results/**/*_feature_decisions.json
+# The selected/tuned champion handoff (model + params + CV interval).
+!project/experiments/results/**/*_champion.json
 !project/experiments/results/**/*.md
 *.png
 !reports/figures/*.png
