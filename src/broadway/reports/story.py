@@ -2,21 +2,29 @@
 
 A busy human should not have to read the pipeline to understand the project.
 This module turns the published ``results/pipeline/<step>/`` decision records,
-their feature-decision sidecars and their evidence CSVs into a single narrative:
-the question, the data, what the EDA found, what was changed and why, the
-features, the model chain, and the honest limits. Each section puts the
-conclusion first, then one graph, then the numbers (value, 95% interval, n,
+their feature-decision sidecars and their provenance-named evidence tables into
+a single narrative: the question, the data, what the EDA found, what was changed
+and why, the features, the model chain, and the honest limits. Each section puts
+the conclusion first, then one graph, then the numbers (value, 95% interval, n,
 verdict) and a link to the record it came from.
 
 Nothing here is a hardcoded result. A stage with no record renders a short
 "not run yet" line, so the page fills in as the pipeline lands. A malformed
 record is skipped by :class:`~broadway.reports.pipeline_evidence.PipelineSeries`
-with one logged traceback; this module never raises for bad evidence. The story
-is filtered by dataset so another dataset's committed records cannot be
-presented as this project's results.
+with one logged traceback; this module never raises for bad evidence. Evidence
+sidecars are accepted only when their declared dataset matches the story's
+dataset, and evidence tables are read only from a path the record's provenance
+names — a stale table from another dataset can never leak into the story.
+
+The dataset name and the project framing (question, target, source table count,
+exclusions, caveats) belong to the project layer: ``project/dashboard.py`` passes
+a :class:`StoryConfig` through :func:`configure_story`. The platform fallback is
+neutral, so ``src/broadway`` stays data-agnostic.
 
 Graphs are drawn in memory with matplotlib's Agg backend and the shared
 ``broadway.viz`` helpers (deterministic, no new dependency, no scratch files).
+The routes live here as an :data:`router`; the dashboard includes it and supplies
+the page frame.
 """
 
 from __future__ import annotations
@@ -25,53 +33,84 @@ import html
 import json
 import logging
 import os
+from collections.abc import Callable
 from dataclasses import dataclass
-from io import BytesIO
 from pathlib import Path
 from urllib.parse import quote
 
-import matplotlib
-
-matplotlib.use("Agg")
-
 import pandas as pd
-from matplotlib.backends.backend_agg import FigureCanvasAgg
+from fastapi import APIRouter
+from fastapi.responses import HTMLResponse, PlainTextResponse, Response
 from matplotlib.figure import Figure
+from pydantic import BaseModel, ConfigDict, Field
 
-from broadway import viz
+from broadway.reports import story_figures as figures
 from broadway.reports.decision import Decision
-from broadway.reports.pipeline_evidence import Finding, PipelineRecord, PipelineSeries
+from broadway.reports.pipeline_evidence import (
+    PipelineRecord,
+    PipelineSeries,
+    findings_from_sidecar,
+)
 
 logger = logging.getLogger(__name__)
 
 STORY_TITLE = "The project story"
-STORY_QUESTION = (
-    "Which orders will end with a 1- or 2-star review — predicted only from "
-    "what is known at purchase time?"
-)
 
-#: Env knob for the dataset the story narrates; the project's dataset is the default.
+#: Optional env override of the configured dataset (an empty value defers to config).
 STORY_DATASET_ENV = "BROADWAY_STORY_DATASET"
-DEFAULT_DATASET = "olist"
 
 _TARGET_COLUMNS = frozenset({"bad_review", "target", "class", "label"})
 _COUNT_COLUMNS = frozenset({"count", "n", "orders", "rows", "order_count"})
-_FEATURE_SECTIONS = frozenset({"features", "associations"})
-_ROLE_COLORS = {
-    "naive_reference": "#999999",
-    "linear_reference": "#E69F00",
-    "candidate": "#0072B2",
-}
+_FEATURE_SECTIONS = ("features", "associations")
 _LABEL_PREFIXES = ("association_", "outlier_share_", "standardized_shift_", "shift_")
-_THRESHOLD_COLOR = "#D55E00"
-# A permanently malformed table is skipped on every request; log its full
+_STEPS = ("etl", "eda", "features", "baseline", "selection", "hpo", "evaluate")
+# A permanently malformed file is skipped on every request; log its full
 # traceback once so the contract's traceback rule does not become log bloat.
 _LOGGED_UNREADABLE: set[Path] = set()
 
 
-def configured_dataset() -> str | None:
-    """The dataset the story narrates: env override, else the project's default."""
-    return os.environ.get(STORY_DATASET_ENV, DEFAULT_DATASET) or None
+class StoryConfig(BaseModel):
+    """The project's framing of the story (the platform fallback is neutral)."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    dataset: str | None = None
+    question: str = Field(min_length=1)
+    why: str = Field(min_length=1)
+    target_label: str = Field(min_length=1)
+    target_rule: str = Field(min_length=1)
+    decision_moment: str = Field(min_length=1)
+    source_name: str = ""
+    source_tables: int | None = Field(default=None, gt=0)
+    post_purchase_note: str = Field(min_length=1)
+    excluded_note: str = Field(min_length=1)
+    caveats: tuple[str, ...] = ()
+
+    @classmethod
+    def fallback(cls) -> StoryConfig:
+        """A neutral framing for a checkout with no project configuration."""
+        return cls(
+            dataset=None,
+            question="Which rows carry the outcome the project predicts?",
+            why=(
+                "The project predicts an outcome from the information available at "
+                "decision time."
+            ),
+            target_label="outcome",
+            target_rule="the configured target",
+            decision_moment="decision time",
+            source_name="",
+            source_tables=None,
+            post_purchase_note=(
+                "Columns known only after the outcome are context only; the feature step "
+                "keeps decision-time information only."
+            ),
+            excluded_note=(
+                "Columns known only after the outcome are excluded from the features; using "
+                "them would be leakage."
+            ),
+            caveats=(),
+        )
 
 
 @dataclass(frozen=True)
@@ -100,21 +139,24 @@ class Effect:
 class Story:
     """Build the story sections and figures from one pipeline results tree."""
 
-    def __init__(self, pipeline: PipelineSeries, dataset: str | None = None) -> None:
+    def __init__(
+        self, pipeline: PipelineSeries, config: StoryConfig | None = None
+    ) -> None:
         self._pipeline = pipeline
-        self.dataset = dataset
+        self._config = config if config is not None else StoryConfig.fallback()
+        self.dataset = os.environ.get(STORY_DATASET_ENV) or self._config.dataset
 
     @classmethod
     def from_experiments_root(
-        cls, experiments_root: Path, dataset: str | None = None
+        cls, experiments_root: Path, config: StoryConfig | None = None
     ) -> Story:
         """Build the story for a checkout's experiments root."""
-        return cls(PipelineSeries.from_experiments_root(experiments_root), dataset)
+        return cls(PipelineSeries.from_experiments_root(experiments_root), config)
 
     @property
     def question(self) -> str:
         """The one-line question the whole page answers."""
-        return STORY_QUESTION
+        return self._config.question
 
     @property
     def has_records(self) -> bool:
@@ -131,6 +173,20 @@ class Story:
         provenance = record.decision.evidence.provenance
         declared = provenance.get("dataset") or record.decision.owner
         return record if declared == self.dataset else None
+
+    def _findings(self, record: PipelineRecord, section: str) -> list[Decision]:
+        """Sidecar conclusions for one section, only from this dataset's sidecar."""
+        payload = _read_json(record.sidecar)
+        if not isinstance(payload, dict):
+            return []
+        declared = payload.get("dataset")
+        if self.dataset is not None and declared != self.dataset:
+            return []
+        return [
+            finding.decision
+            for finding in findings_from_sidecar(record.sidecar)
+            if finding.section == section
+        ]
 
     def _step_dir(self, step: str) -> Path | None:
         return self._pipeline.step_dir(step)
@@ -150,19 +206,16 @@ class Story:
         ]
 
     def _question(self) -> Section:
-        has_target = self._record("etl") is not None
-        records = (("ETL record", "etl"),) if has_target else ()
+        config = self._config
+        records = (("ETL record", "etl"),) if self._record("etl") is not None else ()
         return Section(
             title="The question",
-            conclusions=(
-                (
-                    "Bad reviews are the cost this project predicts: which orders end with "
-                    "a 1- or 2-star review, using only what the storefront knows when the "
-                    "order is placed. Every stage below exists to answer that one question "
-                    "honestly."
-                ),
+            conclusions=(config.why,),
+            numbers=(
+                f"{config.target_label} := {config.target_rule}",
+                f"decision moment := {config.decision_moment}",
             ),
-            numbers=("bad review := review score ≤ 2", "decision moment := purchase time"),
+            figure="question",
             records=records,
         )
 
@@ -174,16 +227,24 @@ class Story:
         provenance = decision.evidence.provenance
         rows_in = _as_int(provenance.get("rows_in"))
         rows_out = _as_int(provenance.get("rows_out"))
+        name = f" {self._config.source_name}" if self._config.source_name else ""
+        source = (
+            f"{self._config.source_tables}{name} source tables"
+            if self._config.source_tables
+            else "The source tables"
+        )
         conclusions = [
             (
-                "Nine Olist source tables collapse to one row per order. Orders without a "
-                "review are dropped with a recorded reason, never imputed."
+                f"{source} collapse to one row per order. Orders without a target are "
+                "dropped with a recorded reason, never imputed."
             )
         ]
         if rows_in is not None and rows_out is not None:
+            dropped = rows_in - rows_out
+            detail = f" ({dropped:,} dropped)" if dropped else ""
             conclusions.append(
-                f"The join took {rows_in:,} source orders to {rows_out:,} rows after the "
-                "accounted drops."
+                f"The record's n is {decision.sample_size:,} source orders; the join kept "
+                f"{rows_out:,} rows after the accounted drops{detail}."
             )
         else:
             conclusions.append(
@@ -192,7 +253,7 @@ class Story:
         conclusions.append(f"The record asks: {decision.question}")
         conclusions.append(f"Verdict: {decision.verdict} — {decision.action}.")
         numbers = [_decision_number(decision)]
-        balance = _class_balance(self._step_dir("etl"))
+        balance = self._balance(record)
         if balance:
             numbers.append(_balance_number(balance))
         else:
@@ -209,10 +270,16 @@ class Story:
         record = self._record("eda")
         if record is None:
             return _missing("What the data says", "eda")
-        effects = _effects(record)
-        outliers = _findings_for(record, "outliers")
-        comparison = _findings_for(record, "comparison")
-        conclusions: list[str] = []
+        decision = record.decision
+        effects = self._effects(record)
+        outliers = self._findings(record, "outliers")
+        comparison = self._findings(record, "comparison")
+        conclusions = [
+            (
+                f"The EDA record reports {decision.verdict} on {decision.metric} "
+                f"({_format(decision.value)})."
+            )
+        ]
         acts = [effect for effect in effects if effect.verdict == "act"]
         if len(acts) >= 2:
             conclusions.append(
@@ -234,40 +301,30 @@ class Story:
             )
         else:
             conclusions.append(
-                "No feature association cleared the floor — the EDA found nothing worth "
-                "carrying forward."
+                "The per-feature evidence table has not been published yet, so the "
+                "association ranking is not narrated."
             )
         noise = len(effects) - len(acts)
         if acts and noise:
             verb = "behaviour sits" if noise == 1 else "behaviours sit"
-            conclusions.append(
-                f"{noise} further {verb} at or below the floor and {'is' if noise == 1 else 'are'} "
-                "noise."
-            )
+            is_are = "is" if noise == 1 else "are"
+            conclusions.append(f"{noise} further {verb} at or below the floor and {is_are} noise.")
         if effects:
-            conclusions.append(
-                "These are measured associations, not feature admissions: the feature step "
-                "keeps purchase-time columns only."
-            )
+            conclusions.append(self._config.post_purchase_note)
         if outliers:
-            flagged = [decision for decision in outliers if decision.verdict == "act"]
-            names = ", ".join(_label(decision.metric) for decision in flagged[:3])
+            flagged = [item for item in outliers if item.verdict == "act"]
+            names = ", ".join(_label(item.metric) for item in flagged[:3])
             suffix = f" ({names})" if names else ""
             conclusions.append(
                 f"{len(flagged)} of {len(outliers)} profiled columns are heavy-tailed{suffix}; "
                 "the data was flagged, not silently trimmed."
             )
         if comparison:
-            worst = max(comparison, key=lambda decision: abs(decision.value))
-            conclusions.append(
-                f"Before/after shifts cover zero (largest |shift| {abs(worst.value):.4f}), "
-                "so no column's distribution moved materially."
-            )
-        numbers = [_decision_number(record.decision)]
+            conclusions.append(_shift_note(max(comparison, key=lambda item: abs(item.value))))
+        numbers = [_decision_number(decision)]
         if effects:
             numbers.append(
-                f"{len(effects)} associations tested · "
-                f"{sum(1 for effect in effects if effect.verdict == 'act')} act"
+                f"{len(effects)} associations tested · {len(acts)} act"
             )
         return Section(
             title="What the data says",
@@ -308,50 +365,45 @@ class Story:
             reasons = provenance.get("reasons", "")
             if reasons and reasons.lower() not in {"none", "no drops"}:
                 conclusions.append(f"Reason: {reasons}.")
-            conclusions.append(
-                "No row values were imputed: missing item aggregates stay null and are "
-                "handled by the declared feature transform."
-            )
+            conclusions.append(self._config.post_purchase_note)
             numbers.append(_decision_number(etl.decision))
             records.append(("ETL record", "etl"))
         if eda is not None:
-            outliers = _findings_for(eda, "outliers")
-            comparison = _findings_for(eda, "comparison")
-            flagged = [decision for decision in outliers if decision.verdict == "act"]
-            if outliers:
+            outliers = self._findings(eda, "outliers")
+            comparison = self._findings(eda, "comparison")
+            flagged = [item for item in outliers if item.verdict == "act"]
+            if flagged:
                 conclusions.append(
-                    f"{len(flagged)} of {len(outliers)} candidate columns are heavy-tailed; "
-                    "the policy is to winsorize the flagged columns rather than delete them."
+                    f"{len(flagged)} of {len(outliers)} candidate columns are heavy-tailed. "
+                    f"Outlier decision: {flagged[0].action}."
+                )
+            elif outliers:
+                conclusions.append(
+                    f"{len(outliers)} candidate columns were profiled; none cleared the "
+                    "outlier threshold."
                 )
             if comparison:
-                worst = max(comparison, key=lambda decision: abs(decision.value))
                 conclusions.append(
-                    f"The before/after shift intervals cover zero (largest |shift| "
-                    f"{abs(worst.value):.4f}), so no distribution moved materially."
+                    _shift_note(max(comparison, key=lambda item: abs(item.value)))
                 )
             if flagged:
-                numbers.append(f"outlier policy: {flagged[0].action}")
+                numbers.append(f"outlier action: {flagged[0].action}")
             records.append(("EDA record", "eda"))
         if flagged:
             conclusions.append(
-                "Trade-off: winsorizing keeps rare high-value orders in the training set; "
-                "the cost is a noisier tail, which the model is told about rather than "
-                "shielded from."
+                "Trade-off: the record's action trades tail fidelity for model stability; "
+                "it does not authorise deleting rows silently."
             )
         elif etl is not None:
             conclusions.append(
                 "Trade-off: rows are dropped only with a recorded reason, so the model "
                 "inherits that selection honestly instead of seeing a silently repaired table."
             )
-        else:
-            conclusions.append(
-                "Trade-off: the EDA flags heavy tails for the feature transform rather than "
-                "removing rows, so rare orders stay in the data at the cost of a longer tail."
-            )
         return Section(
             title="What we changed and why",
             conclusions=tuple(conclusions),
             numbers=tuple(numbers),
+            figure="change" if etl is not None else None,
             records=tuple(records),
         )
 
@@ -372,17 +424,13 @@ class Story:
             ]
         else:
             conclusions = [
-                "The feature step kept every row and built purchase-time features only."
+                "The feature step kept every row and built decision-time features only."
             ]
         if added is not None:
             conclusions.append(f"{added} features were added.")
         if example is not None:
             conclusions.append(f"One example: {example}.")
-        conclusions.append(
-            "Deliberately excluded: review score, delivery and review timestamps, and every "
-            "post-purchase column — they are only known after the outcome, so using them "
-            "would be leakage."
-        )
+        conclusions.append(self._config.excluded_note)
         return Section(
             title="The features",
             conclusions=tuple(conclusions),
@@ -463,21 +511,33 @@ class Story:
             if record is not None
             else "run the holdout promotion check before shipping anything"
         )
+        caveats = self._config.caveats or (
+            "the target is observational",
+            "the features are decision-time only",
+            "this is prediction, not causation",
+        )
+        limits = "; ".join(caveats)
+        if record is not None:
+            conclusion = (
+                f"The result is bounded by: {limits}. The next decision: {next_action}."
+            )
+        else:
+            conclusion = (
+                f"No model has run yet, so there is no result to bound. The design limits: "
+                f"{limits}. The next decision: {next_action}."
+            )
+        numbers: list[str] = []
         records: tuple[tuple[str, str], ...] = ()
         if evaluate is not None:
+            numbers.append(f"holdout · {_decision_number(evaluate.decision)}")
             records = (("holdout record", "evaluate"),)
         elif selection is not None:
+            numbers.append(f"selection · {_decision_number(selection.decision)}")
             records = (("selection record", "selection"),)
         return Section(
             title="What we learned / what is next",
-            conclusions=(
-                (
-                    "Three limits bound the result: the target is an imbalanced binary, "
-                    "the model sees purchase-time information only, and this is prediction, "
-                    "not causation — a feature that predicts a bad review is not a lever "
-                    f"that fixes it. The next decision: {next_action}."
-                ),
-            ),
+            conclusions=(conclusion,),
+            numbers=tuple(numbers),
             records=records,
         )
 
@@ -495,7 +555,7 @@ class Story:
             if section.figure:
                 alt = html.escape(f"{section.title} figure")
                 parts.append(
-                    f'<figure><img src="/story/figure/{html.escape(section.figure)}.png"'
+                    f'<figure><img src="/story/figure/{html.escape(section.figure)}"'
                     f' alt="{alt}"></figure>'
                 )
             if section.numbers:
@@ -532,100 +592,48 @@ class Story:
     def figure_png(self, name: str) -> bytes | None:
         """Render one story figure to PNG bytes, or None for an unknown/absent figure."""
         builders = {
+            "question": self._question_figure,
             "data": self._data_figure,
             "eda": self._eda_figure,
+            "change": self._change_figure,
             "model": self._model_figure,
         }
         build = builders.get(name)
         figure = build() if build is not None else None
-        if figure is None:
-            return None
-        FigureCanvasAgg(figure)
-        buffer = BytesIO()
-        figure.savefig(buffer, format="png", dpi=150, bbox_inches="tight")
-        return buffer.getvalue()
+        return None if figure is None else figures.to_png(figure)
 
     # -- figures -----------------------------------------------------------
+
+    def _question_figure(self) -> Figure:
+        return figures.question_figure(
+            self._config.decision_moment, self._config.target_label
+        )
 
     def _data_figure(self) -> Figure | None:
         record = self._record("etl")
         if record is None:
             return None
-        stages = _funnel(record)
-        balance = _class_balance(self._step_dir("etl"))
-        columns = 2 if balance else 1
-        figure = Figure(figsize=(8.0, 3.6), dpi=150)
-        axis = figure.add_subplot(1, columns, 1)
-        labels = [label for label, _ in stages]
-        counts = [count for _, count in stages]
-        axis.barh(labels, counts, color=viz.palette_colors(len(labels)))
-        axis.set_title("Rows through the order-grain join", fontsize=viz.TITLE_FONTSIZE)
-        axis.set_xlabel("orders", fontsize=viz.LABEL_FONTSIZE)
-        axis.tick_params(labelsize=viz.TICK_FONTSIZE)
-        for index, (_, count) in enumerate(stages):
-            axis.text(count, index, f" {count:,}", va="center", fontsize=viz.TICK_FONTSIZE)
-        viz.despine(axis)
-        if balance:
-            balance_axis = figure.add_subplot(1, 2, 2)
-            balance_labels = [label for label, _ in balance]
-            balance_counts = [count for _, count in balance]
-            balance_axis.bar(
-                balance_labels, balance_counts, color=viz.palette_colors(len(balance_labels))
-            )
-            balance_axis.set_title("Target balance", fontsize=viz.TITLE_FONTSIZE)
-            balance_axis.set_ylabel("orders", fontsize=viz.LABEL_FONTSIZE)
-            balance_axis.tick_params(labelsize=viz.TICK_FONTSIZE)
-            viz.despine(balance_axis)
-        return figure
+        return figures.join_figure(
+            _funnel(record), "Rows through the order-grain join", self._balance(record)
+        )
+
+    def _change_figure(self) -> Figure | None:
+        record = self._record("etl")
+        if record is None:
+            return None
+        return figures.join_figure(
+            _funnel(record), "Rows affected by the cleaning policy", None
+        )
 
     def _eda_figure(self) -> Figure | None:
         record = self._record("eda")
         if record is None:
             return None
-        effects = _effects(record)
-        if not effects:
-            return None
-        top = effects[:10][::-1]
-        figure = Figure(figsize=(8.0, max(2.8, 0.34 * len(top) + 1.5)), dpi=150)
-        axis = figure.add_subplot(111)
-        labels = [effect.label for effect in top]
-        if all(effect.low is not None and effect.high is not None for effect in top):
-            frame = pd.DataFrame(
-                {
-                    "value": [effect.value for effect in top],
-                    "low": [effect.low for effect in top],
-                    "high": [effect.high for effect in top],
-                },
-                index=labels,
-            )
-            viz.draw_coef_forest(
-                axis, frame["value"], frame["low"], frame["high"], annotate=False
-            )
-            axis.axvline(
-                record.decision.threshold,
-                color=_THRESHOLD_COLOR,
-                linestyle="--",
-                linewidth=1,
-                label="effect floor",
-            )
-            axis.legend(fontsize=viz.TICK_FONTSIZE, frameon=False, loc="lower right")
-        else:
-            axis.barh(labels, [effect.value for effect in top], color=viz.palette_colors(len(top)))
-            axis.axvline(
-                record.decision.threshold,
-                color=_THRESHOLD_COLOR,
-                linestyle="--",
-                label="effect floor",
-            )
-            axis.legend(fontsize=viz.TICK_FONTSIZE, frameon=False, loc="lower right")
-        axis.set_title(
-            "Association with the target (effect size, 95% interval)",
-            fontsize=viz.TITLE_FONTSIZE,
-        )
-        axis.set_xlabel(record.decision.unit or "effect size", fontsize=viz.LABEL_FONTSIZE)
-        axis.tick_params(labelsize=viz.TICK_FONTSIZE)
-        viz.despine(axis)
-        return figure
+        effects = self._effects(record)
+        rows = [
+            (effect.label, effect.value, effect.low, effect.high) for effect in effects
+        ]
+        return figures.eda_figure(record.decision.threshold, record.decision.unit, rows)
 
     def _model_figure(self) -> Figure | None:
         if self._record("selection") is None:
@@ -635,50 +643,135 @@ class Story:
         if frame is None or not required.issubset(frame.columns):
             return None
         candidates = [str(value) for value in frame["candidate"]]
-        rmses = [float(value) for value in frame["rmse"]]
-        lows = [float(value) for value in frame["rmse_low"]]
-        highs = [float(value) for value in frame["rmse_high"]]
         roles = (
             [str(value) for value in frame["role"]]
             if "role" in frame.columns
             else [""] * len(candidates)
         )
-        figure = Figure(figsize=(8.0, max(2.8, 0.5 * len(candidates) + 1.5)), dpi=150)
-        axis = figure.add_subplot(111)
-        for index, (rmse, low, high, role) in enumerate(zip(rmses, lows, highs, roles)):
-            axis.errorbar(
-                rmse,
-                index,
-                xerr=[[rmse - low], [high - rmse]],
-                fmt="o",
-                capsize=3,
-                color=_ROLE_COLORS.get(role, "#0072B2"),
-            )
-            axis.annotate(
-                f"{rmse:.3f}",
-                (rmse, index),
-                xytext=(5, 0),
-                textcoords="offset points",
-                va="center",
-                fontsize=viz.TICK_FONTSIZE,
-            )
-        axis.set_yticks(range(len(candidates)))
-        axis.set_yticklabels(candidates)
-        axis.invert_yaxis()
-        axis.set_xlabel("RMSE (lower is better)", fontsize=viz.LABEL_FONTSIZE)
-        axis.set_title(
-            "Repeated-CV RMSE by candidate (95% interval)", fontsize=viz.TITLE_FONTSIZE
+        return figures.model_figure(
+            candidates,
+            [float(value) for value in frame["rmse"]],
+            [float(value) for value in frame["rmse_low"]],
+            [float(value) for value in frame["rmse_high"]],
+            roles,
         )
-        axis.grid(axis="x", alpha=viz.GRID_ALPHA)
-        viz.despine(axis)
-        return figure
+
+    def _effects(self, record: PipelineRecord) -> list[Effect]:
+        """Association effects from the dataset-tagged sidecar, ranked."""
+        decisions = [
+            decision
+            for section in _FEATURE_SECTIONS
+            for decision in self._findings(record, section)
+        ]
+        effects = [
+            Effect(
+                label=_label(decision.metric),
+                value=decision.value,
+                low=decision.interval_low,
+                high=decision.interval_high,
+                verdict=decision.verdict,
+            )
+            for decision in decisions
+        ]
+        return sorted(effects, key=lambda effect: effect.value, reverse=True)
 
     def _candidates_path(self) -> Path:
         step_dir = self._step_dir("selection")
         return (step_dir / "selection_candidates.csv") if step_dir else Path()
 
+    def _balance(self, record: PipelineRecord) -> list[tuple[str, int]] | None:
+        """A balance table only when the record's provenance names the CSV."""
+        for value in record.decision.evidence.provenance.values():
+            if not isinstance(value, str) or not value.lower().endswith(".csv"):
+                continue
+            frame = _read_csv(record.record.parent / Path(value).name)
+            if frame is None:
+                continue
+            target = next(
+                (column for column in frame.columns if str(column).lower() in _TARGET_COLUMNS),
+                None,
+            )
+            count = next(
+                (column for column in frame.columns if str(column).lower() in _COUNT_COLUMNS),
+                None,
+            )
+            if target is None or count is None:
+                continue
+            rows: list[tuple[str, int]] = []
+            try:
+                for _, row in frame.iterrows():
+                    parsed = _as_int(row[count])
+                    if parsed is not None:
+                        rows.append((self._balance_label(row[target]), parsed))
+            except (KeyError, TypeError, ValueError):
+                continue
+            if rows:
+                return rows
+        return None
 
-_STEPS = ("etl", "eda", "features", "baseline", "selection", "hpo", "evaluate")
+    def _balance_label(self, value: object) -> str:
+        text = str(value).strip().lower()
+        if text in {"true", "1", "1.0", "bad", "bad_review", "yes"}:
+            return self._config.target_label
+        if text in {"false", "0", "0.0", "good", "not_bad", "no"}:
+            return f"not {self._config.target_label}"
+        return str(value)
+
+
+#: The configured framing; replaced by the project launcher through ``configure_story``.
+_CONFIG: StoryConfig = StoryConfig.fallback()
+#: The experiments root; the dashboard supplies a callable so late env changes are seen.
+_ROOT_PROVIDER: Callable[[], Path] = lambda: Path(
+    os.environ.get("BROADWAY_EXPERIMENTS_ROOT", "experiments")
+)
+#: The page frame; the dashboard supplies the shared conclusions-first frame.
+_PAGE_RENDERER: Callable[[Story], str] = lambda builder: _default_page(builder)
+
+
+def configure_story(
+    config: StoryConfig | None = None,
+    root_provider: Callable[[], Path] | None = None,
+    page_renderer: Callable[[Story], str] | None = None,
+) -> None:
+    """Inject the project framing, the experiments root and the page frame."""
+    global _CONFIG, _ROOT_PROVIDER, _PAGE_RENDERER
+    if config is not None:
+        _CONFIG = config
+    if root_provider is not None:
+        _ROOT_PROVIDER = root_provider
+    if page_renderer is not None:
+        _PAGE_RENDERER = page_renderer
+
+
+def _default_page(builder: Story) -> str:
+    """A neutral standalone page for a checkout that mounts the router alone."""
+    return (
+        '<!doctype html><html lang="en"><head><meta charset="utf-8">'
+        f"<title>{html.escape(STORY_TITLE)}</title></head><body>"
+        f"<h1>{html.escape(STORY_TITLE)}</h1>"
+        f'<p class="question">{html.escape(builder.question)}</p>'
+        f"{builder.page_body()}</body></html>"
+    )
+
+
+router = APIRouter()
+
+
+@router.get("/story", response_model=None)
+def story_page() -> HTMLResponse:
+    """Serve the project story: conclusions first, graphs, numbers, record links."""
+    builder = Story.from_experiments_root(_ROOT_PROVIDER(), _CONFIG)
+    return HTMLResponse(_PAGE_RENDERER(builder))
+
+
+@router.get("/story/figure/{name}", response_model=None)
+def story_figure(name: str) -> Response | PlainTextResponse:
+    """Serve one story graph, rendered in memory from the current records."""
+    builder = Story.from_experiments_root(_ROOT_PROVIDER(), _CONFIG)
+    png = builder.figure_png(name)
+    if png is None:
+        return PlainTextResponse("unknown story figure", status_code=404)
+    return Response(content=png, media_type="image/png")
 
 
 def _missing(title: str, step: str) -> Section:
@@ -702,6 +795,22 @@ def _format(value: float) -> str:
     if value and abs(value) < 0.001:
         return f"{value:.2e}"
     return f"{value:,.4g}"
+
+
+def _shift_note(decision: Decision) -> str:
+    """One honest before/after sentence; never call a one-sided shift zero."""
+    label = _label(decision.metric)
+    if decision.interval_low <= 0 <= decision.interval_high:
+        return (
+            f"Before/after shift for {label} is consistent with no change: "
+            f"{_format(decision.value)} [{_format(decision.interval_low)}, "
+            f"{_format(decision.interval_high)}] covers zero."
+        )
+    return (
+        f"Before/after shift for {label} is one-sided: {_format(decision.value)} "
+        f"[{_format(decision.interval_low)}, {_format(decision.interval_high)}] does not "
+        "cover zero, so the shift is reported rather than called zero."
+    )
 
 
 def _selection_conclusion(
@@ -752,44 +861,6 @@ def _selection_conclusion(
     )
 
 
-def _effects(record: PipelineRecord) -> list[Effect]:
-    """Association effects from the sidecar, falling back to the published CSV."""
-    decisions = [
-        finding.decision
-        for finding in record.findings()
-        if finding.section in _FEATURE_SECTIONS
-    ]
-    effects = [
-        Effect(
-            label=_label(decision.metric),
-            value=decision.value,
-            low=decision.interval_low,
-            high=decision.interval_high,
-            verdict=decision.verdict,
-        )
-        for decision in decisions
-    ]
-    if not effects:
-        frame = _read_csv(record.record.parent / "eda_effects.csv")
-        if frame is not None and {"feature", "effect"}.issubset(frame.columns):
-            effects = [
-                Effect(
-                    label=str(row["feature"]).replace("_", " "),
-                    value=float(row["effect"]),
-                    low=None,
-                    high=None,
-                    verdict=str(row["verdict"]) if "verdict" in frame.columns else "",
-                )
-                for _, row in frame.iterrows()
-            ]
-    return sorted(effects, key=lambda effect: effect.value, reverse=True)
-
-
-def _findings_for(record: PipelineRecord, section: str) -> list[Decision]:
-    findings: list[Finding] = record.findings()
-    return [finding.decision for finding in findings if finding.section == section]
-
-
 def _label(metric: str) -> str:
     for prefix in _LABEL_PREFIXES:
         if metric.startswith(prefix):
@@ -799,7 +870,7 @@ def _label(metric: str) -> str:
 
 
 def _funnel(record: PipelineRecord) -> list[tuple[str, int]]:
-    """Rows in, rows out, labelled rows — the data funnel the ETL record proves."""
+    """Rows in, rows out, rows dropped — the data funnel the ETL record proves."""
     provenance = record.decision.evidence.provenance
     rows_in = _as_int(provenance.get("rows_in"))
     rows_out = _as_int(provenance.get("rows_out"))
@@ -821,46 +892,6 @@ def _funnel(record: PipelineRecord) -> list[tuple[str, int]]:
             for segment in record.decision.evidence.segments
         ] + [stages[-1]]
     return stages
-
-
-def _class_balance(step_dir: Path | None) -> list[tuple[str, int]] | None:
-    """Find a two-class balance table in a step dir (``bad_review``/``count``)."""
-    if step_dir is None:
-        return None
-    for path in sorted(step_dir.glob("*.csv")):
-        frame = _read_csv(path)
-        if frame is None:
-            continue
-        target = next(
-            (column for column in frame.columns if str(column).lower() in _TARGET_COLUMNS),
-            None,
-        )
-        count = next(
-            (column for column in frame.columns if str(column).lower() in _COUNT_COLUMNS),
-            None,
-        )
-        if target is None or count is None:
-            continue
-        rows: list[tuple[str, int]] = []
-        try:
-            for _, row in frame.iterrows():
-                parsed = _as_int(row[count])
-                if parsed is not None:
-                    rows.append((_balance_label(row[target]), parsed))
-        except (KeyError, TypeError, ValueError):
-            continue
-        if rows:
-            return rows
-    return None
-
-
-def _balance_label(value: object) -> str:
-    text = str(value).strip().lower()
-    if text in {"true", "1", "1.0", "bad", "bad_review", "yes"}:
-        return "bad review (1–2★)"
-    if text in {"false", "0", "0.0", "good", "not_bad", "no"}:
-        return "not a bad review"
-    return str(value)
 
 
 def _balance_number(balance: list[tuple[str, int]]) -> str:

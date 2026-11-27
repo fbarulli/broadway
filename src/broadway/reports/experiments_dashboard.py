@@ -40,7 +40,7 @@ from urllib.parse import parse_qs, quote
 
 import pandas as pd
 from fastapi import FastAPI, Query, Request
-from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse, Response
+from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from broadway.reports.pipeline_evidence import (
@@ -50,7 +50,8 @@ from broadway.reports.pipeline_evidence import (
     PipelineSeries,
     findings_from_sidecar,
 )
-from broadway.reports.story import STORY_TITLE, Story, configured_dataset
+from broadway.reports.story import STORY_TITLE, Story, configure_story
+from broadway.reports.story import router as story_router
 
 logger = logging.getLogger(__name__)
 
@@ -846,6 +847,13 @@ def _render_story_page(builder: Story) -> str:
     return _render_step_page(STORY_TITLE, builder.question, builder.page_body(), "", [])
 
 
+configure_story(
+    root_provider=lambda: EXPERIMENTS_ROOT,
+    page_renderer=_render_story_page,
+)
+app.include_router(story_router)
+
+
 def _render_series_cards(
     stems: list[str], profiles: dict[str, ScriptProfile], back_url: str, focus: str
 ) -> str:
@@ -1049,23 +1057,6 @@ def index(focus: str = Query(default=DEFAULT_SERIES)) -> HTMLResponse | PlainTex
         return PlainTextResponse("unknown series", status_code=404)
     rows = census_rows(focus) if focus else []
     return HTMLResponse(_render_dashboard_page(rows, focus, series))
-
-
-@app.get("/story", response_model=None)
-def story_page() -> HTMLResponse:
-    """Serve the project story: conclusions first, graphs, numbers, record links."""
-    builder = Story.from_experiments_root(EXPERIMENTS_ROOT, configured_dataset())
-    return HTMLResponse(_render_story_page(builder))
-
-
-@app.get("/story/figure/{name}", response_model=None)
-def story_figure(name: str) -> Response | PlainTextResponse:
-    """Serve one story graph, rendered in memory from the current records."""
-    builder = Story.from_experiments_root(EXPERIMENTS_ROOT, configured_dataset())
-    png = builder.figure_png(name)
-    if png is None:
-        return PlainTextResponse("unknown story figure", status_code=404)
-    return Response(content=png, media_type="image/png")
 
 
 @app.get("/experiments/{name}/source", response_model=None)

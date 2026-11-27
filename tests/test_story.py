@@ -1,21 +1,26 @@
 """Public behavior of the project story page.
 
-A synthetic checkout with two valid pipeline records, their EDA evidence and one
+A synthetic checkout with two valid pipeline records, their EDA sidecar and one
 malformed record: the story must lead with the question, narrate each stage
-conclusions-first, reference generated figures, hyperlink the decision records,
-say "not run yet" for a stage with no record, escape record text, and never
-raise for the malformed record (one logged traceback instead).
+conclusions-first, reference generated figures (and every referenced URL must
+serve a PNG), hyperlink the decision records, say "not run yet" for a stage with
+no record, escape record text, and never raise for the malformed record (one
+logged traceback instead). A second fixture pins the evidence-scoping rule: a
+stale foreign CSV must never be read, and an `act` record without a sidecar must
+not be reported as "found nothing".
 """
 
 from __future__ import annotations
 
 import json
 import logging
+import re
 from pathlib import Path
 
 from fastapi.testclient import TestClient
 
 from broadway.reports import experiments_dashboard as ui
+from broadway.reports import story as story_module
 from broadway.reports.decision import Decision
 
 
@@ -53,6 +58,30 @@ def _decision(**overrides: object) -> dict[str, object]:
 def _write(path: Path, payload: object) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload), encoding="utf-8")
+
+
+def _config(dataset: str) -> story_module.StoryConfig:
+    return story_module.StoryConfig(
+        dataset=dataset,
+        question="Which <b>orders</b> end badly?",
+        why="Bad reviews are the cost this project predicts, at purchase time.",
+        target_label="bad review",
+        target_rule="score ≤ 2",
+        decision_moment="purchase time",
+        source_name="Synthetic",
+        source_tables=9,
+        post_purchase_note=(
+            "Delivery timestamps are post-purchase context, never model features."
+        ),
+        excluded_note="Review score and delivery timestamps are excluded as leakage.",
+        caveats=("imbalanced", "purchase-time only", "prediction not causation"),
+    )
+
+
+def _configure(monkeypatch, root: Path, dataset: str) -> None:
+    monkeypatch.setattr(story_module, "_CONFIG", _config(dataset))
+    monkeypatch.setattr(story_module, "_ROOT_PROVIDER", lambda: root)
+    monkeypatch.setattr(ui, "EXPERIMENTS_ROOT", root)
 
 
 def test_story_leads_with_conclusions_and_skips_bad_records(
@@ -106,6 +135,7 @@ def test_story_leads_with_conclusions_and_skips_bad_records(
     _write(
         eda / "eda_feature_decisions.json",
         {
+            "dataset": "synthetic",
             "features": [
                 _decision(
                     metric="association_rating_accuracy_score",
@@ -142,17 +172,14 @@ def test_story_leads_with_conclusions_and_skips_bad_records(
             "comparison": [
                 _decision(
                     metric="standardized_shift_age",
-                    value=0.0,
-                    interval_low=-0.01,
-                    interval_high=0.01,
+                    value=0.02,
+                    interval_low=0.01,
+                    interval_high=0.03,
                     sample_size=50,
                     verdict="no_action",
                 )
             ],
         },
-    )
-    (eda / "eda_effects.csv").write_text(
-        "feature,effect,verdict\nrating_accuracy_score,0.25,act\n", encoding="utf-8"
     )
 
     # Malformed record: the story must skip it and log one traceback.
@@ -160,41 +187,132 @@ def test_story_leads_with_conclusions_and_skips_bad_records(
     hpo.mkdir(parents=True)
     (hpo / "hpo_decision.json").write_text("[]", encoding="utf-8")
 
-    monkeypatch.setattr(ui, "EXPERIMENTS_ROOT", root)
-    monkeypatch.setenv("BROADWAY_STORY_DATASET", "synthetic")
+    _configure(monkeypatch, root, "synthetic")
 
     with caplog.at_level(logging.ERROR):
         client = TestClient(ui.app)
         response = client.get("/story")
-        figure = client.get("/story/figure/data")
         missing_figure = client.get("/story/figure/model")
 
     assert response.status_code == 200
     page = response.text
     assert "The question" in page
+    assert "Bad reviews are the cost this project predicts" in page
     assert "What the data says" in page
-    assert "bad review" in page
     assert "rating accuracy score" in page
     # Conclusions first, graph, then numbers and the record link.
     assert "Verdict: no_action" in page
-    assert 'alt="The data figure"' in page
-    assert '<img src="/story/figure/data.png"' in page
-    assert '<img src="/story/figure/eda.png"' in page
     assert "verdict: act" in page
     assert '<a href="/experiments/etl?focus=pipeline">ETL record</a>' in page
-    # A stage without a record says so; the malformed HPO record does too.
+    # A stage without a record says so.
     assert "not run yet — the features decision record has not been published." in page
-    assert "not run yet — the baseline decision record has not been published." in page
     # Dynamic record text is escaped.
     assert "&lt;b&gt;ingest&lt;/b&gt;" in page
     assert "<b>ingest</b>" not in page
-    # The root dashboard keeps the story as the first surface a human sees.
-    dashboard = ui.index("pipeline").body.decode()
-    assert 'class="story-banner"' in dashboard
-    assert '<a href="/story">Read the project story' in dashboard
-    # Graph and 404s.
-    assert figure.status_code == 200
-    assert figure.headers["content-type"] == "image/png"
-    assert figure.content.startswith(b"\x89PNG")
+    # Every img src the page emits must serve a PNG (URL and route agree).
+    images = re.findall(r'<img src="([^"]+)"', page)
+    assert "/story/figure/question" in images
+    assert "/story/figure/data" in images
+    assert "/story/figure/eda" in images
+    assert "/story/figure/change" in images
+    for url in images:
+        figure = client.get(url)
+        assert figure.status_code == 200, url
+        assert figure.headers["content-type"] == "image/png", url
+        assert figure.content.startswith(b"\x89PNG"), url
+    # The model has not run in this fixture.
     assert missing_figure.status_code == 404
+    # The root dashboard keeps the story as the first surface a human sees.
+    dashboard = client.get("/?focus=pipeline")
+    assert dashboard.status_code == 200
+    assert 'class="story-banner"' in dashboard.text
+    assert '<a href="/story">Read the project story' in dashboard.text
     assert caplog.text.count("unreadable decision record") == 1
+
+
+def _write_olist_eda(eda: Path) -> None:
+    _write(
+        eda / "eda_decision.json",
+        Decision.model_validate(
+            _decision(
+                metric="association_delivery_days",
+                value=0.99,
+                interval_low=0.90,
+                interval_high=0.99,
+                threshold=0.05,
+                unit="rank_biserial_r",
+                verdict="act",
+                owner="olist",
+                sample_size=100,
+                evidence={
+                    "baseline": "no-effect shuffle of the target at this n",
+                    "delta": None,
+                    "segments": [{"segment": "all", "value": 0.99, "sample_size": 100}],
+                    "sensitivity": {"half_sample": 0.98},
+                    "falsifier": "the interval falls at or below the threshold",
+                    "provenance": {"dataset": "olist", "seed": "42"},
+                },
+            )
+        ).model_dump(mode="json"),
+    )
+
+
+def test_story_ignores_stale_foreign_evidence(monkeypatch, tmp_path: Path) -> None:
+    root = tmp_path / "experiments"
+    eda = root / "results" / "pipeline" / "eda"
+    _write_olist_eda(eda)
+    # A stale table from another dataset sits in the same results dir.
+    (eda / "eda_effects.csv").write_text(
+        "feature,effect,verdict\nAMAZON_STALE_FEATURE,0.99,act\n", encoding="utf-8"
+    )
+    # And a stale decision record from another dataset must be filtered out even
+    # when the env override is empty (empty means "use the configured dataset").
+    _write(
+        root / "results" / "pipeline" / "etl" / "etl_decision.json",
+        Decision.model_validate(
+            _decision(
+                question="AMAZON STALE RECORD",
+                metric="rows_dropped_unexplained_share",
+                value=0.0,
+                interval_low=0.0,
+                interval_high=0.0,
+                owner="amazon",
+                sample_size=10,
+                evidence={
+                    "baseline": "stale",
+                    "delta": None,
+                    "segments": [{"segment": "all", "value": 0.0, "sample_size": 10}],
+                    "sensitivity": {"rows_out": 10.0},
+                    "falsifier": "stale",
+                    "provenance": {"dataset": "amazon"},
+                },
+            )
+        ).model_dump(mode="json"),
+    )
+
+    _configure(monkeypatch, root, "olist")
+    monkeypatch.setenv("BROADWAY_STORY_DATASET", "")
+    page = TestClient(ui.app).get("/story").text
+
+    assert "AMAZON_STALE_FEATURE" not in page
+    assert "AMAZON STALE RECORD" not in page
+    assert "not run yet — the etl decision record has not been published." in page
+    assert "association_delivery_days = 0.99" in page
+
+
+def test_story_does_not_invent_a_conclusion_when_evidence_is_missing(
+    monkeypatch, tmp_path: Path
+) -> None:
+    root = tmp_path / "experiments"
+    _write_olist_eda(root / "results" / "pipeline" / "eda")
+    _configure(monkeypatch, root, "olist")
+    client = TestClient(ui.app)
+    page = client.get("/story").text
+
+    assert "The EDA record reports act on association_delivery_days" in page
+    assert "association_delivery_days = 0.99" in page
+    assert "verdict: act" in page
+    assert "evidence table has not been published" in page
+    assert "found nothing" not in page
+    assert "/story/figure/eda" not in page
+    assert client.get("/story/figure/eda").status_code == 404
