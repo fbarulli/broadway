@@ -98,11 +98,13 @@ def join_figure(
 
 
 def eda_figure(
-    threshold: float,
-    unit: str | None,
     rows: list[tuple[str, float, float | None, float | None]],
+    floor: float,
+    xlabel: str,
+    floor_label: str,
+    title: str,
 ) -> Figure | None:
-    """Top effects with their 95% intervals, against the effect floor."""
+    """Top effects with their 95% intervals, against their own calibrated floor."""
     if not rows:
         return None
     top = rows[:10][::-1]
@@ -122,18 +124,15 @@ def eda_figure(
     else:
         axis.barh(labels, [value for _, value, _, _ in top], color=viz.palette_colors(len(top)))
     axis.axvline(
-        threshold,
+        floor,
         color=_THRESHOLD_COLOR,
         linestyle="--",
         linewidth=1,
-        label="effect floor",
+        label=floor_label,
     )
     axis.legend(fontsize=viz.TICK_FONTSIZE, frameon=False, loc="lower right")
-    axis.set_title(
-        "Association with the target (effect size, 95% interval)",
-        fontsize=viz.TITLE_FONTSIZE,
-    )
-    axis.set_xlabel(unit or "effect size", fontsize=viz.LABEL_FONTSIZE)
+    axis.set_title(title, fontsize=viz.TITLE_FONTSIZE)
+    axis.set_xlabel(xlabel, fontsize=viz.LABEL_FONTSIZE)
     axis.tick_params(labelsize=viz.TICK_FONTSIZE)
     viz.despine(axis)
     return figure
@@ -157,26 +156,28 @@ def features_figure(stages: list[tuple[str, int]], title: str) -> Figure:
 
 def model_figure(
     candidates: list[str],
-    rmses: list[float],
+    values: list[float],
     lows: list[float],
     highs: list[float],
     roles: list[str],
+    metric: str,
+    lower_is_better: bool,
 ) -> Figure:
-    """Repeated-CV RMSE per candidate with its 95% interval."""
+    """Repeated-CV metric per candidate with its 95% interval."""
     figure = Figure(figsize=(8.0, max(2.8, 0.5 * len(candidates) + 1.5)), dpi=150)
     axis = figure.add_subplot(111)
-    for index, (rmse, low, high, role) in enumerate(zip(rmses, lows, highs, roles)):
+    for index, (value, low, high, role) in enumerate(zip(values, lows, highs, roles)):
         axis.errorbar(
-            rmse,
+            value,
             index,
-            xerr=[[rmse - low], [high - rmse]],
+            xerr=[[value - low], [high - value]],
             fmt="o",
             capsize=3,
             color=_ROLE_COLORS.get(role, _DEFAULT_COLOR),
         )
         axis.annotate(
-            f"{rmse:.3f}",
-            (rmse, index),
+            f"{value:.3f}",
+            (value, index),
             xytext=(5, 0),
             textcoords="offset points",
             va="center",
@@ -185,8 +186,12 @@ def model_figure(
     axis.set_yticks(range(len(candidates)))
     axis.set_yticklabels(candidates)
     axis.invert_yaxis()
-    axis.set_xlabel("RMSE (lower is better)", fontsize=viz.LABEL_FONTSIZE)
-    axis.set_title("Repeated-CV RMSE by candidate (95% interval)", fontsize=viz.TITLE_FONTSIZE)
+    direction = "lower" if lower_is_better else "higher"
+    axis.set_xlabel(f"{metric} ({direction} is better)", fontsize=viz.LABEL_FONTSIZE)
+    axis.set_title(
+        f"Repeated-CV {metric} by candidate (95% interval)",
+        fontsize=viz.TITLE_FONTSIZE,
+    )
     axis.grid(axis="x", alpha=viz.GRID_ALPHA)
     viz.despine(axis)
     return figure

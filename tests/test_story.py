@@ -188,12 +188,13 @@ def test_story_leads_with_conclusions_and_skips_bad_records(
             ],
             "comparison": [
                 _decision(
-                    metric="standardized_shift_age",
-                    value=0.02,
-                    interval_low=0.01,
-                    interval_high=0.03,
+                    metric="standardized_shift_estimated_days",
+                    value=4.02e-16,
+                    interval_low=4.02e-16,
+                    interval_high=0.0113,
                     sample_size=50,
                     verdict="no_action",
+                    null_threshold=0.009,
                 )
             ],
         },
@@ -218,8 +219,11 @@ def test_story_leads_with_conclusions_and_skips_bad_records(
     assert "What the data says" in page
     assert "rating accuracy score" in page
     # The correction family is the record's family_size, not the sidecar row count.
-    assert "21 tested · 3 decided (2 act, 1 no action)" in page
-    assert "The BH correction family is 21 features; only 3 crossed" in page
+    assert "21 tested, top 3 by effect decided (2 act, 1 no action)" in page
+    assert "The BH correction family is 21 features; the top 3 by effect are ranked." in page
+    # A tiny no_action shift is no shift, not "one-sided".
+    assert "consistent with no material change" in page
+    assert "one-sided" not in page
     # Conclusions first, graph, then numbers and the record link.
     assert "Verdict: no_action" in page
     assert "verdict: act" in page
@@ -447,9 +451,9 @@ def test_story_eda_count_uses_family_size(monkeypatch, tmp_path: Path) -> None:
     _configure(monkeypatch, root, "synthetic")
     page = TestClient(ui.app).get("/story").text
 
-    assert "21 tested · 12 decided (11 act, 1 investigate)" in page
+    assert "21 tested, top 12 by effect decided (11 act, 1 investigate)" in page
     assert (
-        "The BH correction family is 21 features; only 12 crossed the reporting threshold."
+        "The BH correction family is 21 features; the top 12 by effect are ranked."
         in page
     )
 
@@ -488,16 +492,20 @@ def test_story_reads_provenance_named_class_balance(
         ).model_dump(mode="json"),
     )
     (etl / "class_balance.csv").write_text(
-        "class,count\nbad_review,14495\ngood_review,84178\nmissing_target,768\n",
+        "class,count,share_of_total,share_of_kept\n"
+        "bad_review,14495,0.1457,0.1469\n"
+        "good_review,84178,0.8466,0.8531\n"
+        "missing_target,768,0.0077,0.0\n",
         encoding="utf-8",
     )
     _configure(monkeypatch, root, "synthetic")
     page = TestClient(ui.app).get("/story").text
 
     assert (
-        "class balance (n=99,441): bad review 14,495, good review 84,178, "
-        "missing target 768"
+        "bad review 14,495 / good review 84,178 (n=98,673); "
+        "768 unlabeled rows were dropped"
     ) in page
+    assert "missing target 768" not in page
 
 
 def test_story_does_not_invent_a_conclusion_when_evidence_is_missing(
@@ -540,8 +548,8 @@ def test_story_selection_survives_malformed_candidates(
             )
         ).model_dump(mode="json"),
     )
-    # The champion record exists but has no cv_mean; the CSV must be the fallback.
-    _write(selection / "selection_champion.json", {"champion": "rf"})
+    # The champion record exists but cv_mean is non-numeric; the CSV is the fallback.
+    _write(selection / "selection_champion.json", {"champion": "rf", "cv_mean": "n/a"})
     csv_path = selection / "selection_candidates.csv"
     csv_path.write_text(
         "candidate,rmse,rmse_low,rmse_high,role\n"
@@ -571,3 +579,37 @@ def test_story_selection_survives_malformed_candidates(
     assert "candidate evidence table has not been published" in degraded.text
     assert degraded_figure.status_code == 404
     assert caplog.text.count("malformed candidate row") == 1
+
+
+def test_story_model_uses_the_record_metric(monkeypatch, tmp_path: Path) -> None:
+    """A binary target's pr_auc leaderboard is narrated, not silenced for lacking rmse."""
+    root = tmp_path / "experiments"
+    selection = root / "results" / "pipeline" / "selection"
+    _write(
+        selection / "selection_decision.json",
+        Decision.model_validate(
+            _decision(
+                question="Does the selected champion beat the naive reference?",
+                metric="improvement_over_naive_pr_auc",
+                value=0.18,
+                interval_low=0.13,
+                interval_high=0.23,
+                threshold=0.02,
+                unit="relative_improvement",
+                verdict="act",
+                sample_size=50,
+            )
+        ).model_dump(mode="json"),
+    )
+    _write(selection / "selection_champion.json", {"champion": "rf"})
+    (selection / "selection_candidates.csv").write_text(
+        "candidate,pr_auc,pr_auc_low,pr_auc_high,role\n"
+        "rf,0.82,0.79,0.85,candidate\n",
+        encoding="utf-8",
+    )
+    _configure(monkeypatch, root, "synthetic")
+    client = TestClient(ui.app)
+    page = client.get("/story").text
+
+    assert "rf won the repeated-CV leaderboard at 0.820 PR AUC [0.790, 0.850]" in page
+    assert client.get("/story/figure/model").status_code == 200

@@ -36,15 +36,11 @@ the narrative-to-HTML frame and the routes live in
 
 from __future__ import annotations
 
-import json
-import logging
 import os
-from dataclasses import dataclass
 from pathlib import Path
 
 import pandas as pd
 from matplotlib.figure import Figure
-from pydantic import BaseModel, ConfigDict, Field
 
 from broadway.reports import story_figures as figures
 from broadway.reports.decision import Decision
@@ -53,8 +49,36 @@ from broadway.reports.pipeline_evidence import (
     PipelineSeries,
     findings_from_sidecar,
 )
-
-logger = logging.getLogger(__name__)
+from broadway.reports.story_models import (
+    Candidate,
+    Effect,
+    Section,
+    StoryConfig,
+    _as_int,
+    _association_count,
+    _balance_number,
+    _candidate_rows,
+    _decided_from_provenance,
+    _decision_number,
+    _effect_label,
+    _effect_stats,
+    _feature_key,
+    _feature_stages,
+    _first_column,
+    _format,
+    _funnel,
+    _label,
+    _leaderboard_metric,
+    _lower_is_better,
+    _missing,
+    _read_csv,
+    _read_json,
+    _selection_conclusion,
+    _sensitivity_int,
+    _shift_note,
+    _significant_count,
+    _verdict_counts,
+)
 
 STORY_TITLE = "The project story"
 
@@ -64,99 +88,12 @@ STORY_DATASET_ENV = "BROADWAY_STORY_DATASET"
 #: Neutral aliases for a target column; the project's own name comes from config.
 _TARGET_COLUMN_ALIASES = frozenset({"target", "class", "label"})
 _COUNT_COLUMNS = frozenset({"count", "n", "orders", "rows", "order_count"})
-_FEATURE_SECTIONS = ("features", "associations")
-_VERDICT_LABELS = (
-    ("act", "act"),
-    ("investigate", "investigate"),
-    ("no_action", "no action"),
-    ("insufficient", "insufficient"),
+#: Balance-table buckets that are not target classes (pre-ETL drops, not classes).
+_MISSING_LABELS = frozenset(
+    {"missing", "missing_target", "unlabeled", "unlabelled", "unknown", "null", "none", "na"}
 )
-_LABEL_PREFIXES = ("association_", "outlier_share_", "standardized_shift_", "shift_")
+_FEATURE_SECTIONS = ("features", "associations")
 _STEPS = ("etl", "eda", "features", "baseline", "selection", "hpo", "evaluate")
-# A permanently malformed file is skipped on every request; log its full
-# traceback once so the contract's traceback rule does not become log bloat.
-_LOGGED_UNREADABLE: set[Path] = set()
-
-
-class StoryConfig(BaseModel):
-    """The project's framing of the story (the platform fallback is neutral)."""
-
-    model_config = ConfigDict(frozen=True, extra="forbid")
-
-    dataset: str | None = None
-    question: str = Field(min_length=1)
-    why: str = Field(min_length=1)
-    target_label: str = Field(min_length=1)
-    target_rule: str = Field(min_length=1)
-    target_column: str = Field(default="target", min_length=1)
-    decision_moment: str = Field(min_length=1)
-    source_name: str = ""
-    source_tables: int | None = Field(default=None, gt=0)
-    post_purchase_note: str = Field(min_length=1)
-    excluded_note: str = Field(min_length=1)
-    caveats: tuple[str, ...] = ()
-
-    @classmethod
-    def fallback(cls) -> StoryConfig:
-        """A neutral framing for a checkout with no project configuration."""
-        return cls(
-            dataset=None,
-            question="Which rows carry the outcome the project predicts?",
-            why=(
-                "The project predicts an outcome from the information available at "
-                "decision time."
-            ),
-            target_label="outcome",
-            target_rule="the configured target",
-            target_column="target",
-            decision_moment="decision time",
-            source_name="",
-            source_tables=None,
-            post_purchase_note=(
-                "Columns known only after the outcome are context only; the feature step "
-                "keeps decision-time information only."
-            ),
-            excluded_note=(
-                "Columns known only after the outcome are excluded from the features; using "
-                "them would be leakage."
-            ),
-            caveats=(),
-        )
-
-
-@dataclass(frozen=True)
-class Section:
-    """One story section: conclusions first, one graph, then numbers and records."""
-
-    title: str
-    conclusions: tuple[str, ...]
-    numbers: tuple[str, ...] = ()
-    figure: str | None = None
-    records: tuple[tuple[str, str], ...] = ()
-    not_run: bool = False
-
-
-@dataclass(frozen=True)
-class Effect:
-    """One association: its label, point estimate and 95% interval (when present)."""
-
-    label: str
-    value: float
-    low: float | None
-    high: float | None
-    verdict: str
-
-
-@dataclass(frozen=True)
-class Candidate:
-    """One leaderboard row: name, point RMSE and its 95% interval."""
-
-    name: str
-    rmse: float
-    low: float
-    high: float
-    role: str
-
 
 class Story:
     """Build the story sections and figures from one pipeline results tree."""
@@ -279,7 +216,7 @@ class Story:
         numbers = [_decision_number(decision)]
         balance = self._balance(record)
         if balance:
-            numbers.append(_balance_number(balance))
+            numbers.append(_balance_number(balance, rows_in))
         else:
             conclusions.append("The class balance has not been published yet.")
         return Section(
@@ -347,16 +284,27 @@ class Story:
         if comparison:
             conclusions.append(_shift_note(max(comparison, key=lambda item: abs(item.value))))
         tested = _as_int(provenance.get("family_size"))
+        significant = _as_int(provenance.get("significant"))
+        if significant is None:
+            significant = _significant_count(self._effects_table(record), tested)
         decided = len(effects) or _decided_from_provenance(provenance)
         verdict_counts = _verdict_counts(effects, provenance)
         if tested is not None and decided and tested != decided:
-            conclusions.append(
-                f"The BH correction family is {tested} features; only {decided} crossed "
-                "the reporting threshold."
-            )
+            if significant is not None:
+                conclusions.append(
+                    f"The BH correction family is {tested} features; {significant} are "
+                    f"significant and the top {decided} by effect are ranked."
+                )
+            else:
+                conclusions.append(
+                    f"The BH correction family is {tested} features; the top {decided} by "
+                    "effect are ranked."
+                )
         numbers = [_decision_number(decision)]
         if decided:
-            numbers.append(_association_count(tested, decided, verdict_counts))
+            numbers.append(
+                _association_count(tested, decided, verdict_counts, significant)
+            )
         return Section(
             title="What the data says",
             conclusions=tuple(conclusions),
@@ -494,10 +442,13 @@ class Story:
             records.append(("baseline", "baseline"))
         else:
             conclusions.append("Baseline: not run yet.")
-        candidate_frame = _read_csv(self._candidates_path())
-        candidates = _candidate_rows(candidate_frame, self._candidates_path())
+        candidates: list[Candidate] = []
         if selection is not None:
-            conclusions.append(_selection_conclusion(selection, candidates))
+            metric = _leaderboard_metric(selection.decision)
+            candidates = _candidate_rows(
+                _read_csv(self._candidates_path()), self._candidates_path(), metric
+            )
+            conclusions.append(_selection_conclusion(selection, candidates, metric))
             numbers.append(f"selection · {_decision_number(selection.decision)}")
             records.append(("selection", "selection"))
         else:
@@ -506,7 +457,7 @@ class Story:
             decision = hpo.decision
             worth = decision.interval_low > decision.threshold
             conclusions.append(
-                f"HPO moved CV RMSE by {decision.value:.2%} "
+                f"HPO moved CV {_leaderboard_metric(decision)} by {decision.value:.2%} "
                 f"[{decision.interval_low:.2%}, {decision.interval_high:.2%}] over the "
                 f"defaults against a {decision.threshold:.1%} floor — "
                 f"{'worth adopting' if worth else 'not proven worth the extra complexity'} "
@@ -618,10 +569,46 @@ class Story:
         if record is None:
             return None
         effects = self._effects(record)
+        if not effects:
+            return None
+        calibrated = all(
+            effect.null_threshold is not None
+            and effect.low is not None
+            and effect.high is not None
+            for effect in effects
+        )
+        if calibrated:
+            rows: list[tuple[str, float, float | None, float | None]] = []
+            for effect in effects:
+                assert effect.null_threshold is not None
+                assert effect.low is not None and effect.high is not None
+                null = effect.null_threshold
+                rows.append(
+                    (
+                        _effect_label(effect),
+                        effect.value - null,
+                        effect.low - null,
+                        effect.high - null,
+                    )
+                )
+            return figures.eda_figure(
+                rows,
+                0.0,
+                "effect minus its own shuffle null",
+                "own-null baseline",
+                "Association with the target (calibrated margin)",
+            )
         rows = [
-            (effect.label, effect.value, effect.low, effect.high) for effect in effects
+            (_effect_label(effect), effect.value, effect.low, effect.high)
+            for effect in effects
         ]
-        return figures.eda_figure(record.decision.threshold, record.decision.unit, rows)
+        return figures.eda_figure(
+            rows,
+            record.decision.threshold,
+            record.decision.unit or "effect size",
+            "effect floor",
+            "Association with the target (effect size, 95% interval)",
+        )
 
     def _features_figure(self) -> Figure | None:
         record = self._record("features")
@@ -631,37 +618,58 @@ class Story:
         return figures.features_figure(stages, "Feature surface") if stages else None
 
     def _model_figure(self) -> Figure | None:
-        if self._record("selection") is None:
+        record = self._record("selection")
+        if record is None:
             return None
-        rows = _candidate_rows(_read_csv(self._candidates_path()), self._candidates_path())
+        metric = _leaderboard_metric(record.decision)
+        rows = _candidate_rows(
+            _read_csv(self._candidates_path()), self._candidates_path(), metric
+        )
         if not rows:
             return None
         return figures.model_figure(
             [row.name for row in rows],
-            [row.rmse for row in rows],
+            [row.value for row in rows],
             [row.low for row in rows],
             [row.high for row in rows],
             [row.role for row in rows],
+            metric,
+            _lower_is_better(metric),
         )
 
     def _effects(self, record: PipelineRecord) -> list[Effect]:
         """Association effects from the dataset-tagged sidecar, ranked."""
+        stats = _effect_stats(self._effects_table(record))
         decisions = [
             decision
             for section in _FEATURE_SECTIONS
             for decision in self._findings(record, section)
         ]
-        effects = [
-            Effect(
-                label=_label(decision.metric),
-                value=decision.value,
-                low=decision.interval_low,
-                high=decision.interval_high,
-                verdict=decision.verdict,
+        effects = []
+        for decision in decisions:
+            statistic, null = stats.get(_feature_key(decision.metric), (None, None))
+            effects.append(
+                Effect(
+                    label=_label(decision.metric),
+                    value=decision.value,
+                    low=decision.interval_low,
+                    high=decision.interval_high,
+                    verdict=decision.verdict,
+                    statistic=statistic,
+                    null_threshold=(
+                        null if null is not None else decision.null_threshold
+                    ),
+                )
             )
-            for decision in decisions
-        ]
         return sorted(effects, key=lambda effect: effect.value, reverse=True)
+
+    def _effects_table(self, record: PipelineRecord) -> pd.DataFrame | None:
+        """The EDA effects table, only when it matches the record's tested family."""
+        table = _read_csv(record.record.parent / "eda_effects.csv")
+        if table is None:
+            return None
+        family = _as_int(record.decision.evidence.provenance.get("family_size"))
+        return table if family is None or len(table) == family else None
 
     def _candidates_path(self) -> Path:
         step_dir = self._step_dir("selection")
@@ -694,6 +702,8 @@ class Story:
         rows: list[tuple[str, int]] = []
         try:
             for _, row in frame.iterrows():
+                if str(row[target]).strip().lower() in _MISSING_LABELS:
+                    continue
                 parsed = _as_int(row[count])
                 if parsed is not None:
                     rows.append((self._balance_label(row[target]), parsed))
@@ -707,6 +717,8 @@ class Story:
             return []
         rows: list[tuple[str, int]] = []
         for column in frame.columns:
+            if str(column).strip().lower() in _MISSING_LABELS:
+                continue
             parsed = _as_int(frame.iloc[0][column])
             if parsed is not None:
                 rows.append((self._balance_label(column), parsed))
@@ -734,258 +746,3 @@ class Story:
         return label or str(value)
 
 
-def _missing(title: str, step: str) -> Section:
-    return Section(
-        title=title,
-        conclusions=(f"not run yet — the {step} decision record has not been published.",),
-        not_run=True,
-    )
-
-
-def _decision_number(decision: Decision) -> str:
-    unit = f" {decision.unit}" if decision.unit else ""
-    return (
-        f"{decision.metric} = {_format(decision.value)}{unit} "
-        f"[{_format(decision.interval_low)}, {_format(decision.interval_high)}] 95% · "
-        f"n={decision.sample_size:,} · verdict: {decision.verdict}"
-    )
-
-
-def _format(value: float) -> str:
-    if value and abs(value) < 0.001:
-        return f"{value:.2e}"
-    return f"{value:,.4g}"
-
-
-def _shift_note(decision: Decision) -> str:
-    """One honest before/after sentence; never call a one-sided shift zero."""
-    label = _label(decision.metric)
-    if decision.interval_low <= 0 <= decision.interval_high:
-        return (
-            f"Before/after shift for {label} is consistent with no change: "
-            f"{_format(decision.value)} [{_format(decision.interval_low)}, "
-            f"{_format(decision.interval_high)}] covers zero."
-        )
-    return (
-        f"Before/after shift for {label} is one-sided: {_format(decision.value)} "
-        f"[{_format(decision.interval_low)}, {_format(decision.interval_high)}] does not "
-        "cover zero, so the shift is reported rather than called zero."
-    )
-
-
-def _candidate_rows(frame: pd.DataFrame | None, path: Path) -> list[Candidate]:
-    """Parse leaderboard rows, skipping malformed ones with one traceback per file."""
-    if frame is None:
-        return []
-    required = {"candidate", "rmse", "rmse_low", "rmse_high"}
-    if not required.issubset(frame.columns):
-        return []
-    rows: list[Candidate] = []
-    for _, row in frame.iterrows():
-        try:
-            rows.append(
-                Candidate(
-                    name=str(row["candidate"]),
-                    rmse=float(row["rmse"]),
-                    low=float(row["rmse_low"]),
-                    high=float(row["rmse_high"]),
-                    role=str(row["role"]) if "role" in frame.columns else "",
-                )
-            )
-        except (TypeError, ValueError):
-            if path not in _LOGGED_UNREADABLE:
-                _LOGGED_UNREADABLE.add(path)
-                logger.exception("story: malformed candidate row in %s", path)
-    return rows
-
-
-def _selection_conclusion(
-    record: PipelineRecord | None, candidates: list[Candidate]
-) -> str:
-    """One plain-language outcome for the candidate leaderboard."""
-    champion = _read_json(
-        record.record.parent / "selection_champion.json" if record is not None else Path()
-    )
-    winner = champion.get("champion") if isinstance(champion, dict) else None
-    rmse = champion.get("cv_mean") if isinstance(champion, dict) else None
-    low = champion.get("interval_low") if isinstance(champion, dict) else None
-    high = champion.get("interval_high") if isinstance(champion, dict) else None
-    if (winner is None or rmse is None) and candidates:
-        top = candidates[0]
-        winner = winner or top.name
-        rmse = rmse if rmse is not None else top.rmse
-        low = low if low is not None else top.low
-        high = high if high is not None else top.high
-    if winner is None or rmse is None:
-        return (
-            "The candidate evidence table has not been published, so the leaderboard is "
-            "not narrated."
-        )
-    low = rmse if low is None else low
-    high = rmse if high is None else high
-    edge = None
-    edge_low = None
-    edge_high = None
-    if record is not None:
-        sensitivity = record.decision.evidence.sensitivity
-        edge = sensitivity.get("champion_vs_linear_rmse")
-        edge_low = sensitivity.get("champion_vs_linear_rmse_low")
-        edge_high = sensitivity.get("champion_vs_linear_rmse_high")
-    if edge is not None and edge_low is not None and edge_high is not None:
-        if edge_low < 0 < edge_high:
-            verdict = (
-                "its edge over linear has an interval that crosses zero, so the data "
-                "cannot tell them apart"
-            )
-        else:
-            verdict = "its edge over linear clears zero, so it genuinely beat the reference"
-        return (
-            f"{winner} won the repeated-CV leaderboard at {float(rmse):.3f} RMSE "
-            f"[{float(low):.3f}, {float(high):.3f}]; {verdict} "
-            f"(Δ {float(edge):+.3f} [{float(edge_low):+.3f}, {float(edge_high):+.3f}])."
-        )
-    return (
-        f"{winner} won the repeated-CV leaderboard at {float(rmse):.3f} RMSE "
-        f"[{float(low):.3f}, {float(high):.3f}]."
-    )
-
-
-def _label(metric: str) -> str:
-    for prefix in _LABEL_PREFIXES:
-        if metric.startswith(prefix):
-            metric = metric[len(prefix) :]
-            break
-    return metric.replace("_", " ")
-
-
-def _funnel(record: PipelineRecord) -> list[tuple[str, int]]:
-    """Rows in, rows out, rows dropped — the data funnel the ETL record proves."""
-    provenance = record.decision.evidence.provenance
-    rows_in = _as_int(provenance.get("rows_in"))
-    rows_out = _as_int(provenance.get("rows_out"))
-    stages: list[tuple[str, int]] = []
-    if rows_in is not None:
-        stages.append(("source rows", rows_in))
-    if rows_out is not None and rows_out != rows_in:
-        stages.append(("rows kept", rows_out))
-        if rows_in is not None and rows_in > rows_out:
-            stages.append(("dropped (recorded)", rows_in - rows_out))
-    recorded = record.decision.sample_size
-    if recorded not in {rows_in, rows_out}:
-        stages.append(("recorded rows", recorded))
-    if not stages:
-        stages.append(("recorded rows", recorded))
-    if len({count for _, count in stages}) == 1 and record.decision.evidence.segments:
-        stages = [
-            (segment.segment.replace("_", " "), segment.sample_size)
-            for segment in record.decision.evidence.segments
-        ] + [stages[-1]]
-    return stages
-
-
-def _balance_number(balance: list[tuple[str, int]]) -> str:
-    total = sum(count for _, count in balance)
-    if total <= 0:
-        return "class balance unavailable"
-    counts = ", ".join(f"{label} {count:,}" for label, count in balance)
-    return f"class balance (n={total:,}): {counts}"
-
-
-def _decided_from_provenance(provenance: dict[str, str]) -> int:
-    """Features the record decided, from its acted + investigated counts."""
-    acted = _as_int(provenance.get("acted")) or 0
-    investigated = _as_int(provenance.get("investigated")) or 0
-    return acted + investigated
-
-
-def _verdict_counts(effects: list[Effect], provenance: dict[str, str]) -> dict[str, int]:
-    """Verdict tally from the evidence rows, or the record's counts when it has none."""
-    counts: dict[str, int] = {}
-    for effect in effects:
-        counts[effect.verdict] = counts.get(effect.verdict, 0) + 1
-    if effects:
-        return counts
-    acted = _as_int(provenance.get("acted"))
-    investigated = _as_int(provenance.get("investigated"))
-    if acted is not None:
-        counts["act"] = acted
-    if investigated is not None:
-        counts["investigate"] = investigated
-    return counts
-
-
-def _association_count(
-    tested: int | None, decided: int, counts: dict[str, int]
-) -> str:
-    """``21 tested · 12 decided (11 act, 1 investigate)`` — never the row count as tested."""
-    parts = ", ".join(
-        f"{counts[key]} {label}" for key, label in _VERDICT_LABELS if counts.get(key)
-    )
-    prefix = f"{tested} tested · " if tested is not None else ""
-    suffix = f" ({parts})" if parts else ""
-    return f"{prefix}{decided} decided{suffix}"
-
-
-def _feature_stages(decision: Decision) -> list[tuple[str, int]]:
-    """Feature-surface counts the record publishes, in narrative order."""
-    stages: list[tuple[str, int]] = []
-    for label, prefix in (
-        ("added", "features_added"),
-        ("removed", "features_removed"),
-        ("plan columns", "plan_columns"),
-    ):
-        value = _sensitivity_int(decision, prefix)
-        if value is not None:
-            stages.append((label, value))
-    return stages
-
-
-def _sensitivity_int(decision: Decision, prefix: str) -> int | None:
-    for key, value in decision.evidence.sensitivity.items():
-        if key.startswith(prefix):
-            parsed = _as_int(value)
-            if parsed is not None:
-                return parsed
-    return None
-
-
-def _first_column(value: object) -> str | None:
-    if not isinstance(value, str):
-        return None
-    first = value.split(",")[0].strip()
-    return first or None
-
-
-def _as_int(value: object) -> int | None:
-    if isinstance(value, bool):
-        return None
-    try:
-        return int(float(str(value)))
-    except (TypeError, ValueError):
-        return None
-
-
-def _read_csv(path: Path) -> pd.DataFrame | None:
-    """Read a small evidence table, logging one traceback per unreadable path."""
-    if not path.is_file():
-        return None
-    try:
-        return pd.read_csv(path)
-    except (OSError, UnicodeDecodeError, pd.errors.ParserError, ValueError):
-        if path not in _LOGGED_UNREADABLE:
-            _LOGGED_UNREADABLE.add(path)
-            logger.exception("story: unreadable evidence table at %s", path)
-        return None
-
-
-def _read_json(path: Path) -> object:
-    """Read a small JSON document, logging one traceback per unreadable path."""
-    if not path.is_file():
-        return None
-    try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
-        if path not in _LOGGED_UNREADABLE:
-            _LOGGED_UNREADABLE.add(path)
-            logger.exception("story: unreadable JSON at %s", path)
-        return None
