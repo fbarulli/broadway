@@ -17,8 +17,37 @@ import logging
 from pathlib import Path
 
 from broadway.reports import experiments_dashboard as ui
+from broadway.reports import story_page
 from broadway.reports.decision import Decision
-from broadway.reports.pipeline_evidence import PIPELINE_STEPS
+from broadway.reports.pipeline_evidence import PLANNED_STATUS
+from broadway.reports.story_models import StoryConfig, StoryStepMap
+
+CONFIGURED = (
+    "etl",
+    "eda",
+    "features",
+    "baseline",
+    "train",
+    "selection",
+    "hpo",
+    "evaluate",
+)
+PLANNED = (
+    "01_clean",
+    "02_missing",
+    "03_outliers",
+    "04_frame",
+    "06_correlation",
+    "07_clustering",
+    "08_timeseries",
+)
+
+
+def _configure_map(monkeypatch) -> None:
+    config = StoryConfig.fallback().model_copy(
+        update={"steps": StoryStepMap(configured=CONFIGURED, planned=PLANNED)}
+    )
+    monkeypatch.setattr(story_page, "_CONFIG", config)
 
 
 def _decision(**overrides: object) -> dict[str, object]:
@@ -106,12 +135,13 @@ def test_pipeline_series_lists_steps_and_renders_step_pages(
             Decision.model_validate(_decision(metric=stem)).model_dump(mode="json"),
         )
 
+    _configure_map(monkeypatch)
     monkeypatch.setattr(ui, "EXPERIMENTS_ROOT", root)
 
     assert ui.list_series() == ["alpha", "pipeline"]
     rows = ui.census_rows("pipeline")
     assert all(set(row) == {"experiment", "question", "status", "artifacts"} for row in rows)
-    assert [row["experiment"] for row in rows] == [*PIPELINE_STEPS, "bad"]
+    assert [row["experiment"] for row in rows] == [*CONFIGURED, *PLANNED, "bad"]
     by_step = {row["experiment"]: row for row in rows}
     assert by_step["etl"] == {
         "experiment": "etl",
@@ -128,7 +158,7 @@ def test_pipeline_series_lists_steps_and_renders_step_pages(
     assert by_step["01_clean"] == {
         "experiment": "01_clean",
         "question": "",
-        "status": "not run yet",
+        "status": PLANNED_STATUS,
         "artifacts": 0,
     }
     assert by_step["bad"]["status"] == "not run yet"
@@ -196,7 +226,7 @@ def test_pipeline_series_lists_steps_and_renders_step_pages(
     assert bad_page.status_code == 200
     assert pending_page.status_code == 200
     pending_html = bytes(pending_page.body).decode()
-    assert "not run yet — this step will publish its decision record" in pending_html
+    assert PLANNED_STATUS in pending_html
     assert "<table" not in pending_html
     assert "<img" not in pending_html
     assert caplog.text.count("unreadable decision record") == 1
@@ -212,25 +242,32 @@ def test_pipeline_map_lists_pending_and_fills_when_a_lane_runs(
             pipeline / step / f"{step}_decision.json",
             Decision.model_validate(_decision(metric=step)).model_dump(mode="json"),
         )
+    _configure_map(monkeypatch)
     monkeypatch.setattr(ui, "EXPERIMENTS_ROOT", root)
 
     rows = ui.census_rows("pipeline")
-    assert [row["experiment"] for row in rows] == list(PIPELINE_STEPS)
+    assert [row["experiment"] for row in rows] == [*CONFIGURED, *PLANNED]
     by_step = {row["experiment"]: row for row in rows}
     assert by_step["etl"]["status"] == "act"
     assert by_step["01_clean"] == {
         "experiment": "01_clean",
         "question": "",
-        "status": "not run yet",
+        "status": PLANNED_STATUS,
         "artifacts": 0,
     }
-    for step in ("01_clean", "06_correlation", "evaluate"):
+    for step in ("01_clean", "06_correlation"):
         response = ui.experiment_page(step, "pipeline")
         assert response.status_code == 200
         body = bytes(response.body).decode()
-        assert "not run yet — this step will publish" in body
+        assert PLANNED_STATUS in body
         assert "<table" not in body
         assert "<img" not in body
+    response = ui.experiment_page("evaluate", "pipeline")
+    assert response.status_code == 200
+    body = bytes(response.body).decode()
+    assert "not run yet — this step will publish" in body
+    assert "<table" not in body
+    assert "<img" not in body
 
     # A lane record fills its page and row on the next request.
     _write(

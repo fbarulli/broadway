@@ -31,6 +31,16 @@ _LABEL_PREFIXES = ("association_", "outlier_share_", "standardized_shift_", "shi
 # traceback once so the contract's traceback rule does not become log bloat.
 _LOGGED_UNREADABLE: set[Path] = set()
 
+
+class StoryStepMap(BaseModel):
+    """The project's step map: configured steps plus planned (not yet configured) lanes."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    configured: tuple[str, ...] = ()
+    planned: tuple[str, ...] = ()
+
+
 class StoryConfig(BaseModel):
     """The project's framing of the story (the platform fallback is neutral)."""
 
@@ -48,6 +58,7 @@ class StoryConfig(BaseModel):
     post_purchase_note: str = Field(min_length=1)
     excluded_note: str = Field(min_length=1)
     caveats: tuple[str, ...] = ()
+    steps: StoryStepMap = StoryStepMap()
 
     @classmethod
     def fallback(cls) -> StoryConfig:

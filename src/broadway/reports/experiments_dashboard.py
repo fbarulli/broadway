@@ -45,13 +45,14 @@ from fastapi.staticfiles import StaticFiles
 
 from broadway.reports.pipeline_evidence import (
     PIPELINE_FOCUS,
+    PLANNED_STATUS,
     Finding,
     PipelineRecord,
     PipelineSeries,
     findings_from_sidecar,
 )
 from broadway.reports.story import STORY_TITLE, Story
-from broadway.reports.story_page import configure_story, render_body
+from broadway.reports.story_page import configure_story, render_body, story_config
 from broadway.reports.story_page import router as story_router
 
 logger = logging.getLogger(__name__)
@@ -134,6 +135,16 @@ def _results_dir(focus: str) -> Path:
     return EXPERIMENTS_ROOT / "results" / focus
 
 
+def _pipeline_series() -> PipelineSeries:
+    """The pipeline map: configured steps and planned lanes come from the project layer."""
+    config = story_config()
+    return PipelineSeries.from_experiments_root(
+        EXPERIMENTS_ROOT,
+        configured=config.steps.configured,
+        planned=config.steps.planned,
+    )
+
+
 def _h(path: str, focus: str) -> str:
     """Append ``?focus=<quoted series id>`` to an internal path (``&`` if it has a query)."""
     sep = "&" if "?" in path else "?"
@@ -148,7 +159,7 @@ def list_series() -> list[str]:
             continue
         found.add(script.relative_to(EXPERIMENTS_ROOT).parent.as_posix())
     series = sorted(found)
-    pipeline = PipelineSeries.from_experiments_root(EXPERIMENTS_ROOT)
+    pipeline = _pipeline_series()
     if PIPELINE_FOCUS not in found and pipeline.exists:
         series.append(PIPELINE_FOCUS)
     return series
@@ -188,7 +199,7 @@ def series_profiles(focus: str) -> dict[str, ScriptProfile]:
 def census_rows(focus: str) -> list[dict[str, str | int]]:
     """Build one dashboard row per step (experiment | question | status | artifacts)."""
     if focus == PIPELINE_FOCUS:
-        return PipelineSeries.from_experiments_root(EXPERIMENTS_ROOT).census_rows()
+        return _pipeline_series().census_rows()
     rows: list[dict[str, str | int]] = []
     for script in series_scripts(focus):
         stem = script.stem
@@ -822,14 +833,21 @@ def _render_findings(findings: list[Finding]) -> str:
 
 def _render_pipeline_step_page(step: str, series: list[str]) -> str:
     """Render one pipeline step: decision strip(s), findings, figures, then the code."""
-    pipeline = PipelineSeries.from_experiments_root(EXPERIMENTS_ROOT)
+    pipeline = _pipeline_series()
     records = pipeline.records(step)
     primary = pipeline.primary(step)
     if not records:
-        body = (
-            '<p class="not-run">not run yet — this step will publish its decision record, '
-            "per-item findings, figures and producing code here when it runs.</p>"
-        )
+        if pipeline.is_planned(step):
+            body = (
+                f'<p class="not-run">{html.escape(PLANNED_STATUS)}. This lane will publish '
+                "its decision record, findings, figures and code here when it is configured "
+                "and runs.</p>"
+            )
+        else:
+            body = (
+                '<p class="not-run">not run yet — this step will publish its decision '
+                "record, per-item findings, figures and producing code here when it runs.</p>"
+            )
         return _render_step_page(step, "", body, PIPELINE_FOCUS, series)
     strips = "\n".join(_render_pipeline_record(record, len(records) > 1) for record in records)
     findings = [finding for record in records for finding in record.findings()]
@@ -1088,7 +1106,7 @@ def experiment_page(
     if focus not in list_series():
         return PlainTextResponse("unknown series", status_code=404)
     if focus == PIPELINE_FOCUS:
-        pipeline = PipelineSeries.from_experiments_root(EXPERIMENTS_ROOT)
+        pipeline = _pipeline_series()
         if name not in pipeline.steps():
             return PlainTextResponse("unknown experiment", status_code=404)
         return HTMLResponse(_render_pipeline_step_page(name, list_series()))

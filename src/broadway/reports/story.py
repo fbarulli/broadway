@@ -46,6 +46,7 @@ from matplotlib.figure import Figure
 from broadway.reports import story_figures as figures
 from broadway.reports.decision import Decision
 from broadway.reports.pipeline_evidence import (
+    PLANNED_STATUS,
     PipelineRecord,
     PipelineSeries,
     findings_from_sidecar,
@@ -112,7 +113,13 @@ class Story:
         cls, experiments_root: Path, config: StoryConfig | None = None
     ) -> Story:
         """Build the story for a checkout's experiments root."""
-        return cls(PipelineSeries.from_experiments_root(experiments_root), config)
+        resolved = config if config is not None else StoryConfig.fallback()
+        pipeline = PipelineSeries.from_experiments_root(
+            experiments_root,
+            configured=resolved.steps.configured,
+            planned=resolved.steps.planned,
+        )
+        return cls(pipeline, resolved)
 
     @property
     def question(self) -> str:
@@ -168,26 +175,43 @@ class Story:
         ]
 
     def _step_map(self) -> Section:
-        """The full step map with per-step status: done or not run yet."""
-        steps = self._pipeline.steps()
-        if not steps:
+        """The project's configured steps and planned lanes, with per-step status."""
+        configured = self._config.steps.configured
+        planned = self._config.steps.planned
+        extras = [
+            step
+            for step in self._pipeline.steps()
+            if step not in configured and step not in planned
+        ]
+        if not configured and not planned and not extras:
             return Section(
                 title="The step map",
                 conclusions=("No pipeline steps are published yet.",),
                 not_run=True,
             )
-        done = [step for step in steps if self._record(step) is not None]
-        pending = [step for step in steps if step not in done]
+        done = [step for step in configured if self._record(step) is not None]
+        planned_pending = [step for step in planned if self._record(step) is None]
         conclusions = [
             (
-                f"{len(done)} of {len(steps)} steps have published a decision record; "
-                f"{len(pending)} are pending."
+                f"{len(done)} of {len(configured)} configured steps done; "
+                f"{len(planned_pending)} planned lanes not configured."
             )
         ]
-        numbers = tuple(
-            f"{step} — {'done' if step in done else 'not run yet'}" for step in steps
-        )
-        return Section(title="The step map", conclusions=tuple(conclusions), numbers=numbers)
+        numbers: list[str] = []
+        for step in configured:
+            status = "done" if step in done else "not run yet"
+            numbers.append(f"{step} — {status}")
+        for step in planned:
+            status = (
+                "done (planned lane)"
+                if self._record(step) is not None
+                else PLANNED_STATUS
+            )
+            numbers.append(f"{step} — {status}")
+        for step in extras:
+            status = "done" if self._record(step) is not None else "not run yet"
+            numbers.append(f"{step} — {status}")
+        return Section(title="The step map", conclusions=tuple(conclusions), numbers=tuple(numbers))
 
     def _question(self) -> Section:
         config = self._config
@@ -316,8 +340,8 @@ class Story:
         if biased:
             names = ", ".join(effect.label for effect in biased)
             conclusions.append(
-                f"{names}: bootstrap-biased, interval not centred on the point; shown in "
-                "the numbers, not the figure."
+                f"{names}: bootstrap-biased, interval not centred on the point; kept in "
+                "the decision record, not the figure."
             )
         if effects:
             conclusions.append(self._config.post_purchase_note)
@@ -326,7 +350,7 @@ class Story:
             names = ", ".join(_label(item.metric) for item in flagged[:3])
             suffix = f" ({names})" if names else ""
             conclusions.append(
-                f"{len(flagged)} of {len(outliers)} admissible feature columns are "
+                f"{len(flagged)} of {len(outliers)} numeric feature columns are "
                 f"heavy-tailed{suffix}; the data was flagged, not silently trimmed."
             )
         if comparison:
@@ -401,7 +425,8 @@ class Story:
             flagged = [item for item in outliers if item.verdict == "act"]
             if flagged:
                 conclusions.append(
-                    f"{len(flagged)} of {len(outliers)} candidate columns are heavy-tailed. "
+                    f"{len(flagged)} of {len(outliers)} numeric feature columns are "
+                    "heavy-tailed. "
                     f"Outlier decision: {flagged[0].action}."
                 )
             elif outliers:
@@ -430,9 +455,9 @@ class Story:
         )
 
     def _features(self) -> Section:
-        record = self._record("05_features") or self._record("features")
+        record = self._record("features")
         if record is None:
-            return _missing("The features", "05_features")
+            return _missing("The features", "features")
         decision = record.decision
         provenance = decision.evidence.provenance
         added = _sensitivity_int(decision, "features_added")

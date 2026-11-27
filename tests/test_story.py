@@ -26,6 +26,7 @@ from broadway.reports import experiments_dashboard as ui
 from broadway.reports import story as story_module
 from broadway.reports import story_page
 from broadway.reports.decision import Decision
+from broadway.reports.story_models import StoryStepMap
 
 
 def _decision(**overrides: object) -> dict[str, object]:
@@ -64,9 +65,34 @@ def _write(path: Path, payload: object) -> None:
     path.write_text(json.dumps(payload), encoding="utf-8")
 
 
+def _steps() -> StoryStepMap:
+    return StoryStepMap(
+        configured=(
+            "etl",
+            "eda",
+            "features",
+            "baseline",
+            "train",
+            "selection",
+            "hpo",
+            "evaluate",
+        ),
+        planned=(
+            "01_clean",
+            "02_missing",
+            "03_outliers",
+            "04_frame",
+            "06_correlation",
+            "07_clustering",
+            "08_timeseries",
+        ),
+    )
+
+
 def _config(dataset: str) -> story_module.StoryConfig:
     return story_module.StoryConfig(
         dataset=dataset,
+        steps=_steps(),
         question="Which <b>orders</b> end badly?",
         why="Bad reviews are the cost this project predicts, at purchase time.",
         target_label="bad review",
@@ -230,12 +256,14 @@ def test_story_leads_with_conclusions_and_skips_bad_records(
     assert "verdict: act" in page
     assert '<a href="/experiments/etl?focus=pipeline">ETL record</a>' in page
     # A stage without a record says so.
-    assert "not run yet — the 05_features decision record has not been published." in page
-    # The full step map is present with explicit done / not run yet statuses.
+    assert "not run yet — the features decision record has not been published." in page
+    # The project's configured steps and planned lanes are both explicit.
     assert "The step map" in page
+    assert "2 of 8 configured steps done; 7 planned lanes not configured." in page
     assert "etl — done" in page
     assert "eda — done" in page
-    assert "01_clean — not run yet" in page
+    assert "baseline — not run yet" in page
+    assert "01_clean — planned lane — not configured yet" in page
     step_map = page.split("<h2>The step map</h2>", 1)[1].split("</section>", 1)[0]
     assert "<figure>" not in step_map
     assert "<img" not in step_map
@@ -557,7 +585,7 @@ def test_story_eda_figure_survives_the_real_biased_rows(
     assert "interval not centred on the point" in page
     assert "In the purchase-time feature ranking" in page
     assert "are the strongest context associations" in page
-    assert "12 of 12 admissible feature columns" in page
+    assert "12 of 12 numeric feature columns" in page
 
 
 def test_story_selection_survives_malformed_candidates(

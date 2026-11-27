@@ -31,24 +31,8 @@ logger = logging.getLogger(__name__)
 #: The series id under which ``results/pipeline`` is served.
 PIPELINE_FOCUS = "pipeline"
 
-#: The full expected step map: a pending step is listed, never omitted.
-#: One stem per lane; discovered directories outside this map are appended.
-PIPELINE_STEPS = (
-    "etl",
-    "eda",
-    "01_clean",
-    "02_missing",
-    "03_outliers",
-    "04_frame",
-    "05_features",
-    "06_correlation",
-    "07_clustering",
-    "08_timeseries",
-    "baseline",
-    "selection",
-    "hpo",
-    "evaluate",
-)
+#: A planned lane that has not been configured is labelled, not counted as pending.
+PLANNED_STATUS = "planned lane — not configured yet"
 
 _RECORD_SUFFIX = "_decision.json"
 #: Sidecar keys that are step metadata, not per-item conclusions.
@@ -151,14 +135,26 @@ def _section_findings(path: Path, section: str, entries: object) -> list[Finding
 class PipelineSeries:
     """The ``results/pipeline`` tree read as one dashboard series (one row per step)."""
 
-    def __init__(self, results_root: Path) -> None:
+    def __init__(
+        self,
+        results_root: Path,
+        configured: tuple[str, ...] = (),
+        planned: tuple[str, ...] = (),
+    ) -> None:
         self._results_root = Path(results_root)
         self._pipeline_root = self._results_root / PIPELINE_FOCUS
+        self._configured = tuple(configured)
+        self._planned = tuple(planned)
 
     @classmethod
-    def from_experiments_root(cls, experiments_root: Path) -> PipelineSeries:
+    def from_experiments_root(
+        cls,
+        experiments_root: Path,
+        configured: tuple[str, ...] = (),
+        planned: tuple[str, ...] = (),
+    ) -> PipelineSeries:
         """Build the series for the dashboard's configured experiments root."""
-        return cls(Path(experiments_root) / "results")
+        return cls(Path(experiments_root) / "results", configured, planned)
 
     @property
     def exists(self) -> bool:
@@ -166,14 +162,19 @@ class PipelineSeries:
         return self._pipeline_root.is_dir()
 
     def steps(self) -> list[str]:
-        """The expected map, then any discovered step directories not in it."""
+        """Configured steps, planned lanes, then discovered directories outside the map."""
         if not self.exists:
             return []
+        expected = list(dict.fromkeys((*self._configured, *self._planned)))
         discovered = sorted(
             path.name for path in self._pipeline_root.iterdir() if path.is_dir()
         )
-        extra = [step for step in discovered if step not in PIPELINE_STEPS]
-        return [*PIPELINE_STEPS, *extra]
+        extra = [step for step in discovered if step not in expected]
+        return [*expected, *extra]
+
+    def is_planned(self, step: str) -> bool:
+        """Whether the step is a planned lane that is not configured yet."""
+        return step in self._planned and step not in self._configured
 
     def step_dir(self, step: str) -> Path | None:
         """The step's existing directory, or None when it has not run."""
@@ -209,13 +210,18 @@ class PipelineSeries:
         rows: list[dict[str, str | int]] = []
         for step in self.steps():
             record = self.primary(step)
+            status: str
+            if record is not None:
+                status = record.decision.verdict
+            elif self.is_planned(step):
+                status = PLANNED_STATUS
+            else:
+                status = "not run yet"
             rows.append(
                 {
                     "experiment": step,
                     "question": record.decision.question if record is not None else "",
-                    "status": (
-                        record.decision.verdict if record is not None else "not run yet"
-                    ),
+                    "status": status,
                     "artifacts": len(self.artifacts(step)),
                 }
             )

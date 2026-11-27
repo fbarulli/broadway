@@ -45,6 +45,11 @@ def configure_story(
         _PAGE_RENDERER = page_renderer
 
 
+def story_config() -> StoryConfig:
+    """The configured story framing (the project launcher sets it)."""
+    return _CONFIG
+
+
 def render_section(section: Section) -> str:
     """One section: heading, conclusions, figure, numbers, then record links."""
     parts = ['<section class="story-section">', f"<h2>{html.escape(section.title)}</h2>"]

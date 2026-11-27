@@ -16,6 +16,7 @@ if TYPE_CHECKING:
 def _story_config() -> StoryConfig:
     """This project's story framing — the project layer owns the domain prose."""
     from broadway.reports.story import StoryConfig
+    from broadway.reports.story_models import StoryStepMap
 
     return StoryConfig(
         dataset="olist",
@@ -47,6 +48,27 @@ def _story_config() -> StoryConfig:
             "the target is an imbalanced binary",
             "the model sees purchase-time information only",
             "this is prediction, not causation",
+        ),
+        steps=StoryStepMap(
+            configured=(
+                "etl",
+                "eda",
+                "features",
+                "baseline",
+                "train",
+                "selection",
+                "hpo",
+                "evaluate",
+            ),
+            planned=(
+                "01_clean",
+                "02_missing",
+                "03_outliers",
+                "04_frame",
+                "06_correlation",
+                "07_clustering",
+                "08_timeseries",
+            ),
         ),
     )
 
