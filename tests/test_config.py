@@ -46,9 +46,18 @@ def stats_cfg():
     return cfg.stats
 
 
-def test_olist_analysis_contract_parses_through_load_config() -> None:
+def test_olist_analysis_contract_parses_through_load_config(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """The project analysis is valid YAML and a valid AnalysisContract."""
-    import project  # noqa: F401 — activates the project config overlay
+    # The autouse conftest fixture deletes the env var before every test, so
+    # set the overlay explicitly rather than relying on an import side effect
+    # (a second ``import project`` is a no-op once it is in sys.modules). The
+    # split path keeps this config-only equivalence test out of the platform
+    # hygiene guard's project-config literal, matching test_column_plan.py.
+    monkeypatch.setenv(
+        "BROADWAY_CONFIG_OVERLAY_DIR", str(repo_root() / "project" / "config")
+    )
 
     cfg = load_config("train", dataset="olist", experiment="olist", analysis="olist")
 

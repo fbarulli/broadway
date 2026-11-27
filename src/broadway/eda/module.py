@@ -91,12 +91,12 @@ class EdaRunner:
                 summary = SummaryAnalyzer(self._step.max_categories).analyze(
                     descriptive, self._roles()
                 )
-                missing = MissingnessAnalyzer(self._step.max_categories).analyze(profile)
+                missing = MissingnessAnalyzer(self._step.max_categories).analyze(descriptive)
                 quality = QualityAnalyzer(
                     self._step.iqr_multiplier,
                     self._step.z_threshold,
                     self._step.imbalance_min_share,
-                ).analyze(profile, self._dataset.task, self._dataset.target, self._roles())
+                ).analyze(descriptive, self._dataset.task, self._dataset.target, self._roles())
                 provenance = self._provenance(profile)
                 compare = EtlComparator(
                     _PRE_SPLIT_LABEL, _POST_SPLIT_LABEL, self._step

@@ -106,7 +106,10 @@ class QualityAnalyzer:
         if target not in frame.columns:
             return ImbalanceStats(
                 applicable=False,
-                reason=f"target column '{target}' not present in the profiled frame",
+                reason=(
+                    "the outcome distribution is published as class-balance "
+                    "evidence, not in the profile"
+                ),
                 target=target,
                 value_counts=[],
                 minority_share=None,

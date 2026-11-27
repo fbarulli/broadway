@@ -134,6 +134,30 @@ def test_decision_segments_plus_uncovered_cover_n_and_publish_the_tested_family(
     assert bundle.summary.evidence.uncovered == 1
 
 
+def test_high_cardinality_nominal_publishes_corrected_cramers_v() -> None:
+    """Above the cap the effect is the bias-corrected V; the raw V is kept."""
+    step = _step(permutations=10, max_features=2, max_categorical_levels=10)
+    n = 200
+    frame = pd.DataFrame(
+        {
+            "high_card": [f"v{i}" for i in range(n)],
+            "target": [i % 2 for i in range(n)],
+        }
+    )
+    bundle = FeatureTestAnalyzer(step, TaskType.CLASSIFICATION).analyze(
+        frame, "target", _PROVENANCE, _plan(frame)
+    )
+
+    row = next(item for item in bundle.features if item.feature == "high_card")
+    assert row.raw_effect_name == "cramers_v"
+    assert row.raw_effect is not None
+    assert row.effect <= row.raw_effect
+    assert bundle.decisions
+    assert bundle.decisions[0].evidence.sensitivity["cramers_v"] == pytest.approx(
+        row.raw_effect
+    )
+
+
 def test_context_columns_are_labeled_and_never_summarized() -> None:
     """A role=ignore association is measured but can neither act nor be the headline."""
     step = _step(permutations=10, max_features=4, min_sample_size=10)
@@ -377,6 +401,10 @@ def test_eda_step_publishes_every_decision_artifact(tmp_path: Path) -> None:
     html = (reports / "eda.html").read_text(encoding="utf-8")
     assert "Decisions" in html and "Correlation" in html
     assert html.count("data:image/png;base64,") >= 4
+    quality_section = html.split("<h2>Quality</h2>", 1)[1].split("<h2>", 1)[0]
+    missing_section = html.split("<h2>Missingness</h2>", 1)[1].split("<h2>", 1)[0]
+    assert "target" not in quality_section
+    assert "target" not in missing_section
 
     figure = (reports / "eda_effects.png").read_bytes()
     module.run(cfg)
