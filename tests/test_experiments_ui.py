@@ -298,12 +298,12 @@ def test_canvas_page_and_save_validate(monkeypatch, tmp_path) -> None:
 
 
 def test_experiment_page_renders_the_step_source(monkeypatch, tmp_path) -> None:
-    """The step page shows the code the step runs, above its artifacts."""
+    """The step page shows the code the step runs, visible rather than a dropdown."""
     _seed_dashboard(monkeypatch, tmp_path)
     body = ui.experiment_page("01_ingest", "alpha").body.decode("utf-8")
 
-    assert "<summary>code</summary>" in body
-    assert '<details class="code-block"><summary>show code — 01_ingest.py' in body
+    assert "<h3>code — 01_ingest.py" in body
+    assert "<details" not in body
     assert "Load the source data." in body
     assert "raw .py" in body
     assert "download" not in body

@@ -5,8 +5,9 @@ decision record and evidence under
 ``<experiments root>/results/pipeline/<step>/``. The dashboard exposes them through
 the normal series surface — one ``experiment | question | status | artifacts`` row per
 step, opening a step page — instead of a bespoke section. This module owns the data:
-the step list, the validated ``Decision`` records, the files a step produced, the
-static URLs and the producing module source. Rendering stays in the dashboard.
+the step list, the validated ``Decision`` records, the per-item ``Finding`` rows a
+record's feature-decision sidecar carries, the files a step produced, the static URLs
+and the producing module source. Rendering stays in the dashboard.
 
 Every ``*_decision.json`` is validated through the canonical ``Decision`` model; a
 malformed record is skipped (logged once per path with its full traceback) instead of
@@ -15,10 +16,10 @@ failing the page.
 
 from __future__ import annotations
 
+import json
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from urllib.parse import quote
 
 from pydantic import ValidationError
 
@@ -31,11 +32,21 @@ logger = logging.getLogger(__name__)
 PIPELINE_FOCUS = "pipeline"
 
 _RECORD_SUFFIX = "_decision.json"
+#: Sidecar keys that are step metadata, not per-item conclusions.
+_SIDECAR_METADATA = frozenset({"dataset", "summary"})
 #: ``src/broadway`` — the owner of every step module named by ``STEP_MODULES``.
 _PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 # A permanently malformed record is skipped on every request; log its full
 # traceback once so the contract's traceback rule does not become log bloat.
 _LOGGED_UNREADABLE: set[Path] = set()
+
+
+@dataclass(frozen=True)
+class Finding:
+    """One per-item conclusion from a step's feature-decision sidecar."""
+
+    section: str
+    decision: Decision
 
 
 @dataclass(frozen=True)
@@ -66,6 +77,56 @@ class PipelineRecord:
                 logger.exception("pipeline evidence: unreadable decision record at %s", record)
             return None
         return cls(step=record.parent.name, record=record, decision=decision)
+
+    def findings(self) -> list[Finding]:
+        """Per-item conclusions from this record's sidecar, skipping malformed entries."""
+        return findings_from_sidecar(self.sidecar)
+
+
+def findings_from_sidecar(path: Path) -> list[Finding]:
+    """Per-item conclusions from a feature-decision sidecar, skipping malformed entries."""
+    source = Path(path)
+    if not source.is_file():
+        return []
+    payload = _read_json(source)
+    if not isinstance(payload, dict):
+        if payload is not None and source not in _LOGGED_UNREADABLE:
+            _LOGGED_UNREADABLE.add(source)
+            logger.error("pipeline evidence: feature decisions are not a mapping at %s", source)
+        return []
+    return [
+        finding
+        for section, entries in payload.items()
+        if section not in _SIDECAR_METADATA
+        for finding in _section_findings(source, section, entries)
+    ]
+
+
+def _read_json(path: Path) -> object:
+    """Read a JSON document, logging its full traceback once per unreadable path."""
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        if path not in _LOGGED_UNREADABLE:
+            _LOGGED_UNREADABLE.add(path)
+            logger.exception("pipeline evidence: unreadable feature decisions at %s", path)
+        return None
+
+
+def _section_findings(path: Path, section: str, entries: object) -> list[Finding]:
+    """Validate one sidecar section: a list of decisions, or a single mapping."""
+    items = [entries] if isinstance(entries, dict) else entries
+    if not isinstance(items, list):
+        return []
+    found: list[Finding] = []
+    for item in items:
+        try:
+            found.append(Finding(section=section, decision=Decision.model_validate(item)))
+        except ValidationError:
+            if path not in _LOGGED_UNREADABLE:
+                _LOGGED_UNREADABLE.add(path)
+                logger.exception("pipeline evidence: invalid %s finding at %s", section, path)
+    return found
 
 
 class PipelineSeries:
@@ -133,10 +194,6 @@ class PipelineSeries:
                 }
             )
         return rows
-
-    def url(self, path: Path) -> str:
-        """The static URL serving one file of this series."""
-        return "/results/" + quote(path.relative_to(self._results_root).as_posix(), safe="/")
 
     def module_source(self, step: str) -> Path | None:
         """The step's producing module: ``STEP_MODULES`` (the SSOT), else ``<step>/module.py``."""

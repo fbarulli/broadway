@@ -3,8 +3,11 @@
 A synthetic checkout with one script series plus a published pipeline tree: the
 dashboard must list ``pipeline`` after the script series, show one
 ``experiment | question | status | artifacts`` row per pipeline step (linked to its
-step page), render that page with the decision, figure, table, report and code, and
-skip a malformed record with one logged traceback instead of failing the page.
+step page), render that page conclusions-first (decision strip, sidecar findings,
+figures, code) without the series graph, raw CSV previews, dropdown panels or
+observations, and skip a malformed record with one logged traceback instead of
+failing the page. The script-series step page has the same conclusions-first
+shape.
 """
 
 from __future__ import annotations
@@ -68,6 +71,28 @@ def test_pipeline_series_lists_steps_and_renders_step_pages(
     (step / "etl_effects.png").write_bytes(b"png")
     (step / "etl_effects.csv").write_text("stat,value\ncount,1\n", encoding="utf-8")
     (step / "etl.md").write_text("# ETL report\n", encoding="utf-8")
+    _write(
+        step / "etl_feature_decisions.json",
+        {
+            "summary": _decision(),
+            "features": [_decision(metric="association_price")],
+            "outliers": [_decision(metric="outlier_share_age")],
+            "comparison": _decision(metric="shift_age"),
+        },
+    )
+
+    alpha_results = root / "results" / "alpha"
+    alpha_results.mkdir(parents=True)
+    (alpha_results / "01_step.csv").write_text("stat,value\ncount,1\n", encoding="utf-8")
+    (alpha_results / "01_step.png").write_bytes(b"png")
+    _write(
+        alpha_results / "01_step_decision.json",
+        Decision.model_validate(_decision(metric="association_alpha")).model_dump(mode="json"),
+    )
+    _write(
+        alpha_results / "01_step_feature_decisions.json",
+        {"features": [_decision(metric="association_alpha")]},
+    )
 
     bad = root / "results" / "pipeline" / "bad"
     bad.mkdir(parents=True)
@@ -95,7 +120,7 @@ def test_pipeline_series_lists_steps_and_renders_step_pages(
         "experiment": "etl",
         "question": "Does the metric clear its threshold?",
         "status": "act",
-        "artifacts": 4,
+        "artifacts": 5,
     }
     assert rows[2] == {
         "experiment": "evaluate",
@@ -118,21 +143,45 @@ def test_pipeline_series_lists_steps_and_renders_step_pages(
     )
     assert (
         '<tr><td><a href="/experiments/etl?focus=pipeline">etl</a></td>'
-        "<td>Does the metric clear its threshold?</td><td>act</td><td>4</td></tr>"
+        "<td>Does the metric clear its threshold?</td><td>act</td><td>5</td></tr>"
     ) in dashboard_html
     assert "pipeline evidence" not in dashboard_html
 
     assert step_page.status_code == 200
     page = step_page.body.decode()
+    assert '<p class="question">Does the metric clear its threshold?</p>' in page
     assert 'class="decision act"' in page
-    assert "association_&lt;x&gt;" in page
-    assert "dataset: synthetic \u00b7 seed: 42" in page
-    assert '<img src="/results/pipeline/etl/etl_effects.png"' in page
+    assert "code — module.py" in page
+    # The conclusions stay: sidecar findings as tables, figures, then the code.
+    assert "findings — features" in page
+    assert "association_price" in page
+    assert "outlier_share_age" in page
+    assert "shift_age" in page
     assert '<table class="evidence">' in page
-    assert "<td>count</td>" in page
-    assert "ETL report" in page
-    assert "show code — module.py" in page
-    assert '<a href="/results/pipeline/etl/etl_decision.json">etl_decision.json</a>' in page
+    assert '<img src="/results/pipeline/etl/etl_effects.png"' in page
+    # No graph, no raw CSV preview, no dropdown panels, no artifact links/observations.
+    assert "steps taken in the pipeline" not in page
+    assert "tables and raw artifacts" not in page
+    assert "<details" not in page
+    assert "etl_effects.csv" not in page
+    assert "<td>count</td>" not in page
+    assert "ETL report" not in page
+    assert '<a href="/results/' not in page
+    assert "observations" not in page
+
+    experiment = ui.experiment_page("01_step", "alpha").body.decode()
+    assert '<p class="question">A script step.</p>' in experiment
+    assert 'class="decision act"' in experiment
+    assert "findings — features" in experiment
+    assert "association_alpha" in experiment
+    assert '<img src="/results/alpha/01_step.png"' in experiment
+    assert "code — 01_step.py" in experiment
+    assert "steps taken in the pipeline" not in experiment
+    assert "tables and raw artifacts" not in experiment
+    assert "<details" not in experiment
+    assert "<td>count</td>" not in experiment
+    assert '<a href="/results/' not in experiment
+    assert "observations" not in experiment
 
     multi_record = multi_record_page.body.decode()
     assert "<h2>champion_promotion</h2>" in multi_record
