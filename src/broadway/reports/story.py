@@ -51,6 +51,7 @@ from broadway.reports.pipeline_evidence import (
     findings_from_sidecar,
 )
 from broadway.reports.story_models import (
+    _VERDICT_LABELS,
     Candidate,
     Effect,
     Section,
@@ -267,9 +268,17 @@ class Story:
             )
         ]
         acts = [effect for effect in effects if effect.verdict == "act"]
-        if len(acts) >= 2:
+        context = [effect for effect in effects if effect.verdict != "act"]
+        if len(acts) >= 2 and len(context) >= 2 and context[0].value > acts[0].value:
             conclusions.append(
-                f"{acts[0].label} and {acts[1].label} dominate the association ranking "
+                f"In the purchase-time feature ranking, {acts[0].label} and {acts[1].label} "
+                f"lead ({acts[0].value:.2f} and {acts[1].value:.2f}); {context[0].label} and "
+                f"{context[1].label} are the strongest context associations "
+                f"({context[0].value:.2f} and {context[1].value:.2f})."
+            )
+        elif len(acts) >= 2:
+            conclusions.append(
+                f"{acts[0].label} and {acts[1].label} lead the association ranking "
                 f"({acts[0].value:.2f} and {acts[1].value:.2f}); both clear the configured "
                 "effect floor."
             )
@@ -290,11 +299,26 @@ class Story:
                 "The per-feature evidence table has not been published yet, so the "
                 "association ranking is not narrated."
             )
-        noise = len(effects) - len(acts)
-        if acts and noise:
-            verb = "behaviour sits" if noise == 1 else "behaviours sit"
-            is_are = "is" if noise == 1 else "are"
-            conclusions.append(f"{noise} further {verb} at or below the floor and {is_are} noise.")
+        verdicts = _verdict_counts(effects, provenance)
+        biased = [effect for effect in effects if effect.bootstrap_biased]
+        biased_investigate = sum(1 for effect in biased if effect.verdict == "investigate")
+        parts = []
+        for key, label in _VERDICT_LABELS:
+            if verdicts.get(key):
+                suffix = (
+                    f" ({biased_investigate} bootstrap-biased)"
+                    if key == "investigate" and biased_investigate
+                    else ""
+                )
+                parts.append(f"{verdicts[key]} {label}{suffix}")
+        if parts:
+            conclusions.append("Verdicts: " + ", ".join(parts) + ".")
+        if biased:
+            names = ", ".join(effect.label for effect in biased)
+            conclusions.append(
+                f"{names}: bootstrap-biased, interval not centred on the point; shown in "
+                "the numbers, not the figure."
+            )
         if effects:
             conclusions.append(self._config.post_purchase_note)
         if outliers:
@@ -302,8 +326,8 @@ class Story:
             names = ", ".join(_label(item.metric) for item in flagged[:3])
             suffix = f" ({names})" if names else ""
             conclusions.append(
-                f"{len(flagged)} of {len(outliers)} profiled columns are heavy-tailed{suffix}; "
-                "the data was flagged, not silently trimmed."
+                f"{len(flagged)} of {len(outliers)} admissible feature columns are "
+                f"heavy-tailed{suffix}; the data was flagged, not silently trimmed."
             )
         if comparison:
             conclusions.append(_shift_note(max(comparison, key=lambda item: abs(item.value))))
@@ -593,17 +617,18 @@ class Story:
         if record is None:
             return None
         effects = self._effects(record)
-        if not effects:
+        plot_effects = [effect for effect in effects if not effect.bootstrap_biased]
+        if not plot_effects:
             return None
         calibrated = all(
             effect.null_threshold is not None
             and effect.low is not None
             and effect.high is not None
-            for effect in effects
+            for effect in plot_effects
         )
         if calibrated:
             rows: list[tuple[str, float, float | None, float | None]] = []
-            for effect in effects:
+            for effect in plot_effects:
                 assert effect.null_threshold is not None
                 assert effect.low is not None and effect.high is not None
                 null = effect.null_threshold
@@ -624,7 +649,7 @@ class Story:
             )
         rows = [
             (_effect_label(effect), effect.value, effect.low, effect.high)
-            for effect in effects
+            for effect in plot_effects
         ]
         return figures.eda_figure(
             rows,
@@ -671,18 +696,25 @@ class Story:
         ]
         effects = []
         for decision in decisions:
-            statistic, null = stats.get(_feature_key(decision.metric), (None, None))
+            statistic, null, table_biased = stats.get(
+                _feature_key(decision.metric), (None, None, False)
+            )
+            value = decision.value
+            low = decision.interval_low
+            high = decision.interval_high
+            biased = table_biased or value < low or value > high
             effects.append(
                 Effect(
                     label=_label(decision.metric),
-                    value=decision.value,
-                    low=decision.interval_low,
-                    high=decision.interval_high,
+                    value=value,
+                    low=low,
+                    high=high,
                     verdict=decision.verdict,
                     statistic=statistic,
                     null_threshold=(
                         null if null is not None else decision.null_threshold
                     ),
+                    bootstrap_biased=biased,
                 )
             )
         return sorted(effects, key=lambda effect: effect.value, reverse=True)

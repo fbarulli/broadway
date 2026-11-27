@@ -100,6 +100,7 @@ class Effect:
     verdict: str
     statistic: str | None = None
     null_threshold: float | None = None
+    bootstrap_biased: bool = False
 
 
 @dataclass(frozen=True)
@@ -403,15 +404,20 @@ def _feature_key(metric: str) -> str:
 
 def _effect_stats(
     frame: pd.DataFrame | None,
-) -> dict[str, tuple[str | None, float | None]]:
-    """Per-feature statistic name and shuffle null from the effects table, when present."""
+) -> dict[str, tuple[str | None, float | None, bool]]:
+    """Per-feature statistic, shuffle null and bootstrap-bias flag, when present."""
     if frame is None or "feature" not in frame.columns:
         return {}
-    stats: dict[str, tuple[str | None, float | None]] = {}
+    stats: dict[str, tuple[str | None, float | None, bool]] = {}
     for _, row in frame.iterrows():
         statistic = str(row["effect_name"]) if "effect_name" in frame.columns else None
         null = _as_float(row["null_threshold"]) if "null_threshold" in frame.columns else None
-        stats[str(row["feature"])] = (statistic, null)
+        biased = (
+            _is_true(row["bootstrap_biased"])
+            if "bootstrap_biased" in frame.columns
+            else False
+        )
+        stats[str(row["feature"])] = (statistic, null, biased)
     return stats
 
 

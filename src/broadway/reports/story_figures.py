@@ -97,6 +97,14 @@ def join_figure(
     return figure
 
 
+def _clamp_low(low: float | None, value: float) -> float:
+    return value if low is None else min(low, value)
+
+
+def _clamp_high(high: float | None, value: float) -> float:
+    return value if high is None else max(high, value)
+
+
 def eda_figure(
     rows: list[tuple[str, float, float | None, float | None]],
     floor: float,
@@ -115,8 +123,9 @@ def eda_figure(
         frame = pd.DataFrame(
             {
                 "value": [value for _, value, _, _ in top],
-                "low": [low for _, _, low, _ in top],
-                "high": [high for _, _, _, high in top],
+                # A point outside its published interval would make xerr negative.
+                "low": [_clamp_low(low, value) for _, value, low, _ in top],
+                "high": [_clamp_high(high, value) for _, value, _, high in top],
             },
             index=labels,
         )

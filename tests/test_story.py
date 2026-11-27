@@ -17,6 +17,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import shutil
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -532,6 +533,31 @@ def test_story_does_not_invent_a_conclusion_when_evidence_is_missing(
     assert "found nothing" not in page
     assert "/story/figure/eda" not in page
     assert client.get("/story/figure/eda").status_code == 404
+
+
+def test_story_eda_figure_survives_the_real_biased_rows(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """The committed zip/city interval is biased; the EDA figure must still be 200."""
+    root = tmp_path / "experiments"
+    eda = root / "results" / "pipeline" / "eda"
+    source = Path("project/experiments/results/pipeline/eda")
+    for name in ("eda_decision.json", "eda_feature_decisions.json", "eda_effects.csv"):
+        eda.mkdir(parents=True, exist_ok=True)
+        shutil.copy(source / name, eda / name)
+
+    _configure(monkeypatch, root, "olist")
+    client = TestClient(ui.app)
+    figure = client.get("/story/figure/eda")
+    page = client.get("/story").text
+
+    assert figure.status_code == 200
+    assert figure.headers["content-type"] == "image/png"
+    assert "customer zip code prefix, customer city: bootstrap-biased" in page
+    assert "interval not centred on the point" in page
+    assert "In the purchase-time feature ranking" in page
+    assert "are the strongest context associations" in page
+    assert "12 of 12 admissible feature columns" in page
 
 
 def test_story_selection_survives_malformed_candidates(
