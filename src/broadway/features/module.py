@@ -61,6 +61,8 @@ class FeaturesDecision:
         plan_names: list[str],
         val_rows_in: int,
         val_rows_out: int | None,
+        half_sample_loss: float,
+        half_sample_rows: int,
     ) -> None:
         assert cfg.dataset is not None and cfg.features is not None
         self._cfg = cfg
@@ -68,6 +70,8 @@ class FeaturesDecision:
         self._plan_names = plan_names
         self._val_rows_in = val_rows_in
         self._val_rows_out = val_rows_out
+        self._half_sample_loss = half_sample_loss
+        self._half_sample_rows = half_sample_rows
 
     def rule(self) -> DecisionRule:
         assert self._cfg.dataset is not None and self._cfg.features is not None
@@ -81,7 +85,7 @@ class FeaturesDecision:
         )
 
     def decision(self) -> Decision:
-        assert self._cfg.features is not None
+        assert self._cfg.features is not None and self._cfg.dataset is not None
         audit = self._audit
         rows_in = max(audit.rows_in, 1)
         value = audit.rows_dropped_total / rows_in
@@ -106,10 +110,12 @@ class FeaturesDecision:
                 f"features_added_n{rows_in}": float(len(audit.columns_added)),
                 f"features_removed_n{rows_in}": float(len(audit.columns_removed)),
                 f"plan_columns_n{rows_in}": float(len(self._plan_names)),
+                f"first_half_row_loss_n{self._half_sample_rows}": self._half_sample_loss,
             },
             falsifier="the row-loss interval clears the configured drop ceiling",
             provenance={
                 "artifact": self._cfg.features.pipeline_file,
+                "dataset": self._cfg.dataset.name,
                 "plan_columns": ", ".join(self._plan_names),
                 "columns_added": ", ".join(audit.columns_added) or "none",
                 "columns_removed": ", ".join(audit.columns_removed) or "none",
@@ -125,8 +131,9 @@ class FeaturesDecision:
             unit="share",
         )
 
-    def publish(self, out_dir: Path) -> Decision:
+    def publish(self) -> Decision:
         """Write the record plus the keep/drop/transform figure."""
+        assert self._cfg.features is not None
         decision = self.decision()
         import matplotlib
 
@@ -153,7 +160,9 @@ class FeaturesDecision:
             )
         axis.set_ylabel("columns")
         axis.set_title("feature surface: keep / drop / transform")
-        output = StepOutput(results_dir=out_dir, stem="features", decision=decision)
+        output = StepOutput(
+            results_dir=Path(self._cfg.features.output_dir), stem="features", decision=decision
+        )
         output.save_figure(figure)
         plt.close("all")
         output.write()
@@ -203,13 +212,19 @@ def run(cfg: PipelineConfig) -> None:
         columns_removed=sorted(set(columns_before) - set(columns_after)),
     )
     enforce_drop_fraction(audit, cfg.features.max_drop_fraction)
+    half_rows = len(train) // 2
+    half_out = pipeline.transform(
+        train.iloc[:half_rows], plan, cfg.dataset.target, cfg.features.frequency_fill
+    )
     decision = FeaturesDecision(
         cfg,
         audit,
         plan_names=list(plan.names),
         val_rows_in=0 if val is None else len(val),
         val_rows_out=None if val is None else len(val_out),
-    ).publish(out_dir)
+        half_sample_loss=(half_rows - len(half_out)) / max(half_rows, 1),
+        half_sample_rows=max(half_rows, 1),
+    ).publish()
     logger.info(
         "features decision: %s — row loss %.4f (ceiling %.4f), +%d/-%d columns",
         decision.verdict,

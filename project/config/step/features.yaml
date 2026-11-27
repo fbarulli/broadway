@@ -2,6 +2,11 @@
 # The base `configs/step/features.yaml` carries the generic mechanics only; the
 # imputation study's injected columns must exist in this dataset's column plan,
 # so the whole block lives in the project overlay.
+#
+# The report, figure and decision record are committed evidence on the
+# dashboard's pipeline surface; the fitted pipeline itself stays in the
+# dataset's processed store (cfg.etl), never here.
+output_dir: project/experiments/results/pipeline/features
 imputation_study:
   strategies: [median, mean, mode, knn]
   scalings: [none, standard]

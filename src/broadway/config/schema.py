@@ -513,13 +513,20 @@ class ImputationStudyConfig(BaseModel):
 
 
 class FeaturesStep(BaseModel):
-    """Features-step knobs; the optional impact study writes its own table."""
+    """Features-step knobs; the optional impact study writes its own table.
+
+    ``output_dir`` is the human-read evidence surface (report, figure and
+    decision record). The persisted pipeline and transformed splits stay in the
+    dataset's processed store; the two roots are separate because one is
+    committed evidence and the other machine state.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
     frequency_fill: float
     pipeline_file: str
     max_drop_fraction: float = Field(ge=0.0, le=1.0)
+    output_dir: str
     imputation_study: ImputationStudyConfig | None = None
 
 
