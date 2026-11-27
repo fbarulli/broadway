@@ -1,0 +1,49 @@
+{
+  "question": "Do the HPO-best params beat the declared defaults on training-only repeated CV?",
+  "metric": "improvement_over_default_rmse",
+  "value": 0.01421836018396466,
+  "interval_low": 0.009646639804010343,
+  "interval_high": 0.01857282437997488,
+  "reference": null,
+  "delta": null,
+  "threshold": 0.01,
+  "null_threshold": null,
+  "direction": "max",
+  "verdict": "investigate",
+  "action": "adopt the HPO-best params for the tuned champion",
+  "owner": "amazon",
+  "sample_size": 481,
+  "unit": "relative_improvement",
+  "min_sample_size": 400,
+  "evidence": {
+    "baseline": "the experiment's default params on the identical HPO folds",
+    "delta": 0.01421836018396466,
+    "segments": [
+      {
+        "segment": "low_target_half",
+        "value": 0.025851506983582462,
+        "sample_size": 253
+      },
+      {
+        "segment": "high_target_half",
+        "value": 0.01300510915002321,
+        "sample_size": 228
+      }
+    ],
+    "sensitivity": {
+      "second_seed_improvement_seed99": 0.009359620004631083,
+      "best_cv_rmse_n481": 0.8256266666666665,
+      "default_cv_rmse_n481": 0.8372133333333334
+    },
+    "falsifier": "the paired best-vs-default interval's lower bound falls at or below the configured effect floor",
+    "provenance": {
+      "dataset": "amazon",
+      "seed": "7",
+      "folds": "3x5 shuffled KFold (HPO seed)",
+      "trials": "40",
+      "model": "rf",
+      "best_params": "{'n_estimators': 570, 'max_depth': 14, 'min_samples_leaf': 2, 'min_samples_split': 5, 'max_samples': 0.5416264327961499}",
+      "resampling": "paired fold bootstrap"
+    }
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "model": "rf",
+  "best_params": {
+    "n_estimators": 570,
+    "max_depth": 14,
+    "min_samples_leaf": 2,
+    "min_samples_split": 5,
+    "max_samples": 0.5416264327961499
+  },
+  "best_cv": 0.8256266666666665,
+  "default_cv": 0.8372133333333334,
+  "trials": 40,
+  "metric": "rmse"
+}

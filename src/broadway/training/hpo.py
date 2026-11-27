@@ -96,6 +96,17 @@ def _mlflow_callback(
     return callback
 
 
+def suggest_params(model: ModelHPOSpec, trial: optuna.Trial) -> dict[str, float | int]:
+    """Sample one search-space point from ``trial`` (the single suggestion rule)."""
+    params: dict[str, float | int] = {}
+    for name, (low, high) in model.search_space.items():
+        if isinstance(low, int) and isinstance(high, int):
+            params[name] = trial.suggest_int(name, low, high)
+        else:
+            params[name] = trial.suggest_float(name, low, high)
+    return params
+
+
 def _trial_objective(
     model: ModelHPOSpec,
     objective: Objective,
@@ -103,13 +114,7 @@ def _trial_objective(
     """Wrap the params-dict objective into an Optuna trial objective."""
 
     def run(trial: optuna.Trial) -> float:
-        params: dict[str, float | int] = {}
-        for name, (low, high) in model.search_space.items():
-            if isinstance(low, int) and isinstance(high, int):
-                params[name] = trial.suggest_int(name, low, high)
-            else:
-                params[name] = trial.suggest_float(name, low, high)
-        value = float(objective(params, trial))
+        value = float(objective(suggest_params(model, trial), trial))
         if not np.isfinite(value):
             raise optuna.TrialPruned()
         return value

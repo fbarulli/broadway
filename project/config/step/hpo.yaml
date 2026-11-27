@@ -1,0 +1,21 @@
+# Amazon HPO — training-only repeated CV for the selected champion.
+# The folds are seeded independently of the selection folds (2026): the tuned
+# score is never read on the partition that picked the winner. The search space
+# and trial budget live in experiment/amazon_hpo.yaml (SSOT).
+metric: rmse
+cv:
+  folds: 5
+  repeats: 3
+  random_state: 7
+sensitivity_random_state: 99
+bootstrap:
+  iterations: 2000
+  seed: 7
+  level: 0.95
+selection_record: project/experiments/results/pipeline/selection/selection_champion.json
+min_effect: 0.01
+min_sample_size: 400
+action: "adopt the HPO-best params for the tuned champion"
+owner: amazon
+output_dir: project/experiments/results/pipeline/hpo
+output_file: project/experiments/results/pipeline/hpo/hpo_champion.json
