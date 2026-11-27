@@ -7,7 +7,9 @@ serve a PNG), hyperlink the decision records, say "not run yet" for a stage with
 no record, escape record text, and never raise for the malformed record (one
 logged traceback instead). A second fixture pins the evidence-scoping rule: a
 stale foreign CSV must never be read, and an `act` record without a sidecar must
-not be reported as "found nothing".
+not be reported as "found nothing". The acceptance ruling is pinned explicitly:
+every section that makes a data claim carries a figure, while "What we learned /
+what is next" carries numbers and record links and deliberately no chart.
 """
 
 from __future__ import annotations
@@ -21,6 +23,7 @@ from fastapi.testclient import TestClient
 
 from broadway.reports import experiments_dashboard as ui
 from broadway.reports import story as story_module
+from broadway.reports import story_page
 from broadway.reports.decision import Decision
 
 
@@ -79,8 +82,8 @@ def _config(dataset: str) -> story_module.StoryConfig:
 
 
 def _configure(monkeypatch, root: Path, dataset: str) -> None:
-    monkeypatch.setattr(story_module, "_CONFIG", _config(dataset))
-    monkeypatch.setattr(story_module, "_ROOT_PROVIDER", lambda: root)
+    monkeypatch.setattr(story_page, "_CONFIG", _config(dataset))
+    monkeypatch.setattr(story_page, "_ROOT_PROVIDER", lambda: root)
     monkeypatch.setattr(ui, "EXPERIMENTS_ROOT", root)
 
 
@@ -129,6 +132,20 @@ def test_story_leads_with_conclusions_and_skips_bad_records(
                 interval_high=0.31,
                 unit="epsilon_squared",
                 sample_size=50,
+                evidence={
+                    "baseline": "no-effect shuffle of the target at this n",
+                    "delta": None,
+                    "segments": [{"segment": "weekday", "value": 0.94, "sample_size": 30000}],
+                    "sensitivity": {"half_sample": 0.93},
+                    "falsifier": "the interval falls at or below the threshold",
+                    "provenance": {
+                        "dataset": "synthetic",
+                        "seed": "42",
+                        "family_size": "21",
+                        "acted": "2",
+                        "investigated": "1",
+                    },
+                },
             )
         ).model_dump(mode="json"),
     )
@@ -200,6 +217,9 @@ def test_story_leads_with_conclusions_and_skips_bad_records(
     assert "Bad reviews are the cost this project predicts" in page
     assert "What the data says" in page
     assert "rating accuracy score" in page
+    # The correction family is the record's family_size, not the sidecar row count.
+    assert "21 tested · 3 decided (2 act, 1 no action)" in page
+    assert "The BH correction family is 21 features; only 3 crossed" in page
     # Conclusions first, graph, then numbers and the record link.
     assert "Verdict: no_action" in page
     assert "verdict: act" in page
@@ -298,6 +318,186 @@ def test_story_ignores_stale_foreign_evidence(monkeypatch, tmp_path: Path) -> No
     assert "AMAZON STALE RECORD" not in page
     assert "not run yet — the etl decision record has not been published." in page
     assert "association_delivery_days = 0.99" in page
+
+
+def test_story_features_figure_and_learned_numbers(monkeypatch, tmp_path: Path) -> None:
+    """Data-claim sections carry a figure; the learned section carries numbers/links only."""
+    root = tmp_path / "experiments"
+    features = root / "results" / "pipeline" / "features"
+    _write(
+        features / "features_decision.json",
+        Decision.model_validate(
+            _decision(
+                question="Did the feature step keep every row?",
+                metric="row_loss_share",
+                value=0.0,
+                interval_low=0.0,
+                interval_high=0.0,
+                unit="share",
+                verdict="no_action",
+                sample_size=50,
+                evidence={
+                    "baseline": "row-preserving transform",
+                    "delta": None,
+                    "segments": [{"segment": "all", "value": 0.0, "sample_size": 50}],
+                    "sensitivity": {
+                        "features_added_n50": 3.0,
+                        "features_removed_n50": 1.0,
+                        "plan_columns_n50": 4.0,
+                    },
+                    "falsifier": "the row-loss interval clears the drop ceiling",
+                    "provenance": {
+                        "dataset": "synthetic",
+                        "columns_added": "first_enc, second_enc, third_enc",
+                    },
+                },
+            )
+        ).model_dump(mode="json"),
+    )
+    evaluate = root / "results" / "pipeline" / "evaluate"
+    _write(
+        evaluate / "champion_promotion_decision.json",
+        Decision.model_validate(
+            _decision(
+                question="Does the candidate beat the champion on the holdout?",
+                metric="improvement_rmse",
+                value=0.20,
+                interval_low=0.10,
+                interval_high=0.30,
+                threshold=0.05,
+                unit="relative_improvement",
+                verdict="act",
+                sample_size=50,
+            )
+        ).model_dump(mode="json"),
+    )
+    _configure(monkeypatch, root, "synthetic")
+    client = TestClient(ui.app)
+    page = client.get("/story").text
+
+    # A features data claim carries its feature-surface figure.
+    assert "Feature surface: added 3, removed 1, plan columns 4." in page
+    assert "/story/figure/features" in page
+    assert client.get("/story/figure/features").status_code == 200
+    # The learned section is next-steps: numbers and a record link, never a chart.
+    learned = page.split("<h2>What we learned / what is next</h2>", 1)[1].split(
+        "</section>", 1
+    )[0]
+    assert "The result is bounded by" in learned
+    assert "holdout ·" in learned
+    assert '<a href="/experiments/evaluate?focus=pipeline">holdout record</a>' in learned
+    assert "<figure>" not in learned
+    assert "<img" not in learned
+
+
+def test_story_eda_count_uses_family_size(monkeypatch, tmp_path: Path) -> None:
+    """21 tested / 12 decided must come from the record, not the 12 decision rows."""
+    root = tmp_path / "experiments"
+    eda = root / "results" / "pipeline" / "eda"
+    _write(
+        eda / "eda_decision.json",
+        Decision.model_validate(
+            _decision(
+                metric="association_delivery_days",
+                value=0.41,
+                interval_low=0.36,
+                interval_high=0.51,
+                unit="rank_biserial_r",
+                sample_size=100,
+                evidence={
+                    "baseline": "no-effect shuffle of the target at this n",
+                    "delta": None,
+                    "segments": [{"segment": "all", "value": 0.41, "sample_size": 100}],
+                    "sensitivity": {"half_sample": 0.39},
+                    "falsifier": "the interval falls at or below the threshold",
+                    "provenance": {
+                        "dataset": "synthetic",
+                        "family_size": "21",
+                        "acted": "11",
+                        "investigated": "1",
+                    },
+                },
+            )
+        ).model_dump(mode="json"),
+    )
+    features = [
+        _decision(
+            metric=f"association_feature_{index}",
+            value=0.20 - index * 0.01,
+            interval_low=0.10,
+            interval_high=0.30,
+            sample_size=50,
+        )
+        for index in range(11)
+    ]
+    features.append(
+        _decision(
+            metric="association_feature_11",
+            value=0.01,
+            interval_low=0.0,
+            interval_high=0.02,
+            sample_size=50,
+            verdict="investigate",
+        )
+    )
+    _write(
+        eda / "eda_feature_decisions.json",
+        {"dataset": "synthetic", "features": features},
+    )
+    _configure(monkeypatch, root, "synthetic")
+    page = TestClient(ui.app).get("/story").text
+
+    assert "21 tested · 12 decided (11 act, 1 investigate)" in page
+    assert (
+        "The BH correction family is 21 features; only 12 crossed the reporting threshold."
+        in page
+    )
+
+
+def test_story_reads_provenance_named_class_balance(
+    monkeypatch, tmp_path: Path
+) -> None:
+    root = tmp_path / "experiments"
+    etl = root / "results" / "pipeline" / "etl"
+    _write(
+        etl / "etl_decision.json",
+        Decision.model_validate(
+            _decision(
+                metric="rows_dropped_unexplained_share",
+                value=0.0,
+                interval_low=0.0,
+                interval_high=0.0,
+                unit="share",
+                verdict="no_action",
+                sample_size=99441,
+                evidence={
+                    "baseline": "every dropped row carries a reason",
+                    "delta": None,
+                    "segments": [{"segment": "all", "value": 0.0, "sample_size": 99441}],
+                    "sensitivity": {"rows_out": 98673.0},
+                    "falsifier": "the interval clears the drop ceiling",
+                    "provenance": {
+                        "dataset": "synthetic",
+                        "rows_in": "99441",
+                        "rows_out": "98673",
+                        "reasons": "null target: -768 rows",
+                        "class_balance": "class_balance.csv",
+                    },
+                },
+            )
+        ).model_dump(mode="json"),
+    )
+    (etl / "class_balance.csv").write_text(
+        "class,count\nbad_review,14495\ngood_review,84178\nmissing_target,768\n",
+        encoding="utf-8",
+    )
+    _configure(monkeypatch, root, "synthetic")
+    page = TestClient(ui.app).get("/story").text
+
+    assert (
+        "class balance (n=99,441): bad review 14,495, good review 84,178, "
+        "missing target 768"
+    ) in page
 
 
 def test_story_does_not_invent_a_conclusion_when_evidence_is_missing(

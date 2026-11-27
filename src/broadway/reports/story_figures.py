@@ -139,6 +139,22 @@ def eda_figure(
     return figure
 
 
+def features_figure(stages: list[tuple[str, int]], title: str) -> Figure:
+    """Feature-surface counts: plan columns, added columns, removed columns."""
+    figure = Figure(figsize=(8.0, 2.8), dpi=150)
+    axis = figure.add_subplot(111)
+    labels = [label for label, _ in stages]
+    counts = [count for _, count in stages]
+    axis.barh(labels, counts, color=viz.palette_colors(len(labels)))
+    axis.set_title(title, fontsize=viz.TITLE_FONTSIZE)
+    axis.set_xlabel("columns", fontsize=viz.LABEL_FONTSIZE)
+    axis.tick_params(labelsize=viz.TICK_FONTSIZE)
+    for index, (_, count) in enumerate(stages):
+        axis.text(count, index, f" {count:,}", va="center", fontsize=viz.TICK_FONTSIZE)
+    viz.despine(axis)
+    return figure
+
+
 def model_figure(
     candidates: list[str],
     rmses: list[float],

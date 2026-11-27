@@ -50,8 +50,9 @@ from broadway.reports.pipeline_evidence import (
     PipelineSeries,
     findings_from_sidecar,
 )
-from broadway.reports.story import STORY_TITLE, Story, configure_story
-from broadway.reports.story import router as story_router
+from broadway.reports.story import STORY_TITLE, Story
+from broadway.reports.story_page import configure_story, render_body
+from broadway.reports.story_page import router as story_router
 
 logger = logging.getLogger(__name__)
 
@@ -844,7 +845,7 @@ def _render_pipeline_step_page(step: str, series: list[str]) -> str:
 
 def _render_story_page(builder: Story) -> str:
     """Wrap the project story in the shared conclusions-first page frame."""
-    return _render_step_page(STORY_TITLE, builder.question, builder.page_body(), "", [])
+    return _render_step_page(STORY_TITLE, builder.question, render_body(builder), "", [])
 
 
 configure_story(

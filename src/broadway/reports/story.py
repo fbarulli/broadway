@@ -21,26 +21,28 @@ exclusions, caveats) belong to the project layer: ``project/dashboard.py`` passe
 a :class:`StoryConfig` through :func:`configure_story`. The platform fallback is
 neutral, so ``src/broadway`` stays data-agnostic.
 
+Every section that makes a **data claim** carries a figure: the question's
+decision boundary, the data funnel, the EDA effect sizes, the feature surface,
+the cleaning funnel, and the model intervals. "What we learned / what is next"
+is a next-steps section: it carries the numbers and record links, deliberately
+without a decorative chart. That split is the acceptance criterion, and the
+tests pin it.
+
 Graphs are drawn in memory with matplotlib's Agg backend and the shared
-``broadway.viz`` helpers (deterministic, no new dependency, no scratch files).
-The routes live here as an :data:`router`; the dashboard includes it and supplies
-the page frame.
+``broadway.viz`` helpers (deterministic, no new dependency, no scratch files);
+the narrative-to-HTML frame and the routes live in
+:mod:`broadway.reports.story_page`.
 """
 
 from __future__ import annotations
 
-import html
 import json
 import logging
 import os
-from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from urllib.parse import quote
 
 import pandas as pd
-from fastapi import APIRouter
-from fastapi.responses import HTMLResponse, PlainTextResponse, Response
 from matplotlib.figure import Figure
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -59,9 +61,16 @@ STORY_TITLE = "The project story"
 #: Optional env override of the configured dataset (an empty value defers to config).
 STORY_DATASET_ENV = "BROADWAY_STORY_DATASET"
 
-_TARGET_COLUMNS = frozenset({"bad_review", "target", "class", "label"})
+#: Neutral aliases for a target column; the project's own name comes from config.
+_TARGET_COLUMN_ALIASES = frozenset({"target", "class", "label"})
 _COUNT_COLUMNS = frozenset({"count", "n", "orders", "rows", "order_count"})
 _FEATURE_SECTIONS = ("features", "associations")
+_VERDICT_LABELS = (
+    ("act", "act"),
+    ("investigate", "investigate"),
+    ("no_action", "no action"),
+    ("insufficient", "insufficient"),
+)
 _LABEL_PREFIXES = ("association_", "outlier_share_", "standardized_shift_", "shift_")
 _STEPS = ("etl", "eda", "features", "baseline", "selection", "hpo", "evaluate")
 # A permanently malformed file is skipped on every request; log its full
@@ -79,6 +88,7 @@ class StoryConfig(BaseModel):
     why: str = Field(min_length=1)
     target_label: str = Field(min_length=1)
     target_rule: str = Field(min_length=1)
+    target_column: str = Field(default="target", min_length=1)
     decision_moment: str = Field(min_length=1)
     source_name: str = ""
     source_tables: int | None = Field(default=None, gt=0)
@@ -98,6 +108,7 @@ class StoryConfig(BaseModel):
             ),
             target_label="outcome",
             target_rule="the configured target",
+            target_column="target",
             decision_moment="decision time",
             source_name="",
             source_tables=None,
@@ -242,9 +253,11 @@ class Story:
         if rows_in is not None and rows_out is not None:
             dropped = rows_in - rows_out
             detail = f" ({dropped:,} dropped)" if dropped else ""
+            source_suffix = " source orders" if decision.sample_size == rows_in else ""
+            n_phrase = f"{decision.sample_size:,}{source_suffix}"
             conclusions.append(
-                f"The record's n is {decision.sample_size:,} source orders; the join kept "
-                f"{rows_out:,} rows after the accounted drops{detail}."
+                f"The record's n is {n_phrase}; the join kept {rows_out:,} rows after the "
+                f"accounted drops{detail}."
             )
         else:
             conclusions.append(
@@ -271,6 +284,7 @@ class Story:
         if record is None:
             return _missing("What the data says", "eda")
         decision = record.decision
+        provenance = decision.evidence.provenance
         effects = self._effects(record)
         outliers = self._findings(record, "outliers")
         comparison = self._findings(record, "comparison")
@@ -321,11 +335,17 @@ class Story:
             )
         if comparison:
             conclusions.append(_shift_note(max(comparison, key=lambda item: abs(item.value))))
-        numbers = [_decision_number(decision)]
-        if effects:
-            numbers.append(
-                f"{len(effects)} associations tested · {len(acts)} act"
+        tested = _as_int(provenance.get("family_size"))
+        decided = len(effects) or _decided_from_provenance(provenance)
+        verdict_counts = _verdict_counts(effects, provenance)
+        if tested is not None and decided and tested != decided:
+            conclusions.append(
+                f"The BH correction family is {tested} features; only {decided} crossed "
+                "the reporting threshold."
             )
+        numbers = [_decision_number(decision)]
+        if decided:
+            numbers.append(_association_count(tested, decided, verdict_counts))
         return Section(
             title="What the data says",
             conclusions=tuple(conclusions),
@@ -389,12 +409,7 @@ class Story:
             if flagged:
                 numbers.append(f"outlier action: {flagged[0].action}")
             records.append(("EDA record", "eda"))
-        if flagged:
-            conclusions.append(
-                "Trade-off: the record's action trades tail fidelity for model stability; "
-                "it does not authorise deleting rows silently."
-            )
-        elif etl is not None:
+        if etl is not None:
             conclusions.append(
                 "Trade-off: rows are dropped only with a recorded reason, so the model "
                 "inherits that selection honestly instead of seeing a silently repaired table."
@@ -431,10 +446,18 @@ class Story:
         if example is not None:
             conclusions.append(f"One example: {example}.")
         conclusions.append(self._config.excluded_note)
+        stages = _feature_stages(decision)
+        if stages:
+            conclusions.append(
+                "Feature surface: "
+                + ", ".join(f"{label} {count:,}" for label, count in stages)
+                + "."
+            )
         return Section(
             title="The features",
             conclusions=tuple(conclusions),
             numbers=(_decision_number(decision),),
+            figure="features" if stages else None,
             records=(("features record", "features"),),
         )
 
@@ -541,53 +564,7 @@ class Story:
             records=records,
         )
 
-    # -- rendering ---------------------------------------------------------
-
-    def render_section(self, section: Section) -> str:
-        """One section: heading, conclusions, figure, numbers, then record links."""
-        parts = ['<section class="story-section">', f"<h2>{html.escape(section.title)}</h2>"]
-        css = "not-run" if section.not_run else "takeaway"
-        parts.extend(
-            f'<p class="{css}">{html.escape(conclusion)}</p>'
-            for conclusion in section.conclusions
-        )
-        if not section.not_run:
-            if section.figure:
-                alt = html.escape(f"{section.title} figure")
-                parts.append(
-                    f'<figure><img src="/story/figure/{html.escape(section.figure)}"'
-                    f' alt="{alt}"></figure>'
-                )
-            if section.numbers:
-                items = "".join(
-                    f"<li>{html.escape(number)}</li>" for number in section.numbers
-                )
-                parts.append(f'<ul class="numbers">{items}</ul>')
-        if section.records:
-            links = " · ".join(
-                f'<a href="/experiments/{quote(step)}?focus=pipeline">{html.escape(label)}</a>'
-                for label, step in section.records
-            )
-            parts.append(f'<p class="record-link">decision record: {links}</p>')
-        parts.append("</section>")
-        return "\n".join(parts)
-
-    def page_body(self) -> str:
-        """The story body: navigation, a dataset note, then every section."""
-        parts = [
-            (
-                '<nav class="story-nav"><a href="/">← experiments</a> · '
-                '<a href="/?focus=pipeline">pipeline evidence</a></nav>'
-            )
-        ]
-        if not self.has_records:
-            scope = html.escape(self.dataset or "project")
-            parts.append(
-                f'<p class="not-run">No {scope} decision records are published yet — every '
-                "numeric stage below says “not run yet” until the pipeline lands.</p>"
-            )
-        parts.extend(self.render_section(section) for section in self.sections())
-        return "\n".join(parts)
+    # -- figures -----------------------------------------------------------
 
     def figure_png(self, name: str) -> bytes | None:
         """Render one story figure to PNG bytes, or None for an unknown/absent figure."""
@@ -595,6 +572,7 @@ class Story:
             "question": self._question_figure,
             "data": self._data_figure,
             "eda": self._eda_figure,
+            "features": self._features_figure,
             "change": self._change_figure,
             "model": self._model_figure,
         }
@@ -635,26 +613,40 @@ class Story:
         ]
         return figures.eda_figure(record.decision.threshold, record.decision.unit, rows)
 
+    def _features_figure(self) -> Figure | None:
+        record = self._record("features")
+        if record is None:
+            return None
+        stages = _feature_stages(record.decision)
+        return figures.features_figure(stages, "Feature surface") if stages else None
+
     def _model_figure(self) -> Figure | None:
         if self._record("selection") is None:
             return None
-        frame = _read_csv(self._candidates_path())
+        path = self._candidates_path()
+        frame = _read_csv(path)
         required = {"candidate", "rmse", "rmse_low", "rmse_high"}
         if frame is None or not required.issubset(frame.columns):
             return None
-        candidates = [str(value) for value in frame["candidate"]]
-        roles = (
-            [str(value) for value in frame["role"]]
-            if "role" in frame.columns
-            else [""] * len(candidates)
-        )
-        return figures.model_figure(
-            candidates,
-            [float(value) for value in frame["rmse"]],
-            [float(value) for value in frame["rmse_low"]],
-            [float(value) for value in frame["rmse_high"]],
-            roles,
-        )
+        candidates: list[str] = []
+        rmses: list[float] = []
+        lows: list[float] = []
+        highs: list[float] = []
+        roles: list[str] = []
+        for _, row in frame.iterrows():
+            try:
+                candidates.append(str(row["candidate"]))
+                rmses.append(float(row["rmse"]))
+                lows.append(float(row["rmse_low"]))
+                highs.append(float(row["rmse_high"]))
+                roles.append(str(row["role"]) if "role" in frame.columns else "")
+            except (TypeError, ValueError):
+                if path not in _LOGGED_UNREADABLE:
+                    _LOGGED_UNREADABLE.add(path)
+                    logger.exception("story: malformed candidate row in %s", path)
+        if not candidates:
+            return None
+        return figures.model_figure(candidates, rmses, lows, highs, roles)
 
     def _effects(self, record: PipelineRecord) -> list[Effect]:
         """Association effects from the dataset-tagged sidecar, ranked."""
@@ -687,91 +679,63 @@ class Story:
             frame = _read_csv(record.record.parent / Path(value).name)
             if frame is None:
                 continue
-            target = next(
-                (column for column in frame.columns if str(column).lower() in _TARGET_COLUMNS),
-                None,
-            )
-            count = next(
-                (column for column in frame.columns if str(column).lower() in _COUNT_COLUMNS),
-                None,
-            )
-            if target is None or count is None:
-                continue
-            rows: list[tuple[str, int]] = []
-            try:
-                for _, row in frame.iterrows():
-                    parsed = _as_int(row[count])
-                    if parsed is not None:
-                        rows.append((self._balance_label(row[target]), parsed))
-            except (KeyError, TypeError, ValueError):
-                continue
+            rows = self._long_balance(frame)
+            if rows is None:
+                rows = self._wide_balance(frame)
             if rows:
                 return rows
         return None
 
+    def _long_balance(self, frame: pd.DataFrame) -> list[tuple[str, int]] | None:
+        """Long form: one row per class, with a target label and a count column."""
+        target = self._target_column(frame)
+        count = next(
+            (column for column in frame.columns if str(column).lower() in _COUNT_COLUMNS),
+            None,
+        )
+        if target is None or count is None:
+            return None
+        rows: list[tuple[str, int]] = []
+        try:
+            for _, row in frame.iterrows():
+                parsed = _as_int(row[count])
+                if parsed is not None:
+                    rows.append((self._balance_label(row[target]), parsed))
+        except (KeyError, TypeError, ValueError):
+            return None
+        return rows or None
+
+    def _wide_balance(self, frame: pd.DataFrame) -> list[tuple[str, int]]:
+        """Wide form: one row whose columns are the class labels and counts."""
+        if len(frame) != 1:
+            return []
+        rows: list[tuple[str, int]] = []
+        for column in frame.columns:
+            parsed = _as_int(frame.iloc[0][column])
+            if parsed is not None:
+                rows.append((self._balance_label(column), parsed))
+        return rows
+
+    def _target_column(self, frame: pd.DataFrame) -> str | None:
+        if self._config.target_column in frame.columns:
+            return self._config.target_column
+        return next(
+            (
+                column
+                for column in frame.columns
+                if str(column).lower() in _TARGET_COLUMN_ALIASES
+            ),
+            None,
+        )
+
     def _balance_label(self, value: object) -> str:
         text = str(value).strip().lower()
-        if text in {"true", "1", "1.0", "bad", "bad_review", "yes"}:
+        if text in {"true", "1", "1.0", "yes"}:
             return self._config.target_label
-        if text in {"false", "0", "0.0", "good", "not_bad", "no"}:
+        if text in {"false", "0", "0.0", "no"}:
             return f"not {self._config.target_label}"
-        return str(value)
-
-
-#: The configured framing; replaced by the project launcher through ``configure_story``.
-_CONFIG: StoryConfig = StoryConfig.fallback()
-#: The experiments root; the dashboard supplies a callable so late env changes are seen.
-_ROOT_PROVIDER: Callable[[], Path] = lambda: Path(
-    os.environ.get("BROADWAY_EXPERIMENTS_ROOT", "experiments")
-)
-#: The page frame; the dashboard supplies the shared conclusions-first frame.
-_PAGE_RENDERER: Callable[[Story], str] = lambda builder: _default_page(builder)
-
-
-def configure_story(
-    config: StoryConfig | None = None,
-    root_provider: Callable[[], Path] | None = None,
-    page_renderer: Callable[[Story], str] | None = None,
-) -> None:
-    """Inject the project framing, the experiments root and the page frame."""
-    global _CONFIG, _ROOT_PROVIDER, _PAGE_RENDERER
-    if config is not None:
-        _CONFIG = config
-    if root_provider is not None:
-        _ROOT_PROVIDER = root_provider
-    if page_renderer is not None:
-        _PAGE_RENDERER = page_renderer
-
-
-def _default_page(builder: Story) -> str:
-    """A neutral standalone page for a checkout that mounts the router alone."""
-    return (
-        '<!doctype html><html lang="en"><head><meta charset="utf-8">'
-        f"<title>{html.escape(STORY_TITLE)}</title></head><body>"
-        f"<h1>{html.escape(STORY_TITLE)}</h1>"
-        f'<p class="question">{html.escape(builder.question)}</p>'
-        f"{builder.page_body()}</body></html>"
-    )
-
-
-router = APIRouter()
-
-
-@router.get("/story", response_model=None)
-def story_page() -> HTMLResponse:
-    """Serve the project story: conclusions first, graphs, numbers, record links."""
-    builder = Story.from_experiments_root(_ROOT_PROVIDER(), _CONFIG)
-    return HTMLResponse(_PAGE_RENDERER(builder))
-
-
-@router.get("/story/figure/{name}", response_model=None)
-def story_figure(name: str) -> Response | PlainTextResponse:
-    """Serve one story graph, rendered in memory from the current records."""
-    builder = Story.from_experiments_root(_ROOT_PROVIDER(), _CONFIG)
-    png = builder.figure_png(name)
-    if png is None:
-        return PlainTextResponse("unknown story figure", status_code=404)
-    return Response(content=png, media_type="image/png")
+        label = str(value).replace("_", " ").strip()
+        return label or str(value)
 
 
 def _missing(title: str, step: str) -> Section:
@@ -898,8 +862,57 @@ def _balance_number(balance: list[tuple[str, int]]) -> str:
     total = sum(count for _, count in balance)
     if total <= 0:
         return "class balance unavailable"
-    shares = ", ".join(f"{label} {count / total:.1%}" for label, count in balance)
-    return f"class balance (n={total:,}): {shares}"
+    counts = ", ".join(f"{label} {count:,}" for label, count in balance)
+    return f"class balance (n={total:,}): {counts}"
+
+
+def _decided_from_provenance(provenance: dict[str, str]) -> int:
+    """Features the record decided, from its acted + investigated counts."""
+    acted = _as_int(provenance.get("acted")) or 0
+    investigated = _as_int(provenance.get("investigated")) or 0
+    return acted + investigated
+
+
+def _verdict_counts(effects: list[Effect], provenance: dict[str, str]) -> dict[str, int]:
+    """Verdict tally from the evidence rows, or the record's counts when it has none."""
+    counts: dict[str, int] = {}
+    for effect in effects:
+        counts[effect.verdict] = counts.get(effect.verdict, 0) + 1
+    if effects:
+        return counts
+    acted = _as_int(provenance.get("acted"))
+    investigated = _as_int(provenance.get("investigated"))
+    if acted is not None:
+        counts["act"] = acted
+    if investigated is not None:
+        counts["investigate"] = investigated
+    return counts
+
+
+def _association_count(
+    tested: int | None, decided: int, counts: dict[str, int]
+) -> str:
+    """``21 tested · 12 decided (11 act, 1 investigate)`` — never the row count as tested."""
+    parts = ", ".join(
+        f"{counts[key]} {label}" for key, label in _VERDICT_LABELS if counts.get(key)
+    )
+    prefix = f"{tested} tested · " if tested is not None else ""
+    suffix = f" ({parts})" if parts else ""
+    return f"{prefix}{decided} decided{suffix}"
+
+
+def _feature_stages(decision: Decision) -> list[tuple[str, int]]:
+    """Feature-surface counts the record publishes, in narrative order."""
+    stages: list[tuple[str, int]] = []
+    for label, prefix in (
+        ("added", "features_added"),
+        ("removed", "features_removed"),
+        ("plan columns", "plan_columns"),
+    ):
+        value = _sensitivity_int(decision, prefix)
+        if value is not None:
+            stages.append((label, value))
+    return stages
 
 
 def _sensitivity_int(decision: Decision, prefix: str) -> int | None:

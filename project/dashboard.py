@@ -30,6 +30,7 @@ def _story_config() -> StoryConfig:
         ),
         target_label="bad review",
         target_rule="review score ≤ 2",
+        target_column="bad_review",
         decision_moment="purchase time",
         source_name="Olist",
         source_tables=9,
@@ -58,7 +59,7 @@ def main() -> None:
     # repo-root default). Only override when the resolved dir is real.
     if paths.observations.is_dir():
         os.environ.setdefault("BROADWAY_OBSERVATIONS_DIR", str(paths.observations))
-    from broadway.reports.story import configure_story
+    from broadway.reports.story_page import configure_story
 
     configure_story(_story_config())
     from broadway.reports.experiments_dashboard import app
