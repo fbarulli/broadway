@@ -1,6 +1,6 @@
 # DIGEST.md — rendered from agents/ledger/gates.yaml · NEVER HAND-EDIT ·
 
-> 172 gates · rendered 2026-11-27 @ HEAD e5ebb33 · load THIS into context;
+> 173 gates · rendered 2026-11-27 @ HEAD fc75c4a · load THIS into context;
 > gates.yaml is the sole SSOT; the retired GATES.md/gates/*.md markdown world survives in agents/ledger/arbitration/2026-08-24/surface-and-analysis-preservation.md.
 
 | band | phase | gates | findings |
@@ -14,9 +14,9 @@
 | 07-surfaces | surfaces | 13 | 1 |
 | 08-config | config-schema | 17 | 11 |
 | 80-hpo-optuna | hpo-optuna | 10 | 9 |
-| 09-infra | infra-meta | 60 | 17 |
+| 09-infra | infra-meta | 61 | 18 |
 | 81-object-custody | object-custody | 6 | 0 |
-| **total** | | **172** | **84** |
+| **total** | | **173** | **85** |
 
 ### 01-ingest — ingest
 
@@ -379,6 +379,8 @@
   [DatasetContract (target/datetime/columns) via project.features.load_contract] → [ColumnPlan keep-set (14 ops) consumed by the project ML pipeline projection and project/config/experiment/taxi.yaml feature_plan] · pins: 2
 - **GATE-INFRA-182** `src/broadway/evaluate/leaderboard.py:45 MetricDirection + src/broadway/evaluate/feature_selection.py rfe_curve + src/broadway/evaluate/explain.py shap_summary + src/broadway/tracking/manifest.py:20 DataManifest + gpu_training/adapters/gluonts_step.py step + gpu_training/adapters/prophet_step.py step + gpu_training/adapters/timesfm_step.py step`
   [ranked frame (one row per run) + declared metric directions, measured 95% intervals per run (ChampionDecision)] → [one ranked leaderboard figure per metric + <stem>_champion.json, rfe curve, SHAP/permutation/PDP tables, data manifest, GPU adapter step()] · pins: 4
+- **GATE-INFRA-183** `project/config/dataset/amazon.yaml:1 amazon contract + project/features/amazon.py:19 plan + project/config/experiment/amazon.yaml:1 data_source + project/config/experiments/amazon_survey.yaml:1 decision rules + project/experiments/amazon_survey/01_profile.py:1 main` ⚠FINDING
+  [CFG-DATASET-CONTRACT, raw survey CSV data/raw/amazon/amazon_consumer_behavior_survey.csv (602x23, git-ignored), EDA-ranked feature family, declared once in project/config/experiments/amazon_survey.yaml] → [ARTIFACT-CANONICAL-PARQUET, data/processed/amazon/{amazon_canonical,train,val}.parquet + amazon_clean.json (ProcessedStore dataset namespace), artifacts/discover/amazon/{profile,qq_overview}.json + figures; artifacts/tracking/amazon/data_manifest.json (ArtifactStore dataset namespace), project/experiments/results/amazon_survey/01_profile_{decision.json,md,png,ranked.csv,segments.csv}, project/experiments/results/pipeline/eda/eda_{decision.json,feature_decisions.json,*.csv,*.png}] · pins: 4
 
 ### 81-object-custody — object-custody
 

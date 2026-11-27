@@ -75,6 +75,7 @@ from __future__ import annotations
 import argparse
 import datetime
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -105,6 +106,90 @@ ID_TOKEN_RES = [
     r"(?<![A-Z-])CFG-[A-Z0-9]+(?:-[A-Z0-9]+)*",
     r"(?<![A-Z-])VOCAB-[A-Z0-9]+(?:-[A-Z0-9]+)*",
 ]
+
+
+_HEAD_LINE = re.compile(r"^(  head: ')([0-9a-f]{7,40})(')$", re.MULTILINE)
+_SHA_LINE = re.compile(r"^[0-9a-f]{7,40}$")
+# A rewrite in progress makes "the commit that will contain this file" unknowable:
+# HEAD is about to be replaced, so a stamp taken now would be a lie.
+_IN_PROGRESS = (
+    "rebase-merge",
+    "rebase-apply",
+    "MERGE_HEAD",
+    "CHERRY_PICK_HEAD",
+    "REVERT_HEAD",
+)
+
+
+class StampError(RuntimeError):
+    """``meta.head`` cannot be justified from the repository state."""
+
+
+class HeadStamp:
+    """Generate ``meta.head`` from git so the parent-stamp law holds by construction.
+
+    The governance probe derives the required value from git: the first parent of
+    the last commit touching ``gates.yaml`` when the file is clean, and ``HEAD``
+    while the file is dirty. Writing the current ``HEAD`` on every render satisfies
+    both states — the render's own commit is a child of that HEAD, and while the
+    edit is uncommitted the required value is that same HEAD. A repository that
+    cannot answer ``rev-parse HEAD`` (no repo, unborn HEAD) or is mid-rewrite fails
+    loud instead of writing a stamp it cannot justify.
+    """
+
+    def __init__(self, repo: Path) -> None:
+        self._repo = Path(repo)
+
+    @classmethod
+    def for_repo(cls) -> HeadStamp:
+        return cls(REPO_ROOT)
+
+    def value(self) -> str:
+        """The stamp to write: the short HEAD sha, or a loud failure."""
+        in_progress = self._git_dir_markers()
+        if in_progress:
+            raise StampError(
+                "cannot stamp meta.head: a git rewrite is in progress "
+                f"({', '.join(in_progress)}); finish it, then re-render"
+            )
+        head = self._git("rev-parse", "--short=7", "HEAD")
+        if not _SHA_LINE.fullmatch(head):
+            raise StampError(f"git returned an unusable HEAD sha: {head!r}")
+        return head
+
+    def write(self, gates_path: Path) -> str:
+        """Rewrite the single ``meta.head`` line in ``gates_path``; returns the sha."""
+        sha = self.value()
+        source = Path(gates_path)
+        text = source.read_text(encoding="utf-8")
+        updated, count = _HEAD_LINE.subn(f"  head: '{sha}'", text)
+        if count != 1:
+            raise StampError(
+                f"cannot stamp {source}: expected exactly one meta.head line, found {count}"
+            )
+        source.write_text(updated, encoding="utf-8")
+        return sha
+
+    def _git(self, *args: str) -> str:
+        try:
+            result = subprocess.run(
+                ["git", "-C", str(self._repo), *args],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+        except (OSError, subprocess.CalledProcessError) as error:
+            detail = getattr(error, "stderr", "") or str(error)
+            raise StampError(
+                f"cannot resolve meta.head: `git {' '.join(args)}` failed ({detail.strip()})"
+            ) from error
+        return result.stdout.strip()
+
+    def _git_dir_markers(self) -> list[str]:
+        git_dir = Path(self._git("rev-parse", "--git-dir"))
+        if not git_dir.is_absolute():
+            git_dir = self._repo / git_dir
+        return [marker for marker in _IN_PROGRESS if (git_dir / marker).exists()]
 
 
 def load_registry(path: Path | str | None = None) -> dict:
@@ -391,9 +476,9 @@ def query_blast_radius(registry: dict, relpath: str) -> int:
     downstream -= seed_ids
     affected = [g for g in gates if g["id"] in seed_ids or g["id"] in downstream]
     pins = sorted({node for g in affected for node in g["validated_by"]})
-    lines = [f"blast-radius for {rel}: {len(affected)} gate(s) affected "
-             f"({len(seed_ids)} at depth 0 — own/reference;"
-             f" {len(downstream)} at depth 1 — one-hop downstream)"]
+    lines = [(f"blast-radius for {rel}: {len(affected)} gate(s) affected "
+              f"({len(seed_ids)} at depth 0 — own/reference;"
+              f" {len(downstream)} at depth 1 — one-hop downstream)")]
     for g in affected:
         depth = 0 if g["id"] in seed_ids else 1
         lines.append(f"d{depth} {g['id']} · {g['phase']} · {g['owner']}")
@@ -759,8 +844,8 @@ def query_dedupe_proposals(dirpath: Path, registry: dict) -> int:
     cands, notes = parse_proposal_candidates(directory)
     classified = classify_proposals(cands, registry)
     files = sorted({c["file"] for c, _, _ in classified})
-    lines = [f"dedupe-proposals · {len(classified)} candidate(s) parsed from "
-             f"{len(files)} file(s) · {directory}"]
+    lines = [(f"dedupe-proposals · {len(classified)} candidate(s) parsed from "
+              f"{len(files)} file(s) · {directory}")]
     lines.extend(f"note: {n}" for n in notes)
     for cand, cls, detail in sorted(classified,
                                     key=lambda t: (t[0]["file"], t[0]["id"])):
@@ -945,6 +1030,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.dedupe_proposals is not None:
         return query_dedupe_proposals(args.dedupe_proposals, registry)
 
+    # The stamp is generated, never typed: the digest and the registry agree with
+    # git by construction, and the parent-stamp probe reads the same derivation.
+    registry["meta"]["head"] = HeadStamp.for_repo().write(args.gates)
     args.index_dir.mkdir(parents=True, exist_ok=True)
     banner = ("# Rendered by agents/tools/render_gates.py from agents/ledger/gates.yaml"
               " — do not hand-edit.\n")

@@ -350,6 +350,7 @@ lookup value audit (data/lookup_value_audit.py:48):
 matplotlib:
 - GATE-SURF-66
 - GATE-INFRA-182
+- GATE-INFRA-183
 matplotlib (Agg):
 - GATE-STATS-48
 matplotlib Agg (:8):
@@ -439,6 +440,7 @@ pandas:
 - GATE-INFRA-161
 - GATE-INFRA-176
 - GATE-INFRA-182
+- GATE-INFRA-183
 pandas (df ops):
 - GATE-ETL-17
 pandas (via df.to_parquet at call site):
@@ -551,6 +553,7 @@ pyyaml:
 - GATE-INFRA-178
 - GATE-INFRA-179
 - GATE-INFRA-180
+- GATE-INFRA-183
 re:
 - GATE-ETL-10
 - GATE-ETL-19
@@ -576,6 +579,8 @@ scikit-learn:
 - GATE-HPO-81
 - GATE-HPO-87
 - GATE-INFRA-161
+scipy:
+- GATE-INFRA-183
 scipy.stats:
 - GATE-STATS-45
 scipy.stats (levene/skew/kurtosis/shapiro):

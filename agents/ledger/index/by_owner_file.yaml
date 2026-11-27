@@ -51,6 +51,8 @@ k8s/optuna/teardown.sh:
 - GATE-INFRA-145
 k8s/postgres-deployment.yaml:
 - GATE-INFRA-133
+project/config/dataset/amazon.yaml:
+- GATE-INFRA-183
 project/config/experiment/taxi.yaml:
 - GATE-INFRA-180
 project/dashboard.py:

@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import importlib.util
 import re
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -65,7 +66,7 @@ BAND_RANGES = {
     "SURF": [(60, 69), (100, 102)],
     "CFG": [(70, 79), (103, 112)],
     "HPO": [(80, 89)],
-    "INFRA": [(90, 99), (121, 148), (154, 182)],
+    "INFRA": [(90, 99), (121, 148), (154, 183)],
     "CUST": [(147, 153)],
 }
 ID_RX = re.compile(r"^GATE-[A-Z]+-\d{2,3}$")
@@ -378,27 +379,58 @@ def test_renderer_roundtrip_byte_identical_and_help(tmp_path):
         renderer.main(["--help"])
     assert excinfo.value.code == 0
 
-    targets = [DIGEST] + INDEX_FILES
-    assert renderer.main([]) == 0
+    # Render a scratch copy: the real render stamps gates.yaml from git, which a
+    # test must never mutate. The stamp is still derived from the real repository.
+    scratch_gates = tmp_path / "gates.yaml"
+    scratch_gates.write_bytes(GATES_YAML.read_bytes())
+    scratch_digest = tmp_path / "DIGEST.md"
+    scratch_index = tmp_path / "idx"
+    argv = ["--gates", str(scratch_gates), "--digest", str(scratch_digest),
+            "--index-dir", str(scratch_index)]
+    assert renderer.main(argv) == 0
+    targets = [scratch_digest, *(scratch_index / rel.name for rel in INDEX_FILES)]
     first = {p: p.read_bytes() for p in targets}
-    assert renderer.main([]) == 0
+    assert renderer.main(argv) == 0
     second = {p: p.read_bytes() for p in targets}
     drift = [str(p) for p in targets if first[p] != second[p]]
     assert drift == [], f"renderer output not idempotent for: {drift}"
 
-    digest_text = DIGEST.read_text(encoding="utf-8")
+    # The stamp is generated, never typed: meta.head is the HEAD at render time,
+    # which is the first parent of the commit that will carry the rendered file.
+    head = subprocess.run(
+        ["git", "rev-parse", "--short=7", "HEAD"],
+        cwd=REPO, capture_output=True, text=True, check=True,
+    ).stdout.strip()
+    assert yaml.safe_load(scratch_gates.read_text(encoding="utf-8"))["meta"]["head"] == head
+
+    digest_text = scratch_digest.read_text(encoding="utf-8")
     assert digest_text.startswith("# DIGEST.md — rendered from agents/ledger/gates.yaml")
+    assert f"@ HEAD {head}" in digest_text
     assert f"| **total** | | **{len(GATES)}** |" in digest_text
     assert digest_text.count("\n### ") == len({_band_of(g["id"]) for g in GATES}), \
         "digest must carry one section per band"
 
-    scratch_digest = tmp_path / "digest_alt.md"
-    scratch_index = tmp_path / "idx"
-    assert renderer.main(["--digest", str(scratch_digest),
-                          "--index-dir", str(scratch_index)]) == 0
-    assert scratch_digest.read_bytes() == first[DIGEST]
-    for rel in INDEX_FILES:
-        assert (scratch_index / rel.name).read_bytes() == first[rel]
+
+def test_head_stamp_refuses_a_rewrite_in_progress(tmp_path):
+    """A stamp taken mid-rebase would lie about its parent, so it fails loud."""
+    renderer = _renderer()
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+    subprocess.run(
+        ["git", "-c", "user.name=probe", "-c", "user.email=probe@example.com",
+         "commit", "--allow-empty", "-m", "seed", "-q"],
+        cwd=repo, check=True,
+    )
+    stamp = renderer.HeadStamp(repo)
+    assert stamp.value() == subprocess.run(
+        ["git", "rev-parse", "--short=7", "HEAD"],
+        cwd=repo, capture_output=True, text=True, check=True,
+    ).stdout.strip()
+
+    (repo / ".git" / "rebase-merge").mkdir()
+    with pytest.raises(renderer.StampError, match="rewrite is in progress"):
+        stamp.value()
 
 
 # --------------------------------------------------- (g) REG-QL query layer
@@ -523,8 +555,8 @@ def test_query_findings_sheet_matches_meta_counts(capsys):
     assert code == 0 and err == ""
     body = [l for l in out.splitlines() if l.startswith("GATE-")]
     footer = out.strip().splitlines()[-1]
-    assert len(body) == REG["meta"]["counts"]["gates_with_findings"] == 84
-    assert footer == (f"== 84 flagged gate(s) · "
+    assert len(body) == REG["meta"]["counts"]["gates_with_findings"] == 85
+    assert footer == (f"== 85 flagged gate(s) · "
                       f"{REG['meta']['counts']['finding_strings']} finding(s) ==")
     parts = body[0].split(" · ")
     assert len(parts) == 4
