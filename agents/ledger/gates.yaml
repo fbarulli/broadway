@@ -14,7 +14,7 @@ retired:
   # 2026-11-26 so the sample-generation gate is probed again.
   history_rows_retained: ['GATE-INGEST-01', 'GATE-INGEST-04', 'GATE-ETL-17', 'GATE-ETL-18', 'GATE-ETL-19', 'GATE-ETL-117']
 meta:
-  head: 'fc75c4a'
+  head: '48ab32e'
   assembled: '2026-11-26'
   source_fragments:
   - agents/ledger/gates/01-ingest.md

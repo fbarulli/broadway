@@ -221,12 +221,27 @@ def extract_non_gate_tokens(text: str) -> set[str]:
     return out
 
 
+def owner_paths(owner: str) -> list[str]:
+    """Every repo path an owner string names (multi-owner rows separate with ' + ').
+
+    The registry grammar allows ``path:symbol + path:symbol -> path:symbol``; an
+    index that reads only the leading token silently hides the rest of the surface
+    from ``--file`` and ``by_owner_file.yaml``.
+    """
+    paths: list[str] = []
+    for part in re.split(r"\s+->\s+|\s+\+\s+(?=[\w.]+/)", owner):
+        head = re.match(r"[^\s:]+", part.strip())
+        if head and ("/" in head.group(0) or re.search(r"\.[A-Za-z0-9]+$", head.group(0))):
+            paths.append(head.group(0))
+    return paths or [re.match(r"[^\s:]+", owner).group(0)]
+
+
 def build_by_owner_file(registry: dict) -> dict[str, list[str]]:
-    """owner leading repo-path token -> gate ids in canonical order."""
+    """owner repo-path token -> gate ids in canonical order (every named path)."""
     idx: dict[str, list[str]] = {}
     for gate in sorted(registry["gates"], key=lambda g: g["order"]):
-        head = re.match(r"[^\s:]+", gate["owner"]).group(0)
-        idx.setdefault(head, []).append(gate["id"])
+        for head in owner_paths(gate["owner"]):
+            idx.setdefault(head, []).append(gate["id"])
     return dict(sorted(idx.items()))
 
 
@@ -312,7 +327,9 @@ def gates_in_order(registry: dict) -> list[dict]:
 
 
 def gates_owning(gates: list[dict], rel: str) -> list[dict]:
-    return [g for g in gates if path_matches(owner_head(g["owner"]), rel)]
+    return [
+        g for g in gates if any(path_matches(head, rel) for head in owner_paths(g["owner"]))
+    ]
 
 
 def gates_referencing(gates: list[dict], owned_ids: set[str]) -> dict[str, set[str]]:

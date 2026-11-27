@@ -498,6 +498,13 @@ def test_query_file_lists_owners_and_referencers(capsys):
     assert "refs" in ref_line and "GATE-INGEST-04" in ref_line
     assert out.rstrip().endswith("=="), "sheet closes with a count footer"
 
+    # A multi-owner row is indexed under EVERY path it names, not just the head.
+    code2, out2, err2 = _run_renderer(
+        capsys, ["--file", "src/broadway/evaluate/feature_selection.py"]
+    )
+    assert code2 == 0 and err2 == ""
+    assert "GATE-INFRA-182" in out2
+
 
 def test_query_file_suffix_match_equals_full_path(capsys):
     _, full_out, _ = _run_renderer(capsys, ["--file", "project/etl/process.py"])
