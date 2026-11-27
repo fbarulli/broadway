@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from enum import Enum, StrEnum
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING, Literal
 
 from pydantic import (
@@ -71,6 +71,16 @@ class LookupSpec(BaseModel):
 
 
 class DatasetContract(BaseModel):
+    """The raw schema, target, and read-time bindings of one dataset.
+
+    ``columns`` names the frame **as consumed**: every reader applies
+    ``column_renames`` (raw source label -> contract label) before validating,
+    so a source whose labels carry a trailing space or a vendor spelling still
+    lands on the contract's names. ``processed_subdir`` overrides
+    ``EnvironmentConfig.processed_subdir`` for this dataset, so two datasets
+    bound to one environment never write each other's processed artifacts.
+    """
+
     name: str
     path: str
     target: str
@@ -79,6 +89,45 @@ class DatasetContract(BaseModel):
     columns: dict[str, ColumnSchema]
     lookup_tables: dict[str, LookupSpec]
     exclude_from_profiling: list[str] = []
+    column_renames: dict[str, str] = {}
+    processed_subdir: str | None = None
+    artifacts_subdir: str | None = None
+
+    @field_validator("processed_subdir", "artifacts_subdir")
+    @classmethod
+    def _validate_relative_subdir(cls, value: str | None) -> str | None:
+        """A dataset namespace must stay relative (it is joined under a root)."""
+        if value is None:
+            return value
+        path = PurePosixPath(value)
+        if path.is_absolute() or ".." in path.parts:
+            raise ValueError(
+                f"dataset subdir must be a relative path without '..', got {value!r}"
+            )
+        return value
+
+    @model_validator(mode="after")
+    def _validate_column_renames(self) -> DatasetContract:
+        """Reject a rename map that cannot be applied unambiguously (fail at parse)."""
+        if not self.column_renames:
+            return self
+        unbound = sorted(set(self.column_renames.values()) - set(self.columns))
+        if unbound:
+            raise ValueError(
+                "column_renames must target contract columns; unbound target(s): "
+                f"{unbound}"
+            )
+        shadowed = sorted(set(self.column_renames) & set(self.columns))
+        if shadowed:
+            raise ValueError(
+                "column_renames source label(s) collide with contract columns: "
+                f"{shadowed}"
+            )
+        targets = list(self.column_renames.values())
+        duplicated = sorted({name for name in targets if targets.count(name) > 1})
+        if duplicated:
+            raise ValueError(f"column_renames target(s) are not unique: {duplicated}")
+        return self
 
 
 class EnvironmentConfig(BaseModel):

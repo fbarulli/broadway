@@ -9,6 +9,7 @@ from pathlib import Path
 import pandas as pd
 
 from broadway.config.schema import PipelineConfig
+from broadway.data.loader import ProcessedStore
 from broadway.features.generic import build_generic_feature_specs
 from broadway.features.pipeline import FeaturePipeline
 from broadway.features.plan import ColumnPlan
@@ -24,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 def _load_split(cfg: PipelineConfig) -> tuple[pd.DataFrame, pd.DataFrame | None]:
     assert cfg.etl is not None
-    out_dir = Path(cfg.environment.data_dir) / cfg.environment.processed_subdir
+    out_dir = ProcessedStore.from_config(cfg).directory
     train = pd.read_parquet(out_dir / cfg.etl.train_file)
     val_path = out_dir / cfg.etl.val_file
     val = pd.read_parquet(val_path) if val_path.exists() else None
@@ -175,7 +176,7 @@ def run(cfg: PipelineConfig) -> None:
     build_engineered_schema(specs).validate(train_out)
     rows_out = len(train_out)
     columns_after = list(train_out.columns)
-    out_dir = Path(cfg.environment.data_dir) / cfg.environment.processed_subdir
+    out_dir = ProcessedStore.from_config(cfg).directory
     train_out.to_parquet(out_dir / cfg.etl.train_features_file, index=False)
     logger.info(f"train features written ({len(train_out)} rows)")
     if val is not None:

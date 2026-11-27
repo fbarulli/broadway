@@ -33,6 +33,7 @@ from broadway.calibration.metrics import (
 )
 from broadway.calibration.quantile import QuantileInterval
 from broadway.config.schema import PipelineConfig
+from broadway.data.loader import ArtifactStore, ProcessedStore
 from broadway.evaluate.comparison import compare_models
 from broadway.evaluate.contracts import (
     LEDGER_RESIDUAL_COLUMN,
@@ -78,7 +79,7 @@ def _feature_frame(cfg: PipelineConfig, frame: pd.DataFrame) -> pd.DataFrame:
 
 
 def _processed_dir(cfg: PipelineConfig) -> Path:
-    return Path(cfg.environment.data_dir) / cfg.environment.processed_subdir
+    return ProcessedStore.from_config(cfg).directory
 
 
 def _load_val_features(
@@ -739,7 +740,9 @@ def run(cfg: PipelineConfig) -> None:
         )
     residuals = residual_summary(y_true, y_pred)
 
-    eval_dir = Path(cfg.evaluate.output_dir)
+    eval_dir = ArtifactStore.from_contract(
+        cfg.dataset, Path(cfg.evaluate.output_dir)
+    ).directory
     eval_dir.mkdir(parents=True, exist_ok=True)
     if promotion is not None:
         published = promotion.publish(eval_dir)

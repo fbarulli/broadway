@@ -1,7 +1,6 @@
 column,n,iqr_count,iqr_share,z_count,z_share,max_share,verdict
-fare_amount,50000,5487,0.10974,583,0.01166,0.01,act
-passenger_count,50000,10940,0.2188,1912,0.03824,0.01,act
-trip_distance,50000,6573,0.13146,2058,0.04116,0.01,act
-trip_duration_minutes,50000,3080,0.0616,1083,0.02166,0.01,act
-LocationID,50000,0,0.0,0,0.0,0.01,no_action
-LocationID_lookup,50000,0,0.0,0,0.0,0.01,no_action
+age,602,20,0.033223,5,0.008306,0.01,act
+Customer_Reviews_Importance,602,0,0.0,0,0.0,0.01,no_action
+recommendation_personalization_score,602,35,0.05814,0,0.0,0.01,act
+rating_accuracy_score,602,21,0.034884,0,0.0,0.01,act
+Shopping_Satisfaction,602,17,0.028239,0,0.0,0.01,act

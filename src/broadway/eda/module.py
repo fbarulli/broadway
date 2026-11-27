@@ -21,7 +21,7 @@ import pyarrow.parquet as pq
 from matplotlib.figure import Figure
 
 from broadway.config.schema import DatasetContract, EdaStep, EtlStep, PipelineConfig
-from broadway.data.loader import canonical_path
+from broadway.data.loader import ProcessedStore, canonical_path
 from broadway.eda.artifacts import EdaArtifactWriter
 from broadway.eda.compare import EtlComparator
 from broadway.eda.correlation import CorrelationAnalyzer
@@ -45,6 +45,7 @@ from broadway.eda.summary import SummaryAnalyzer
 from broadway.eda.tests import FeatureTestAnalyzer
 from broadway.eda.visualize import FigureRenderer
 from broadway.observability.profiling import phase, timed
+from broadway.reports.decision import Decision
 
 logger = logging.getLogger(__name__)
 
@@ -179,6 +180,7 @@ class EdaRunner:
         writer = self._writer()
         for name, title, figure in evidence:
             if figure is None:
+                writer.remove_figure(name, self._step.plot_format)
                 continue
             writer.write_figure(name, figure, self._step.plot_format)
             figures.append(renderer.embed(figure, title))
@@ -196,7 +198,7 @@ class EdaRunner:
         writer.write_decisions(
             EdaDecisionBundle(
                 dataset=result.dataset,
-                summary=result.feature_tests.summary,
+                summary=self._summary_record(result.feature_tests.summary, result.correlation),
                 comparison=result.compare.decision,
                 features=result.feature_tests.decisions,
                 outliers=result.outliers.decisions,
@@ -204,18 +206,45 @@ class EdaRunner:
         )
         return writer.write_html(EdaReportBuilder().build(result))
 
+    @staticmethod
+    def _summary_record(
+        summary: Decision | None, correlation: CorrelationResult
+    ) -> Decision | None:
+        """Record why the correlation evidence is absent (or how it was measured).
+
+        The correlation figure is drawn only when at least two numeric columns
+        exist; on an all-categorical frame the row is the record of that fact, and
+        the writer removes any previous run's figure of the same name.
+        """
+        if summary is None:
+            return None
+        reason = correlation.reason or (
+            f"measured over {len(correlation.columns)} numeric columns"
+        )
+        evidence = summary.evidence.model_copy(
+            update={
+                "provenance": {**summary.evidence.provenance, "correlation": reason}
+            }
+        )
+        return summary.model_copy(update={"evidence": evidence})
+
     def _provenance(self, frame: pd.DataFrame) -> dict[str, str]:
         """The digest a reader needs to re-run these decisions on the same rows."""
         digest = hashlib.sha256(
             pd.util.hash_pandas_object(frame, index=True).to_numpy().tobytes()
         ).hexdigest()[:_HASH_LENGTH]
+        budget = (
+            min(self._step.sample_size, self._source_rows)
+            if self._step.sample_size
+            else self._source_rows
+        )
         return {
             "dataset": self._dataset.name,
             "artifact": f"{self._etl.train_file}+{self._etl.val_file}",
             "source": self._dataset.path,
             "sample_sha256": digest,
             "sampled_rows": str(len(frame)),
-            "sample_size": str(self._step.sample_size or self._source_rows),
+            "sample_size": str(budget),
             "seed": str(self._random_state),
             "exclusions": "pairwise-complete rows per feature; exclude_from_profiling dropped",
         }
@@ -231,7 +260,7 @@ class EdaRunner:
     def _load_split(self) -> tuple[pd.DataFrame, int, list[str]]:
         """One proportional draw of train+val (never 50k from each split)."""
         notes: list[str] = []
-        out_dir = Path(self._cfg.environment.data_dir) / self._cfg.environment.processed_subdir
+        out_dir = ProcessedStore.from_config(self._cfg).directory
         train_path = out_dir / self._etl.train_file
         val_path = out_dir / self._etl.val_file
         train_rows = self._row_count(train_path, "train split")

@@ -4,6 +4,7 @@ import pandas as pd
 import pytest
 import yaml
 
+from broadway.config import loader
 from broadway.discover import module
 from broadway.discover.profile import DatasetProfile, build_profile
 from broadway.lineage import records
@@ -66,6 +67,9 @@ def test_run_writes_profile(tmp_path, monkeypatch) -> None:
             "value": [10.0, 20.0, 30.0, 40.0],
         }
     ).to_csv(csv, index=False)
+    # The contract resolver (config_path) reads the project overlay first, so
+    # point it at the isolated tree; the loader's base directory stays real.
+    monkeypatch.setenv(loader.CONFIG_OVERLAY_ENV, str(tmp_path / "configs"))
     monkeypatch.setattr(module, "CONFIGS_DIR", tmp_path / "configs")
     monkeypatch.setattr(module, "ARTIFACTS_DIR", str(tmp_path / "artifacts"))
     monkeypatch.setattr(module, "DATASET_DIR", "dataset")
@@ -83,6 +87,9 @@ def test_profile_command(tmp_path, monkeypatch) -> None:
     parquet = tmp_path / "data.parquet"
     data.to_parquet(parquet)
 
+    # The contract resolver (config_path) reads the project overlay first, so
+    # point it at the isolated tree; the loader's base directory stays real.
+    monkeypatch.setenv(loader.CONFIG_OVERLAY_ENV, str(tmp_path / "configs"))
     monkeypatch.setattr(module, "CONFIGS_DIR", tmp_path / "configs")
     monkeypatch.setattr(module, "ARTIFACTS_DIR", str(tmp_path / "artifacts"))
     monkeypatch.setattr(module, "DATASET_DIR", "dataset")

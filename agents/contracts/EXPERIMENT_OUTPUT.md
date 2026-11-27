@@ -117,12 +117,13 @@ ratchet grows into (`PIPELINE_DECISION_ENFORCED`):
 ## The ratchet
 
 `ENFORCED` in `scripts/check_experiment_outputs.py` lists the series that must
-publish a question + figure (currently `fare_prediction`, `timeseries`).
-`DECISION_ENFORCED` lists the individual steps that must build a `StepOutput`
-with a decision record (currently `fare_prediction/01_generate_sample`). An
-entry is added once it complies. **Never remove an entry.** The rule itself
-lives in `project/config/experiments/fare_prediction.yaml` under
-`decisions.<step>` — one threshold, one direction, one action, one owner.
+publish a question + figure (currently `amazon_survey`, `fare_prediction`,
+`timeseries`). `DECISION_ENFORCED` lists the individual steps that must build a
+`StepOutput` with a decision record (currently `fare_prediction/01–08`,
+`timeseries/01–04`, `amazon_survey/01_profile`). An entry is added once it
+complies. **Never remove an entry.** The rule itself lives in the series'
+`project/config/experiments/<series>.yaml` under `decisions.<step>` — one
+threshold, one direction, one action, one owner.
 
 Everything else is reported as an advisory backlog on every gate run, so the
 gap is visible rather than forgotten.

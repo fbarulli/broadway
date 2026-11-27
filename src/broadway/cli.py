@@ -36,6 +36,12 @@ def _build_parser() -> argparse.ArgumentParser:
     discover.add_argument("--task", type=str, required=True)
     discover.add_argument("--datetime-column", type=str, default=None)
     discover.add_argument("--ignore-columns", nargs="*", default=[])
+    discover.add_argument(
+        "--artifacts-subdir",
+        type=str,
+        default=None,
+        help="dataset namespace under each artifact dir (recorded in the contract)",
+    )
 
     columns = sub.add_parser("columns")
     columns.add_argument("--csv", type=str, required=True)
@@ -119,7 +125,14 @@ def main() -> None:
     if args.step == "discover":
         from broadway.discover.module import run as discover_run
 
-        discover_run(args.csv, args.target, args.task, args.datetime_column, args.ignore_columns)
+        discover_run(
+            args.csv,
+            args.target,
+            args.task,
+            args.datetime_column,
+            args.ignore_columns,
+            args.artifacts_subdir,
+        )
     elif args.step == "columns":
         from broadway.discover.columns import run as columns_run
 

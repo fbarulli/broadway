@@ -202,7 +202,9 @@ def _render_plan_source(
         "this callable by ``feature_plan``.\n"
         '"""\n\n'
         "from __future__ import annotations\n\n"
-        "from broadway.config.schema import DatasetContract, DerivedFeature\n"
+        "from broadway.config.schema import "
+        + ("DatasetContract, DerivedFeature" if derived_lines else "DatasetContract")
+        + "\n"
         "from broadway.features.plan import ColumnOp, ColumnPlan\n\n\n"
         "def plan(dataset: DatasetContract) -> ColumnPlan:\n"
         "    return ColumnPlan.from_declaration(\n"

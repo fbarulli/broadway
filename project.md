@@ -81,6 +81,7 @@ project/
 ├── experiments/
 │   ├── fare_prediction/       # 01…08, each publishing <stem>_decision.json
 │   ├── timeseries/            # 01…04, same contract
+│   ├── amazon_survey/         # 01, same contract (Amazon consumer-behaviour survey)
 │   ├── more_modeling/  multivariate/  univariate/  mlflow/  …
 │   └── results/               # committed figures, reports, tables, decisions
 ├── scripts/                   # numbered teaching scripts (record-free by D32)

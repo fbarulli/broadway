@@ -20,6 +20,7 @@ from broadway.calibration import CALIBRATION_FILE
 from broadway.calibration.conformal import SplitConformal
 from broadway.calibration.contracts import CalibrationConfig, CalibrationSummary
 from broadway.config.schema import PipelineConfig, TaskType
+from broadway.data.loader import ArtifactStore, ProcessedStore
 from broadway.data.splitter import calibration_split, split
 from broadway.evaluate.contracts import BootstrapConfig
 from broadway.evaluate.metrics import MetricBootstrap, compute_metrics
@@ -31,7 +32,7 @@ from broadway.observability.profiling import phase
 from broadway.reports.decision import Decision, DecisionRule, Evidence, SegmentEvidence
 from broadway.reports.step_output import StepOutput
 from broadway.tracking.bundle import TrackingBundle
-from broadway.tracking.manifest import MANIFEST_FILENAME
+from broadway.tracking.manifest import MANIFEST_FILENAME, tracking_dir
 from broadway.training.contracts import TrainingResult
 from broadway.training.hpo import run_hpo
 from broadway.training.learning_curve import LearningCurve, LearningCurveResult
@@ -48,7 +49,7 @@ logger = logging.getLogger(__name__)
 
 
 def _processed_dir(cfg: PipelineConfig) -> Path:
-    return Path(cfg.environment.data_dir) / cfg.environment.processed_subdir
+    return ProcessedStore.from_config(cfg).directory
 
 
 def _load_features(cfg: PipelineConfig) -> tuple[pd.DataFrame, pd.DataFrame | None]:
@@ -412,6 +413,7 @@ def _tracking_bundle(cfg: PipelineConfig) -> TrackingBundle | None:
         dataset=cfg.dataset.name,
         config=tracking,
         clean_result_path=processed_dir / f"{cfg.dataset.name}_clean.json",
+        machine_dir=ArtifactStore.from_contract(cfg.dataset, tracking_dir()).directory,
     )
 
 

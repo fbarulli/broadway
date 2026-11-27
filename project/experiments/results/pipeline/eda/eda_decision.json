@@ -1,59 +1,71 @@
 {
   "question": "Is there at least one feature whose association with the target survives multiple-testing correction and the minimum effect?",
-  "metric": "association_fare_amount",
-  "value": 0.939610491850154,
-  "interval_low": 0.9366869137261491,
-  "interval_high": 0.9424532254611994,
+  "metric": "association_rating_accuracy_score",
+  "value": 0.22993240309247154,
+  "interval_low": 0.18007180190274175,
+  "interval_high": 0.2949677721209352,
   "reference": 0.0,
-  "delta": 0.939610491850154,
+  "delta": 0.22993240309247154,
   "threshold": 0.05,
-  "null_threshold": 0.00894649506402447,
+  "null_threshold": 0.007443146113530719,
   "direction": "max",
   "verdict": "act",
   "action": "keep the feature whose association clears the minimum effect; drop or defer the trivial ones",
   "owner": "eda",
-  "sample_size": 50000,
-  "unit": null,
+  "sample_size": 602,
+  "unit": "epsilon_squared",
   "min_sample_size": 100,
   "evidence": {
     "baseline": "no-effect shuffle of the target at this n",
     "delta": null,
     "segments": [
       {
-        "segment": "weekday",
-        "value": 0.9428929691053395,
-        "sample_size": 36188
+        "segment": "Female",
+        "value": 0.1871653320964484,
+        "sample_size": 352
       },
       {
-        "segment": "weekend",
-        "value": 0.9318708593718809,
-        "sample_size": 13812
+        "segment": "Male",
+        "value": 0.23251150690839578,
+        "sample_size": 142
+      },
+      {
+        "segment": "Others",
+        "value": 0.3840006265664158,
+        "sample_size": 19
+      },
+      {
+        "segment": "Prefer not to say",
+        "value": 0.32799706517102206,
+        "sample_size": 89
       }
     ],
     "sensitivity": {
-      "abs_pearson_r": 0.7631252912346266,
+      "eta_squared": 0.2703413084405568,
       "iterations": 200.0,
       "alpha": 0.05
     },
-    "falsifier": "the association's interval falls at or below max(min_effect, the shuffle null band) — the feature would be indistinguishable from a shuffled target at n=50,000",
+    "falsifier": "the association's interval falls at or below max(min_effect, the shuffle null band) — the feature would be indistinguishable from a shuffled target at n=602",
     "provenance": {
-      "dataset": "taxi",
+      "dataset": "amazon",
       "artifact": "train.parquet+val.parquet",
-      "source": "data/processed/training_data.parquet",
-      "sample_sha256": "359222920661145a",
-      "sampled_rows": "50000",
-      "sample_size": "50000",
+      "source": "data/raw/amazon/amazon_consumer_behavior_survey.csv",
+      "sample_sha256": "9858827b9b2fb5f4",
+      "sampled_rows": "602",
+      "sample_size": "602",
       "seed": "42",
       "exclusions": "pairwise-complete rows per feature; exclude_from_profiling dropped",
-      "feature": "fare_amount",
-      "test": "spearman",
-      "rows": "50000",
+      "feature": "rating_accuracy_score",
+      "test": "kruskal",
+      "rows": "602",
       "resampling": "iid+shuffle",
-      "segments": "weekday/weekend by pickup_datetime day of week",
-      "family_size": "7",
-      "acted": "6",
-      "investigated": "1",
-      "selected_feature": "association_fare_amount"
+      "segments": "levels of Gender",
+      "family_size": "12",
+      "acted": "3",
+      "investigated": "7",
+      "selected_feature": "association_rating_accuracy_score",
+      "effect_name": "epsilon_squared",
+      "correlation": "target 'Shopping_Satisfaction' is not numeric; ranked association belongs to the tests"
     }
   }
 }

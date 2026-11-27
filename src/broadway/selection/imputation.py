@@ -24,7 +24,6 @@ from __future__ import annotations
 import argparse
 import logging
 from collections.abc import Sequence
-from pathlib import Path
 from typing import Final, Literal
 
 import numpy as np
@@ -40,6 +39,7 @@ from broadway.config.schema import (
     PipelineConfig,
     ScalingStrategy,
 )
+from broadway.data.loader import ProcessedStore
 from broadway.evaluate.metrics import METRIC_DECIMALS, compute_metrics
 from broadway.features.plan import ColumnPlan
 from broadway.features.recipe import build_pipeline
@@ -171,7 +171,7 @@ class ImputationImpactStudy:
         self._experiment: ExperimentConfig = cfg.experiment
         self._train_file = cfg.etl.train_features_file
         self._val_file = cfg.etl.val_features_file
-        self._processed_dir = Path(cfg.environment.data_dir) / cfg.environment.processed_subdir
+        self._processed_dir = ProcessedStore.from_config(cfg).directory
 
     def run(self) -> ImpactTable:
         """Measure every variant and write the delta table to its config path."""

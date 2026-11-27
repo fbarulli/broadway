@@ -27,7 +27,7 @@ DEFAULT_EXPERIMENTS = ROOT / "project" / "experiments"
 PROJECT_EVIDENCE_STEPS: tuple[str, ...] = ("eda",)
 
 # Ratchet: a series joins this list once every step complies. Never remove one.
-ENFORCED: tuple[str, ...] = ("fare_prediction", "timeseries")
+ENFORCED: tuple[str, ...] = ("amazon_survey", "fare_prediction", "timeseries")
 
 # The decision half of the contract, per step (a step publishes a computed
 # verdict). A step joins this set when it builds a StepOutput with a Decision.
@@ -45,6 +45,7 @@ DECISION_ENFORCED: tuple[tuple[str, str], ...] = (
     ("timeseries", "02_seasonality"),
     ("timeseries", "03_stationarity_acf"),
     ("timeseries", "04_forecast_models"),
+    ("amazon_survey", "01_profile"),
 )
 
 # Pipeline modules that must publish a decision record (the same contract, one
@@ -138,13 +139,28 @@ class SeriesAudit:
 
 
 class ExperimentOutputAudit:
-    """Walk the experiment tree and classify each step script."""
+    """Walk the experiment tree and classify each step script.
+
+    ``DECISION_ENFORCED`` pairs must publish a record that validates through the
+    canonical ``Decision`` — the script carrying a ``StepOutput`` call is not
+    evidence that the record exists (a deleted record would otherwise pass).
+    """
 
     def __init__(
-        self, root: Path | None = DEFAULT_EXPERIMENTS, enforced: tuple[str, ...] = ENFORCED
+        self,
+        root: Path | None = DEFAULT_EXPERIMENTS,
+        enforced: tuple[str, ...] = ENFORCED,
+        results_root: Path | None = None,
+        decision_enforced: tuple[tuple[str, str], ...] = DECISION_ENFORCED,
     ) -> None:
         self._root = root
         self._enforced = enforced
+        self._decision_enforced = decision_enforced
+        self._results_root = (
+            results_root
+            if results_root is not None
+            else (Path(root) / "results" if root is not None else None)
+        )
 
     def series(self) -> list[SeriesAudit]:
         if self._root is None or not self._root.is_dir():
@@ -191,9 +207,28 @@ class ExperimentOutputAudit:
         insight = [
             step
             for step in steps
-            if (step.series, step.stem) in DECISION_ENFORCED and not step.has_decision
+            if (step.series, step.stem) in self._decision_enforced
+            and not self._publishes_decision(step)
         ]
         return base + insight
+
+    def _publishes_decision(self, step: StepAudit) -> bool:
+        """A pair passes only with a published record that validates as a Decision."""
+        if not step.has_decision or self._results_root is None:
+            return False
+        record = self._results_root / step.series / f"{step.stem}_decision.json"
+        try:
+            Decision.model_validate_json(record.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, ValidationError):
+            logger.warning(
+                "experiment audit: no valid decision record for %s/%s at %s",
+                step.series,
+                step.stem,
+                record,
+                exc_info=True,
+            )
+            return False
+        return True
 
     def advisory(self) -> list[StepAudit]:
         """Non-compliant steps outside the enforced series (reported, not gated)."""
@@ -274,7 +309,7 @@ def main() -> int:
     layout = resolve_project_layout()
     if layout.reason:
         print(f"note project experiments skipped: {layout.reason}")
-    audit = ExperimentOutputAudit(layout.experiments)
+    audit = ExperimentOutputAudit(layout.experiments, results_root=layout.results)
     violations = audit.violations()
     advisory = audit.advisory()
     for step in violations:

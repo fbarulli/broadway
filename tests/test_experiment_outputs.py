@@ -56,7 +56,7 @@ def test_enforced_series_steps_publish_a_question_and_a_figure() -> None:
     enforced_steps = sum(
         len(series.steps) for series in audit.series() if series.series in audit._enforced
     )
-    assert enforced_steps >= 12
+    assert enforced_steps == 13
 
 
 def test_audit_of_a_missing_experiments_root_is_empty(tmp_path: Path) -> None:
@@ -126,3 +126,32 @@ def test_pipeline_audit_accepts_only_a_canonical_published_record(tmp_path: Path
 
     record.write_text("[]", encoding="utf-8")
     assert audit.status() == {"eda": False}
+
+
+def test_decision_enforced_pair_needs_a_valid_record(tmp_path: Path) -> None:
+    """A pair passes only when its published record validates (not just the AST call)."""
+    audit = _audit_module()
+    experiments = tmp_path / "experiments"
+    series = experiments / "synthetic"
+    series.mkdir(parents=True)
+    (series / "01_step.py").write_text(
+        '"""Does the metric clear its threshold?"""\n'
+        "def main():\n"
+        "    figure.savefig('01_step.png')\n"
+        "    StepOutput(results_dir='.', stem='01_step', decision=None)\n",
+        encoding="utf-8",
+    )
+    results = experiments / "results" / "synthetic"
+    results.mkdir(parents=True)
+    gate = audit.ExperimentOutputAudit(
+        experiments,
+        results_root=experiments / "results",
+        decision_enforced=(("synthetic", "01_step"),),
+    )
+    assert [(item.series, item.stem) for item in gate.violations()] == [
+        ("synthetic", "01_step")
+    ]
+    (results / "01_step_decision.json").write_text(
+        json.dumps(_decision()), encoding="utf-8"
+    )
+    assert gate.violations() == []

@@ -136,7 +136,15 @@ class EffectStatistic:
 
     @staticmethod
     def epsilon_squared(values: np.ndarray, codes: np.ndarray) -> float:
-        """Kruskal's rank effect ε² = (H - k + 1) / (n - k), on midranks."""
+        """Kruskal's rank effect ε² = (H - k + 1) / (n - k), on midranks.
+
+        Ties are handled by midranks in H and the published value does NOT apply
+        the tie correction to the denominator; on a heavily tied 1-5 rating the
+        corrected variant is larger (e.g. 0.2515 vs the published 0.2299 for the
+        Amazon rating-accuracy family). The uncorrected definition is the one the
+        registry's ``effect_name`` records — a consumer comparing across studies
+        must use the same correction, not mix them.
+        """
         ranks = stats.rankdata(values)
         sizes, means, _centre, _total = EffectStatistic._group_moments(ranks, codes)
         if sizes.size < 2 or ranks.size <= sizes.size:
@@ -417,7 +425,7 @@ class FeatureTestAnalyzer:
             features=results,
             skipped=skipped,
             decisions=decisions,
-            summary=self._summary(decisions),
+            summary=self._summary(decisions, rows),
         )
 
     def _tests(
@@ -549,12 +557,16 @@ class FeatureTestAnalyzer:
             for name, index in SegmentPlan.groups(labels)
         ]
 
-    def _summary(self, decisions: list[Decision]) -> Decision | None:
+    def _summary(
+        self, decisions: list[Decision], rows: list[FeatureTestResult]
+    ) -> Decision | None:
         """The family aggregate: act if any act, else the strongest investigate.
 
         The verdict is not typed: the family rule selects which feature's
         *computed* decision is representative (the largest margin over its own
         threshold) and the record states the family counts in its provenance.
+        The chosen feature's effect name becomes the record's ``unit`` — the
+        metric is a test statistic whose scale a reader must know.
         """
         if not decisions:
             return None
@@ -567,6 +579,10 @@ class FeatureTestAnalyzer:
                 item.value,
             ),
         )
+        effect_name = next(
+            (row.effect_name for row in rows if f"association_{row.feature}" == chosen.metric),
+            None,
+        )
         evidence = chosen.evidence.model_copy(
             update={
                 "provenance": {
@@ -575,6 +591,7 @@ class FeatureTestAnalyzer:
                     "acted": str(len(acting)),
                     "investigated": str(sum(1 for item in decisions if item.verdict == "investigate")),
                     "selected_feature": chosen.metric,
+                    "effect_name": effect_name or chosen.metric,
                 }
             }
         )
@@ -584,6 +601,7 @@ class FeatureTestAnalyzer:
                     "Is there at least one feature whose association with the target "
                     "survives multiple-testing correction and the minimum effect?"
                 ),
+                "unit": effect_name or chosen.unit,
                 "evidence": evidence,
             }
         )

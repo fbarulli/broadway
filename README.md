@@ -816,9 +816,9 @@ Every step that a human reads publishes a computed record beside its report
 - Experiment rules live in `project/config/experiments/*.yaml` under
   `decisions.<step>`; an undeclared step raises a named `DecisionRuleError`.
 
-`fare_prediction/01–08` and `timeseries/01–04` publish records; the pipeline
-steps `etl`, `features`, `training` (HPO runs), `baseline`, `evaluate`, and
-`causal` publish theirs and are enforced in
+`fare_prediction/01–08`, `timeseries/01–04`, and `amazon_survey/01_profile`
+publish records; the pipeline steps `etl`, `features`, `training` (HPO runs),
+`baseline`, `evaluate`, and `causal` publish theirs and are enforced in
 `scripts/check_experiment_outputs.py` (`PIPELINE_DECISION_ENFORCED`).
 
 Promotion is interval-based: `artifacts/evaluation/promotion_decision.json`

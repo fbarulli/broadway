@@ -16,6 +16,7 @@ from broadway.cleaning.models import StructuralCleanResult
 from broadway.config.loader import load_config
 from broadway.config.viz import load_viz_config
 from broadway.data.join_audit import JoinAuditReport
+from broadway.data.loader import ArtifactStore, ProcessedStore
 from broadway.data.lookup_value_audit import LookupValueAuditReport
 from broadway.discover.profile import DatasetProfile
 from broadway.discover.qq import QqOverview
@@ -664,13 +665,17 @@ def render_index(
 
 
 def _evidence_paths(cfg: Any) -> dict[str, Path]:
-    processed = Path(cfg.environment.data_dir) / cfg.environment.processed_subdir
+    processed = ProcessedStore.from_parts(cfg.dataset, cfg.environment).directory
+    discover = ArtifactStore.from_contract(
+        cfg.dataset,
+        Path(os.getenv("BROADWAY_ARTIFACTS_DIR", "artifacts")) / "discover",
+    ).directory
     return {
         "clean": processed / f"{cfg.dataset.name}_clean.json",
         "join": processed / f"{cfg.dataset.name}_join_audit.json",
         "lookup": processed / f"{cfg.dataset.name}_lookup_value_audit.json",
-        "profile": Path(os.getenv("BROADWAY_ARTIFACTS_DIR", "artifacts")) / "discover" / "profile.json",
-        "qq": Path(os.getenv("BROADWAY_ARTIFACTS_DIR", "artifacts")) / "discover" / "qq_overview.json",
+        "profile": discover / "profile.json",
+        "qq": discover / "qq_overview.json",
     }
 
 

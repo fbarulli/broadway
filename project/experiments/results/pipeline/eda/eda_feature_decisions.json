@@ -1,79 +1,91 @@
 {
-  "dataset": "taxi",
+  "dataset": "amazon",
   "summary": {
     "question": "Is there at least one feature whose association with the target survives multiple-testing correction and the minimum effect?",
-    "metric": "association_fare_amount",
-    "value": 0.939610491850154,
-    "interval_low": 0.9366869137261491,
-    "interval_high": 0.9424532254611994,
+    "metric": "association_rating_accuracy_score",
+    "value": 0.22993240309247154,
+    "interval_low": 0.18007180190274175,
+    "interval_high": 0.2949677721209352,
     "reference": 0.0,
-    "delta": 0.939610491850154,
+    "delta": 0.22993240309247154,
     "threshold": 0.05,
-    "null_threshold": 0.00894649506402447,
+    "null_threshold": 0.007443146113530719,
     "direction": "max",
     "verdict": "act",
     "action": "keep the feature whose association clears the minimum effect; drop or defer the trivial ones",
     "owner": "eda",
-    "sample_size": 50000,
-    "unit": null,
+    "sample_size": 602,
+    "unit": "epsilon_squared",
     "min_sample_size": 100,
     "evidence": {
       "baseline": "no-effect shuffle of the target at this n",
       "delta": null,
       "segments": [
         {
-          "segment": "weekday",
-          "value": 0.9428929691053395,
-          "sample_size": 36188
+          "segment": "Female",
+          "value": 0.1871653320964484,
+          "sample_size": 352
         },
         {
-          "segment": "weekend",
-          "value": 0.9318708593718809,
-          "sample_size": 13812
+          "segment": "Male",
+          "value": 0.23251150690839578,
+          "sample_size": 142
+        },
+        {
+          "segment": "Others",
+          "value": 0.3840006265664158,
+          "sample_size": 19
+        },
+        {
+          "segment": "Prefer not to say",
+          "value": 0.32799706517102206,
+          "sample_size": 89
         }
       ],
       "sensitivity": {
-        "abs_pearson_r": 0.7631252912346266,
+        "eta_squared": 0.2703413084405568,
         "iterations": 200.0,
         "alpha": 0.05
       },
-      "falsifier": "the association's interval falls at or below max(min_effect, the shuffle null band) — the feature would be indistinguishable from a shuffled target at n=50,000",
+      "falsifier": "the association's interval falls at or below max(min_effect, the shuffle null band) — the feature would be indistinguishable from a shuffled target at n=602",
       "provenance": {
-        "dataset": "taxi",
+        "dataset": "amazon",
         "artifact": "train.parquet+val.parquet",
-        "source": "data/processed/training_data.parquet",
-        "sample_sha256": "359222920661145a",
-        "sampled_rows": "50000",
-        "sample_size": "50000",
+        "source": "data/raw/amazon/amazon_consumer_behavior_survey.csv",
+        "sample_sha256": "9858827b9b2fb5f4",
+        "sampled_rows": "602",
+        "sample_size": "602",
         "seed": "42",
         "exclusions": "pairwise-complete rows per feature; exclude_from_profiling dropped",
-        "feature": "fare_amount",
-        "test": "spearman",
-        "rows": "50000",
+        "feature": "rating_accuracy_score",
+        "test": "kruskal",
+        "rows": "602",
         "resampling": "iid+shuffle",
-        "segments": "weekday/weekend by pickup_datetime day of week",
-        "family_size": "7",
-        "acted": "6",
-        "investigated": "1",
-        "selected_feature": "association_fare_amount"
+        "segments": "levels of Gender",
+        "family_size": "12",
+        "acted": "3",
+        "investigated": "7",
+        "selected_feature": "association_rating_accuracy_score",
+        "effect_name": "epsilon_squared",
+        "correlation": "target 'Shopping_Satisfaction' is not numeric; ranked association belongs to the tests"
       }
     }
   },
   "comparison": {
-    "question": "Did the ETL change the passenger_count distribution beyond sampling noise (train+val (post-split) vs canonical (pre-split))?",
-    "metric": "standardized_shift_passenger_count",
-    "value": 0.012517458186558476,
-    "interval_low": 0.001311022232201635,
-    "interval_high": 0.025792897382219,
+    "question": "Did the ETL change the recommendation_personalization_score distribution beyond sampling noise (train+val (post-split) vs canonical (pre-split))?",
+    "metric": "standardized_shift_recommendation_personalization_score",
+    "value": 0.0,
+    "interval_low": 0.0,
+    "interval_high": 0.12985202292837028,
     "reference": 0.0,
-    "delta": 0.012517458186558476,
-    "threshold": 0.05,
-    "null_threshold": 0.012172842214581885,
+    "delta": 0.0,
+    "threshold": 0.10859807383250566,
+    "null_threshold": 0.10859807383250566,
     "direction": "max",
-    "verdict": "no_action",
+    "verdict": "investigate",
     "action": "re-check the ETL transform on the shifted column before profiling or training on it",
     "owner": "eda",
-    "sample_size": 100000,
+    "sample_size": 1204,
     "unit": null,
     "min_sample_size": 100,
     "evidence": {
@@ -81,56 +93,66 @@
       "delta": null,
       "segments": [
         {
-          "segment": "weekday",
-          "value": 0.022796722219288173,
-          "sample_size": 72281
+          "segment": "Female",
+          "value": 0.0,
+          "sample_size": 704
         },
         {
-          "segment": "weekend",
-          "value": 0.009947271469575303,
-          "sample_size": 27719
+          "segment": "Male",
+          "value": 0.0,
+          "sample_size": 284
+        },
+        {
+          "segment": "Others",
+          "value": 0.0,
+          "sample_size": 38
+        },
+        {
+          "segment": "Prefer not to say",
+          "value": 0.0,
+          "sample_size": 178
         }
       ],
       "sensitivity": {
-        "mean_delta": 0.010340000000000016,
+        "mean_delta": 0.0,
         "median_delta": 0.0,
         "iterations": 200.0
       },
       "falsifier": "the standardized shift's interval falls at or below the minimum effect and the label-shuffle null band at this n",
       "provenance": {
-        "dataset": "taxi",
+        "dataset": "amazon",
         "artifact": "train.parquet+val.parquet",
-        "source": "data/processed/training_data.parquet",
-        "sample_sha256": "359222920661145a",
-        "sampled_rows": "50000",
-        "sample_size": "50000",
+        "source": "data/raw/amazon/amazon_consumer_behavior_survey.csv",
+        "sample_sha256": "9858827b9b2fb5f4",
+        "sampled_rows": "602",
+        "sample_size": "602",
         "seed": "42",
         "exclusions": "pairwise-complete rows per feature; exclude_from_profiling dropped",
-        "column": "passenger_count",
+        "column": "recommendation_personalization_score",
         "before": "canonical (pre-split)",
         "after": "train+val (post-split)",
-        "rows": "100000",
+        "rows": "1204",
         "resampling": "iid+shuffle",
-        "segments": "weekday/weekend by pickup_datetime day of week"
+        "segments": "levels of Gender"
       }
     }
   },
   "features": [
     {
-      "question": "Does fare_amount move the numeric target 'trip_duration_minutes' beyond the minimum effect and the no-effect null band?",
-      "metric": "association_fare_amount",
-      "value": 0.939610491850154,
-      "interval_low": 0.9366869137261491,
-      "interval_high": 0.9424532254611994,
+      "question": "Does rating_accuracy_score move the numeric target 'Shopping_Satisfaction' beyond the minimum effect and the no-effect null band?",
+      "metric": "association_rating_accuracy_score",
+      "value": 0.22993240309247154,
+      "interval_low": 0.18007180190274175,
+      "interval_high": 0.2949677721209352,
       "reference": 0.0,
-      "delta": 0.939610491850154,
+      "delta": 0.22993240309247154,
       "threshold": 0.05,
-      "null_threshold": 0.00894649506402447,
+      "null_threshold": 0.007443146113530719,
       "direction": "max",
       "verdict": "act",
       "action": "keep the feature whose association clears the minimum effect; drop or defer the trivial ones",
       "owner": "eda",
-      "sample_size": 50000,
+      "sample_size": 602,
       "unit": null,
       "min_sample_size": 100,
       "evidence": {
@@ -138,164 +160,64 @@
         "delta": null,
         "segments": [
           {
-            "segment": "weekday",
-            "value": 0.9428929691053395,
-            "sample_size": 36188
+            "segment": "Female",
+            "value": 0.1871653320964484,
+            "sample_size": 352
           },
           {
-            "segment": "weekend",
-            "value": 0.9318708593718809,
-            "sample_size": 13812
+            "segment": "Male",
+            "value": 0.23251150690839578,
+            "sample_size": 142
+          },
+          {
+            "segment": "Others",
+            "value": 0.3840006265664158,
+            "sample_size": 19
+          },
+          {
+            "segment": "Prefer not to say",
+            "value": 0.32799706517102206,
+            "sample_size": 89
           }
         ],
         "sensitivity": {
-          "abs_pearson_r": 0.7631252912346266,
+          "eta_squared": 0.2703413084405568,
           "iterations": 200.0,
           "alpha": 0.05
         },
-        "falsifier": "the association's interval falls at or below max(min_effect, the shuffle null band) — the feature would be indistinguishable from a shuffled target at n=50,000",
+        "falsifier": "the association's interval falls at or below max(min_effect, the shuffle null band) — the feature would be indistinguishable from a shuffled target at n=602",
         "provenance": {
-          "dataset": "taxi",
+          "dataset": "amazon",
           "artifact": "train.parquet+val.parquet",
-          "source": "data/processed/training_data.parquet",
-          "sample_sha256": "359222920661145a",
-          "sampled_rows": "50000",
-          "sample_size": "50000",
+          "source": "data/raw/amazon/amazon_consumer_behavior_survey.csv",
+          "sample_sha256": "9858827b9b2fb5f4",
+          "sampled_rows": "602",
+          "sample_size": "602",
           "seed": "42",
           "exclusions": "pairwise-complete rows per feature; exclude_from_profiling dropped",
-          "feature": "fare_amount",
-          "test": "spearman",
-          "rows": "50000",
-          "resampling": "iid+shuffle",
-          "segments": "weekday/weekend by pickup_datetime day of week"
-        }
-      }
-    },
-    {
-      "question": "Does trip_distance move the numeric target 'trip_duration_minutes' beyond the minimum effect and the no-effect null band?",
-      "metric": "association_trip_distance",
-      "value": 0.8552222969261708,
-      "interval_low": 0.8520931781724849,
-      "interval_high": 0.8583469598906684,
-      "reference": 0.0,
-      "delta": 0.8552222969261708,
-      "threshold": 0.05,
-      "null_threshold": 0.008748509378989258,
-      "direction": "max",
-      "verdict": "act",
-      "action": "keep the feature whose association clears the minimum effect; drop or defer the trivial ones",
-      "owner": "eda",
-      "sample_size": 50000,
-      "unit": null,
-      "min_sample_size": 100,
-      "evidence": {
-        "baseline": "no-effect shuffle of the target at this n",
-        "delta": null,
-        "segments": [
-          {
-            "segment": "weekday",
-            "value": 0.8556308303843564,
-            "sample_size": 36188
-          },
-          {
-            "segment": "weekend",
-            "value": 0.8613200642931577,
-            "sample_size": 13812
-          }
-        ],
-        "sensitivity": {
-          "abs_pearson_r": 0.7920594069020745,
-          "iterations": 200.0,
-          "alpha": 0.05
-        },
-        "falsifier": "the association's interval falls at or below max(min_effect, the shuffle null band) — the feature would be indistinguishable from a shuffled target at n=50,000",
-        "provenance": {
-          "dataset": "taxi",
-          "artifact": "train.parquet+val.parquet",
-          "source": "data/processed/training_data.parquet",
-          "sample_sha256": "359222920661145a",
-          "sampled_rows": "50000",
-          "sample_size": "50000",
-          "seed": "42",
-          "exclusions": "pairwise-complete rows per feature; exclude_from_profiling dropped",
-          "feature": "trip_distance",
-          "test": "spearman",
-          "rows": "50000",
-          "resampling": "iid+shuffle",
-          "segments": "weekday/weekend by pickup_datetime day of week"
-        }
-      }
-    },
-    {
-      "question": "Does Borough move the numeric target 'trip_duration_minutes' beyond the minimum effect and the no-effect null band?",
-      "metric": "association_Borough",
-      "value": 0.15798248467489107,
-      "interval_low": 0.1535880762164391,
-      "interval_high": 0.16361222648915358,
-      "reference": 0.0,
-      "delta": 0.15798248467489107,
-      "threshold": 0.05,
-      "null_threshold": 0.0000997204152136111,
-      "direction": "max",
-      "verdict": "act",
-      "action": "keep the feature whose association clears the minimum effect; drop or defer the trivial ones",
-      "owner": "eda",
-      "sample_size": 49991,
-      "unit": null,
-      "min_sample_size": 100,
-      "evidence": {
-        "baseline": "no-effect shuffle of the target at this n",
-        "delta": null,
-        "segments": [
-          {
-            "segment": "weekday",
-            "value": 0.16133163627647285,
-            "sample_size": 36184
-          },
-          {
-            "segment": "weekend",
-            "value": 0.1507045589965993,
-            "sample_size": 13807
-          }
-        ],
-        "sensitivity": {
-          "eta_squared": 0.26653537195669785,
-          "iterations": 200.0,
-          "alpha": 0.05
-        },
-        "falsifier": "the association's interval falls at or below max(min_effect, the shuffle null band) — the feature would be indistinguishable from a shuffled target at n=49,991",
-        "provenance": {
-          "dataset": "taxi",
-          "artifact": "train.parquet+val.parquet",
-          "source": "data/processed/training_data.parquet",
-          "sample_sha256": "359222920661145a",
-          "sampled_rows": "50000",
-          "sample_size": "50000",
-          "seed": "42",
-          "exclusions": "pairwise-complete rows per feature; exclude_from_profiling dropped",
-          "feature": "Borough",
+          "feature": "rating_accuracy_score",
           "test": "kruskal",
-          "rows": "49991",
+          "rows": "602",
           "resampling": "iid+shuffle",
-          "segments": "weekday/weekend by pickup_datetime day of week"
+          "segments": "levels of Gender"
         }
       }
     },
     {
-      "question": "Does service_zone move the numeric target 'trip_duration_minutes' beyond the minimum effect and the no-effect null band?",
-      "metric": "association_service_zone",
-      "value": 0.1479271026304399,
-      "interval_low": 0.14308704055477411,
-      "interval_high": 0.15333134647398425,
+      "question": "Does recommendation_personalization_score move the numeric target 'Shopping_Satisfaction' beyond the minimum effect and the no-effect null band?",
+      "metric": "association_recommendation_personalization_score",
+      "value": 0.188902586255417,
+      "interval_low": 0.14616621144591038,
+      "interval_high": 0.24891635461851516,
       "reference": 0.0,
-      "delta": 0.1479271026304399,
+      "delta": 0.188902586255417,
       "threshold": 0.05,
-      "null_threshold": 0.00009808276208313024,
+      "null_threshold": 0.00972203046929848,
       "direction": "max",
       "verdict": "act",
       "action": "keep the feature whose association clears the minimum effect; drop or defer the trivial ones",
       "owner": "eda",
-      "sample_size": 49857,
+      "sample_size": 602,
       "unit": null,
       "min_sample_size": 100,
       "evidence": {
@@ -303,54 +225,64 @@
         "delta": null,
         "segments": [
           {
-            "segment": "weekday",
-            "value": 0.1487613209156217,
-            "sample_size": 36086
+            "segment": "Female",
+            "value": 0.172280583381565,
+            "sample_size": 352
           },
           {
-            "segment": "weekend",
-            "value": 0.14741481040010204,
-            "sample_size": 13771
+            "segment": "Male",
+            "value": 0.1663473497410023,
+            "sample_size": 142
+          },
+          {
+            "segment": "Others",
+            "value": 0.3937393483709267,
+            "sample_size": 19
+          },
+          {
+            "segment": "Prefer not to say",
+            "value": 0.26589704549772836,
+            "sample_size": 89
           }
         ],
         "sensitivity": {
-          "eta_squared": 0.24676530855908554,
+          "eta_squared": 0.20672382787730567,
           "iterations": 200.0,
           "alpha": 0.05
         },
-        "falsifier": "the association's interval falls at or below max(min_effect, the shuffle null band) — the feature would be indistinguishable from a shuffled target at n=49,857",
+        "falsifier": "the association's interval falls at or below max(min_effect, the shuffle null band) — the feature would be indistinguishable from a shuffled target at n=602",
         "provenance": {
-          "dataset": "taxi",
+          "dataset": "amazon",
           "artifact": "train.parquet+val.parquet",
-          "source": "data/processed/training_data.parquet",
-          "sample_sha256": "359222920661145a",
-          "sampled_rows": "50000",
-          "sample_size": "50000",
+          "source": "data/raw/amazon/amazon_consumer_behavior_survey.csv",
+          "sample_sha256": "9858827b9b2fb5f4",
+          "sampled_rows": "602",
+          "sample_size": "602",
           "seed": "42",
           "exclusions": "pairwise-complete rows per feature; exclude_from_profiling dropped",
-          "feature": "service_zone",
+          "feature": "recommendation_personalization_score",
           "test": "kruskal",
-          "rows": "49857",
+          "rows": "602",
           "resampling": "iid+shuffle",
-          "segments": "weekday/weekend by pickup_datetime day of week"
+          "segments": "levels of Gender"
         }
       }
     },
     {
-      "question": "Does Borough_lookup move the numeric target 'trip_duration_minutes' beyond the minimum effect and the no-effect null band?",
-      "metric": "association_Borough_lookup",
-      "value": 0.1165883843608848,
-      "interval_low": 0.11142293378408402,
-      "interval_high": 0.12121331318897731,
+      "question": "Does Customer_Reviews_Importance move the numeric target 'Shopping_Satisfaction' beyond the minimum effect and the no-effect null band?",
+      "metric": "association_Customer_Reviews_Importance",
+      "value": 0.163894001904076,
+      "interval_low": 0.11237855276223087,
+      "interval_high": 0.22686542605844173,
       "reference": 0.0,
-      "delta": 0.1165883843608848,
+      "delta": 0.163894001904076,
       "threshold": 0.05,
-      "null_threshold": 0.00012095730065090963,
+      "null_threshold": 0.006449449191233903,
       "direction": "max",
       "verdict": "act",
       "action": "keep the feature whose association clears the minimum effect; drop or defer the trivial ones",
       "owner": "eda",
-      "sample_size": 49813,
+      "sample_size": 602,
       "unit": null,
       "min_sample_size": 100,
       "evidence": {
@@ -358,109 +290,64 @@
         "delta": null,
         "segments": [
           {
-            "segment": "weekday",
-            "value": 0.11868637460208031,
-            "sample_size": 36061
+            "segment": "Female",
+            "value": 0.12005247166586705,
+            "sample_size": 352
           },
           {
-            "segment": "weekend",
-            "value": 0.11343835424205864,
-            "sample_size": 13752
+            "segment": "Male",
+            "value": 0.1781561159691745,
+            "sample_size": 142
+          },
+          {
+            "segment": "Others",
+            "value": 0.2759473684210529,
+            "sample_size": 19
+          },
+          {
+            "segment": "Prefer not to say",
+            "value": 0.3140991589655383,
+            "sample_size": 89
           }
         ],
         "sensitivity": {
-          "eta_squared": 0.15971716784757126,
+          "eta_squared": 0.18157114541678615,
           "iterations": 200.0,
           "alpha": 0.05
         },
-        "falsifier": "the association's interval falls at or below max(min_effect, the shuffle null band) — the feature would be indistinguishable from a shuffled target at n=49,813",
+        "falsifier": "the association's interval falls at or below max(min_effect, the shuffle null band) — the feature would be indistinguishable from a shuffled target at n=602",
         "provenance": {
-          "dataset": "taxi",
+          "dataset": "amazon",
           "artifact": "train.parquet+val.parquet",
-          "source": "data/processed/training_data.parquet",
-          "sample_sha256": "359222920661145a",
-          "sampled_rows": "50000",
-          "sample_size": "50000",
+          "source": "data/raw/amazon/amazon_consumer_behavior_survey.csv",
+          "sample_sha256": "9858827b9b2fb5f4",
+          "sampled_rows": "602",
+          "sample_size": "602",
           "seed": "42",
           "exclusions": "pairwise-complete rows per feature; exclude_from_profiling dropped",
-          "feature": "Borough_lookup",
+          "feature": "Customer_Reviews_Importance",
           "test": "kruskal",
-          "rows": "49813",
+          "rows": "602",
           "resampling": "iid+shuffle",
-          "segments": "weekday/weekend by pickup_datetime day of week"
+          "segments": "levels of Gender"
         }
       }
     },
     {
-      "question": "Does service_zone_lookup move the numeric target 'trip_duration_minutes' beyond the minimum effect and the no-effect null band?",
-      "metric": "association_service_zone_lookup",
-      "value": 0.10399502067486935,
-      "interval_low": 0.09927597631752923,
-      "interval_high": 0.10845721808639547,
+      "question": "Does Product_Search_Method move the numeric target 'Shopping_Satisfaction' beyond the minimum effect and the no-effect null band?",
+      "metric": "association_Product_Search_Method",
+      "value": 0.06915927211045891,
+      "interval_low": 0.03507764004754904,
+      "interval_high": 0.11438726430870622,
       "reference": 0.0,
-      "delta": 0.10399502067486935,
+      "delta": 0.06915927211045891,
       "threshold": 0.05,
-      "null_threshold": 0.00008385433936374801,
-      "direction": "max",
-      "verdict": "act",
-      "action": "keep the feature whose association clears the minimum effect; drop or defer the trivial ones",
-      "owner": "eda",
-      "sample_size": 49598,
-      "unit": null,
-      "min_sample_size": 100,
-      "evidence": {
-        "baseline": "no-effect shuffle of the target at this n",
-        "delta": null,
-        "segments": [
-          {
-            "segment": "weekday",
-            "value": 0.10603066199791945,
-            "sample_size": 35905
-          },
-          {
-            "segment": "weekend",
-            "value": 0.1003603306251816,
-            "sample_size": 13693
-          }
-        ],
-        "sensitivity": {
-          "eta_squared": 0.1420603817102354,
-          "iterations": 200.0,
-          "alpha": 0.05
-        },
-        "falsifier": "the association's interval falls at or below max(min_effect, the shuffle null band) — the feature would be indistinguishable from a shuffled target at n=49,598",
-        "provenance": {
-          "dataset": "taxi",
-          "artifact": "train.parquet+val.parquet",
-          "source": "data/processed/training_data.parquet",
-          "sample_sha256": "359222920661145a",
-          "sampled_rows": "50000",
-          "sample_size": "50000",
-          "seed": "42",
-          "exclusions": "pairwise-complete rows per feature; exclude_from_profiling dropped",
-          "feature": "service_zone_lookup",
-          "test": "kruskal",
-          "rows": "49598",
-          "resampling": "iid+shuffle",
-          "segments": "weekday/weekend by pickup_datetime day of week"
-        }
-      }
-    },
-    {
-      "question": "Does passenger_count move the numeric target 'trip_duration_minutes' beyond the minimum effect and the no-effect null band?",
-      "metric": "association_passenger_count",
-      "value": 0.04295954388334315,
-      "interval_low": 0.03436386986385888,
-      "interval_high": 0.05254489016188671,
-      "reference": 0.0,
-      "delta": 0.04295954388334315,
-      "threshold": 0.05,
-      "null_threshold": 0.009858700546212058,
+      "null_threshold": 0.007216742251489046,
       "direction": "max",
       "verdict": "investigate",
       "action": "keep the feature whose association clears the minimum effect; drop or defer the trivial ones",
       "owner": "eda",
-      "sample_size": 50000,
+      "sample_size": 600,
       "unit": null,
       "min_sample_size": 100,
       "evidence": {
@@ -468,56 +355,586 @@
         "delta": null,
         "segments": [
           {
-            "segment": "weekday",
-            "value": 0.048840168889785034,
-            "sample_size": 36188
+            "segment": "Female",
+            "value": 0.024929145149193747,
+            "sample_size": 350
           },
           {
-            "segment": "weekend",
-            "value": 0.04201966266089419,
-            "sample_size": 13812
+            "segment": "Male",
+            "value": 0.130734985507358,
+            "sample_size": 142
+          },
+          {
+            "segment": "Others",
+            "value": 0.0,
+            "sample_size": 19
+          },
+          {
+            "segment": "Prefer not to say",
+            "value": 0.12154092780001587,
+            "sample_size": 89
           }
         ],
         "sensitivity": {
-          "abs_pearson_r": 0.03245026529154684,
+          "eta_squared": 0.08379436171741976,
           "iterations": 200.0,
           "alpha": 0.05
         },
-        "falsifier": "the association's interval falls at or below max(min_effect, the shuffle null band) — the feature would be indistinguishable from a shuffled target at n=50,000",
+        "falsifier": "the association's interval falls at or below max(min_effect, the shuffle null band) — the feature would be indistinguishable from a shuffled target at n=600",
         "provenance": {
-          "dataset": "taxi",
+          "dataset": "amazon",
           "artifact": "train.parquet+val.parquet",
-          "source": "data/processed/training_data.parquet",
-          "sample_sha256": "359222920661145a",
-          "sampled_rows": "50000",
-          "sample_size": "50000",
+          "source": "data/raw/amazon/amazon_consumer_behavior_survey.csv",
+          "sample_sha256": "9858827b9b2fb5f4",
+          "sampled_rows": "602",
+          "sample_size": "602",
           "seed": "42",
           "exclusions": "pairwise-complete rows per feature; exclude_from_profiling dropped",
-          "feature": "passenger_count",
-          "test": "spearman",
-          "rows": "50000",
+          "feature": "Product_Search_Method",
+          "test": "kruskal",
+          "rows": "600",
           "resampling": "iid+shuffle",
-          "segments": "weekday/weekend by pickup_datetime day of week"
+          "segments": "levels of Gender"
+        }
+      }
+    },
+    {
+      "question": "Does Review_Reliability move the numeric target 'Shopping_Satisfaction' beyond the minimum effect and the no-effect null band?",
+      "metric": "association_Review_Reliability",
+      "value": 0.05532266486488841,
+      "interval_low": 0.02864472474176382,
+      "interval_high": 0.10021514495186742,
+      "reference": 0.0,
+      "delta": 0.05532266486488841,
+      "threshold": 0.05,
+      "null_threshold": 0.00733801436031526,
+      "direction": "max",
+      "verdict": "investigate",
+      "action": "keep the feature whose association clears the minimum effect; drop or defer the trivial ones",
+      "owner": "eda",
+      "sample_size": 602,
+      "unit": null,
+      "min_sample_size": 100,
+      "evidence": {
+        "baseline": "no-effect shuffle of the target at this n",
+        "delta": null,
+        "segments": [
+          {
+            "segment": "Female",
+            "value": 0.02147661535666305,
+            "sample_size": 352
+          },
+          {
+            "segment": "Male",
+            "value": 0.09059809533894674,
+            "sample_size": 142
+          },
+          {
+            "segment": "Others",
+            "value": 0.2304511278195481,
+            "sample_size": 19
+          },
+          {
+            "segment": "Prefer not to say",
+            "value": 0.03565002846369902,
+            "sample_size": 89
+          }
+        ],
+        "sensitivity": {
+          "eta_squared": 0.07471917190146019,
+          "iterations": 200.0,
+          "alpha": 0.05
+        },
+        "falsifier": "the association's interval falls at or below max(min_effect, the shuffle null band) — the feature would be indistinguishable from a shuffled target at n=602",
+        "provenance": {
+          "dataset": "amazon",
+          "artifact": "train.parquet+val.parquet",
+          "source": "data/raw/amazon/amazon_consumer_behavior_survey.csv",
+          "sample_sha256": "9858827b9b2fb5f4",
+          "sampled_rows": "602",
+          "sample_size": "602",
+          "seed": "42",
+          "exclusions": "pairwise-complete rows per feature; exclude_from_profiling dropped",
+          "feature": "Review_Reliability",
+          "test": "kruskal",
+          "rows": "602",
+          "resampling": "iid+shuffle",
+          "segments": "levels of Gender"
+        }
+      }
+    },
+    {
+      "question": "Does Cart_Completion_Frequency move the numeric target 'Shopping_Satisfaction' beyond the minimum effect and the no-effect null band?",
+      "metric": "association_Cart_Completion_Frequency",
+      "value": 0.05080483781548949,
+      "interval_low": 0.025307815190941715,
+      "interval_high": 0.10647262397336515,
+      "reference": 0.0,
+      "delta": 0.05080483781548949,
+      "threshold": 0.05,
+      "null_threshold": 0.007187067075938521,
+      "direction": "max",
+      "verdict": "investigate",
+      "action": "keep the feature whose association clears the minimum effect; drop or defer the trivial ones",
+      "owner": "eda",
+      "sample_size": 602,
+      "unit": null,
+      "min_sample_size": 100,
+      "evidence": {
+        "baseline": "no-effect shuffle of the target at this n",
+        "delta": null,
+        "segments": [
+          {
+            "segment": "Female",
+            "value": 0.011523801242026989,
+            "sample_size": 352
+          },
+          {
+            "segment": "Male",
+            "value": 0.10416346574653126,
+            "sample_size": 142
+          },
+          {
+            "segment": "Others",
+            "value": 0.029036654135338274,
+            "sample_size": 19
+          },
+          {
+            "segment": "Prefer not to say",
+            "value": 0.07467692900442151,
+            "sample_size": 89
+          }
+        ],
+        "sensitivity": {
+          "eta_squared": 0.0644011912261613,
+          "iterations": 200.0,
+          "alpha": 0.05
+        },
+        "falsifier": "the association's interval falls at or below max(min_effect, the shuffle null band) — the feature would be indistinguishable from a shuffled target at n=602",
+        "provenance": {
+          "dataset": "amazon",
+          "artifact": "train.parquet+val.parquet",
+          "source": "data/raw/amazon/amazon_consumer_behavior_survey.csv",
+          "sample_sha256": "9858827b9b2fb5f4",
+          "sampled_rows": "602",
+          "sample_size": "602",
+          "seed": "42",
+          "exclusions": "pairwise-complete rows per feature; exclude_from_profiling dropped",
+          "feature": "Cart_Completion_Frequency",
+          "test": "kruskal",
+          "rows": "602",
+          "resampling": "iid+shuffle",
+          "segments": "levels of Gender"
+        }
+      }
+    },
+    {
+      "question": "Does Add_to_Cart_Browsing move the numeric target 'Shopping_Satisfaction' beyond the minimum effect and the no-effect null band?",
+      "metric": "association_Add_to_Cart_Browsing",
+      "value": 0.047058242911967404,
+      "interval_low": 0.019680659472680946,
+      "interval_high": 0.08677553410794733,
+      "reference": 0.0,
+      "delta": 0.047058242911967404,
+      "threshold": 0.05,
+      "null_threshold": 0.007372693500074599,
+      "direction": "max",
+      "verdict": "investigate",
+      "action": "keep the feature whose association clears the minimum effect; drop or defer the trivial ones",
+      "owner": "eda",
+      "sample_size": 602,
+      "unit": null,
+      "min_sample_size": 100,
+      "evidence": {
+        "baseline": "no-effect shuffle of the target at this n",
+        "delta": null,
+        "segments": [
+          {
+            "segment": "Female",
+            "value": 0.046389826662477276,
+            "sample_size": 352
+          },
+          {
+            "segment": "Male",
+            "value": 0.05236569641271226,
+            "sample_size": 142
+          },
+          {
+            "segment": "Others",
+            "value": 0.0,
+            "sample_size": 19
+          },
+          {
+            "segment": "Prefer not to say",
+            "value": 0.0010717003986919049,
+            "sample_size": 89
+          }
+        ],
+        "sensitivity": {
+          "eta_squared": 0.046340632367235124,
+          "iterations": 200.0,
+          "alpha": 0.05
+        },
+        "falsifier": "the association's interval falls at or below max(min_effect, the shuffle null band) — the feature would be indistinguishable from a shuffled target at n=602",
+        "provenance": {
+          "dataset": "amazon",
+          "artifact": "train.parquet+val.parquet",
+          "source": "data/raw/amazon/amazon_consumer_behavior_survey.csv",
+          "sample_sha256": "9858827b9b2fb5f4",
+          "sampled_rows": "602",
+          "sample_size": "602",
+          "seed": "42",
+          "exclusions": "pairwise-complete rows per feature; exclude_from_profiling dropped",
+          "feature": "Add_to_Cart_Browsing",
+          "test": "kruskal",
+          "rows": "602",
+          "resampling": "iid+shuffle",
+          "segments": "levels of Gender"
+        }
+      }
+    },
+    {
+      "question": "Does Review_Helpfulness move the numeric target 'Shopping_Satisfaction' beyond the minimum effect and the no-effect null band?",
+      "metric": "association_Review_Helpfulness",
+      "value": 0.03543096908348148,
+      "interval_low": 0.012381931076450928,
+      "interval_high": 0.07077700390962105,
+      "reference": 0.0,
+      "delta": 0.03543096908348148,
+      "threshold": 0.05,
+      "null_threshold": 0.005342848465039964,
+      "direction": "max",
+      "verdict": "investigate",
+      "action": "keep the feature whose association clears the minimum effect; drop or defer the trivial ones",
+      "owner": "eda",
+      "sample_size": 602,
+      "unit": null,
+      "min_sample_size": 100,
+      "evidence": {
+        "baseline": "no-effect shuffle of the target at this n",
+        "delta": null,
+        "segments": [
+          {
+            "segment": "Female",
+            "value": 0.04682515407812793,
+            "sample_size": 352
+          },
+          {
+            "segment": "Male",
+            "value": 0.04500118200773037,
+            "sample_size": 142
+          },
+          {
+            "segment": "Others",
+            "value": 0.10200501253132854,
+            "sample_size": 19
+          },
+          {
+            "segment": "Prefer not to say",
+            "value": 0.034971040350974814,
+            "sample_size": 89
+          }
+        ],
+        "sensitivity": {
+          "eta_squared": 0.039158073492866666,
+          "iterations": 200.0,
+          "alpha": 0.05
+        },
+        "falsifier": "the association's interval falls at or below max(min_effect, the shuffle null band) — the feature would be indistinguishable from a shuffled target at n=602",
+        "provenance": {
+          "dataset": "amazon",
+          "artifact": "train.parquet+val.parquet",
+          "source": "data/raw/amazon/amazon_consumer_behavior_survey.csv",
+          "sample_sha256": "9858827b9b2fb5f4",
+          "sampled_rows": "602",
+          "sample_size": "602",
+          "seed": "42",
+          "exclusions": "pairwise-complete rows per feature; exclude_from_profiling dropped",
+          "feature": "Review_Helpfulness",
+          "test": "kruskal",
+          "rows": "602",
+          "resampling": "iid+shuffle",
+          "segments": "levels of Gender"
+        }
+      }
+    },
+    {
+      "question": "Does Recommendation_Helpfulness move the numeric target 'Shopping_Satisfaction' beyond the minimum effect and the no-effect null band?",
+      "metric": "association_Recommendation_Helpfulness",
+      "value": 0.029345116630248868,
+      "interval_low": 0.008522452509640982,
+      "interval_high": 0.07152252441485035,
+      "reference": 0.0,
+      "delta": 0.029345116630248868,
+      "threshold": 0.05,
+      "null_threshold": 0.004965822723636525,
+      "direction": "max",
+      "verdict": "investigate",
+      "action": "keep the feature whose association clears the minimum effect; drop or defer the trivial ones",
+      "owner": "eda",
+      "sample_size": 602,
+      "unit": null,
+      "min_sample_size": 100,
+      "evidence": {
+        "baseline": "no-effect shuffle of the target at this n",
+        "delta": null,
+        "segments": [
+          {
+            "segment": "Female",
+            "value": 0.03500150605172046,
+            "sample_size": 352
+          },
+          {
+            "segment": "Male",
+            "value": 0.020109120953657276,
+            "sample_size": 142
+          },
+          {
+            "segment": "Others",
+            "value": 0.0,
+            "sample_size": 19
+          },
+          {
+            "segment": "Prefer not to say",
+            "value": 0.05201312356966294,
+            "sample_size": 89
+          }
+        ],
+        "sensitivity": {
+          "eta_squared": 0.02859834413792456,
+          "iterations": 200.0,
+          "alpha": 0.05
+        },
+        "falsifier": "the association's interval falls at or below max(min_effect, the shuffle null band) — the feature would be indistinguishable from a shuffled target at n=602",
+        "provenance": {
+          "dataset": "amazon",
+          "artifact": "train.parquet+val.parquet",
+          "source": "data/raw/amazon/amazon_consumer_behavior_survey.csv",
+          "sample_sha256": "9858827b9b2fb5f4",
+          "sampled_rows": "602",
+          "sample_size": "602",
+          "seed": "42",
+          "exclusions": "pairwise-complete rows per feature; exclude_from_profiling dropped",
+          "feature": "Recommendation_Helpfulness",
+          "test": "kruskal",
+          "rows": "602",
+          "resampling": "iid+shuffle",
+          "segments": "levels of Gender"
+        }
+      }
+    },
+    {
+      "question": "Does Saveforlater_Frequency move the numeric target 'Shopping_Satisfaction' beyond the minimum effect and the no-effect null band?",
+      "metric": "association_Saveforlater_Frequency",
+      "value": 0.023044757527646544,
+      "interval_low": 0.0056265780172856175,
+      "interval_high": 0.06508293956362,
+      "reference": 0.0,
+      "delta": 0.023044757527646544,
+      "threshold": 0.05,
+      "null_threshold": 0.007188214560986237,
+      "direction": "max",
+      "verdict": "investigate",
+      "action": "keep the feature whose association clears the minimum effect; drop or defer the trivial ones",
+      "owner": "eda",
+      "sample_size": 602,
+      "unit": null,
+      "min_sample_size": 100,
+      "evidence": {
+        "baseline": "no-effect shuffle of the target at this n",
+        "delta": null,
+        "segments": [
+          {
+            "segment": "Female",
+            "value": 0.02548620017762099,
+            "sample_size": 352
+          },
+          {
+            "segment": "Male",
+            "value": 0.08383331709755582,
+            "sample_size": 142
+          },
+          {
+            "segment": "Others",
+            "value": 0.0718750000000006,
+            "sample_size": 19
+          },
+          {
+            "segment": "Prefer not to say",
+            "value": 0.07977179722364337,
+            "sample_size": 89
+          }
+        ],
+        "sensitivity": {
+          "eta_squared": 0.03235213565652483,
+          "iterations": 200.0,
+          "alpha": 0.05
+        },
+        "falsifier": "the association's interval falls at or below max(min_effect, the shuffle null band) — the feature would be indistinguishable from a shuffled target at n=602",
+        "provenance": {
+          "dataset": "amazon",
+          "artifact": "train.parquet+val.parquet",
+          "source": "data/raw/amazon/amazon_consumer_behavior_survey.csv",
+          "sample_sha256": "9858827b9b2fb5f4",
+          "sampled_rows": "602",
+          "sample_size": "602",
+          "seed": "42",
+          "exclusions": "pairwise-complete rows per feature; exclude_from_profiling dropped",
+          "feature": "Saveforlater_Frequency",
+          "test": "kruskal",
+          "rows": "602",
+          "resampling": "iid+shuffle",
+          "segments": "levels of Gender"
+        }
+      }
+    },
+    {
+      "question": "Does Browsing_Frequency move the numeric target 'Shopping_Satisfaction' beyond the minimum effect and the no-effect null band?",
+      "metric": "association_Browsing_Frequency",
+      "value": 0.014868378708197544,
+      "interval_low": 0.0018536899019051191,
+      "interval_high": 0.049594702694080985,
+      "reference": 0.0,
+      "delta": 0.014868378708197544,
+      "threshold": 0.05,
+      "null_threshold": 0.007376495043746398,
+      "direction": "max",
+      "verdict": "no_action",
+      "action": "keep the feature whose association clears the minimum effect; drop or defer the trivial ones",
+      "owner": "eda",
+      "sample_size": 602,
+      "unit": null,
+      "min_sample_size": 100,
+      "evidence": {
+        "baseline": "no-effect shuffle of the target at this n",
+        "delta": null,
+        "segments": [
+          {
+            "segment": "Female",
+            "value": 0.009162797002776925,
+            "sample_size": 352
+          },
+          {
+            "segment": "Male",
+            "value": 0.013813747844301855,
+            "sample_size": 142
+          },
+          {
+            "segment": "Others",
+            "value": 0.0,
+            "sample_size": 19
+          },
+          {
+            "segment": "Prefer not to say",
+            "value": 0.027628040579527887,
+            "sample_size": 89
+          }
+        ],
+        "sensitivity": {
+          "eta_squared": 0.02441149993273463,
+          "iterations": 200.0,
+          "alpha": 0.05
+        },
+        "falsifier": "the association's interval falls at or below max(min_effect, the shuffle null band) — the feature would be indistinguishable from a shuffled target at n=602",
+        "provenance": {
+          "dataset": "amazon",
+          "artifact": "train.parquet+val.parquet",
+          "source": "data/raw/amazon/amazon_consumer_behavior_survey.csv",
+          "sample_sha256": "9858827b9b2fb5f4",
+          "sampled_rows": "602",
+          "sample_size": "602",
+          "seed": "42",
+          "exclusions": "pairwise-complete rows per feature; exclude_from_profiling dropped",
+          "feature": "Browsing_Frequency",
+          "test": "kruskal",
+          "rows": "602",
+          "resampling": "iid+shuffle",
+          "segments": "levels of Gender"
+        }
+      }
+    },
+    {
+      "question": "Does Cart_Abandonment_Factors move the numeric target 'Shopping_Satisfaction' beyond the minimum effect and the no-effect null band?",
+      "metric": "association_Cart_Abandonment_Factors",
+      "value": 0.012967368787428197,
+      "interval_low": 0.0019008827781486347,
+      "interval_high": 0.04074935363006238,
+      "reference": 0.0,
+      "delta": 0.012967368787428197,
+      "threshold": 0.05,
+      "null_threshold": 0.006597424917848575,
+      "direction": "max",
+      "verdict": "no_action",
+      "action": "keep the feature whose association clears the minimum effect; drop or defer the trivial ones",
+      "owner": "eda",
+      "sample_size": 602,
+      "unit": null,
+      "min_sample_size": 100,
+      "evidence": {
+        "baseline": "no-effect shuffle of the target at this n",
+        "delta": null,
+        "segments": [
+          {
+            "segment": "Female",
+            "value": 0.0,
+            "sample_size": 352
+          },
+          {
+            "segment": "Male",
+            "value": 0.047553291064670544,
+            "sample_size": 142
+          },
+          {
+            "segment": "Others",
+            "value": 0.3071710526315788,
+            "sample_size": 19
+          },
+          {
+            "segment": "Prefer not to say",
+            "value": 0.06705334718156952,
+            "sample_size": 89
+          }
+        ],
+        "sensitivity": {
+          "eta_squared": 0.025462568958969454,
+          "iterations": 200.0,
+          "alpha": 0.05
+        },
+        "falsifier": "the association's interval falls at or below max(min_effect, the shuffle null band) — the feature would be indistinguishable from a shuffled target at n=602",
+        "provenance": {
+          "dataset": "amazon",
+          "artifact": "train.parquet+val.parquet",
+          "source": "data/raw/amazon/amazon_consumer_behavior_survey.csv",
+          "sample_sha256": "9858827b9b2fb5f4",
+          "sampled_rows": "602",
+          "sample_size": "602",
+          "seed": "42",
+          "exclusions": "pairwise-complete rows per feature; exclude_from_profiling dropped",
+          "feature": "Cart_Abandonment_Factors",
+          "test": "kruskal",
+          "rows": "602",
+          "resampling": "iid+shuffle",
+          "segments": "levels of Gender"
         }
       }
     }
   ],
   "outliers": [
     {
-      "question": "Is more than 1.00% of fare_amount outside the IQR fence of 1.5 x IQR?",
-      "metric": "outlier_share_fare_amount",
-      "value": 0.10974,
-      "interval_low": 0.1074575,
-      "interval_high": 0.11228650000000001,
+      "question": "Is more than 1.00% of age outside the IQR fence of 1.5 x IQR?",
+      "metric": "outlier_share_age",
+      "value": 0.03322259136212625,
+      "interval_low": 0.019892026578073096,
+      "interval_high": 0.046511627906976744,
       "reference": 0.006976603239280177,
-      "delta": 0.10276339676071983,
-      "threshold": 0.01,
-      "null_threshold": 0.007600999999999999,
+      "delta": 0.02624598812284607,
+      "threshold": 0.011710963455149473,
+      "null_threshold": 0.011710963455149473,
       "direction": "max",
       "verdict": "act",
       "action": "winsorize the flagged columns before training, or exclude them with a recorded reason",
       "owner": "eda",
-      "sample_size": 50000,
+      "sample_size": 602,
       "unit": null,
       "min_sample_size": 100,
       "evidence": {
@@ -525,215 +942,63 @@
         "delta": null,
         "segments": [
           {
-            "segment": "weekday",
-            "value": 0.11108654802697027,
-            "sample_size": 36188
+            "segment": "Female",
+            "value": 0.02556818181818182,
+            "sample_size": 352
           },
           {
-            "segment": "weekend",
-            "value": 0.10621198957428324,
-            "sample_size": 13812
+            "segment": "Male",
+            "value": 0.035211267605633804,
+            "sample_size": 142
+          },
+          {
+            "segment": "Others",
+            "value": 0.0,
+            "sample_size": 19
+          },
+          {
+            "segment": "Prefer not to say",
+            "value": 0.06741573033707865,
+            "sample_size": 89
           }
         ],
         "sensitivity": {
-          "z_score_share": 0.01166,
+          "z_score_share": 0.008306,
           "iqr_multiplier": 1.5,
           "iterations": 200.0
         },
         "falsifier": "the share's interval falls at or below the declared maximum share — the column would carry no more extreme values than its fence implies",
         "provenance": {
-          "dataset": "taxi",
+          "dataset": "amazon",
           "artifact": "train.parquet+val.parquet",
-          "source": "data/processed/training_data.parquet",
-          "sample_sha256": "359222920661145a",
-          "sampled_rows": "50000",
-          "sample_size": "50000",
+          "source": "data/raw/amazon/amazon_consumer_behavior_survey.csv",
+          "sample_sha256": "9858827b9b2fb5f4",
+          "sampled_rows": "602",
+          "sample_size": "602",
           "seed": "42",
           "exclusions": "pairwise-complete rows per feature; exclude_from_profiling dropped",
-          "column": "fare_amount",
-          "rows": "50000",
+          "column": "age",
+          "rows": "602",
           "resampling": "iid",
-          "segments": "weekday/weekend by pickup_datetime day of week"
+          "segments": "levels of Gender"
         }
       }
     },
     {
-      "question": "Is more than 1.00% of passenger_count outside the IQR fence of 1.5 x IQR?",
-      "metric": "outlier_share_passenger_count",
-      "value": 0.2188,
-      "interval_low": 0.215532,
-      "interval_high": 0.2224535,
-      "reference": 0.006976603239280177,
-      "delta": 0.21182339676071982,
-      "threshold": 0.01,
-      "null_threshold": 0.007600999999999999,
-      "direction": "max",
-      "verdict": "act",
-      "action": "winsorize the flagged columns before training, or exclude them with a recorded reason",
-      "owner": "eda",
-      "sample_size": 50000,
-      "unit": null,
-      "min_sample_size": 100,
-      "evidence": {
-        "baseline": "binomial null at this n around the share a Gaussian reference produces at iqr_multiplier=1.5",
-        "delta": null,
-        "segments": [
-          {
-            "segment": "weekday",
-            "value": 0.1970542721344092,
-            "sample_size": 36188
-          },
-          {
-            "segment": "weekend",
-            "value": 0.27577468867651317,
-            "sample_size": 13812
-          }
-        ],
-        "sensitivity": {
-          "z_score_share": 0.03824,
-          "iqr_multiplier": 1.5,
-          "iterations": 200.0
-        },
-        "falsifier": "the share's interval falls at or below the declared maximum share — the column would carry no more extreme values than its fence implies",
-        "provenance": {
-          "dataset": "taxi",
-          "artifact": "train.parquet+val.parquet",
-          "source": "data/processed/training_data.parquet",
-          "sample_sha256": "359222920661145a",
-          "sampled_rows": "50000",
-          "sample_size": "50000",
-          "seed": "42",
-          "exclusions": "pairwise-complete rows per feature; exclude_from_profiling dropped",
-          "column": "passenger_count",
-          "rows": "50000",
-          "resampling": "iid",
-          "segments": "weekday/weekend by pickup_datetime day of week"
-        }
-      }
-    },
-    {
-      "question": "Is more than 1.00% of trip_distance outside the IQR fence of 1.5 x IQR?",
-      "metric": "outlier_share_trip_distance",
-      "value": 0.13146,
-      "interval_low": 0.1285385,
-      "interval_high": 0.1343405,
-      "reference": 0.006976603239280177,
-      "delta": 0.12448339676071982,
-      "threshold": 0.01,
-      "null_threshold": 0.007600999999999999,
-      "direction": "max",
-      "verdict": "act",
-      "action": "winsorize the flagged columns before training, or exclude them with a recorded reason",
-      "owner": "eda",
-      "sample_size": 50000,
-      "unit": null,
-      "min_sample_size": 100,
-      "evidence": {
-        "baseline": "binomial null at this n around the share a Gaussian reference produces at iqr_multiplier=1.5",
-        "delta": null,
-        "segments": [
-          {
-            "segment": "weekday",
-            "value": 0.13280645517851222,
-            "sample_size": 36188
-          },
-          {
-            "segment": "weekend",
-            "value": 0.12793223284100783,
-            "sample_size": 13812
-          }
-        ],
-        "sensitivity": {
-          "z_score_share": 0.04116,
-          "iqr_multiplier": 1.5,
-          "iterations": 200.0
-        },
-        "falsifier": "the share's interval falls at or below the declared maximum share — the column would carry no more extreme values than its fence implies",
-        "provenance": {
-          "dataset": "taxi",
-          "artifact": "train.parquet+val.parquet",
-          "source": "data/processed/training_data.parquet",
-          "sample_sha256": "359222920661145a",
-          "sampled_rows": "50000",
-          "sample_size": "50000",
-          "seed": "42",
-          "exclusions": "pairwise-complete rows per feature; exclude_from_profiling dropped",
-          "column": "trip_distance",
-          "rows": "50000",
-          "resampling": "iid",
-          "segments": "weekday/weekend by pickup_datetime day of week"
-        }
-      }
-    },
-    {
-      "question": "Is more than 1.00% of trip_duration_minutes outside the IQR fence of 1.5 x IQR?",
-      "metric": "outlier_share_trip_duration_minutes",
-      "value": 0.0616,
-      "interval_low": 0.05956,
-      "interval_high": 0.063602,
-      "reference": 0.006976603239280177,
-      "delta": 0.054623396760719825,
-      "threshold": 0.01,
-      "null_threshold": 0.007600999999999999,
-      "direction": "max",
-      "verdict": "act",
-      "action": "winsorize the flagged columns before training, or exclude them with a recorded reason",
-      "owner": "eda",
-      "sample_size": 50000,
-      "unit": null,
-      "min_sample_size": 100,
-      "evidence": {
-        "baseline": "binomial null at this n around the share a Gaussian reference produces at iqr_multiplier=1.5",
-        "delta": null,
-        "segments": [
-          {
-            "segment": "weekday",
-            "value": 0.06748093290593567,
-            "sample_size": 36188
-          },
-          {
-            "segment": "weekend",
-            "value": 0.04619171734723429,
-            "sample_size": 13812
-          }
-        ],
-        "sensitivity": {
-          "z_score_share": 0.02166,
-          "iqr_multiplier": 1.5,
-          "iterations": 200.0
-        },
-        "falsifier": "the share's interval falls at or below the declared maximum share — the column would carry no more extreme values than its fence implies",
-        "provenance": {
-          "dataset": "taxi",
-          "artifact": "train.parquet+val.parquet",
-          "source": "data/processed/training_data.parquet",
-          "sample_sha256": "359222920661145a",
-          "sampled_rows": "50000",
-          "sample_size": "50000",
-          "seed": "42",
-          "exclusions": "pairwise-complete rows per feature; exclude_from_profiling dropped",
-          "column": "trip_duration_minutes",
-          "rows": "50000",
-          "resampling": "iid",
-          "segments": "weekday/weekend by pickup_datetime day of week"
-        }
-      }
-    },
-    {
-      "question": "Is more than 1.00% of LocationID outside the IQR fence of 1.5 x IQR?",
-      "metric": "outlier_share_LocationID",
+      "question": "Is more than 1.00% of Customer_Reviews_Importance outside the IQR fence of 1.5 x IQR?",
+      "metric": "outlier_share_Customer_Reviews_Importance",
       "value": 0.0,
       "interval_low": 0.0,
       "interval_high": 0.0,
       "reference": 0.006976603239280177,
       "delta": -0.006976603239280177,
-      "threshold": 0.01,
-      "null_threshold": 0.007600999999999999,
+      "threshold": 0.011710963455149473,
+      "null_threshold": 0.011710963455149473,
       "direction": "max",
       "verdict": "no_action",
       "action": "winsorize the flagged columns before training, or exclude them with a recorded reason",
       "owner": "eda",
-      "sample_size": 50000,
+      "sample_size": 602,
       "unit": null,
       "min_sample_size": 100,
       "evidence": {
@@ -741,14 +1006,24 @@
         "delta": null,
         "segments": [
           {
-            "segment": "weekday",
+            "segment": "Female",
             "value": 0.0,
-            "sample_size": 36188
+            "sample_size": 352
           },
           {
-            "segment": "weekend",
+            "segment": "Male",
             "value": 0.0,
-            "sample_size": 13812
+            "sample_size": 142
+          },
+          {
+            "segment": "Others",
+            "value": 0.0,
+            "sample_size": 19
+          },
+          {
+            "segment": "Prefer not to say",
+            "value": 0.0,
+            "sample_size": 89
           }
         ],
         "sensitivity": {
@@ -758,36 +1033,36 @@
         },
         "falsifier": "the share's interval falls at or below the declared maximum share — the column would carry no more extreme values than its fence implies",
         "provenance": {
-          "dataset": "taxi",
+          "dataset": "amazon",
           "artifact": "train.parquet+val.parquet",
-          "source": "data/processed/training_data.parquet",
-          "sample_sha256": "359222920661145a",
-          "sampled_rows": "50000",
-          "sample_size": "50000",
+          "source": "data/raw/amazon/amazon_consumer_behavior_survey.csv",
+          "sample_sha256": "9858827b9b2fb5f4",
+          "sampled_rows": "602",
+          "sample_size": "602",
           "seed": "42",
           "exclusions": "pairwise-complete rows per feature; exclude_from_profiling dropped",
-          "column": "LocationID",
-          "rows": "50000",
+          "column": "Customer_Reviews_Importance",
+          "rows": "602",
           "resampling": "iid",
-          "segments": "weekday/weekend by pickup_datetime day of week"
+          "segments": "levels of Gender"
         }
       }
     },
     {
-      "question": "Is more than 1.00% of LocationID_lookup outside the IQR fence of 1.5 x IQR?",
-      "metric": "outlier_share_LocationID_lookup",
-      "value": 0.0,
-      "interval_low": 0.0,
-      "interval_high": 0.0,
+      "question": "Is more than 1.00% of recommendation_personalization_score outside the IQR fence of 1.5 x IQR?",
+      "metric": "outlier_share_recommendation_personalization_score",
+      "value": 0.05813953488372093,
+      "interval_low": 0.03986710963455149,
+      "interval_high": 0.07475083056478406,
       "reference": 0.006976603239280177,
-      "delta": -0.006976603239280177,
-      "threshold": 0.01,
-      "null_threshold": 0.007600999999999999,
+      "delta": 0.05116293164444075,
+      "threshold": 0.011710963455149473,
+      "null_threshold": 0.011710963455149473,
       "direction": "max",
-      "verdict": "no_action",
+      "verdict": "act",
       "action": "winsorize the flagged columns before training, or exclude them with a recorded reason",
       "owner": "eda",
-      "sample_size": 50000,
+      "sample_size": 602,
       "unit": null,
       "min_sample_size": 100,
       "evidence": {
@@ -795,14 +1070,24 @@
         "delta": null,
         "segments": [
           {
-            "segment": "weekday",
-            "value": 0.0,
-            "sample_size": 36188
+            "segment": "Female",
+            "value": 0.05965909090909091,
+            "sample_size": 352
           },
           {
-            "segment": "weekend",
-            "value": 0.0,
-            "sample_size": 13812
+            "segment": "Male",
+            "value": 0.035211267605633804,
+            "sample_size": 142
+          },
+          {
+            "segment": "Others",
+            "value": 0.15789473684210525,
+            "sample_size": 19
+          },
+          {
+            "segment": "Prefer not to say",
+            "value": 0.06741573033707865,
+            "sample_size": 89
           }
         ],
         "sensitivity": {
@@ -812,18 +1097,146 @@
         },
         "falsifier": "the share's interval falls at or below the declared maximum share — the column would carry no more extreme values than its fence implies",
         "provenance": {
-          "dataset": "taxi",
+          "dataset": "amazon",
           "artifact": "train.parquet+val.parquet",
-          "source": "data/processed/training_data.parquet",
-          "sample_sha256": "359222920661145a",
-          "sampled_rows": "50000",
-          "sample_size": "50000",
+          "source": "data/raw/amazon/amazon_consumer_behavior_survey.csv",
+          "sample_sha256": "9858827b9b2fb5f4",
+          "sampled_rows": "602",
+          "sample_size": "602",
           "seed": "42",
           "exclusions": "pairwise-complete rows per feature; exclude_from_profiling dropped",
-          "column": "LocationID_lookup",
-          "rows": "50000",
+          "column": "recommendation_personalization_score",
+          "rows": "602",
           "resampling": "iid",
-          "segments": "weekday/weekend by pickup_datetime day of week"
+          "segments": "levels of Gender"
+        }
+      }
+    },
+    {
+      "question": "Is more than 1.00% of rating_accuracy_score outside the IQR fence of 1.5 x IQR?",
+      "metric": "outlier_share_rating_accuracy_score",
+      "value": 0.03488372093023256,
+      "interval_low": 0.02159468438538206,
+      "interval_high": 0.04983388704318937,
+      "reference": 0.006976603239280177,
+      "delta": 0.02790711769095238,
+      "threshold": 0.011710963455149473,
+      "null_threshold": 0.011710963455149473,
+      "direction": "max",
+      "verdict": "act",
+      "action": "winsorize the flagged columns before training, or exclude them with a recorded reason",
+      "owner": "eda",
+      "sample_size": 602,
+      "unit": null,
+      "min_sample_size": 100,
+      "evidence": {
+        "baseline": "binomial null at this n around the share a Gaussian reference produces at iqr_multiplier=1.5",
+        "delta": null,
+        "segments": [
+          {
+            "segment": "Female",
+            "value": 0.017045454545454544,
+            "sample_size": 352
+          },
+          {
+            "segment": "Male",
+            "value": 0.035211267605633804,
+            "sample_size": 142
+          },
+          {
+            "segment": "Others",
+            "value": 0.15789473684210525,
+            "sample_size": 19
+          },
+          {
+            "segment": "Prefer not to say",
+            "value": 0.07865168539325842,
+            "sample_size": 89
+          }
+        ],
+        "sensitivity": {
+          "z_score_share": 0.0,
+          "iqr_multiplier": 1.5,
+          "iterations": 200.0
+        },
+        "falsifier": "the share's interval falls at or below the declared maximum share — the column would carry no more extreme values than its fence implies",
+        "provenance": {
+          "dataset": "amazon",
+          "artifact": "train.parquet+val.parquet",
+          "source": "data/raw/amazon/amazon_consumer_behavior_survey.csv",
+          "sample_sha256": "9858827b9b2fb5f4",
+          "sampled_rows": "602",
+          "sample_size": "602",
+          "seed": "42",
+          "exclusions": "pairwise-complete rows per feature; exclude_from_profiling dropped",
+          "column": "rating_accuracy_score",
+          "rows": "602",
+          "resampling": "iid",
+          "segments": "levels of Gender"
+        }
+      }
+    },
+    {
+      "question": "Is more than 1.00% of Shopping_Satisfaction outside the IQR fence of 1.5 x IQR?",
+      "metric": "outlier_share_Shopping_Satisfaction",
+      "value": 0.02823920265780731,
+      "interval_low": 0.016569767441860474,
+      "interval_high": 0.04156976744186048,
+      "reference": 0.006976603239280177,
+      "delta": 0.021262599418527133,
+      "threshold": 0.011710963455149473,
+      "null_threshold": 0.011710963455149473,
+      "direction": "max",
+      "verdict": "act",
+      "action": "winsorize the flagged columns before training, or exclude them with a recorded reason",
+      "owner": "eda",
+      "sample_size": 602,
+      "unit": null,
+      "min_sample_size": 100,
+      "evidence": {
+        "baseline": "binomial null at this n around the share a Gaussian reference produces at iqr_multiplier=1.5",
+        "delta": null,
+        "segments": [
+          {
+            "segment": "Female",
+            "value": 0.017045454545454544,
+            "sample_size": 352
+          },
+          {
+            "segment": "Male",
+            "value": 0.02112676056338028,
+            "sample_size": 142
+          },
+          {
+            "segment": "Others",
+            "value": 0.10526315789473684,
+            "sample_size": 19
+          },
+          {
+            "segment": "Prefer not to say",
+            "value": 0.06741573033707865,
+            "sample_size": 89
+          }
+        ],
+        "sensitivity": {
+          "z_score_share": 0.0,
+          "iqr_multiplier": 1.5,
+          "iterations": 200.0
+        },
+        "falsifier": "the share's interval falls at or below the declared maximum share — the column would carry no more extreme values than its fence implies",
+        "provenance": {
+          "dataset": "amazon",
+          "artifact": "train.parquet+val.parquet",
+          "source": "data/raw/amazon/amazon_consumer_behavior_survey.csv",
+          "sample_sha256": "9858827b9b2fb5f4",
+          "sampled_rows": "602",
+          "sample_size": "602",
+          "seed": "42",
+          "exclusions": "pairwise-complete rows per feature; exclude_from_profiling dropped",
+          "column": "Shopping_Satisfaction",
+          "rows": "602",
+          "resampling": "iid",
+          "segments": "levels of Gender"
         }
       }
     }

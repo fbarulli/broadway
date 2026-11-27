@@ -10,10 +10,11 @@ import pandas as pd
 import polars as pl
 from pandera.errors import SchemaError
 
-from broadway.config.schema import DatasetContract, EnvironmentConfig
+from broadway.config.schema import DatasetContract, EnvironmentConfig, PipelineConfig
 from broadway.contracts.pandera import build_raw_schema
 from broadway.data.join_audit import JoinAudit, audit_join
 from broadway.data.lookup_value_audit import LookupValueAudit, audit_lookup_values
+from broadway.data.normalize import ColumnNormalizer
 
 READERS = {
     ".csv": pd.read_csv,
@@ -109,11 +110,64 @@ def _assert_unique_merged_labels(
     )
 
 
+class ProcessedStore:
+    """The one owner of where a dataset's processed artifacts live.
+
+    ``EnvironmentConfig.processed_subdir`` is the shared default;
+    ``DatasetContract.processed_subdir`` overrides it for one dataset so two
+    datasets bound to the same environment cannot overwrite each other's
+    canonical, split, or feature artifacts.
+    """
+
+    def __init__(self, data_dir: str, subdir: str) -> None:
+        self._directory = Path(data_dir) / subdir
+
+    @classmethod
+    def from_config(cls, cfg: PipelineConfig) -> ProcessedStore:
+        """Build from a step config (the caller's dataset + environment binding)."""
+        if cfg.dataset is None:
+            raise ValueError("the processed store requires a dataset config")
+        return cls.from_parts(cfg.dataset, cfg.environment)
+
+    @classmethod
+    def from_parts(
+        cls, dataset: DatasetContract, environment: EnvironmentConfig
+    ) -> ProcessedStore:
+        subdir = dataset.processed_subdir or environment.processed_subdir
+        return cls(environment.data_dir, subdir)
+
+    @property
+    def directory(self) -> Path:
+        return self._directory
+
+    def file(self, name: str) -> Path:
+        return self._directory / name
+
+
+class ArtifactStore:
+    """The one owner of where a dataset's machine evidence lives.
+
+    Each artifact directory (``artifacts/discover``, ``artifacts/tracking``,
+    ``artifacts/evaluation``) nests the dataset under its ``artifacts_subdir``
+    when declared (``artifacts/discover/amazon/...``), so two datasets sharing
+    one environment never overwrite each other's evidence.
+    """
+
+    def __init__(self, root: Path, subdir: str | None) -> None:
+        self._directory = Path(root) / subdir if subdir else Path(root)
+
+    @classmethod
+    def from_contract(cls, dataset: DatasetContract, root: Path) -> ArtifactStore:
+        return cls(root, dataset.artifacts_subdir)
+
+    @property
+    def directory(self) -> Path:
+        return self._directory
+
+
 def canonical_path(dataset: DatasetContract, environment: EnvironmentConfig) -> Path:
-    return (
-        Path(environment.data_dir)
-        / environment.processed_subdir
-        / f"{dataset.name}_canonical.parquet"
+    return ProcessedStore.from_parts(dataset, environment).file(
+        f"{dataset.name}_canonical.parquet"
     )
 
 
@@ -126,7 +180,7 @@ def load_with_audit(dataset: DatasetContract) -> tuple[pd.DataFrame, list[JoinAu
     ext = path.suffix.lower()
     if ext not in READERS:
         raise ValueError(f"unsupported format: {ext}")
-    df = READERS[ext](path)
+    df = ColumnNormalizer.from_contract(dataset).apply(READERS[ext](path))
     audits: list[JoinAudit] = []
     value_audits: list[LookupValueAudit] = []
     for col, lookup in dataset.lookup_tables.items():
@@ -167,10 +221,13 @@ def read_sample(
     """
     if sample is None and not full:
         raise ValueError("pass sample=<n>, or full=True to load the full dataset")
+    normalizer = ColumnNormalizer.from_contract(dataset)
     lf = pl.scan_parquet(dataset.path)
     if columns:
-        lf = lf.select(columns)
+        # A projection before the read must name the file's labels; the caller
+        # names the contract's (the normalizer maps the requested set back).
+        lf = lf.select([normalizer.source_name(name) for name in columns])
     df = lf.collect()
     if sample is not None:
         df = df.sample(n=sample, seed=seed)
-    return df.to_pandas()
+    return normalizer.apply(df.to_pandas())

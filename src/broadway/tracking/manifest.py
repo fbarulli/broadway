@@ -17,6 +17,7 @@ import pandas as pd
 from pydantic import BaseModel, ConfigDict
 
 from broadway.config.schema import DatasetContract
+from broadway.data.loader import ArtifactStore
 from broadway.discover.profile import DatasetProfile
 from broadway.lineage.models import TransformAudit
 
@@ -58,6 +59,12 @@ def default_profile_path(artifacts_dir: Path | None = None) -> Path:
     if base is None:
         base = Path(os.getenv("BROADWAY_ARTIFACTS_DIR", "artifacts"))
     return base / _PROFILE_RELATIVE
+
+
+def dataset_profile_path(dataset: DatasetContract) -> Path:
+    """The discover profile for this dataset (namespaced when it declares one)."""
+    base = Path(os.getenv("BROADWAY_ARTIFACTS_DIR", "artifacts"))
+    return ArtifactStore.from_contract(dataset, base / "discover").directory / "profile.json"
 
 
 def sha256_of_file(path: Path) -> str:
@@ -149,7 +156,11 @@ def write_etl_manifest(
     profile_file: Path | None = None,
 ) -> Path:
     """Build and write the manifest for one etl run; returns the written path."""
-    resolved = profile if profile is not None else load_profile(profile_file)
+    resolved = profile
+    if resolved is None:
+        resolved = load_profile(
+            profile_file if profile_file is not None else dataset_profile_path(dataset)
+        )
     if resolved is not None:
         timestamp_min, timestamp_max = timestamps_from_profile(resolved)
     elif df is not None:

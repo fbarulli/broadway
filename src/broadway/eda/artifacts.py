@@ -89,6 +89,20 @@ class EdaArtifactWriter:
         figure.savefig(path, format=plot_format, dpi=self._dpi)
         return path
 
+    def remove_figure(self, name: str, plot_format: str) -> Path | None:
+        """Delete a stale figure of this run's stem; a skipped panel leaves no file.
+
+        A figure the current run cannot draw (e.g. no numeric column pair) must not
+        survive from an earlier run beside today's record and report: the file name
+        is the step's, not the run's, so a leftover is read as current evidence.
+        """
+        path = self.figure_path(name, plot_format)
+        if not path.exists():
+            return None
+        path.unlink()
+        logger.info("eda: removed stale figure %s (this run drew none)", path)
+        return path
+
     def write_tables(
         self,
         tests: FeatureTestBundle,

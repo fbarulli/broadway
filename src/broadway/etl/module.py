@@ -14,7 +14,7 @@ from broadway.contracts.pandera import build_raw_schema
 from broadway.contracts.selectors import datetime_columns, numeric_columns
 from broadway.data.cleaner import canonicalize
 from broadway.data.join_audit import JoinAuditReport
-from broadway.data.loader import canonical_path, load_with_audit
+from broadway.data.loader import ArtifactStore, ProcessedStore, canonical_path, load_with_audit
 from broadway.data.lookup_value_audit import LookupValueAuditReport
 from broadway.data.splitter import split
 from broadway.lineage.ids import node_id
@@ -22,7 +22,7 @@ from broadway.lineage.models import TransformAudit
 from broadway.lineage.records import enforce_drop_fraction, records_dir, write_record
 from broadway.reports.decision import Decision, DecisionRule, Evidence, SegmentEvidence
 from broadway.reports.step_output import StepOutput
-from broadway.tracking.manifest import write_etl_manifest
+from broadway.tracking.manifest import tracking_dir, write_etl_manifest
 
 logger = logging.getLogger(__name__)
 
@@ -186,7 +186,7 @@ def run(cfg: PipelineConfig) -> None:
     )
     reasons.extend(clean_reasons)
 
-    out_dir = Path(cfg.environment.data_dir) / cfg.environment.processed_subdir
+    out_dir = ProcessedStore.from_config(cfg).directory
     out_dir.mkdir(parents=True, exist_ok=True)
 
     build_raw_schema(dataset).validate(df)
@@ -249,6 +249,7 @@ def run(cfg: PipelineConfig) -> None:
         canonical_path=canonical_path_,
         schema_contract=experiment.data_source.schema_contract,
         df=df,
+        tracking_root=ArtifactStore.from_contract(dataset, tracking_dir()).directory,
     )
 
     ingest_id = node_id("ingest", dataset.name)

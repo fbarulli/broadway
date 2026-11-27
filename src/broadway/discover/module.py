@@ -9,10 +9,12 @@ from pathlib import Path
 import pandas as pd
 import yaml
 
-from broadway.config.loader import CONFIGS_DIR
+from broadway.config.loader import CONFIGS_DIR, config_path
 from broadway.config.schema import ColumnRole, ColumnSchema, DatasetContract, TaskType
+from broadway.data.loader import ArtifactStore
+from broadway.data.normalize import ColumnNormalizer
 from broadway.discover.profile import DatasetProfile, build_profile
-from broadway.discover.qq import plot_numeric_qq
+from broadway.discover.qq import QqOverview, plot_numeric_qq
 from broadway.lineage.ids import node_id
 from broadway.lineage.records import write_record
 from broadway.reports.paths import FIGURES_DIR
@@ -45,6 +47,7 @@ def _build_contract(
     task: str,
     dt_col: str | None,
     ignore_cols: list[str],
+    artifacts_subdir: str | None = None,
 ) -> DatasetContract:
     columns = {}
     for col in df.columns:
@@ -62,6 +65,7 @@ def _build_contract(
         datetime_column=dt_col,
         columns=columns,
         lookup_tables={},
+        artifacts_subdir=artifacts_subdir,
     )
 
 
@@ -71,11 +75,31 @@ def _log_identifier_recommendations(contract: DatasetContract, profile: DatasetP
             logger.info(f"likely identifier: {col} (identifier_score={col_profile.identifier_score})")
 
 
-def _write_qq_overview(df: pd.DataFrame, source_path: str, exclude: list[str] | None = None) -> None:
-    qq_dir = Path(ARTIFACTS_DIR) / "discover"
+def _discover_dir(contract: DatasetContract) -> Path:
+    """The discover evidence dir for this dataset (dataset-scoped when declared)."""
+    return ArtifactStore.from_contract(contract, Path(ARTIFACTS_DIR) / "discover").directory
+
+
+def _qq_figures_dir(contract: DatasetContract) -> Path:
+    """Tracked report figures for a shared dataset; its own store when scoped."""
+    if contract.artifacts_subdir is None:
+        return FIGURES_DIR
+    return _discover_dir(contract) / "figures"
+
+
+def _write_qq_overview(
+    df: pd.DataFrame,
+    source_path: str,
+    contract: DatasetContract,
+    exclude: list[str] | None = None,
+) -> QqOverview:
+    qq_dir = _discover_dir(contract)
     qq_dir.mkdir(parents=True, exist_ok=True)
-    FIGURES_DIR.mkdir(parents=True, exist_ok=True)
-    plot_numeric_qq(df, FIGURES_DIR, qq_dir / "qq_overview.json", source_path=source_path, exclude=exclude)
+    figures_dir = _qq_figures_dir(contract)
+    figures_dir.mkdir(parents=True, exist_ok=True)
+    return plot_numeric_qq(
+        df, figures_dir, qq_dir / "qq_overview.json", source_path=source_path, exclude=exclude
+    )
 
 
 def run(
@@ -84,10 +108,13 @@ def run(
     task: str,
     datetime_column: str | None = None,
     ignore_columns: list[str] | None = None,
+    artifacts_subdir: str | None = None,
 ) -> None:
     ignore = ignore_columns or []
     df = _read(csv)
-    contract = _build_contract(df, csv, target, task, datetime_column, ignore)
+    contract = _build_contract(
+        df, csv, target, task, datetime_column, ignore, artifacts_subdir
+    )
     out_dir = CONFIGS_DIR / DATASET_DIR
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / f"{contract.name}.yaml"
@@ -96,13 +123,13 @@ def run(
         yaml.dump(contract.model_dump(mode="json"), f, default_flow_style=False)
 
     profile = build_profile(contract.name, csv, df)
-    profile_dir = Path(ARTIFACTS_DIR) / "discover"
+    profile_dir = _discover_dir(contract)
     profile_dir.mkdir(parents=True, exist_ok=True)
     profile_path = profile_dir / "profile.json"
     profile_path.write_text(profile.model_dump_json(indent=2), encoding="utf-8")
     logger.info(f"discover: wrote {len(profile.columns)} column profiles to {profile_path}")
     _log_identifier_recommendations(contract, profile)
-    _write_qq_overview(df, csv)
+    _write_qq_overview(df, csv, contract)
     write_record(
         node_id("profile", contract.name),
         "profile",
@@ -112,19 +139,21 @@ def run(
 
 
 def profile(dataset_name: str) -> None:
-    contract_path = CONFIGS_DIR / DATASET_DIR / f"{dataset_name}.yaml"
+    contract_path = config_path(f"{DATASET_DIR}/{dataset_name}.yaml")
     if not contract_path.exists():
         raise FileNotFoundError(f"dataset contract not found: {contract_path}")
     with open(contract_path, encoding="utf-8") as f:
         contract = DatasetContract(**yaml.safe_load(f))
-    df = _read(contract.path)
+    df = ColumnNormalizer.from_contract(contract).apply(_read(contract.path))
     result = build_profile(contract.name, contract.path, df)
-    profile_dir = Path(ARTIFACTS_DIR) / "discover"
+    profile_dir = _discover_dir(contract)
     profile_dir.mkdir(parents=True, exist_ok=True)
     profile_path = profile_dir / "profile.json"
     profile_path.write_text(result.model_dump_json(indent=2), encoding="utf-8")
     logger.info(f"profile: wrote {len(result.columns)} columns to {profile_path}")
-    _write_qq_overview(df, contract.path, exclude=contract.exclude_from_profiling)
+    _write_qq_overview(
+        df, contract.path, contract, exclude=contract.exclude_from_profiling
+    )
     write_record(
         node_id("profile", contract.name),
         "profile",

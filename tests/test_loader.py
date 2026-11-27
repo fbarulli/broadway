@@ -226,3 +226,79 @@ def test_missing_config_overlay_fails_loudly(
 
     with pytest.raises(FileNotFoundError, match="config overlay directory not found"):
         loader.config_path("dataset/test.yaml")
+
+
+def _rename_contract(**overrides: object) -> dict:
+    contract = {
+        "name": "survey",
+        "path": "unused.csv",
+        "target": "satisfaction",
+        "task": "regression",
+        "datetime_column": None,
+        "columns": {
+            "rating_accuracy_score": {"dtype": "int64", "null_count": 0, "role": "feature"},
+            "satisfaction": {"dtype": "int64", "null_count": 0, "role": "target"},
+        },
+        "lookup_tables": {},
+        "column_renames": {"Rating_Accuracy ": "rating_accuracy_score"},
+    }
+    contract.update(overrides)
+    return contract
+
+
+def test_contract_column_renames_are_applied_on_read(tmp_path: Path) -> None:
+    """A declared raw-label rename lands the frame on the contract's own names."""
+    import pandas as pd
+
+    from broadway.config.schema import DatasetContract
+    from broadway.contracts.pandera import build_raw_schema
+    from broadway.data.loader import load_with_audit, read_sample
+
+    source = tmp_path / "survey.csv"
+    source.write_text("Rating_Accuracy ,satisfaction\n1,2\n5,4\n", encoding="utf-8")
+    contract = DatasetContract(**_rename_contract(path=str(source)))
+
+    frame, _, _ = load_with_audit(contract)
+    assert list(frame.columns) == ["rating_accuracy_score", "satisfaction"]
+    build_raw_schema(contract).validate(frame)
+
+    # A projection names contract columns; the reader maps them back to the file's
+    # raw labels (the parquet here keeps the source labels, as a real file does).
+    parquet = tmp_path / "survey.parquet"
+    pd.read_csv(source).to_parquet(parquet, index=False)
+    pruned = read_sample(DatasetContract(**_rename_contract(path=str(parquet))),
+                         sample=1, seed=0, columns=["rating_accuracy_score"])
+    assert list(pruned.columns) == ["rating_accuracy_score"]
+
+    with pytest.raises(ValueError, match="unbound target"):
+        DatasetContract(**_rename_contract(column_renames={"Rating_Accuracy ": "age"}))
+
+
+def test_dataset_processed_subdir_scopes_canonical_artifacts(tmp_path: Path) -> None:
+    """A dataset's processed override outranks the environment default."""
+    from broadway.config.schema import DatasetContract, EnvironmentConfig
+    from broadway.data.loader import ProcessedStore, canonical_path
+
+    environment = EnvironmentConfig(**{**_ENVIRONMENT, "data_dir": str(tmp_path)})
+    scoped = DatasetContract(**_rename_contract(processed_subdir="processed/amazon"))
+    shared = DatasetContract(**_rename_contract())
+
+    assert canonical_path(scoped, environment) == (
+        tmp_path / "processed" / "amazon" / "survey_canonical.parquet"
+    )
+    assert ProcessedStore.from_parts(shared, environment).directory == tmp_path / "processed"
+
+
+def test_artifact_store_scopes_a_dataset_namespace(tmp_path: Path) -> None:
+    """A dataset's artifact override outranks the shared dir; a bad one fails at parse."""
+    from broadway.config.schema import DatasetContract
+    from broadway.data.loader import ArtifactStore
+
+    root = tmp_path / "artifacts" / "discover"
+    scoped = DatasetContract(**_rename_contract(artifacts_subdir="amazon"))
+    shared = DatasetContract(**_rename_contract())
+
+    assert ArtifactStore.from_contract(scoped, root).directory == root / "amazon"
+    assert ArtifactStore.from_contract(shared, root).directory == root
+    with pytest.raises(ValueError, match="relative path"):
+        DatasetContract(**_rename_contract(artifacts_subdir="../escape"))

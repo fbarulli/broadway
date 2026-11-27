@@ -11,6 +11,7 @@ from scipy import stats
 
 import broadway.discover.module as discover_module
 from broadway import viz
+from broadway.config import loader
 from broadway.config.loader import load_config
 from broadway.config.viz import QqZonesConfig, load_viz_config
 from broadway.discover.profile import ColumnProfile, DatasetProfile
@@ -640,6 +641,9 @@ def test_discover_profile_writes_qq_overview(tmp_path, monkeypatch) -> None:
     parquet = tmp_path / "data.parquet"
     data.to_parquet(parquet)
 
+    # The contract resolver (config_path) reads the project overlay first, so
+    # point it at the isolated tree; the loader's base directory stays real.
+    monkeypatch.setenv(loader.CONFIG_OVERLAY_ENV, str(tmp_path / "configs"))
     monkeypatch.setattr(discover_module, "CONFIGS_DIR", tmp_path / "configs")
     monkeypatch.setattr(discover_module, "ARTIFACTS_DIR", str(tmp_path / "artifacts"))
     monkeypatch.setattr(discover_module, "DATASET_DIR", "dataset")
