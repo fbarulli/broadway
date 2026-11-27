@@ -38,6 +38,7 @@ src/broadway/
 │   └── models/                # registry: linear, RF, XGB, LGBM, lgbm_quantile
 ├── evaluate/
 │   ├── metrics.py             # metric vocabulary + MAPE SSOT (fraction × 100)
+│   ├── repeated_cv.py         # repeated shuffled KFold (cross-sectional rows)
 │   ├── validation.py          # holdout scoring, CV (expanding/rolling)
 │   ├── leaderboard.py         # per-metric ranked figures + ChampionDecision
 │   ├── promotion.py           # point-estimate helper
@@ -59,7 +60,11 @@ src/broadway/
 │   ├── decision_log.py        # MLflow projection (view; the JSON is the truth)
 │   ├── experiments_dashboard.py
 │   └── markdown.py, results.py, timeline.py, index.py, audit.py, registry.py
-├── onboarding/  discover/  selection/  unsupervised/  samples/
+├── selection/
+│   ├── module.py              # candidate repeated-CV selection (+ selection decision)
+│   ├── candidates.py          # registry candidates + the naive-mean reference
+│   └── tuning.py              # HPO on training-only CV (+ hpo decision)
+├── onboarding/  discover/  unsupervised/  samples/
 └── inference/api.py           # FastAPI surface (no serving bundle is produced)
 ```
 
@@ -74,9 +79,11 @@ project/
 ├── config/                    # the project config tree (overlay-selected)
 │   ├── dataset/amazon.yaml    # 23 columns, target, renames, processed/artifact namespace
 │   ├── analysis/amazon.yaml   # goal, row definition, decision moment, leakage note
-│   ├── experiment/amazon.yaml # feature plan + linear model + random split
+│   ├── experiment/            # amazon (reference), amazon_hpo (search space),
+│   │                          #   amazon_champion (deployable default champion)
 │   ├── experiments/           # amazon_survey.yaml (decision rule), amazon_hpo.yaml
-│   ├── step/                  # eda output slot, dataset-specific feature knobs
+│   ├── step/                  # eda/etl/features/baseline/train/evaluate/selection/hpo
+│   │                          #   output slots, rules, folds and seeds
 │   └── layout.yaml            # every project path, resolved once
 ├── features/amazon.py         # the Amazon ColumnPlan (single keep-set)
 ├── experiments/
@@ -110,7 +117,9 @@ targets `project/config/experiments/amazon_hpo.yaml` (the project HPO spec).
 | Step figure | `…/<stem>.png` | one figure answering the step question |
 | Evidence tables | `…/<stem>_<name>.csv` | aggregates only |
 | Decision record | `…/<stem>_decision.json` | `reports/decision.py`, never hand-written |
-| Pipeline decisions | `artifacts/{etl,features,training,baseline,evaluation}/…` | `StepOutput` + figure |
+| Pipeline decisions | `project/experiments/results/pipeline/<step>/<stem>_decision.json` | `StepOutput` + figure; enforced by the gate |
+| Selection handoff | `…/pipeline/selection/selection_champion.json` | champion + params + rule |
+| HPO handoff | `…/pipeline/hpo/hpo_champion.json` | tuned params + CV on the report folds |
 | Promotion record | `artifacts/evaluation/promotion_decision.json` | interval vs threshold |
 | Champion record | `…/<stem>_champion.json` | best run + 95% interval |
 
