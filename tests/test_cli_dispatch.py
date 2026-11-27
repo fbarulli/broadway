@@ -56,7 +56,7 @@ def test_cli_discover_dispatches_csv_target_task(
         monkeypatch, "discover", "--csv", "a.csv", "--target", "price",
         "--task", "regression",
     )
-    assert spy.calls == [("a.csv", "price", "regression", None, [])]
+    assert spy.calls == [("a.csv", "price", "regression", None, [], None)]
 
 
 def test_cli_discover_passes_optional_args(
@@ -69,9 +69,11 @@ def test_cli_discover_passes_optional_args(
     _main(
         monkeypatch, "discover", "--csv", "a.csv", "--target", "price",
         "--task", "regression", "--datetime-column", "dt",
-        "--ignore-columns", "c1", "c2",
+        "--ignore-columns", "c1", "c2", "--artifacts-subdir", "amazon",
     )
-    assert spy.calls == [("a.csv", "price", "regression", "dt", ["c1", "c2"])]
+    assert spy.calls == [
+        ("a.csv", "price", "regression", "dt", ["c1", "c2"], "amazon")
+    ]
 
 
 def test_cli_columns_dispatches_csv(monkeypatch: pytest.MonkeyPatch) -> None:
