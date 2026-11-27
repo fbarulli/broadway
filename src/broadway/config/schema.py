@@ -291,6 +291,9 @@ class ExperimentConfig(BaseModel):
     preprocessing: list[PreprocessingStepConfig] = []
     target_transforms: list[PreprocessingStepConfig] = []
     calibration: CalibrationConfig | None = None
+    # Optional evidence tag so two runs of the same step for this experiment
+    # publish distinct records (champion vs tuned) under the evaluate step dir.
+    evaluation_tag: str | None = None
 
     # Resolved by the loader from ``feature_plan`` + the dataset contract.
     _plan: ColumnPlan | None = PrivateAttr(default=None)
@@ -388,6 +391,9 @@ class DiscoverStep(BaseModel):
 
 
 class EtlStep(BaseModel):
+    # Optional evidence surface for the report/figure/decision record (the
+    # processed canonical/splits stay where the dataset contract puts them).
+    output_dir: str | None = None
     ci_sample_size: int = Field(ge=0)
     random_state: int
     train_file: str
@@ -680,7 +686,7 @@ class TrainStep(BaseModel):
     cv_kind: CvKind
     # Independent shuffles for a cross-sectional cv_kind='kfold' (the deployed
     # fit's repeated-CV score); a time-aware kind always uses one pass.
-    cv_repeats: int = Field(ge=1)
+    cv_repeats: int = Field(default=1, ge=1)
     # Rows dropped between a training prefix and its validation block (the
     # purge gap); a forecast horizon h requires cv_gap >= h.
     cv_gap: int = Field(default=0, ge=0)
@@ -703,8 +709,8 @@ class TrainStep(BaseModel):
     output_file: str
     # The deployed fit's training-only CV verdict vs the naive reference (the
     # training row of EXPERIMENT_OUTPUT.md), plus its paired bootstrap.
-    fit_decision: DecisionRule
-    bootstrap: BootstrapConfig
+    fit_decision: DecisionRule | None = None
+    bootstrap: BootstrapConfig = Field(default_factory=BootstrapConfig)
     learning_curve: LearningCurveConfig | None = None
     tracking: TrackingConfig | None = None
 
@@ -738,6 +744,9 @@ class TrainStep(BaseModel):
 class EvaluateStep(BaseModel):
     target_metric: str
     promotion_threshold: float
+    # Record/table stem; an experiment may prefix it (``evaluation_tag``) so a
+    # champion run and a tuned run publish distinct promotion records.
+    record_stem: str = "promotion"
     output_dir: str
     output_file: str
     coverage_tolerance: float | None = Field(default=None, ge=0.0, le=1.0)

@@ -7,12 +7,30 @@ from pathlib import Path
 
 import pytest
 
-_SNAPSHOT_DIRS = ["artifacts", "reports"]
+_SNAPSHOT_DIRS = ["artifacts", "reports", "project/experiments/results"]
+# Gate-owned advisory reports: the consolidation gate rewrites its own scan
+# report as the tree changes (it runs before pytest but can land on the
+# session boundary), so it is not test state. Everything else under the
+# snapshot dirs is held to the custody law.
+_GATE_OWNED = Path("artifacts/consolidation")
 # Only the CLI's configured process log directory is exempt: a real CLI
 # invocation in a test (subprocess) writes it by design. Config SSOT:
 # configs/environment/*.yaml `log_dir`.
 _LOG_DIR = Path("artifacts/logs")
 _snapshot: dict[str, dict[str, str]] = {}
+
+
+@pytest.fixture(autouse=True)
+def _no_ambient_config_overlay(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A platform test never inherits the project's config overlay.
+
+    ``project/__init__`` activates ``BROADWAY_CONFIG_OVERLAY_DIR`` at import
+    time for the project CLI. A test that imports the project layer would leak
+    that into every later test in the same worker, silently routing synthetic
+    datasets' evidence into the project's committed results tree. Tests that
+    need an overlay set it themselves.
+    """
+    monkeypatch.delenv("BROADWAY_CONFIG_OVERLAY_DIR", raising=False)
 
 
 @pytest.fixture(autouse=True)
@@ -61,7 +79,11 @@ def _tree_hashes(root: Path) -> dict[str, str]:
     if not root.is_dir():
         return out
     for p in sorted(root.rglob("*")):
-        if p.is_file() and not p.is_relative_to(_LOG_DIR):
+        if (
+            p.is_file()
+            and not p.is_relative_to(_LOG_DIR)
+            and not p.is_relative_to(_GATE_OWNED)
+        ):
             out[str(p)] = hashlib.sha256(p.read_bytes()).hexdigest()
     return out
 
