@@ -20,7 +20,7 @@ retired:
   # dataset surface. Preserved as history; no longer bind a live surface.
   history_rows_retained: ['GATE-TRAIN-32', 'GATE-CFG-104', 'GATE-CFG-111', 'GATE-CFG-112', 'GATE-INFRA-122', 'GATE-INFRA-129', 'GATE-INFRA-180', 'GATE-INFRA-181', 'GATE-CUST-149', 'GATE-CUST-152']
 meta:
-  head: 'd376f63'
+  head: '5c2bf11'
   assembled: '2026-11-26'
   source_fragments:
   - agents/ledger/gates/01-ingest.md
@@ -2503,7 +2503,7 @@ gates:
   - tests/test_eda_paths.py::test_eda_report_renders_without_figures_and_with_an_etl_comparison
   - tests/test_eda_paths.py::test_eda_fails_loud_when_the_train_split_is_missing
   - tests/test_eda_paths.py::test_eda_requires_dataset_eda_and_etl_config
-  - tests/test_pipeline_evidence.py::test_dashboard_root_renders_pipeline_records_and_skips_malformed
+  - tests/test_pipeline_evidence.py::test_pipeline_series_lists_steps_and_renders_step_pages
   if_changed:
   - rerun tests/test_qq.py + tests/test_viz.py
   - regenerate figures then rerun ds-pipeline audit so ../figures links match renamed files
