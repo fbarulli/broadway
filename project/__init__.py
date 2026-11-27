@@ -1,4 +1,4 @@
-"""Project composition boundary for the taxi development layer."""
+"""Project composition boundary for the Amazon dataset project."""
 
 from __future__ import annotations
 

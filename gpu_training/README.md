@@ -27,8 +27,8 @@ Our models:
 - `config/` — probe config, study config (`hpo_kernel.yaml`), fan-out profiles
   (`hpo_run.yaml`, `hpo_run_kaggle.yaml`). SSOT; no values in code.
 - `adapters/` — the adapter contract; `cpu_smoke.py` is the probe's reference
-  implementation and `taxi.py` is the real HPO objective for this project's
-  taxi dataset. Probe adapters: `gluonts_step.py` (GluonTS SimpleFeedForward),
+  implementation and `project.py` is the real HPO objective for this project's
+  Amazon dataset. Probe adapters: `gluonts_step.py` (GluonTS SimpleFeedForward),
   `timesfm_step.py` (TimesFM 2.5 200M torch module, no checkpoint download) and
   `prophet_step.py` (CPU-only). Each imports its vendor package lazily and fails
   loud with the install hint when it is absent — never a made-up number.
@@ -49,7 +49,7 @@ footprint, the per-GPU concurrency
 (`per_gpu × device_count`). On a 15.6 GB T4 a 10.7 GB/trial model fits once, so
 a 2×T4 host runs 2 parallel trials; the launcher must list both GPUs
 (`gpus: [0, 1], mps_slots_per_gpu: 1`). (10.7 GB/trial is the 2026-11-25 T4
-hardware measurement — not a taxi-model figure.) When no batch fits,
+hardware measurement — not a model figure.) When no batch fits,
 `max_batch` is `null` and the launcher refuses to start.
 
 `peak_rss_mb` on CPU is process-cumulative (`ru_maxrss` high-water mark), not a
@@ -109,10 +109,10 @@ Output (`baseline/memory_baseline.json` by default):
 `config/hpo_kernel.yaml` names the study and nothing else:
 
 ```yaml
-hpo_spec: project/config/experiments/mlflow.yaml   # -> hpo: search spaces, direction, metric, budget
+hpo_spec: project/config/experiments/amazon_hpo.yaml   # -> hpo: search spaces, direction, metric, budget
 model: lgbm                                        # the model's entry in that spec
-dataset: taxi                                      # project/config/dataset/taxi.yaml
-experiment: taxi                                   # project/config/experiment/taxi.yaml
+dataset: amazon                                    # project/config/dataset/amazon.yaml
+experiment: amazon                                 # project/config/experiment/amazon.yaml
 micro_batch_param: null                            # tabular model: no batch dial
 storage_env: OPTUNA_STORAGE_URL
 local_storage_url: sqlite:///artifacts/gpu_training/hpo_study.db
@@ -134,7 +134,7 @@ def build(study: Mapping[str, Any]) -> Objective:
 # Objective: objective(params: dict[str, float | int], trial) -> float
 ```
 
-`adapters/taxi.py` is the real one: it loads the project dataset/experiment,
+`adapters/project.py` is the real one: it loads the project dataset/experiment,
 splits through the canonical splitter and returns the canonical
 `broadway.training.hpo.make_objective` — the kernel never fits a model itself.
 
@@ -171,9 +171,9 @@ printed.
 
 `config/hpo_run_kaggle.yaml` is the 2xT4 hardware profile. The concurrency
 constant comes from the **2026-11-25 Kaggle 2xT4 hardware measurement**, not
-from the taxi model: one patched trial peaked at 10 699 MiB on a 15 360 MiB
+from the model: one patched trial peaked at 10 699 MiB on a 15 360 MiB
 Tesla T4, so two co-tenant trials on one card OOM and the profile runs exactly
-one trial per GPU. The taxi HPO itself (LightGBM, CPU) has **no GPU footprint
+one trial per GPU. The project HPO itself (LightGBM, CPU) has **no GPU footprint
 measurement** yet; `gpus: [0, 1]` there means two workers, not two CUDA models.
 
 ```bash

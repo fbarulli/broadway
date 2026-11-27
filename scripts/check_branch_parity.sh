@@ -2,7 +2,7 @@
 # Branch parity gate — keep main and taxi's SHARED surface in lockstep.
 #
 # The repo has a deliberate split:
-#   * taxi — the active development line and maintained reference use case
+#   * the track branch — the active development line and maintained reference use case
 #             (agents/contracts/MAIN_AGENT_CONTRACT.md §2); main is frozen
 #             until declared main-day.
 #
@@ -16,7 +16,7 @@
 # ERA-AWARE (D16): behaviour is gated by the era declaration, INLINED below
 # (D21 relocated it from .github/parity-era.env — see "Era declaration").
 # PARITY_ERA=dev means
-# taxi is the active line and main is frozen (every event runs frozen-main
+# the track branch is the active line and main is frozen (every event runs frozen-main
 # custody, then branch-aware pass-along guards); PARITY_ERA=main is lockstep
 # day (stock check / --sync). There is no environment-variable dialect.
 #

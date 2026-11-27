@@ -70,26 +70,10 @@ def test_worker_image_copies_the_project_path_import_closure() -> None:
     assert "FROM broadway-base:latest" in worker
 
 
-def test_moved_experiment_helpers_resolve_layout_through_project_paths() -> None:
-    helpers = (
-        "project/experiments/fare_prediction/_common.py",
-        "project/experiments/more_modeling/_common.py",
-        "project/experiments/polynomial_regression_et_all/_common.py",
-        "project/experiments/multivariate/_setup.py",
-        "project/experiments/mlflow/_common.py",
-        "project/experiments/univariate/fare_amount_trip_distance/_common.py",
-    )
-    for relative in helpers:
-        text = (REPO / relative).read_text(encoding="utf-8")
-        assert "load_project_paths" in text, relative
-        assert ' / "experiments" / "results"' not in text, relative
-        assert ' / "config" / "experiments"' not in text, relative
-
-
-def test_main_day_sync_removes_project_surfaces_and_keeps_generic_sample() -> None:
+def test_main_day_sync_removes_project_surfaces_via_whitelist() -> None:
     sync = (REPO / "scripts" / "main_day_sync.sh").read_text(encoding="utf-8")
     assert "git rm -r --ignore-unmatch project reports readmore experiments configs/project configs/experiments beads" in sync
-    assert "configs/sample/fare_prediction_1m.yaml" not in sync
+    assert "configs/sample/" not in sync
     # Whitelist SSOT: the sync reads scripts/main_whitelist.txt via
     # configs/tooling.yaml (no second inline list); the generic sample
     # survives via the wholesale configs/ entry in that file.
@@ -99,12 +83,6 @@ def test_main_day_sync_removes_project_surfaces_and_keeps_generic_sample() -> No
     assert "\nconfigs/\n" in "\n" + "\n".join(
         line.split("#", 1)[0].strip() for line in whitelist.splitlines()
     ) + "\n"
-
-
-def test_ci_smoke_uses_the_moved_project_dispatcher() -> None:
-    workflow = (REPO / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
-    assert "python project/experiments.py verify" in workflow
-    assert "python experiments.py verify" not in workflow
 
 
 def test_reusable_source_never_imports_the_project_layer() -> None:

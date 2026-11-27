@@ -5,7 +5,7 @@
 # editing YAML alone reopens two-source drift (D16d rejected C7).
 # CI-only (need docker; live in ci.yml BY NAME): kubeconform,
 # orchestrator dry-run, build-and-boot. experiments.py verify
-# runs on taxi only. The full tier additionally runs 'project-tests'
+# runs on the track branch only. The full tier additionally runs 'project-tests'
 # (project/tests, collected WITHOUT --cov; the >=95 floor stays on tests/).
 # Usage: run_local_ci.sh [--static|--tier=fast|--tier=full] [--clean-lint]
 #        [-h|--help]; flags COMBINE (e.g. --tier=fast --clean-lint);
@@ -217,7 +217,7 @@ run_bg mypy    dispatch bash scripts/uv.sh run --extra dev mypy src/broadway
 # counts only, never fails. Highest strictness surfaces silent errors, data
 # coercion, unexpected behavior, and data drops as advice; mypy enforces.
 # Version/scope resolve from configs/tooling.yaml (SSOT); options live in
-# pyrightconfig.json (strict JSON). Identical on taxi and main via parity.
+# pyrightconfig.json (strict JSON). Identical on the track and main lines via parity.
 # Promote to enforcing only by ruling; see
 # configs/tooling.yaml + pyrightconfig.json + scripts/pyright_advisory.sh.
 run_bg pyright-advisory bash scripts/pyright_advisory.sh
@@ -246,11 +246,11 @@ run_bg logging gate_logging
 run_bg experiment-outputs bash scripts/uv.sh run --extra dev python scripts/check_experiment_outputs.py
 collect ruff mypy pyright-advisory vulture configs shell-scripts docker-paths deps consolidation logging experiment-outputs
 if [[ $STATIC -eq 0 && $TIER == "full" ]]; then
-  # Main-branch platform subset: taxi-coupled suites (ledger probes,
+  # Main-branch platform subset: track-coupled suites (ledger probes,
   # state_records, project loader paths) cannot pass where project/ and the
   # ledger are absent BY DESIGN — the data-agnostic line runs the platform
   # subset instead. Explicit --tier=full forces the literal gate; the
-  # default full tier on a main checkout subsets automatically. Taxi runs
+  # default full tier on a main checkout subsets automatically. Track runs
   # the literal gate either way.
   _branch="${GITHUB_REF_NAME:-$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")}"
   if [[ $SEEN_TIER -eq 0 && "$_branch" == "main" ]]; then

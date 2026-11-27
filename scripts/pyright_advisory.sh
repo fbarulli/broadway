@@ -4,7 +4,7 @@
 # enforcing checker; pyright runs at highest strictness to surface silent
 # errors, data coercion, unexpected behavior, and data drops — as ADVICE.
 # NO HARDCODED VALUES: version + scope resolve from configs/tooling.yaml
-# (SSOT) and pyrightconfig.json include. Same config on taxi and main
+# (SSOT) and pyrightconfig.json include. Same config on the track and main lines
 # (shared via parity surface). Bump the version ONLY in configs/tooling.yaml.
 # Skips cleanly when node is absent (e.g. node-less CI images).
 set -euo pipefail

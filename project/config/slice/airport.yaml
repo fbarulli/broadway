@@ -1,4 +1,0 @@
-name: airport
-dataset: taxi
-description: trips that start or end at the airport
-filter_expression: pickup_location_id == 132 or dropoff_location_id == 132

@@ -7,7 +7,7 @@ Update freely; remove entries when done (git history is the record).
 
 - **Statistical testing** — next work stream (user-directed, 2026-08-16).
   Scope to be set by the user: platform `src/broadway/stats` testing vs.
-  hypothesis tests on the taxi data vs. tutorial continuation. Do not start
+  hypothesis tests on the Amazon dataset vs. tutorial continuation. Do not start
   until the specific direction is given.
 
 Standing rules live in `agents/ledger/HANDOFF.md` / `agents/contracts/WORKER_CONTRACT.md` (config
@@ -25,7 +25,7 @@ every src change, fail loud, one logical change per commit).
 - **Cleanup/polish slice** — doc drift, dead code, silent posthoc skip,
   unlabeled Q-Q truncation. (Legacy results-index is NOT orphaned anymore:
   `reports/index.py`/`sequence.py`/`registry.py` are live + tested;
-  `reports/audit.py` is taxi-free.)
+  `reports/audit.py` is dataset-agnostic.)
 - **Lineage-viz** (`graph_todo.md`) — `src/broadway/lineage/` exists
   (graph/mermaid/records/state/sample), but the learnGitBranching-style
   commit-tree renderer is still not built (`mermaid.py` emits plain

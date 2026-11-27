@@ -1,22 +1,3 @@
 frequency_fill: -1.0
 pipeline_file: feature_pipeline.pkl
 max_drop_fraction: 0.0
-# Measured imputation/scaling impact study (report only — never a gate).
-# The study reads the persisted train/val feature splits, injects the churn
-# below into the TRAIN split only, and scores every variant on the same clean
-# holdout. Run explicitly:
-#   python -m broadway.selection.imputation --dataset <dataset> --experiment <experiment>
-# `sample_size` bounds the KNN strategy's pairwise-distance cost; 0 means all
-# rows. `missing_injection.columns` must exist in the experiment's column plan
-# (the taxi plan's continuous columns are used here).
-imputation_study:
-  strategies: [median, mean, mode, knn]
-  scalings: [none, standard]
-  metric_direction: minimize
-  sample_size: 10000
-  knn_neighbors: 5
-  missing_injection:
-    rate: 0.10
-    columns: [passenger_count, trip_distance]
-  output_dir: artifacts/features
-  output_file: imputation_impact.json

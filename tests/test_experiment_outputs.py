@@ -56,7 +56,7 @@ def test_enforced_series_steps_publish_a_question_and_a_figure() -> None:
     enforced_steps = sum(
         len(series.steps) for series in audit.series() if series.series in audit._enforced
     )
-    assert enforced_steps == 13
+    assert enforced_steps == 1
 
 
 def test_audit_of_a_missing_experiments_root_is_empty(tmp_path: Path) -> None:

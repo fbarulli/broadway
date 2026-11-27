@@ -12,7 +12,7 @@ kernel_config: hpo_kernel.yaml
 seed: 1729
 
 # The adapter factory: build(study) -> objective(params, trial) -> float.
-objective: adapters.taxi:build
+objective: adapters.project:build
 
 # Env var that holds the shared Optuna URL; never a file or a literal.
 storage_env: OPTUNA_STORAGE_URL

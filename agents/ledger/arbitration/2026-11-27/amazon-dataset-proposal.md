@@ -665,3 +665,94 @@ $ agents/tools/render_gates.py                                     # stamp gener
 | 9 | the plan frequency-encoded the 1–5 rating columns | the ordinals are numeric `source` keeps; the hand-fix is recorded in the plan docstring | plan inspected (`source` int64 ops) |
 | 10 | stage-2 plan missed several surfaces | §12 now lists ignore rules, `reports/results/index.md`, ledger index/DIGEST/factsheets, `readmore/00_ingestion.md`, the taxi-referencing scripts/whitelist, the four missed tests, base config taxis, the namespace-package question, and the tag + archive manifest/checksum | §12 |
 
+
+## 16. Stage-2 completion note (taxi removal executed 2026-11-27)
+
+Status: **executed, not pushed.** Owner approved the full replacement; this stage ran
+the §12 plan in the mandated order (preserve → remove/rewire → rewire to Amazon → nit).
+
+### 16.1 Preserve (reversible)
+
+- Tag `pre-amazon-removal` at `d376f634f57d5b2aaa242ca07c65eba6527cfffc` (the stage-1
+  integration head), message "taxi dataset + experiments before Amazon replacement".
+- Untracked taxi data moved (never `rm`) to
+  `/home/opc/ONE/ER-archive/broadway-taxi-data-2026-11-27/` — **25 files, ~790 MB**,
+  `sha256sum -c MANIFEST.sha256` verifies. Includes `data/raw/yellow_tripdata_2024-0{1,2,3}.parquet`,
+  `taxi_zone_lookup.csv`, the processed canonical/train/val/feature parquet + clean/audit
+  JSON + feature pipeline, the `fare_prediction_1m@v3` sample, non-Amazon
+  `artifacts/evaluation/*` and the stale taxi `artifacts/reports/eda.html`. A README
+  records what/why/how to restore. No file was open (`lsof`/`fuser` clean).
+- `data/raw/amazon/` and `data/processed/amazon/` were not moved; the raw CSV sha256 is
+  unchanged (`edb1af97…`). ETL/EDA reruns regenerated `data/processed/amazon/` as expected.
+
+### 16.2 Removed / rewired (recoverable via tag + history)
+
+- Config: taxi dataset/analysis/experiment/project/sample/slice configs, the taxi
+  experiment series configs (`fare_prediction`, `timeseries`, `multivariate`, `mlflow`,
+  `working`), and the project `feature_engineering.yaml`.
+- Experiments: `fare_prediction`, `timeseries`, `more_modeling`, `multivariate`,
+  `polynomial_regression_et_all`, `univariate`, `mlflow` (scripts + tracked results).
+  `amazon_survey` and the Amazon pipeline-EDA evidence are kept.
+- Code: `project/{data,working,ml_pipeline,config,experiments,basic,boroughs}.py`,
+  `project/scripts/*`, `project/STATS.md`, `project/k8s/optuna/configmap.yaml`.
+  `project/features/__init__.py` is now an import-light package file (the Amazon plan is
+  `project/features/amazon.py`).
+- Tests: taxi-only project suites removed; platform tests rewired to platform-only or
+  Amazon (`test_column_plan`, `test_config`, `test_experiments_dispatcher`,
+  `test_gpu_training`, `test_project_paths`, `test_recipe`, `test_mermaid`,
+  `test_profiling`). The retired-config probe and the branch-parity/tooling tests are
+  retained (they pin branch vocabulary / the checker, not taxi data).
+- GPU lane: `gpu_training/adapters/taxi.py` → `project.py` (objective
+  `adapters.project:build`), study config points at `dataset: amazon`,
+  `experiment: amazon`, `hpo_spec: project/config/experiments/amazon_hpo.yaml` (new).
+- Base configs: taxi imputation columns moved out of `configs/step/features.yaml` into
+  `project/config/step/features.yaml` (Amazon columns); taxi comments removed from
+  `configs/step/train.yaml` / `configs/tooling.yaml`.
+- `.gitignore`: univariate sample-evidence negations dropped; Amazon evidence negations kept.
+- Ledger: retired rows (`GATE-TRAIN-32`, `GATE-CFG-104/111/112`, `GATE-INFRA-122/129/180/181`,
+  `GATE-CUST-149/152`) recorded in `retired:`; live GPU/contract rows updated to the
+  Amazon/`project.py` naming; `GATE-INFRA-183` updated for the single-dataset state.
+  `DIGEST.md` + `index/*` re-rendered (round-trip byte-identical).
+- Docs/maps: README/project.md/TODO/CONTRIBUTING/HPO_TRAINING/readmore rewritten to the
+  Amazon project; stale taxi report renders and `diagrams/data_tracking.mmd` removed;
+  `reports/lineage` citation dropped from the contract (`src/broadway/lineage/graph.py`
+  remains the code surface).
+- CI: the removed `project/experiments.py verify` smoke step was dropped; workload-image
+  steps already auto-skip when `project/config/experiments/mlflow.yaml` is absent.
+
+### 16.3 The known nit (fixed)
+
+`project/experiments/amazon_survey/01_profile.py` no longer hardcodes the dataset name or
+the 0.95 CI level: the dataset is `dataset:` in `project/config/experiments/amazon_survey.yaml`,
+the contract name is `cfg.dataset.name`, and the CI multiplier comes from
+`measurement.confidence`. The regenerated record is byte-identical (same
+`0.5015 [0.4275, 0.5729]`, null `0.1166`, n=602, verdict `act`).
+
+### 16.4 Verification (real artifacts)
+
+- `python -m project.cli etl --dataset amazon --experiment amazon` → exit 0.
+- `python -m project.cli eda --dataset amazon` → exit 0 (602 rows, same decisions).
+- `python project/experiments/amazon_survey/01_profile.py` → exit 0, record unchanged.
+- `scripts/check_experiment_outputs.py` → `EXPERIMENT OUTPUTS OK — 1 enforced steps,
+  0 advisory gaps` (the taxi series are gone; the count is no longer 13 by construction).
+- `scripts/check_project_paths.py --context dev` → OK.
+- `pytest tests/test_governance_probes.py -k head_parent_stamp` → green.
+- `bash scripts/run_local_ci.sh` (FULL) → `LOCAL-CI GREEN` (parity, ruff, mypy,
+  pyright-advisory, vulture, configs, shell-scripts, docker-paths, deps, consolidation,
+  logging, experiment-outputs, pytest, project-tests).
+- `git grep -il taxi` now lists only historical arbitration/archive/factsheet/notes
+  records, branch-vocabulary files (`taxi` is the branch name), the retired-path probe,
+  and the ledger's preserved retired rows.
+
+### 16.5 Remaining risks
+
+1. **K8s HPO workload is parked, not re-homed.** The taxi-bound `k8s/optuna` worker and
+   `project/k8s/optuna/configmap.yaml` are gone; the generic k8s/optuna manifests and
+   Dockerfiles remain and auto-skip because `project/config/experiments/mlflow.yaml` is
+   absent. Distributed HPO for Amazon is future work (documented in HPO_TRAINING.md).
+2. **The `git grep` residue is intentional** (history + branch name). The dataset
+   references inside retired ledger rows are preserved as history, not live ownership.
+3. **`project/config/step/features.yaml` overlays every project step load** (stage-1
+   design), so it also applies when a project checkout loads the synthetic `test` dataset;
+   the imputation study validates its columns against the plan and fails loud, so this is
+   visible rather than silent.

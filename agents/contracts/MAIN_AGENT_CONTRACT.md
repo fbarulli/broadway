@@ -92,7 +92,7 @@ Before modifying a governed surface, the main agent or dispatched investigator m
 Use the repository's mapping and graph tools where available, including:
 
 * `graphify` for codebase knowledge-graph and structural relationships (project dependency; see pyproject.toml)
-* lineage graph surfaces (`reports/lineage/graph.json`, `src/broadway/lineage/graph.py`) for import/dependency and structural relationships
+* lineage graph surfaces (`src/broadway/lineage/graph.py`) for import/dependency and structural relationships
 * `render_gates.py --blast-radius <path>` for governed-surface ownership and downstream gate impact
 * the gate registry and generated digest for surface ownership and validation requirements
 * targeted repository search and live command output rather than stale prose

@@ -1,3 +1,0 @@
-series,n,adf_stat,p_value,stationary_at_5pct
-hourly,2183,-5.527,1.82e-06,True
-daily,91,-2.077,0.254,False

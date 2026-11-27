@@ -4,7 +4,7 @@
 # CI (`COPY project/` with no project/ on the data-agnostic line), caught
 # here in seconds instead of after a 10-minute image build.
 # Branch-aware: WORKLOAD images (configs/tooling.yaml docker.images with
-# workload:true — they bake the taxi reference pipeline or FROM its base)
+# workload:true — they bake the project pipeline or FROM its base)
 # are SKIPPED with notice when project/ is absent. Skipping there is
 # correct; failing is not. Platform images must resolve everywhere.
 # NO HARDCODED VALUES: image table (dockerfile/context/workload) resolves

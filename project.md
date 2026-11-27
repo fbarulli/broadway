@@ -67,25 +67,23 @@ src/broadway/
 `reports/model_evaluation.html` do **not** exist; they were removed or never
 shipped. Do not write against them.
 
-## 2. Project (the taxi development layer)
+## 2. Project (the Amazon dataset layer)
 
 ```
 project/
 ├── config/                    # the project config tree (overlay-selected)
-│   ├── dataset/  analysis/  slice/
-│   ├── sample/                # named-sample definitions (immutable artifacts)
-│   ├── experiments/           # fare_prediction.yaml, timeseries.yaml, mlflow.yaml, …
+│   ├── dataset/amazon.yaml    # 23 columns, target, renames, processed/artifact namespace
+│   ├── analysis/amazon.yaml   # goal, row definition, decision moment, leakage note
+│   ├── experiment/amazon.yaml # feature plan + linear model + random split
+│   ├── experiments/           # amazon_survey.yaml (decision rule), amazon_hpo.yaml
+│   ├── step/                  # eda output slot, dataset-specific feature knobs
 │   └── layout.yaml            # every project path, resolved once
-├── features/__init__.py       # the taxi ColumnPlan (raw ids + route_frequency)
-├── ml_pipeline.py             # the dataset-specific FeaturePipeline (golden-pinned)
+├── features/amazon.py         # the Amazon ColumnPlan (single keep-set)
 ├── experiments/
-│   ├── fare_prediction/       # 01…08, each publishing <stem>_decision.json
-│   ├── timeseries/            # 01…04, same contract
-│   ├── amazon_survey/         # 01, same contract (Amazon consumer-behaviour survey)
-│   ├── more_modeling/  multivariate/  univariate/  mlflow/  …
+│   ├── amazon_survey/         # 01_profile, publishing <stem>_decision.json
 │   └── results/               # committed figures, reports, tables, decisions
-├── scripts/                   # numbered teaching scripts (record-free by D32)
-└── data.py                    # project constants (config-driven)
+├── paths.py                   # project layout loader
+├── cli.py / dashboard.py      # project composition roots
 ```
 
 ## 3. GPU lane (`gpu_training/`)
@@ -97,13 +95,12 @@ gpu_training/
 ├── hpo_kernel.py              # one Optuna worker → broadway.training.hpo
 ├── hpo_study.py               # study config (search space, data, storage)
 ├── lane_contract.py           # module:function boundary resolution
-├── adapters/                  # gluonts_step, prophet_step, timesfm_step, taxi, cpu_smoke
+├── adapters/                  # gluonts_step, prophet_step, timesfm_step, project, cpu_smoke
 └── config/                    # memory_probe.yaml, hpo_kernel.yaml, hpo_run*.yaml
 ```
 
 The lane is config-driven: the kernel carries no vendor code, and the study
-targets the same `project/config/experiments/mlflow.yaml` HPO spec as the
-in-process bandit.
+targets `project/config/experiments/amazon_hpo.yaml` (the project HPO spec).
 
 ## 4. Artifacts a run produces
 

@@ -1,0 +1,15 @@
+# Project dataset binding for the features step's dataset-specific knobs.
+# The base `configs/step/features.yaml` carries the generic mechanics only; the
+# imputation study's injected columns must exist in this dataset's column plan,
+# so the whole block lives in the project overlay.
+imputation_study:
+  strategies: [median, mean, mode, knn]
+  scalings: [none, standard]
+  metric_direction: minimize
+  sample_size: 10000
+  knn_neighbors: 5
+  missing_injection:
+    rate: 0.10
+    columns: [age, Customer_Reviews_Importance]
+  output_dir: artifacts/features
+  output_file: imputation_impact.json

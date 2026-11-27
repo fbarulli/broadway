@@ -13,8 +13,14 @@ retired:
   # src/broadway/samples/generate.py generate_sample() surface — un-retired
   # 2026-11-26 so the sample-generation gate is probed again.
   history_rows_retained: ['GATE-INGEST-01', 'GATE-INGEST-04', 'GATE-ETL-17', 'GATE-ETL-18', 'GATE-ETL-19', 'GATE-ETL-117']
+- owners: ['project/data.py', 'project/experiments.py', 'project/config/experiment/taxi.yaml', 'project/features/__init__.py', 'project/config/project/taxi.yaml']
+  date: '2026-11-27'
+  successor: 'project/config/dataset/amazon.yaml + project/features/amazon.py + project/config/experiment/amazon.yaml; the project readers/dispatcher were removed with the taxi dataset'
+  # Owner-approved Amazon replacement: these rows described the retired taxi
+  # dataset surface. Preserved as history; no longer bind a live surface.
+  history_rows_retained: ['GATE-TRAIN-32', 'GATE-CFG-104', 'GATE-CFG-111', 'GATE-CFG-112', 'GATE-INFRA-122', 'GATE-INFRA-129', 'GATE-INFRA-180', 'GATE-INFRA-181', 'GATE-CUST-149', 'GATE-CUST-152']
 meta:
-  head: '48ab32e'
+  head: 'd376f63'
   assembled: '2026-11-26'
   source_fragments:
   - agents/ledger/gates/01-ingest.md
@@ -1637,12 +1643,11 @@ gates:
   - 'small_group_threshold argument into run_anova; surfaces as AnalysisPlan.threshold_context.any_small_group + imbalance_ratio (src/broadway/stats/anova.py:60, 68-71) and warning "underpowered: small group(s)" when ANY group < floor'
   transforms:
   - 'T-BUG-4 (eee33d7) binding AT ENTRY: run_anova(groups, small_group_threshold=cfg.stats.min_rows_for_sampling) — pre-fix the key was dead config (agents/ledger/DECISIONS.md:81-83)'
-  - 'config chain: authored configs/step/stats.yaml:4 (=10000) → StatsStep.min_rows_for_sampling src/broadway/config/schema.py:253 (required int, no default) → bound here; second out-of-band consumer project/data.py:61 (MIN_ROWS_FOR_SAMPLING)'
+  - 'config chain: authored configs/step/stats.yaml:4 (=10000) → StatsStep.min_rows_for_sampling src/broadway/config/schema.py:253 (required int, no default) → bound here (the former out-of-band project/data.py copy retired with the dataset)'
   - alpha is NOT bound on this surface — stays library default 0.05 (anova.py:80)
   touched_by:
   - broadway.config.schema.StatsStep
   - configs/step/stats.yaml
-  - project/data.py
   - broadway.stats.anova.run_anova
   validated_by:
   - tests/test_stats_module.py::test_stats_run_small_group_threshold_binds_to_config
@@ -2615,7 +2620,7 @@ gates:
   owner: 'src/broadway/inference/api.py:1 FastAPI app stub (module docstring only — NO app symbol at HEAD; gate demands its creation) + k8s/api-deployment.yaml:18 uvicorn command'
   inputs:
   - uvicorn ASGI target import (inference.api:app)
-  - models:/taxi@champion via MLflow registry
+  - the deployed champion model via the MLflow registry
   outputs:
   - HTTP GET /health POST /predict GET /metrics bound 0.0.0.0:8000 — or loud CrashLoopBackOff with named cause on every replica
   transforms:
@@ -2798,7 +2803,7 @@ gates:
   order: 84
   owner: src/broadway/config/schema.py:51 DatasetContract
   inputs:
-  - 'project/config/dataset/*.yaml (column pins: dtype/null_count/role per column, e.g. project/config/dataset/taxi.yaml:1-29; lookup_tables with value_policies/sentinel_values taxi.yaml:31-59)'
+  - 'project/config/dataset/*.yaml (column pins: dtype/null_count/role per column, e.g. project/config/dataset/amazon.yaml; lookup_tables with value_policies/sentinel_values where a contract declares them)'
   outputs:
   - DatasetContract with dict[str, ColumnSchema]
   - consumed by pandera_dtype/build_raw_schema and every loader
@@ -2822,7 +2827,7 @@ gates:
   if_changed:
   - src/broadway/config/schema.py
   - src/broadway/contracts/pandera.py
-  - project/config/dataset/taxi.yaml
+  - project/config/dataset/amazon.yaml
   - configs/dataset/test.yaml
   findings:
   - schema-without-strictness asymmetry — DatasetContract (schema.py:51) and EnvironmentConfig (schema.py:62) do NOT set ConfigDict(extra="forbid"), while AnalysisContract (analysis/contracts.py:20), DataSourceRef (schema.py:146), ModelHPOSpec (schema.py:120), PreprocessingStepConfig (schema.py:175) and SampleSpec (lineage/models.py:38) DO. A typo'd key in a dataset/environment yaml (e.g. `datbase_host`) is SILENTLY IGNORED by pydantic-v2 default — config drift invisible at the exact layer whose job is to pin truth.
@@ -3068,12 +3073,12 @@ gates:
   order: 93
   owner: 'src/broadway/data/loader.py:134 lookup pre-read existence admission (declared-lookup bootstrap check)'
   inputs:
-  - 'DatasetContract.lookup_tables paths — project/config/dataset/taxi.yaml:31-34 declares out-of-repo symlink data/raw/taxi_zone_lookup.csv → /home/opc/ONE/learning/data/raw/taxi_zone_lookup.csv'
+  - 'DatasetContract.lookup_tables paths — a contract may declare a lookup (the Amazon contract declares none); each declared path must resolve before the merge'
   outputs:
   - dangling-symlink-aware loud pre-merge error NAMING the bootstrap step
   transforms:
   - 'AMENDED per packet H X2: the gate lives as a PRE-READ existence assertion at load_with_audit — Path.exists() follows links so a DANGLING symlink passes naive checks; the error must name the bootstrap step'
-  - 'co-tenancy with GATE-ETL-11/GATE-INGEST-02 on load_with_audit DECLARED, line-anchored aspect: pre-read admission check (O5 precedent); artifact declaration side remains project/config/dataset/taxi.yaml:31-34'
+  - 'co-tenancy with GATE-ETL-11/GATE-INGEST-02 on load_with_audit DECLARED, line-anchored aspect: pre-read admission check (O5 precedent); the artifact declaration side remains the contract lookup_tables block'
   touched_by: []
   validated_by: []
   if_changed:
@@ -3116,9 +3121,9 @@ gates:
 - id: GATE-CFG-112
   phase: config-schema
   order: 96
-  owner: 'src/broadway/lineage/models.py:37 SampleSpec.column_mapping + project/config/sample/taxi_diagnostic.yaml:5 (+ consumers stats/module.py:42, stats/describe.py:132, timeline/runners.py:100)'
+  owner: 'src/broadway/lineage/models.py:37 SampleSpec.column_mapping (+ consumers stats/module.py:42, stats/describe.py:132, timeline/runners.py:100)'
   inputs:
-  - 'column_mapping block + analysis group_column (project/config/analysis/taxi_hypothesis.yaml:13 group_column: Borough)'
+  - 'column_mapping block + a declared analysis group_column (a project sample/analysis may set one; absent when undeclared)'
   outputs:
   - 'validated mapping direction (logical→source); load-time existence validation of mapped values against the sample artifact'
   transforms:
@@ -3134,7 +3139,7 @@ gates:
   - tests/test_describe.py::test_describe_run_column_mapping
   if_changed:
   - SampleSpec.column_mapping field semantics
-  - taxi_diagnostic.yaml mapping block
+  - any project sample column_mapping block
   findings:
   - 'FINDING-D1 correction carried per packets F/G: the three cited TRACKED tests pin the consumers'' correct direction (describe test builds source_{group} physical columns); the "fixture fix / inverted yaml" framing is struck — what legitimately remains is direction-law documentation plus the unpinned load-time existence check.'
 - id: GATE-HPO-80
@@ -3507,8 +3512,8 @@ gates:
   order: 109
   owner: scripts/run_local_ci.sh:102 gate battery (ruff, mypy, pyright-advisory, Vulture, configs, shell-scripts, docker-paths, deps, consolidation, logging, pytest+cov floor=95, project-tests)
   inputs:
-  - src/** tests/test_project_paths.py project/experiments/** project/experiments.py project/dashboard.py project/paths.py project/working.py project/data.py scripts/check_project_paths.py scripts/ (ruff)
-  - project/config/ (project-owned layout, experiment, and taxi config-overlay SSOT)
+  - src/** tests/test_project_paths.py project/experiments/** project/dashboard.py project/paths.py project/features/** scripts/check_project_paths.py scripts/ (ruff)
+  - project/config/ (project-owned layout, experiment, and dataset config-overlay SSOT)
   - src/broadway/** (mypy)
   - src/broadway/** + pyrightconfig.json via scripts/pyright_advisory.sh (pyright-advisory, consultant)
   - configs/experiment/*.yaml via load_config(dataset='test') (configs)
@@ -3537,7 +3542,7 @@ gates:
   - 'project-tests step (:97, full-tier-only): uv run pytest project/tests -q --dist worksteal with NO coverage flags — the >=95 floor deliberately stays on tests/ (header :7-8); closes the data-gate hole (human ruling): 26 tests / 6 files collected+passing at HEAD eb9ea18'
   - coverage floor value 95 owned here; docs must quote it identically
   - configs gate asserts non-empty glob then loads every experiment config
-  - project-paths fails if a runtime surface or file restores retired root experiment/taxi config paths, or the project layout is incomplete
+  - project-paths fails if a runtime surface or file restores a retired root experiment path or a retired dataset config name, or the project layout is incomplete
   - 'the contract is a doc, the teeth are the checker: agents/contracts/EXPERIMENT_OUTPUT.md declares the question/compare/aggregates/determinism/one-figure/decision rules and the pipeline coverage matrix, while the Python ratchet never parses the markdown — the pin lives in tests/test_experiment_outputs.py'
   touched_by:
   - agents/ledger/DECISIONS.md D26 (senior adoption makes gate-list edits executable)
@@ -3554,9 +3559,6 @@ gates:
   if_changed:
   - src/
   - tests/
-  - project/working.py
-  - project/data.py
-  - project/experiments.py
   - project/dashboard.py
   - project/paths.py
   - project/config/
@@ -3595,7 +3597,7 @@ gates:
   validated_by:
   - tests/test_branch_parity_scripts.py::test_parity_surface_includes_scripts
   - tests/test_branch_parity_scripts.py::test_scripts_diff_empty_vs_main
-  - tests/test_project_paths.py::test_main_day_sync_removes_project_surfaces_and_keeps_generic_sample
+  - tests/test_project_paths.py::test_main_day_sync_removes_project_surfaces_via_whitelist
   if_changed:
   - any SHARED[] path
   - refs origin/main, origin/taxi
@@ -4632,7 +4634,7 @@ gates:
   inputs: []
   outputs: []
   transforms:
-  - 'declares the per-worker command template (kernel entry + {config}/{n_trials}/{micro_batch}/{worker}/{seed}/{objective}/{storage}), kernel_config hpo_kernel.yaml, seed 1729, objective adapters.taxi:build, gpus [0], mps_slots_per_gpu 2, and workers null (= use the measured concurrency); the study budget comes from the project HPO spec, never from this file (commit 1b1c69f)'
+  - 'declares the per-worker command template (kernel entry + {config}/{n_trials}/{micro_batch}/{worker}/{seed}/{objective}/{storage}), kernel_config hpo_kernel.yaml, seed 1729, objective adapters.project:build, gpus [0], mps_slots_per_gpu 2, and workers null (= use the measured concurrency); the study budget comes from the project HPO spec, never from this file (commit 1b1c69f)'
   - 'the shared Optuna URL is named only as storage_env OPTUNA_STORAGE_URL; the value comes from the secret store and never from this file'
   - 'gpu_training/config/hpo_run_kaggle.yaml EXTENDS this profile with hardware deltas only (gpus [0,1], mps_slots_per_gpu 1, storage_required false = the workers share the kernel''s local SQLite study) — command, seed, objective and storage policy stay declared once here (:1-12)'
   touched_by:
@@ -4664,7 +4666,7 @@ gates:
 - id: GATE-INFRA-176
   phase: infra-meta
   order: 160
-  owner: 'gpu_training/hpo_kernel.py:44 WorkerInvocation + gpu_training/hpo_study.py:63 HpoStudyConfig + gpu_training/lane_contract.py:17 resolve_callable + gpu_training/adapters/taxi.py:77 build() + gpu_training/config/hpo_kernel.yaml:1 study SSOT'
+  owner: 'gpu_training/hpo_kernel.py:44 WorkerInvocation + gpu_training/hpo_study.py:63 HpoStudyConfig + gpu_training/lane_contract.py:17 resolve_callable + gpu_training/adapters/project.py:77 build() + gpu_training/config/hpo_kernel.yaml:1 study SSOT'
   inputs:
   - 'one launcher-rendered worker argv: --config/--n-trials/--micro-batch/--worker/--seed/--objective/--storage'
   - 'gpu_training/config/hpo_kernel.yaml study SSOT (hpo_spec/model/dataset/experiment/storage_env/local_storage_url/micro_batch_param)'
@@ -4674,14 +4676,14 @@ gates:
   - 'one worker run record JSON {study, model, worker, sampler_seed, n_trials, micro_batch, storage source, dataset identity, best_value, best_params, elapsed_s}'
   - 'trials persisted into the shared Optuna study (argv URL, else the study config env var, else the local SQLite study)'
   transforms:
-  - 'LANE CONTRACT (one row, five co-tenant files; commit 1b1c69f): hpo_kernel runs ONE canonical worker, hpo_study owns the study definition, lane_contract owns module:function resolution, adapters/taxi owns the taxi objective, hpo_kernel.yaml owns the study SSOT — no vendor/model code and no sampler loop lives in the lane'
+  - 'LANE CONTRACT (one row, five co-tenant files; commit 1b1c69f): hpo_kernel runs ONE canonical worker, hpo_study owns the study definition, lane_contract owns module:function resolution, adapters/project owns the project objective, hpo_kernel.yaml owns the study SSOT — no vendor/model code and no sampler loop lives in the lane'
   - 'WorkerInvocation is the boundary: frozen/extra=forbid, objective must be module:function, n_trials/micro_batch > 0, worker >= 0 (:44-70)'
   - 'PER-WORKER SEED: sampler_seed = seed + worker (:65-67) — two workers inheriting one seed draw the same TPE cold-start sequence and burn half the budget on duplicate trials (the 2xT4 regression this fixes)'
   - 'storage fallback order argv → study storage_env → local SQLite (:81-88); a missing local SQLite parent directory is created first (:91-102)'
   - 'the storage URL is a SECRET: only the child argv carries it; HpoWorker output and a traceback are scrubbed to <redacted> before stderr (:105-107, :205-213)'
   - 'HpoStudyConfig is the boundary-validated study definition (frozen/extra=forbid) that resolves hpo_spec + local sqlite at the repo root, reads the project HPO spec for space/direction/budget, and PREFLIGHTS the declared parquet + columns via DatasetIdentity before any trial (:63-90, :120-163)'
   - 'HpoWorker.build resolves the objective factory through resolve_callable (loud on a non-module:function reference, a missing attribute or a non-callable) and runs the study through broadway.training.hpo.run_model_study (:19-29, :143-166)'
-  - 'adapters/taxi.py build(study) composes the canonical make_objective over the project configs and the canonical splitter; every dial comes from project/config (:77-87)'
+  - 'adapters/project.py build(study) composes the canonical make_objective over the project configs and the canonical splitter; every dial comes from project/config (:77-87)'
   touched_by:
   - optuna@4.4.0
   - pydantic@2.11.7
@@ -4803,7 +4805,7 @@ gates:
   findings: []
 # --- Amazon stage-1 surface (2026-11-27): the staged dataset binding, its
 # read-time normalization, the dataset-scoped artifact namespaces and the one
-# survey step. Taxi rows stay live until the stage-2 removal.
+# survey step. Stage 2 (owner-approved Amazon replacement) removed the predecessor dataset rows.
 - id: GATE-INFRA-183
   phase: infra-meta
   order: 167
@@ -4820,7 +4822,7 @@ gates:
   - 'project/experiments/results/pipeline/eda/eda_{decision.json,feature_decisions.json,*.csv,*.png}'
   transforms:
   - 'DatasetContract.column_renames maps the two trailing-space raw labels to recommendation_personalization_score and rating_accuracy_score before any read; strip is refused because the space-free Personalized_Recommendation_Frequency is a different variable'
-  - 'ProcessedStore/ArtifactStore scope this dataset to processed/amazon and artifacts/*/amazon, so an Amazon run cannot overwrite taxi parquet, the taxi data manifest or the tracked numeric_*.png audit figures'
+  - 'ProcessedStore/ArtifactStore scope this dataset to processed/amazon and artifacts/*/amazon; since the stage-2 removal Amazon is the only project dataset (the predecessor parquet, manifest and tracked audit figures were archived)'
   - 'target Shopping_Satisfaction is an ordinal 1-5 rating published as a regression task; the survey step measures |Spearman rho| with a selection-adjusted null over the declared 12-feature family and the shared segment plan, and publishes a StepOutput record'
   - 'the generated feature plan keeps the 1-5 rating columns numeric (source ops) rather than frequency-encoded counts'
   touched_by:
@@ -4845,7 +4847,7 @@ gates:
 - id: GATE-INFRA-181
   phase: infra-meta
   order: 165
-  owner: 'project/features/__init__.py:48 taxi()  # package plan callable resolved by ExperimentConfig.feature_plan'
+  owner: 'project/features/amazon.py:19 plan()  # package plan callable resolved by ExperimentConfig.feature_plan'
   inputs:
   - DatasetContract (target/datetime/columns) via project.features.load_contract
   outputs:

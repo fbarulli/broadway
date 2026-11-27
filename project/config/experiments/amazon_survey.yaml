@@ -2,6 +2,9 @@
 # Loaded by project/experiments/amazon_survey/01_profile.py through
 # DecisionRuleSet.from_yaml; no seed, threshold, family, criterion or resample
 # budget lives in the step script (agents/contracts/EXPERIMENT_OUTPUT.md).
+# The dataset this series measures (SSOT for the step; the contract owns its
+# target, columns and paths).
+dataset: amazon
 seed: 42
 iterations: 1000
 

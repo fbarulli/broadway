@@ -1,9 +1,0 @@
-{
-  "dataset": "sample_evidence",
-  "origin": "TLC-derived analysis sample carried by the dev line (full NYC-taxi schema: tpep_*, fare_amount, total_amount, ...)",
-  "size_bytes": 1070706,
-  "sha256": "dc3127eec59a0703e220c7879c556650c7e766a071f152169107ddd832a3e27e",
-  "renamed_from": "ratecode1_sample.parquet",
-  "renamed": "2026-08-26",
-  "convention_note": "whitelisted evidence pin; named-sample @v grammar not applicable"
-}

@@ -15,14 +15,14 @@ pyright:
   # Highest strictness, CONSULTANT role: findings are reported, never blocking.
   # run_local_ci.sh routes pyright-advisory as always-green; mypy enforces.
   mode: "strict"
-  # Advisory scope. Same on taxi and main (shared via parity surface).
+  # Advisory scope. Same on the track and main lines (shared via parity surface).
   scope:
     - "src/broadway"
   # Consultant law: true means the gate MUST always exit 0 (see advisory script).
   advisory_only: true
 
 shared_surface:
-  # Single source of the taxi<->main shared surface. The parity checker,
+  # Single source of the track<->main shared surface. The parity checker,
   # main-day sync, and promote script ALL read this file; none maintain a
   # second inline list.
   file: "scripts/main_whitelist.txt"
@@ -40,7 +40,7 @@ methods:
 docker:
   # Build table SSOT: every image CI builds, with its build CONTEXT (must
   # match the `docker build` contexts in .github/workflows/ci.yml) and
-  # whether it is a WORKLOAD image (bakes the taxi reference pipeline via
+  # whether it is a WORKLOAD image (bakes the project pipeline via
   # COPY project/... or FROMs an image that does). Workload images cannot
   # build on the data-agnostic main line — the pre-flight gate and CI skip
   # them there with notice instead of failing on missing paths.

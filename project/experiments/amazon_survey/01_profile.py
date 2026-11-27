@@ -90,13 +90,14 @@ class SurveyFrame:
     frame: pd.DataFrame
     artifact: Path
     source: str
+    dataset: str
     target: str
     segment_plan: SegmentPlan
 
 
 def _experiment_config() -> dict:
     config = yaml.safe_load(CONFIG.read_text(encoding="utf-8"))
-    require_keys(config, ["seed", "iterations", "feature", "family"], CONFIG.name)
+    require_keys(config, ["dataset", "seed", "iterations", "feature", "family"], CONFIG.name)
     return config
 
 
@@ -104,11 +105,11 @@ def _rule(step: str) -> DecisionRule:
     return DecisionRuleSet.from_yaml(CONFIG).rule(step)
 
 
-def _load() -> SurveyFrame:
+def _load(dataset: str) -> SurveyFrame:
     """The ETL canonical frame, its path/source, target, and the segment plan."""
-    cfg = load_config("eda", dataset="amazon")
+    cfg = load_config("eda", dataset=dataset)
     if cfg.dataset is None or cfg.eda is None:
-        raise ValueError("amazon_survey requires the amazon dataset contract")
+        raise ValueError("amazon_survey requires a configured dataset contract")
     artifact = canonical_path(cfg.dataset, cfg.environment)
     frame = pd.read_parquet(artifact)
     plan = SegmentPlan.build(
@@ -118,6 +119,7 @@ def _load() -> SurveyFrame:
         frame=frame,
         artifact=artifact,
         source=cfg.dataset.path,
+        dataset=cfg.dataset.name,
         target=cfg.dataset.target,
         segment_plan=plan,
     )
@@ -157,7 +159,7 @@ def _family_null(
 
 
 def _half_sample(
-    survey: SurveyFrame, feature: str, seed: int, iterations: int
+    survey: SurveyFrame, feature: str, seed: int, iterations: int, confidence: float
 ) -> float:
     """|rho| on one seeded half of the frame (its own n, a robustness check)."""
     measurement = MeasurementEstimator().estimate(
@@ -168,7 +170,7 @@ def _half_sample(
             sample_size=len(survey.frame) // 2,
             iterations=iterations,
             seed=seed,
-            confidence=0.95,
+            confidence=confidence,
         ),
         name="rho_half_sample",
     )
@@ -287,7 +289,7 @@ def main() -> None:
     feature = str(config["feature"])
     family = tuple(str(name) for name in config["family"])
     rule = _rule(STEM)
-    survey = _load()
+    survey = _load(str(config["dataset"]))
     RESULTS.mkdir(parents=True, exist_ok=True)
 
     measurement = MeasurementEstimator().estimate(
@@ -299,7 +301,6 @@ def main() -> None:
             null_column=feature,
             iterations=iterations,
             seed=seed,
-            confidence=0.95,
         ),
         name=rule.metric,
         unit="abs_spearman_rho",
@@ -308,7 +309,7 @@ def main() -> None:
     # The published rule IS the selection-adjusted one: the record must not claim a
     # wider null than the threshold it was judged against.
     measurement = measurement.model_copy(update={"null_threshold": selection_null})
-    half = _half_sample(survey, feature, seed, iterations)
+    half = _half_sample(survey, feature, seed, iterations, measurement.confidence)
     ranked = _ranked(survey, family)
     evidence = Evidence(
         baseline=(
@@ -333,7 +334,7 @@ def main() -> None:
             f"{survey.target} shuffle over the same family"
         ),
         provenance={
-            "dataset": "amazon",
+            "dataset": survey.dataset,
             "artifact": str(survey.artifact),
             "artifact_sha256": hashlib.sha256(survey.artifact.read_bytes()).hexdigest()[:16],
             "source": survey.source,

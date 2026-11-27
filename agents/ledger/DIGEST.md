@@ -1,6 +1,6 @@
 # DIGEST.md — rendered from agents/ledger/gates.yaml · NEVER HAND-EDIT ·
 
-> 173 gates · rendered 2026-11-27 @ HEAD 48ab32e · load THIS into context;
+> 173 gates · rendered 2026-11-27 @ HEAD d376f63 · load THIS into context;
 > gates.yaml is the sole SSOT; the retired GATES.md/gates/*.md markdown world survives in agents/ledger/arbitration/2026-08-24/surface-and-analysis-preservation.md.
 
 | band | phase | gates | findings |
@@ -191,7 +191,7 @@
 - **GATE-SURF-69** `src/broadway/reports/__init__.py  # renderer-purity contract over the package (markdown.py, results.py, timeline.py, index.py, audit.py, registry.py) + src/broadway/reports/decision.py:55 DecisionRule + src/broadway/reports/step_output.py:23 StepOutput + src/broadway/tracking/bundle.py:44 TrackingBundle + src/broadway/tracking/report.py:17 run()`
   [persisted typed evidence JSON artifacts, persisted AnalysisStep/AnalysisDecision models, QqOverview/DatasetProfile/JoinAuditReport/LookupValueAuditReport/StructuralCleanResult models, tracking: artifacts/tracking/baseline_stats.json + optional profile/clean JSON, decision rule from project/config/experiments/<series>.yaml decisions.<step> (metric/direction/min_effect/null_quantile/min_sample_size/action/owner), required Evidence bundle carried by the decision (baseline/segments/sensitivity/falsifier/provenance)] → [(cross-cutting) all reports/**/*.md listed in GATE-SURF-60..64, tracking: reports/tracking/data_card.md (tracked) + artifacts/tracking/baseline_stats.json (ignored machine truth), per-step output triple: <stem>.md report + <stem>.png figure + <stem>_decision.json Decision record (metric/interval/threshold/verdict + evidence) under the experiment results dir, evidence tables <stem>_<name>.csv rendered below the figure by the dashboard] · pins: 14
 - **GATE-SURF-100** `src/broadway/inference/api.py:1 FastAPI app stub (module docstring only — NO app symbol at HEAD; gate demands its creation) + k8s/api-deployment.yaml:18 uvicorn command` ⚠FINDING
-  [uvicorn ASGI target import (inference.api:app), models:/taxi@champion via MLflow registry] → [HTTP GET /health POST /predict GET /metrics bound 0.0.0.0:8000 — or loud CrashLoopBackOff with named cause on every replica] · pins: none direct
+  [uvicorn ASGI target import (inference.api:app), the deployed champion model via the MLflow registry] → [HTTP GET /health POST /predict GET /metrics bound 0.0.0.0:8000 — or loud CrashLoopBackOff with named cause on every replica] · pins: none direct
 - **GATE-SURF-101** `src/broadway/discover/columns.py:10 run()`
   [raw CSV path (ds-pipeline columns subparser argv)] → [stdout per-column dtype report (read-only probe, zero artifact writes)] · pins: none direct
 - **GATE-SURF-102** `src/broadway/reports/experiments_dashboard.py:56 FastAPI app custody (generic dashboard series endpoints)`
@@ -208,7 +208,7 @@
 - **GATE-CFG-73** `src/broadway/config/schema.py:62 EnvironmentConfig`
   [merged environment section (post GATE-CFG-71)] → [typed EnvironmentConfig instance embedded in PipelineConfig (loader.py:135)] · pins: 4
 - **GATE-CFG-74** `src/broadway/config/schema.py:51 DatasetContract` ⚠FINDING
-  [project/config/dataset/*.yaml (column pins: dtype/null_count/role per column, e.g. project/config/dataset/taxi.yaml:1-29; lookup_tables with value_policies/sentinel_values taxi.yaml:31-59)] → [DatasetContract with dict[str, ColumnSchema], consumed by pandera_dtype/build_raw_schema and every loader] · pins: 5
+  [project/config/dataset/*.yaml (column pins: dtype/null_count/role per column, e.g. project/config/dataset/amazon.yaml; lookup_tables with value_policies/sentinel_values where a contract declares them)] → [DatasetContract with dict[str, ColumnSchema], consumed by pandera_dtype/build_raw_schema and every loader] · pins: 5
 - **GATE-CFG-75** `src/broadway/contracts/pandera.py:46 build_raw_schema()` ⚠FINDING
   [DatasetContract.columns (post GATE-CFG-74)] → [pa.DataFrameSchema, one pa.Column per contract entry, coerce=False strict dtypes, nullable=True (pandera.py:55-59)] · pins: 5
 - **GATE-CFG-76** `src/broadway/config/schema.py:187 ExperimentConfig` ⚠FINDING
@@ -226,13 +226,13 @@
 - **GATE-CFG-105** `src/broadway/onboard/module.py:215 init() (_write_configs :178-198)`
   [stdin prompts + 13 argv flags] → [configs dataset/analysis/experiment YAMLs + profile JSON + 1 lineage record (write call :302)] · pins: none direct
 - **GATE-CFG-107** `src/broadway/data/loader.py:134 lookup pre-read existence admission (declared-lookup bootstrap check)` ⚠FINDING
-  [DatasetContract.lookup_tables paths — project/config/dataset/taxi.yaml:31-34 declares out-of-repo symlink data/raw/taxi_zone_lookup.csv → /home/opc/ONE/learning/data/raw/taxi_zone_lookup.csv] → [dangling-symlink-aware loud pre-merge error NAMING the bootstrap step] · pins: none direct
+  [DatasetContract.lookup_tables paths — a contract may declare a lookup (the Amazon contract declares none); each declared path must resolve before the merge] → [dangling-symlink-aware loud pre-merge error NAMING the bootstrap step] · pins: none direct
 - **GATE-CFG-108** `src/broadway/onboard/infer.py:10 _IDENTIFIER_THRESHOLD`
   [BROADWAY_IDENTIFIER_THRESHOLD env var] → [typed float threshold or named parse error] · pins: none direct
 - **GATE-CFG-111** `project/experiments/mlflow/_common.py:60 CONFIG_PATH BROADWAY_MLFLOW_CONFIG resolution + project/experiments/mlflow/03_optuna_worker.py:46-49 HPO_CONFIG_PATH env branch` ⚠FINDING
   [BROADWAY_MLFLOW_CONFIG env var] → [single resolution dialect for the MLflow/HPO config path] · pins: none direct
-- **GATE-CFG-112** `src/broadway/lineage/models.py:37 SampleSpec.column_mapping + project/config/sample/taxi_diagnostic.yaml:5 (+ consumers stats/module.py:42, stats/describe.py:132, timeline/runners.py:100)` ⚠FINDING
-  [column_mapping block + analysis group_column (project/config/analysis/taxi_hypothesis.yaml:13 group_column: Borough)] → [validated mapping direction (logical→source); load-time existence validation of mapped values against the sample artifact] · pins: 3
+- **GATE-CFG-112** `src/broadway/lineage/models.py:37 SampleSpec.column_mapping (+ consumers stats/module.py:42, stats/describe.py:132, timeline/runners.py:100)` ⚠FINDING
+  [column_mapping block + a declared analysis group_column (a project sample/analysis may set one; absent when undeclared)] → [validated mapping direction (logical→source); load-time existence validation of mapped values against the sample artifact] · pins: 3
 
 ### 80-hpo-optuna — hpo-optuna
 
@@ -264,7 +264,7 @@
 - **GATE-INFRA-91** `scripts/run_local_ci.sh:30 gate_parity() (F1b pin-guard, wired at :43)` ⚠FINDING
   [refs/remotes/origin/sklearn:scripts/check_branch_parity.sh via `git show` (:33)] → [parity sub-verdict to run() aggregator, FAIL parity (F1b): origin/sklearn unavailable | legacy pre-D16 checker on track ref] · pins: 3
 - **GATE-INFRA-92** `scripts/run_local_ci.sh:102 gate battery (ruff, mypy, pyright-advisory, Vulture, configs, shell-scripts, docker-paths, deps, consolidation, logging, pytest+cov floor=95, project-tests)` ⚠FINDING
-  [src/** tests/test_project_paths.py project/experiments/** project/experiments.py project/dashboard.py project/paths.py project/working.py project/data.py scripts/check_project_paths.py scripts/ (ruff), project/config/ (project-owned layout, experiment, and taxi config-overlay SSOT), src/broadway/** (mypy), src/broadway/** + pyrightconfig.json via scripts/pyright_advisory.sh (pyright-advisory, consultant), configs/experiment/*.yaml via load_config(dataset='test') (configs), k8s/optuna/*.sh + scripts/*.sh via sh -n + shellcheck (shell-scripts), scripts/check_docker_paths.sh (docker-paths), scripts/check_dependencies.py + configs/dependencies.yaml via scripts/uv.sh (deps), scripts/check_duplication.py + configs/duplication.yaml via scripts/uv.sh (consolidation), src/broadway/** handler-construction grep census (logging), src/broadway project scripts via Vulture --min-confidence 95 (vulture), tests/** (pytest -n 4 --dist worksteal, --cov-fail-under=95), project/tests/** (project-tests: full tier only, -q --dist worksteal, NO coverage flags), scripts/check_experiment_outputs.py + agents/contracts/EXPERIMENT_OUTPUT.md via the experiment-outputs gate (run_bg :246)] → [PASS/FAIL ruff|mypy|pyright-advisory|vulture|configs|shell-scripts|docker-paths|deps|consolidation|logging|experiment-outputs|pytest|project-tests banners + 40-line tails, cov floor breach ⇒ FAIL pytest, experiment-outputs verdict: EXPERIMENT OUTPUTS OK (enforced-step count + advisory gap count) or OUTPUTS RED naming each violating step (scripts/check_experiment_outputs.py:174-197)] · pins: 7
+  [src/** tests/test_project_paths.py project/experiments/** project/dashboard.py project/paths.py project/features/** scripts/check_project_paths.py scripts/ (ruff), project/config/ (project-owned layout, experiment, and dataset config-overlay SSOT), src/broadway/** (mypy), src/broadway/** + pyrightconfig.json via scripts/pyright_advisory.sh (pyright-advisory, consultant), configs/experiment/*.yaml via load_config(dataset='test') (configs), k8s/optuna/*.sh + scripts/*.sh via sh -n + shellcheck (shell-scripts), scripts/check_docker_paths.sh (docker-paths), scripts/check_dependencies.py + configs/dependencies.yaml via scripts/uv.sh (deps), scripts/check_duplication.py + configs/duplication.yaml via scripts/uv.sh (consolidation), src/broadway/** handler-construction grep census (logging), src/broadway project scripts via Vulture --min-confidence 95 (vulture), tests/** (pytest -n 4 --dist worksteal, --cov-fail-under=95), project/tests/** (project-tests: full tier only, -q --dist worksteal, NO coverage flags), scripts/check_experiment_outputs.py + agents/contracts/EXPERIMENT_OUTPUT.md via the experiment-outputs gate (run_bg :246)] → [PASS/FAIL ruff|mypy|pyright-advisory|vulture|configs|shell-scripts|docker-paths|deps|consolidation|logging|experiment-outputs|pytest|project-tests banners + 40-line tails, cov floor breach ⇒ FAIL pytest, experiment-outputs verdict: EXPERIMENT OUTPUTS OK (enforced-step count + advisory gap count) or OUTPUTS RED naming each violating step (scripts/check_experiment_outputs.py:174-197)] · pins: 7
 - **GATE-INFRA-93** `scripts/check_branch_parity.sh:71 check() (SHARED lockstep, list at :43-69) + sync_to_main() :89` ⚠FINDING
   [24-entry SHARED surface: src/ tests/ demo/ configs/dataset/test.yaml configs/experiment/{baseline,engineered,hyperopt}.yaml configs/analysis/{test,test_hypothesis,test_causal}.yaml configs/step/{causal,etl}.yaml configs/environment/ configs/flow/ k8s/ docker/ .github/workflows/ pyproject.toml Dockerfile docker-compose.yml .gitignore .dockerignore README.md scripts/, origin/main vs origin/taxi tips] → [PARITY OK | DRIFT: <path> differs … PARITY FAILED — run $0 --sync, sync mode: taxi→main checkout + deletion mirror (:89-103)] · pins: 3
 - **GATE-INFRA-94** `scripts/check_branch_parity.sh:111 inline era declaration PARITY_ERA/PARITY_TRACK_BRANCH/PARITY_ALLOWLIST/PARITY_MAIN_ANCHOR (:111-114) + anchor guards :121-132 + dev-era dispatch :192-226` ⚠FINDING
@@ -365,7 +365,7 @@
   [] → [] · pins: 2
 - **GATE-INFRA-175** `gpu_training/adapters/cpu_smoke.py:18 step()`
   [] → [] · pins: 1
-- **GATE-INFRA-176** `gpu_training/hpo_kernel.py:44 WorkerInvocation + gpu_training/hpo_study.py:63 HpoStudyConfig + gpu_training/lane_contract.py:17 resolve_callable + gpu_training/adapters/taxi.py:77 build() + gpu_training/config/hpo_kernel.yaml:1 study SSOT`
+- **GATE-INFRA-176** `gpu_training/hpo_kernel.py:44 WorkerInvocation + gpu_training/hpo_study.py:63 HpoStudyConfig + gpu_training/lane_contract.py:17 resolve_callable + gpu_training/adapters/project.py:77 build() + gpu_training/config/hpo_kernel.yaml:1 study SSOT`
   [one launcher-rendered worker argv: --config/--n-trials/--micro-batch/--worker/--seed/--objective/--storage, gpu_training/config/hpo_kernel.yaml study SSOT (hpo_spec/model/dataset/experiment/storage_env/local_storage_url/micro_batch_param), project HPO spec hpo block (search space, direction, target metric, budget) + the named project dataset/experiment configs, OPTUNA_STORAGE_URL from the secret store (never a file literal)] → [one worker run record JSON {study, model, worker, sampler_seed, n_trials, micro_batch, storage source, dataset identity, best_value, best_params, elapsed_s}, trials persisted into the shared Optuna study (argv URL, else the study config env var, else the local SQLite study)] · pins: 4
 - **GATE-INFRA-177** `src/broadway/pipeline.py:16 run()`
   [] → [] · pins: 1
@@ -375,7 +375,7 @@
   [] → [] · pins: none direct
 - **GATE-INFRA-180** `project/config/experiment/taxi.yaml:1 calibration opt-in overlay (split_conformal)`
   [] → [] · pins: none direct
-- **GATE-INFRA-181** `project/features/__init__.py:48 taxi()  # package plan callable resolved by ExperimentConfig.feature_plan`
+- **GATE-INFRA-181** `project/features/amazon.py:19 plan()  # package plan callable resolved by ExperimentConfig.feature_plan`
   [DatasetContract (target/datetime/columns) via project.features.load_contract] → [ColumnPlan keep-set (14 ops) consumed by the project ML pipeline projection and project/config/experiment/taxi.yaml feature_plan] · pins: 2
 - **GATE-INFRA-182** `src/broadway/evaluate/leaderboard.py:45 MetricDirection + src/broadway/evaluate/feature_selection.py rfe_curve + src/broadway/evaluate/explain.py shap_summary + src/broadway/tracking/manifest.py:20 DataManifest + gpu_training/adapters/gluonts_step.py step + gpu_training/adapters/prophet_step.py step + gpu_training/adapters/timesfm_step.py step`
   [ranked frame (one row per run) + declared metric directions, measured 95% intervals per run (ChampionDecision)] → [one ranked leaderboard figure per metric + <stem>_champion.json, rfe curve, SHAP/permutation/PDP tables, data manifest, GPU adapter step()] · pins: 4

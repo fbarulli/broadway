@@ -16,7 +16,7 @@ rather than a change of yardstick.
 Run it explicitly (the features artifacts are read, never regenerated):
 
     BROADWAY_CONFIG_OVERLAY_DIR=project/config \\
-        python -m broadway.selection.imputation --dataset taxi --experiment taxi
+        python -m broadway.selection.imputation --dataset amazon --experiment amazon
 """
 
 from __future__ import annotations

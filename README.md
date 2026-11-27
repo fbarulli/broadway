@@ -359,7 +359,7 @@ hand-maintaining a diagram:
 
 ```bash
 
-ds-pipeline lineage --analysis taxi --dataset taxi
+ds-pipeline lineage --analysis amazon --dataset amazon
 
 # → reports/lineage/graph.json + graph.md (Mermaid) + run-state summary
 
@@ -383,11 +383,11 @@ hierarchy built from the machine evidence in `artifacts/`.
 
 ```bash
 
-ds-pipeline walkthrough --analysis taxi_hypothesis --dataset taxi
+ds-pipeline walkthrough --analysis amazon --dataset amazon
 
 # → reports/index.md (dashboard) + reports/timeline.md + reports/results/ + reports/figures/
 
-ds-pipeline audit --dataset taxi [--analysis taxi_hypothesis]
+ds-pipeline audit --dataset amazon [--analysis amazon]
 
 # → reports/audit/{index,profile,transform,join,lookup_values}.md
 
@@ -687,7 +687,7 @@ dataset|analysis|experiment|project|sample|slice/<name>.yaml
 
 ```
 
-`configs/analysis/` holds generic/test analytical use cases. The taxi development
+`configs/analysis/` holds generic/test analytical use cases. The Amazon project
 
 profile lives under `project/config/` and overlays only matching config names.
 
@@ -774,11 +774,11 @@ logs the bundle as MLflow run artifacts.
 
 2. Shared functions live in one place and are imported, never duplicated.
 
-3. The agent making a change updates structural maps (`graphify` knowledge graph, `reports/lineage/graph.json`) in the same commit when the change alters the structure.
+3. The agent making a change updates structural maps (`graphify` knowledge graph, the lineage graph under `reports/lineage/`) in the same commit when the change alters the structure.
 
 ---
 
-## 7. Branch parity — main vs taxi
+## 7. Branch parity — main vs the track branch
 
 Branch model and parity workflow live in `agents/contracts/MAIN_AGENT_CONTRACT.md` §§2/12.
 
@@ -786,11 +786,11 @@ Branch model and parity workflow live in `agents/contracts/MAIN_AGENT_CONTRACT.m
 
 |--------|------|----------|
 
-| `sklearn` | active development line (MAIN_AGENT_CONTRACT.md §2) | platform + the NYC taxi demo (`project/`, scratch docs, generated `reports/`) |
+| `sklearn` | active development line (MAIN_AGENT_CONTRACT.md §2) | platform + the Amazon project (`project/`, scratch docs, generated `reports/`) |
 
 | `taxi` | pass-along mirror of sklearn | fast-forward copy of sklearn |
 
-| `main` | public platform | platform only — generic synthetic demo and `configs/sample/demo.yaml`; no `project/`, taxi config, or committed experiment output |
+| `main` | public platform | platform only — generic synthetic demo; no `project/`, project config, or committed experiment output |
 ---
 
 ## 8. Decisions, EDA, and the GPU lane
@@ -816,8 +816,7 @@ Every step that a human reads publishes a computed record beside its report
 - Experiment rules live in `project/config/experiments/*.yaml` under
   `decisions.<step>`; an undeclared step raises a named `DecisionRuleError`.
 
-`fare_prediction/01–08`, `timeseries/01–04`, and `amazon_survey/01_profile`
-publish records; the pipeline steps `etl`, `features`, `training` (HPO runs),
+`amazon_survey/01_profile` publishes a record; the pipeline steps `etl`, `features`, `training` (HPO runs),
 `baseline`, `evaluate`, and `causal` publish theirs and are enforced in
 `scripts/check_experiment_outputs.py` (`PIPELINE_DECISION_ENFORCED`).
 
@@ -848,6 +847,6 @@ search-space definition:
    `broadway.training.hpo.run_model_study` — the same seeded TPE study the
    in-process bandit uses.
 
-The study/search-space/budget SSOT is `project/config/experiments/mlflow.yaml`
+The study/search-space/budget SSOT is `project/config/experiments/amazon_hpo.yaml`
 (via `gpu_training/config/hpo_kernel.yaml`); secrets (the shared storage URL)
 come from the environment and are redacted from every printed command.

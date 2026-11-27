@@ -1,8 +1,0 @@
-column,dtype,missing
-pickup_datetime,datetime64[ns],0
-pickup_location_id,int32,0
-dropoff_location_id,int32,0
-fare_amount,float64,0
-trip_distance,float64,0
-trip_duration_minutes,float64,0
-speed_mph,float64,0

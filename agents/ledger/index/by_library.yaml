@@ -497,8 +497,6 @@ project.etl.process_config:
 - GATE-ETL-19
 project.etl.process_config (indirectly via caller chain):
 - GATE-ETL-17
-project/data.py:
-- GATE-STATS-43
 psycopg2-binary:
 - GATE-HPO-86
 pyarrow:

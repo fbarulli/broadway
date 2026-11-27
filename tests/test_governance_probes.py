@@ -466,8 +466,8 @@ def test_probe_a_red_separator_count_mismatch(tmp_path: Path) -> None:
 
 def test_probe_b_red_phantom_path_in_contract(tmp_path: Path) -> None:
     def rename_cited_path(lines: list[str]) -> list[str]:
-        hit = next(i for i, ln in enumerate(lines) if "`reports/lineage/graph.json`" in ln)
-        lines[hit] = lines[hit].replace("`reports/lineage/graph.json`", "`reports/lineage/graph_phantom.json`")
+        hit = next(i for i, ln in enumerate(lines) if "`src/broadway/lineage/graph.py`" in ln)
+        lines[hit] = lines[hit].replace("`src/broadway/lineage/graph.py`", "`src/broadway/lineage/graph_phantom.py`")
         return lines
 
     seeded = _seeded_copy(tmp_path, "agents/contracts/MAIN_AGENT_CONTRACT.md", rename_cited_path)

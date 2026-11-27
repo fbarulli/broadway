@@ -1,9 +1,9 @@
 # Kaggle 2xT4 hardware profile — extends the fan-out profile; only hardware deltas.
 #
-# Measured on the 2026-11-25 Kaggle 2xT4 run (hardware measurement, NOT taxi-model
+# Measured on the 2026-11-25 Kaggle 2xT4 run (hardware measurement, NOT model
 # numbers): one patched trial peaked at 10 699 MiB on a 15 360 MiB Tesla T4, so two
-# co-tenant trials on one card OOM. Hence exactly one trial per GPU here; the taxi
-# HPO in this profile has no GPU footprint measurement of its own (see README).
+# co-tenant trials on one card OOM. Hence exactly one trial per GPU here; the
+# project HPO in this profile has no GPU footprint measurement of its own (see README).
 #
 # Everything else — command, seed, objective adapter, storage env, and the study
 # config that owns the budget/search space/dataset — is inherited from

@@ -1,4 +1,4 @@
-"""HPO objective for the taxi project dataset — the real branch data, no fixtures.
+"""HPO objective for the project dataset — the real data, no fixtures.
 
 Adapter contract (``gpu_training/hpo_kernel.py --objective``)::
 
@@ -6,9 +6,9 @@ Adapter contract (``gpu_training/hpo_kernel.py --objective``)::
 
 Every dial comes from the project config, never from this file:
 
-* ``project/config/dataset/taxi.yaml`` — the parquet path, the target, the
-  datetime column and the feature columns (by role);
-* ``project/config/experiment/taxi.yaml`` — the split kind/size and seed;
+* the project dataset contract the study names — the parquet path, the
+  target, the datetime column and the feature columns (by role);
+* the project experiment contract the study names — the split kind/size and seed;
 * the project HPO spec (``hpo_spec`` in the study config) — the model, its
   search space and the target metric.
 
@@ -75,7 +75,7 @@ def _hpo_config(spec_path: str) -> HPOConfig:
 
 
 def build(study: Mapping[str, Any]) -> Objective:
-    """Build the taxi objective from the study's project references."""
+    """Build the project objective from the study's config references."""
     cfg = load_config(
         "train", dataset=str(study["dataset"]), experiment=str(study["experiment"])
     )

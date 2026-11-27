@@ -1,14 +1,13 @@
-# HPO Training — how it works & how to view results
+# HPO Training — how it works & how to run it
 
 Broadway's hyperparameter optimization is **one config-driven API** shared by the
-platform `train` step, the model battle, and the distributed k8s workers — with an
-**on-demand lifecycle**: the cluster exists only while training runs, snapshots the
-results on finish, and restores them on the next call.
+platform `train` step and the GPU lane's fan-out workers.
 
 ## 1. The model of HPO
 
 ```
-configs/experiments/mlflow.yaml (hpo block)
+project/config/experiments/amazon_hpo.yaml (hpo block)   # project spec
+configs/experiment/hyperopt.yaml (hpo block)             # platform train
         │  search spaces + budgets
         ▼
 src/broadway/training/hpo.py  (the unified API)
@@ -30,10 +29,11 @@ src/broadway/training/hpo.py  (the unified API)
 
 | Concern | Location |
 |---|---|
-| Search spaces + budgets (k8s / battle) | `configs/experiments/mlflow.yaml` → `hpo:` (models, spaces, `total_trials`, `initial_trials_per_model`, `top_k`, `target_metric`) |
+| Project dataset/experiment | `project/config/dataset/amazon.yaml`, `project/config/experiment/amazon.yaml` |
+| Search spaces + budgets (GPU lane) | `project/config/experiments/amazon_hpo.yaml` → `hpo:` |
 | Search spaces (platform `train`) | `configs/experiment/hyperopt.yaml` → `hpo:` |
 | Allowed params + base defaults per model | `src/broadway/training/models/registry.py` (`MODEL_META`) |
-| k8s infra only (DB URLs, mlflow URI, dataset path) | `project/k8s/optuna/configmap.yaml` |
+| GPU lane study definition | `gpu_training/config/hpo_kernel.yaml` |
 
 A model's HPO block looks like:
 
@@ -41,15 +41,15 @@ A model's HPO block looks like:
 hpo:
   engine: optuna
   direction: minimize
-  target_metric: mae
-  total_trials: 100
+  target_metric: rmse
+  total_trials: 60
   initial_trials_per_model: 20
   top_k: 2
   models:
     - name: lgbm
-      search_space: {n_estimators: [50, 200], max_depth: [3, 8], learning_rate: [0.05, 0.3]}
+      search_space: {n_estimators: [50, 500], max_depth: [3, 12], learning_rate: [0.01, 0.3]}
     - name: xgb
-      search_space: {n_estimators: [50, 200], max_depth: [3, 8], learning_rate: [0.05, 0.3], reg_lambda: [1e-3, 10]}
+      search_space: {n_estimators: [50, 500], max_depth: [3, 12], learning_rate: [0.01, 0.3], reg_lambda: [1e-3, 10]}
     - name: linear
       search_space: {}   # no tunable hyperparameters
 ```
@@ -61,105 +61,45 @@ Model names are **registry keys** (`linear`, `lgbm`, `xgb`, `rf`); display label
 
 | Path | Command | Storage |
 |---|---|---|
-| Platform `train` + HPO | `uv run ds-pipeline train --dataset … --experiment hyperopt` | in-memory |
-| Model battle (bandit demo) | `uv run python experiments/mlflow/01_model_battle_mlflow.py` | in-memory |
-| Distributed worker (one study per model) | `uv run python experiments/mlflow/03_optuna_worker.py --model {lgbm,ols,xgb} --config …` | shared Postgres (k8s) or `sqlite:///…` locally |
+| Platform `train` + HPO | `uv run ds-pipeline train --dataset amazon --experiment hyperopt` | in-memory |
+| GPU lane dry-run (preflight) | `uv run python gpu_training/run_hpo.py --baseline baseline/memory_baseline.json --config gpu_training/config/hpo_run.yaml` | none |
+| GPU lane fan-out | the same command with `--execute` | shared URL or local SQLite |
 
-## 4. The on-demand lifecycle
+The GPU lane reads the study in `gpu_training/config/hpo_kernel.yaml`: the HPO
+spec, the project dataset/experiment names, and the storage policy. Its adapter
+(`gpu_training/adapters/project.py`) loads the named project contracts and returns
+the canonical `broadway.training.hpo.make_objective`; it never re-implements a fit.
 
-The k8s stack (kind cluster: postgres + mlflow + optuna workers) is **not kept
-running**. `k8s/optuna/lifecycle.sh` activates it for a run and tears it down
-after, snapshotting the results:
+## 4. Distributed k8s stack — retired with the predecessor dataset
 
-```bash
-k8s/optuna/lifecycle.sh train   # up → restore → run HPO → dump → down
-k8s/optuna/lifecycle.sh up      # create cluster (if absent), restore snapshot
-k8s/optuna/lifecycle.sh dump    # snapshot DBs + artifacts (no teardown)
-k8s/optuna/lifecycle.sh down    # dump, then delete the cluster
-```
+The former `k8s/optuna` worker/mini-cluster served the predecessor project's model
+battle. It is **not wired to Amazon**: the project HPO worker and its configmap
+were removed with the dataset, so the workload-image steps auto-skip when the
+project HPO spec is absent. The generic manifests and Dockerfiles remain in-tree
+as platform infrastructure; re-enabling a distributed study for Amazon is future
+work, not a claim that it runs today.
 
-Durable state lives in `data/optuna-backup/` (gitignored):
+## 5. Viewing results
 
-```
-optuna.sql.gz           the Optuna studies + trials (resume-able)
-mlflow.sql.gz           mlflow run metadata (params, metrics)
-mlflow-artifacts.tar.gz models, figures, artifacts
-```
-
-The next `train`/`up` restores these (custom-format dumps via `pg_restore`,
-artifacts via `tar`), so studies **resume across cycles** — verified: after a full
-teardown + recreate + restore, `ratecode1_lgbm` still had its 40 trials, `ols` 43,
-`xgb` 40.
-
-The worker image mirrors the repo layout (single source of truth — no remapped
-paths); workers auto-delete ~2 min after finishing (`ttlSecondsAfterFinished`).
-
-## 4a. CI boundary (what is and isn't automated)
-
-- **CI — structural determinism, no cluster, no training:** the platform gates
-  (ruff/mypy/pytest+coverage, shellcheck, kubeconform, frozen lockfile,
-  config parse-all, orchestrator job dry-run) plus the **Build & Boot** job —
-  builds the three images (cached across runs via a gzipped `docker save`
-  tarball + `actions/cache`) and boots the worker container (imports, CLI,
-  config-load simulation).
-  Rapid pushes cancel in-flight runs (`concurrency`).
-- **CD — push the verified images to GHCR** on push to `main`/`taxi` only
-  (never on PRs), tagged `ghcr.io/<repo>/<image>:<sha>` and `:latest`.
-  `lifecycle.sh` consumes the built tag via `OPTUNA_WORKER_IMAGE`:
-  ```bash
-  OPTUNA_WORKER_IMAGE=ghcr.io/<repo>/broadway-optuna-worker:<sha> \
-    k8s/optuna/lifecycle.sh train
-  ```
-  (For the local kind stack the default `broadway-optuna-worker:latest` is
-  loaded into the cluster; the GHCR tag is for real clusters.)
-- **Manual — runtime semantics:** `lifecycle.sh train` (kind cluster + workers +
-  dump/restore) runs only on demand. **There is no scheduled retraining, by
-  design** — HPO answers the question you ask, when you ask it.
-
-## 5. Viewing mlflow results
-
-**The one command — no Kubernetes involved:**
+**The one command — no cluster involved:**
 
 ```bash
-k8s/optuna/lifecycle.sh view
-# restores the snapshot into a throwaway docker postgres, runs mlflow locally,
-# and prints:  mlflow UI (all dumped results): http://127.0.0.1:5000
+uv run python -m project.dashboard
 ```
 
-Open `http://127.0.0.1:5000` — you'll see every completed run (params + metrics)
-from the snapshot (`data/optuna-backup/`), and the Optuna studies are restored in
-the same postgres. Stop when done:
+Experiment outputs are committed under `project/experiments/results/` and read by
+the dashboard (`project/dashboard.py` → `broadway.reports.experiments_dashboard`).
 
-```bash
-docker rm -f broadway-view-pg          # the throwaway postgres
-kill $(pgrep -f 'mlflow server.*15433')  # the local mlflow
-```
-
-Notes:
-- The cluster is **never** involved in viewing — it only exists for distributed
-  training (`train`/`up`/`down`).
-- Runs + metrics always display. Model **artifact links may 404** — the dump
-  records the pod's `/mlflow` paths, which a local server can't resolve; the
-  numeric results are unaffected.
-- While the cluster happens to be up (during `train`), the same runs are also at
-  `http://<node-ip>:30500` / `kubectl port-forward svc/mlflow 5000:5000`.
-
-**Per-model results without the UI** — the worker logs print the best run:
-
-```bash
-kubectl logs job/optuna-lgbm | grep DONE
-# [worker] DONE model=lgbm best_mae=2.0041 params={...}
-```
-
-**Committed evidence** — the model battle writes a metrics CSV + leaderboard to
-`experiments/results/mlflow/` (tracked).
+**Per-model results without the UI** — the GPU lane's kernel prints one JSON run
+record (study, model, worker, sampler seed, trial count, dataset identity, best
+value/params, elapsed seconds).
 
 ## 6. Tuning a model
 
-1. Edit the search space in the `hpo:` block (`configs/experiments/mlflow.yaml` or
-   `configs/experiment/hyperopt.yaml`).
-2. Run the path you want (local battle, `train`, or `lifecycle.sh train`).
-3. Read the leaderboard / UI; the bandit already shifted budget to the leaders.
+1. Edit the search space in the `hpo:` block (`project/config/experiments/amazon_hpo.yaml`
+   or `configs/experiment/hyperopt.yaml`).
+2. Run the path you want (platform `train` or the GPU lane).
+3. Read the leaderboard / run record; the bandit already shifted budget to the leaders.
 
 Parameter names must be in the model's `allowed_params` (registry) or the config
 fails validation.

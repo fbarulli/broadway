@@ -28,10 +28,10 @@ gpu_training/adapters/cpu_smoke.py:
 - GATE-INFRA-175
 gpu_training/adapters/gluonts_step.py:
 - GATE-INFRA-182
+gpu_training/adapters/project.py:
+- GATE-INFRA-176
 gpu_training/adapters/prophet_step.py:
 - GATE-INFRA-182
-gpu_training/adapters/taxi.py:
-- GATE-INFRA-176
 gpu_training/adapters/timesfm_step.py:
 - GATE-INFRA-182
 gpu_training/config/hpo_kernel.yaml:
@@ -74,8 +74,6 @@ project/config/experiment/taxi.yaml:
 - GATE-INFRA-180
 project/config/experiments/amazon_survey.yaml:
 - GATE-INFRA-183
-project/config/sample/taxi_diagnostic.yaml:
-- GATE-CFG-112
 project/dashboard.py:
 - GATE-INFRA-123
 project/data.py:
@@ -100,9 +98,8 @@ project/experiments/mlflow/03_optuna_worker.py:
 - GATE-CUST-152
 project/experiments/mlflow/_common.py:
 - GATE-CFG-111
-project/features/__init__.py:
-- GATE-INFRA-181
 project/features/amazon.py:
+- GATE-INFRA-181
 - GATE-INFRA-183
 scripts/check_branch_parity.sh:
 - GATE-INFRA-93

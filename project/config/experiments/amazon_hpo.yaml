@@ -1,21 +1,25 @@
-# mlflow model-battle experiment — run knobs + the unified HPO spec.
-# The dataset loader/filters/time_bucket are owned by project/working.py
-# (project/config/experiments/working.yaml). Model recipes stay in code: they
-# reference the platform model registry / sklearn classes. The HPO search
-# spaces and trial budgets (hpo:) are the single source of truth for BOTH
-# the battle orchestrator (01, hpo.run_hpo) and the k8s per-model workers
-# (03, hpo.run_model_study) — the k8s worker only injects the RDB storage_url
-# at runtime, so no storage_url is set here.
-sample_size: 1000
-test_fraction: 0.2
+# amazon_hpo — the HPO spec for the project's Amazon dataset (SSOT).
+# Read by the platform HPO lane (gpu_training/config/hpo_kernel.yaml -> hpo_spec)
+# and by the shared `broadway.training.hpo` API. The search space, direction,
+# metric and trial budget live here; no profile or script repeats them.
 seed: 42
-continuous_features: [trip_distance, duration_minutes, pickup_hour]
-categorical_features: [time_bucket]
+test_fraction: 0.2
+continuous_features:
+  - age
+  - Customer_Reviews_Importance
+  - recommendation_personalization_score
+  - rating_accuracy_score
+categorical_features:
+  - Gender
+  - Purchase_Frequency
+  - Browsing_Frequency
+  - Review_Reliability
+  - Recommendation_Helpfulness
 hpo:
   engine: optuna
   direction: minimize
-  target_metric: mae
-  total_trials: 100
+  target_metric: rmse
+  total_trials: 60
   initial_trials_per_model: 20
   top_k: 2
   models:

@@ -35,13 +35,13 @@ def test_enabled_profiler_writes_a_record_with_the_run_id(
     output = tmp_path / "profiles" / "etl.json"
 
     StepProfiler(_config(tmp_path, enabled=True)).run(
-        "etl", "taxi", lambda: sum(range(1000))
+        "etl", "amazon", lambda: sum(range(1000))
     )
 
     record = ProfileRecord.model_validate_json(output.read_text(encoding="utf-8"))
     assert record.step == "etl"
     assert record.run_id == "run-id-probe"
-    assert record.dataset == "taxi"
+    assert record.dataset == "amazon"
     assert record.runs == 1
     assert record.wall_p50 > 0.0
     assert record.wall_p95 == record.wall_p50
@@ -59,7 +59,7 @@ def test_disabled_profiler_runs_the_callable_and_writes_nothing(
     calls: list[int] = []
 
     StepProfiler(_config(tmp_path, enabled=False)).run(
-        "etl", "taxi", lambda: calls.append(1)
+        "etl", "amazon", lambda: calls.append(1)
     )
 
     assert calls == [1]
@@ -80,7 +80,7 @@ def test_phase_records_only_into_the_active_profile(
         with phase("model_fit"):
             time.sleep(0.01)
 
-    StepProfiler(_config(tmp_path, enabled=True)).run("train", "taxi", probe)
+    StepProfiler(_config(tmp_path, enabled=True)).run("train", "amazon", probe)
 
     record = ProfileRecord.model_validate_json(output.read_text(encoding="utf-8"))
     assert record.phases["model_fit"].wall_seconds >= 0.01

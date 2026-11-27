@@ -1,4 +1,0 @@
-population,role,mae,rmse,r2,tail_mae,verdict
-A,Revenue Engine,1.2006,2.1542,0.9629,4.183145064585146,"Reliable for the Manhattan-grid volume: safe for upfront app pricing, driver payouts, and revenue forecasting."
-B,Risk Simulator,2.8386,5.2592,0.9636,8.50883454313499,"Outer-borough and airport trips are structurally harder to predict — use for risk and uncertainty, not point estimates."
-C,Cheat Code (failed),1.2174,2.1435,0.9632,4.192315859752705,Penalizing outer-borough errors does not fix the underlying fare physics — no meaningful gain over A.

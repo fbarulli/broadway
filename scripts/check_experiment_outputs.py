@@ -26,25 +26,14 @@ DEFAULT_EXPERIMENTS = ROOT / "project" / "experiments"
 # data-agnostic checkout stays green.
 PROJECT_EVIDENCE_STEPS: tuple[str, ...] = ("eda",)
 
-# Ratchet: a series joins this list once every step complies. Never remove one.
-ENFORCED: tuple[str, ...] = ("amazon_survey", "fare_prediction", "timeseries")
+# Ratchet: a series joins this list once every step complies. An entry is
+# retired only with its dataset (the owner-approved Amazon replacement removed
+# the predecessor series; they no longer exist to audit).
+ENFORCED: tuple[str, ...] = ("amazon_survey",)
 
 # The decision half of the contract, per step (a step publishes a computed
 # verdict). A step joins this set when it builds a StepOutput with a Decision.
-# Never remove.
 DECISION_ENFORCED: tuple[tuple[str, str], ...] = (
-    ("fare_prediction", "01_generate_sample"),
-    ("fare_prediction", "02_filtered_profile"),
-    ("fare_prediction", "03_short_trips"),
-    ("fare_prediction", "04_percentile_extremes_audit"),
-    ("fare_prediction", "05_temporal_features"),
-    ("fare_prediction", "06_prepare_model_data"),
-    ("fare_prediction", "07_specification_diagnostics"),
-    ("fare_prediction", "08_lightgbm_baseline"),
-    ("timeseries", "01_series_profile"),
-    ("timeseries", "02_seasonality"),
-    ("timeseries", "03_stationarity_acf"),
-    ("timeseries", "04_forecast_models"),
     ("amazon_survey", "01_profile"),
 )
 

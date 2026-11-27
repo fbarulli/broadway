@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# MAIN-DAY SYNC — resync main from dev (taxi) via WHITELIST SSOT
+# MAIN-DAY SYNC — resync main from the track branch via WHITELIST SSOT
 # Run from main worktree root. Requires: git, bash, python3+yaml.
 # Design: copy only what main should contain, then re-apply main-only files.
 # Idempotent: safe to re-run.
@@ -9,7 +9,7 @@
 
 set -euo pipefail
 
-echo "==> MAIN-DAY SYNC: resyncing main from taxi (whitelist)"
+echo "==> MAIN-DAY SYNC: resyncing main from the track branch (whitelist)"
 
 # --- 0) Preconditions
 current_branch=$(git symbolic-ref --short HEAD)

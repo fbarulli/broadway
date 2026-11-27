@@ -1,128 +1,94 @@
 # 00_ingestion.md — data loading + column verification
 
 How to run Broadway's data-loading steps and verify their outputs, especially
-the columns. Two surfaces produce data: the pipeline CLI (`ingest` → `etl`)
-and the numbered project scripts. Column correctness is enforced at several
-boundaries, each with its own command.
+the columns. Column correctness is enforced at several boundaries, each with
+its own command.
+
+The project's dataset is the Amazon consumer-behaviour survey
+(`project/config/dataset/amazon.yaml`); the platform's data-agnostic demo uses
+the synthetic `test` dataset (`configs/dataset/test.yaml`).
 
 ### Human-readable views
 
-The JSON audit/clean artifacts below aren't meant to be read by hand. For a
-human-readable summary of what happened to the data, run:
+For a human-readable summary of what happened to the data, run:
 
 ```bash
-uv run ds-pipeline audit --dataset taxi
+uv run ds-pipeline audit --dataset amazon
 ```
 
-This renders `reports/audit/` (`index.md`, `profile.md`, `transform.md`,
-`join.md`, `lookup_values.md`) from the persisted typed evidence — no recompute.
+This renders `reports/audit/` (`index.md`, `profile.md`, `transform.md`) from
+the persisted typed evidence — no recompute.
 
 ## Commands to load + verify columns
 
-### 1. Inspect the produced raw data schema (read-only, no recompute)
+### 1. Inspect a source file (read-only, no writes)
 
 ```bash
-uv run python -m project.scripts.01_load_data
+uv run ds-pipeline columns --csv data/raw/amazon/amazon_consumer_behavior_survey.csv
 ```
 
-Prints the arrow schema, row count, sample rows, and column names of
-`data/processed/training_data.parquet`. Implemented in `inspect_schema`
-(`project/data.py`).
+Lists the columns + dtypes of a source file.
 
-To list the columns + dtypes of a source file (read-only, no writes):
+### 2. Canonicalize + split (`etl`)
 
 ```bash
-uv run ds-pipeline columns --csv <path>
+uv run ds-pipeline etl --dataset amazon --experiment amazon
 ```
 
-### 2. Rebuild the raw data (`ingest`)
+Preserves the raw CSV as the source of record, applies the contract's
+`column_renames` (two trailing-space headers are distinct variables), then
+validates against the config contract. Outputs under
+`data/processed/amazon/` (the dataset-scoped `processed_subdir`):
 
-```bash
-uv run ds-pipeline ingest --dataset taxi
-```
-
-Reads `data/raw/yellow_tripdata_*.parquet`, filters/renames, then enforces the
-exact schema from `configs/dataset/taxi.yaml`. Produces
-`data/processed/training_data.parquet` and writes the `ingest:taxi` lineage
-record.
-
-It hard-fails on any column mismatch via the contract-driven validation in
-`etl/process.py`: every column in the contract must be present (extra columns
-are dropped, missing ones raise), dtypes must match exactly (`build_raw_schema`
-→ `validate`), and any column missing a dtype or carrying an unsupported dtype
-raises.
-
-Expected columns come from `configs/dataset/taxi.yaml` (7 columns):
-
-- `pickup_datetime`
-- `passenger_count`
-- `trip_distance`
-- `pickup_location_id`
-- `dropoff_location_id`
-- `fare_amount`
-- `trip_duration_minutes` (target)
-
-### 3. Canonicalize + split (`etl`)
-
-```bash
-uv run ds-pipeline etl --dataset taxi --experiment taxi
-```
-
-Joins lookup tables, canonicalizes, then validates against the config contract.
-Outputs:
-
-- `taxi_canonical.parquet`
+- `amazon_canonical.parquet`
 - `train.parquet`
 - `val.parquet`
-- `taxi_clean.json` (structural clean result)
-- `taxi_join_audit.json` (join audit)
-- `taxi_lookup_value_audit.json` (lookup value audit)
+- `amazon_clean.json` (structural clean result)
+- `etl_decision.json` / `etl.md` / `etl.png` (the ETL decision record)
 
 Column presence/dtype is enforced by `build_raw_schema(dataset).validate(df)`
 (`etl/module.py`).
 
-### 4. Contract check (pass/fail on columns + nulls)
+### 3. Contract check (pass/fail on columns + nulls)
 
 ```bash
-uv run ds-pipeline contracts --dataset taxi --experiment taxi
+uv run ds-pipeline contracts --dataset amazon --experiment amazon
 ```
 
-Checks `check_columns` + `check_nulls` against `configs/dataset/taxi.yaml`
-(null threshold 0.05). Implemented in `contracts/module.py`.
+Checks `check_columns` + `check_nulls` against the dataset contract (null
+threshold 0.05). Implemented in `contracts/module.py`.
 
-### 5. Re-profile observed facts (per-column dtypes/nulls)
+### 4. Re-profile observed facts (per-column dtypes/nulls)
 
 ```bash
-uv run ds-pipeline profile --dataset taxi
+uv run ds-pipeline profile --dataset amazon
 ```
 
-Writes `artifacts/discover/profile.json`.
+Writes `artifacts/discover/amazon/profile.json` (the dataset's artifact
+namespace).
 
-### 6. Infer a contract from a new file
+### 5. Infer a contract from a new file
 
-Not needed for taxi, but this is the column-authoring path for a new dataset:
+This is the column-authoring path for a new dataset:
 
 ```bash
 uv run ds-pipeline discover --csv <path> --target <col> --task regression
 ```
 
-### 7. Tests that assert column correctness
+### 6. Tests that assert column correctness
 
 ```bash
 uv run pytest -q
 ```
 
-`tests/test_contracts.py` validates columns and nulls against
-`data/processed/training_data.parquet`.
-
 ## Key column facts (what "correct" means)
 
-- **Contract source of truth:** `configs/dataset/taxi.yaml` — 7 columns, each
-  with `dtype`, `null_count`, and `role`.
+- **Contract source of truth:** `project/config/dataset/amazon.yaml` — 23
+  columns, each with `dtype`, `null_count`, and `role`; `Shopping_Satisfaction`
+  is the target, `Timestamp` is ignored.
 - **Raw-boundary check** (`contracts`) verifies **presence + nulls only**;
   dtype is intentionally deferred (`contracts/checks.py`).
 - **Canonical-boundary check** (`etl`) verifies **strict dtypes** via Pandera
   (`contracts/pandera.py`).
 
-All steps already have outputs on disk under `data/processed/`
-(e.g. `training_data.parquet`, `taxi_canonical.parquet`).
+ETL outputs live under `data/processed/amazon/` (git-ignored, regenerable).

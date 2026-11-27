@@ -193,7 +193,7 @@ DatasetContract.columns (declared dtypes/null_count):
 - GATE-FEAT-26
 DatasetContract.columns (post GATE-CFG-74):
 - GATE-CFG-75
-? DatasetContract.lookup_tables paths — project/config/dataset/taxi.yaml:31-34 declares out-of-repo symlink data/raw/taxi_zone_lookup.csv → /home/opc/ONE/learning/data/raw/taxi_zone_lookup.csv
+? DatasetContract.lookup_tables paths — a contract may declare a lookup (the Amazon contract declares none); each declared path must resolve before the merge
 : - GATE-CFG-107
 DatasetContract.path (csv/parquet/xlsx via READERS dict keyed on suffix):
 - GATE-ETL-11
@@ -493,7 +493,7 @@ coef/HC3_SE/CI_low/CI_high DataFrame:
 - GATE-TRAIN-38
 coerce=False strict dtypes:
 - GATE-CFG-75
-'column_mapping block + analysis group_column (project/config/analysis/taxi_hypothesis.yaml:13 group_column: Borough)':
+column_mapping block + a declared analysis group_column (a project sample/analysis may set one; absent when undeclared):
 - GATE-CFG-112
 compose stack definition:
 - GATE-INFRA-128
@@ -771,8 +771,6 @@ model_type registry key:
 - GATE-TRAIN-34
 model_uri + alias="champion":
 - GATE-CUST-147
-models:/taxi@champion via MLflow registry:
-- GATE-SURF-100
 modified_zscore MAD-guard :12-13:
 - GATE-STATS-48
 module binding or loud unknown-step error:
@@ -912,9 +910,9 @@ project-owned plots/results CSVs/verification JSON (self-auditing verify subcomm
 - GATE-INFRA-122
 project-provided experiment scripts and result artifacts via BROADWAY_EXPERIMENTS_ROOT:
 - GATE-SURF-102
-project/config/ (project-owned layout, experiment, and taxi config-overlay SSOT):
+project/config/ (project-owned layout, experiment, and dataset config-overlay SSOT):
 - GATE-INFRA-92
-? 'project/config/dataset/*.yaml (column pins: dtype/null_count/role per column, e.g. project/config/dataset/taxi.yaml:1-29; lookup_tables with value_policies/sentinel_values taxi.yaml:31-59)'
+? 'project/config/dataset/*.yaml (column pins: dtype/null_count/role per column, e.g. project/config/dataset/amazon.yaml; lookup_tables with value_policies/sentinel_values where a contract declares them)'
 : - GATE-CFG-74
 project/config/project/taxi.yaml knobs:
 - GATE-ETL-117
@@ -1118,7 +1116,7 @@ small_n default 30 (:11); SOLE production caller timeline/runners.py:396 passes 
 - GATE-STATS-47
 source_group_column:
 - GATE-STATS-42
-? src/** tests/test_project_paths.py project/experiments/** project/experiments.py project/dashboard.py project/paths.py project/working.py project/data.py scripts/check_project_paths.py scripts/ (ruff)
+? src/** tests/test_project_paths.py project/experiments/** project/dashboard.py project/paths.py project/features/** scripts/check_project_paths.py scripts/ (ruff)
 : - GATE-INFRA-92
 src/broadway project scripts via Vulture --min-confidence 95 (vulture):
 - GATE-INFRA-92
@@ -1172,6 +1170,8 @@ teardown invocation after cluster/image-producing lanes:
 - GATE-INFRA-145
 tests/** (pytest -n 4 --dist worksteal, --cov-fail-under=95):
 - GATE-INFRA-92
+the deployed champion model via the MLflow registry:
+- GATE-SURF-100
 the sample's own ColumnPlan instance (one op per source column + one derive op per declared derivation):
 - GATE-ETL-116
 the training-time conformal q, or the candidate model native quantile predictions (lower/mid/upper):

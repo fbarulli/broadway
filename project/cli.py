@@ -1,4 +1,4 @@
-"""Project-composed CLI for the taxi development profile."""
+"""Project-composed CLI for the Amazon dataset project."""
 
 from __future__ import annotations
 

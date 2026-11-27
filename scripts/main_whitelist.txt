@@ -1,11 +1,11 @@
-# main_whitelist.txt — THE shared surface between taxi (track) and main.
+# main_whitelist.txt — THE shared surface between the track branch and main.
 # Single source of truth: read by scripts/check_branch_parity.sh (SHARED),
 # scripts/main_day_sync.sh (checkout list) and scripts/promote_to_main.sh.
 # One path per line; '#' comments and blank lines ignored.
-# Anything NOT listed is deliberately taxi-only or main-only. Main-owned
+# Anything NOT listed is deliberately track-only or main-only. Main-owned
 # slate (README.md, GOVERNANCE-POINTER.md, BROADWAY.md, root contracts) is
-# NEVER listed — main's blank-slate README differs from taxi's by design.
-# Taxi-only bindings (project/, reports/, readmore/, read.md, synth.md,
+# NEVER listed — main's blank-slate README differs from the track line by design.
+# Track-only bindings (project/, reports/, readmore/, read.md, synth.md,
 # TODO.md, project.md, experiments/, agents/ledger) must NEVER be added.
 src/
 tests/

@@ -133,13 +133,6 @@ jobs:
             -summary \
             /work/jobs.yaml
 
-      # CI-only — named in scripts/run_local_ci.sh header.
-      - name: Experiment smoke (taxi branch only — project dispatcher)
-        if: github.ref == 'refs/heads/taxi' || (github.event_name == 'pull_request' && github.base_ref == 'taxi')
-        env:
-          MPLCONFIGDIR: "${{ runner.temp }}/mplconfig"
-        run: bash scripts/uv.sh run python project/experiments.py verify
-
   # CI-only — named in scripts/run_local_ci.sh header.
   # Build & Boot — structural determinism of the deployment images WITHOUT a
   # cluster. Catches missing files / broken COPY paths / PYTHONPATH and import
@@ -170,8 +163,8 @@ jobs:
         with:
           fetch-depth: 1
 
-      # Branch-aware builds: the optuna workload images bake the taxi
-      # reference pipeline (COPY project/...) and cannot build on the
+      # Branch-aware builds: the optuna workload images bake the project
+      # pipeline (COPY project/...) and cannot build on the
       # data-agnostic main line. Detect once; workload steps below run
       # only when the sources exist (loud SKIP otherwise), platform-image
       # steps always run. Mirrors scripts/check_docker_paths.sh (local

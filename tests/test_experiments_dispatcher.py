@@ -1,51 +1,14 @@
-"""Non-mutating command-surface checks for the root experiments dispatcher."""
+"""Project CLI activates the project config overlay."""
 
 from __future__ import annotations
 
 import os
-import re
 import subprocess
 import sys
-
-import pytest
 
 from broadway.paths import repo_root
 
 REPO = repo_root()
-EXPECTED_COMMANDS = {"ols", "diagnostics", "qq_legend", "verify"}
-
-pytestmark = pytest.mark.skipif(
-    not (REPO / "project" / "experiments.py").exists(),
-    reason="taxi-only: data-agnostic main carries no project/",
-)
-
-
-def _help_result() -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        [sys.executable, "project/experiments.py", "--help"],
-        cwd=REPO,
-        capture_output=True,
-        text=True,
-        check=False,
-        timeout=30,
-    )
-
-
-def test_help_lists_exact_dispatcher_commands() -> None:
-    """The help path exposes only the dispatcher commands without execution."""
-    result = _help_result()
-    assert result.returncode == 0
-    match = re.search(r"\{(?P<commands>[^}]+)\}", result.stdout)
-    assert match is not None
-    assert set(match.group("commands").split(",")) == EXPECTED_COMMANDS
-
-
-def test_dispatcher_uses_project_configured_data_and_results_paths() -> None:
-    source = (REPO / "project" / "experiments.py").read_text(encoding="utf-8")
-    assert 'ROOT / "data"' not in source
-    assert 'PATHS.results / "ols"' in source
-    assert 'PATHS.results / "diagnostics"' in source
-    assert 'PATHS.results / "qq_legend"' in source
 
 
 def test_project_cli_activates_the_project_config_overlay() -> None:
@@ -57,7 +20,7 @@ def test_project_cli_activates_the_project_config_overlay() -> None:
             "-c",
             (
                 "import project.cli; from broadway.config.loader import load_config; "
-                "print(load_config('etl', dataset='taxi', experiment='taxi').dataset.name)"
+                "print(load_config('etl', dataset='amazon', experiment='amazon').dataset.name)"
             ),
         ],
         cwd=REPO,
@@ -67,5 +30,5 @@ def test_project_cli_activates_the_project_config_overlay() -> None:
         timeout=30,
         env=environment,
     )
-    assert result.returncode == 0
-    assert result.stdout.strip() == "taxi"
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "amazon"

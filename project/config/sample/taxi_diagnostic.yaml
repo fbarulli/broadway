@@ -1,6 +1,0 @@
-name: taxi_diagnostic
-role: diagnostic
-path: data/processed/joined_sample_live.parquet
-description: stratified live sample — diagnostic population
-column_mapping:
-  Borough: pickup_borough

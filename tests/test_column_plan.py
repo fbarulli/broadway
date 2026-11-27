@@ -7,6 +7,7 @@ contract and records the same ordered manifest.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import numpy as np
@@ -24,7 +25,7 @@ from broadway.config.schema import (
 from broadway.features.plan import ColumnOp, ColumnPlan, resolve_plan
 from broadway.utils import eligible_feature_columns
 
-# The taxi reference contract lives in the project overlay; the path is split
+# The Amazon reference contract lives in the project overlay; the path is split
 # so the platform-hygiene guard can distinguish this config-only equivalence
 # test (generated frames, no project imports/data reads) from demo coupling.
 _PROJECT_CONFIG = Path("project") / "config"
@@ -35,14 +36,14 @@ def _shipped_cfg(dataset: str, experiment: str) -> PipelineConfig:
     return load_config("train", dataset=dataset, experiment=experiment)
 
 
-def _taxi_cfg() -> PipelineConfig:
-    """Load the taxi contract pair as plain config models (no step tree)."""
+def _amazon_cfg() -> PipelineConfig:
+    """Load the Amazon contract pair as plain config models (no step tree)."""
     dataset = DatasetContract.model_validate(
-        yaml.safe_load((_PROJECT_CONFIG / "dataset" / "taxi.yaml").read_text(encoding="utf-8"))
+        yaml.safe_load((_PROJECT_CONFIG / "dataset" / "amazon.yaml").read_text(encoding="utf-8"))
     )
     experiment = ExperimentConfig.model_validate(
         yaml.safe_load(
-            (_PROJECT_CONFIG / "experiment" / "taxi.yaml").read_text(encoding="utf-8")
+            (_PROJECT_CONFIG / "experiment" / "amazon.yaml").read_text(encoding="utf-8")
         )
     )
     experiment.bind_plan(resolve_plan(experiment.feature_plan, dataset))
@@ -89,8 +90,8 @@ def test_plan_apply_matches_eligible_surface_and_manifest(
     _assert_plan_matches(cfg)
 
 
-def test_plan_apply_matches_eligible_surface_for_the_taxi_contract() -> None:
-    _assert_plan_matches(_taxi_cfg())
+def test_plan_apply_matches_eligible_surface_for_the_amazon_contract() -> None:
+    _assert_plan_matches(_amazon_cfg())
 
 
 def _assert_plan_matches(cfg: PipelineConfig) -> None:
@@ -111,12 +112,13 @@ def _assert_plan_matches(cfg: PipelineConfig) -> None:
 
 
 def test_plan_apply_fails_loud_on_a_missing_derived_source() -> None:
-    cfg = _taxi_cfg()
+    cfg = _shipped_cfg("test", "engineered")
     assert cfg.dataset is not None and cfg.experiment is not None
     frame = _post_features_frame(cfg)
     plan = ColumnPlan.from_config(cfg.dataset, cfg.experiment)
     derived = next(op for op in plan.columns if op.op == "derive")
-    with pytest.raises(ValueError, match=f"derive input missing for '{derived.name}'"):
+    # A missing derive/source input must fail loud, naming the dropped column.
+    with pytest.raises(ValueError, match=re.escape(derived.sources[0])):
         plan.apply(frame.drop(columns=[derived.sources[0]]))
 
 

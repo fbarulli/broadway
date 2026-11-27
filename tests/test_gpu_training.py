@@ -102,7 +102,7 @@ def _run_config(**overrides: object) -> run_hpo.HpoRunConfig:
         ),
         "kernel_config": str(STUDY_CONFIG),
         "seed": 1729,
-        "objective": "adapters.taxi:build",
+        "objective": "adapters.project:build",
         "storage_env": "OPTUNA_STORAGE_URL",
         "gpus": [0],
         "mps_slots_per_gpu": 2,
@@ -140,35 +140,31 @@ def test_plan_requires_a_fitting_batch() -> None:
         run_hpo._plan(_run_config(), {"max_batch": None, "concurrent_trials": 1}, 5)
 
 
-def _taxi_fixture(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """Tmp parquet + config overlay for the real taxi dataset/experiment contracts.
+def _amazon_fixture(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Tmp parquet + config overlay for the real Amazon dataset/experiment contracts.
 
     The declared data path is overlaid, exactly as a Kaggle mount would be; the
     contracts themselves are the committed project ones (no hand-written columns).
     """
-    parquet = tmp_path / "training_data.parquet"
-    pq.write_table(
-        pa.table(
-            {
-                "dropoff_location_id": pa.array([1, 2, 3], type=pa.int32()),
-                "fare_amount": pa.array([10.0, 20.0, 30.0], type=pa.float64()),
-                "passenger_count": pa.array([1.0, 2.0, 1.0], type=pa.float64()),
-                "pickup_datetime": pa.array([0, 86_400, 172_800], type=pa.timestamp("ns")),
-                "pickup_location_id": pa.array([1, 2, 3], type=pa.int32()),
-                "trip_distance": pa.array([1.0, 2.0, 3.0], type=pa.float64()),
-                "trip_duration_minutes": pa.array([5.0, 10.0, 15.0], type=pa.float64()),
-            }
-        ),
-        parquet,
+    parquet = tmp_path / "amazon.parquet"
+    contract = yaml.safe_load(
+        (_ROOT / "project" / "config" / "dataset" / "amazon.yaml").read_text(encoding="utf-8")
     )
+    arrays = {
+        name: pa.array([1, 2, 3], type=pa.int64())
+        if spec["dtype"].startswith("int")
+        else pa.array(["a", "b", "c"], type=pa.string())
+        for name, spec in contract["columns"].items()
+    }
+    pq.write_table(pa.table(arrays), parquet)
     overlay = tmp_path / "overlay"
     for kind in ("dataset", "experiment"):
         source = yaml.safe_load(
-            (_ROOT / "project/config" / kind / "taxi.yaml").read_text(encoding="utf-8")
+            (_ROOT / "project" / "config" / kind / "amazon.yaml").read_text(encoding="utf-8")
         )
         if kind == "dataset":
             source["path"] = str(parquet)
-        target = overlay / kind / "taxi.yaml"
+        target = overlay / kind / "amazon.yaml"
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(yaml.safe_dump(source), encoding="utf-8")
     monkeypatch.setenv("BROADWAY_CONFIG_OVERLAY_DIR", str(overlay))
@@ -198,7 +194,7 @@ def _fake_objective_module(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> s
 def _write_run_inputs(
     tmp_path: Path, command: str, monkeypatch: pytest.MonkeyPatch
 ) -> tuple[Path, Path]:
-    _taxi_fixture(tmp_path, monkeypatch)
+    _amazon_fixture(tmp_path, monkeypatch)
     baseline = tmp_path / "baseline.json"
     baseline.write_text('{"max_batch": 8, "concurrent_trials": 2}', encoding="utf-8")
     config_path = tmp_path / "hpo_run.yaml"
@@ -208,7 +204,7 @@ def _write_run_inputs(
                 "command": command,
                 "kernel_config": str(STUDY_CONFIG),
                 "seed": 1729,
-                "objective": "adapters.taxi:build",
+                "objective": "adapters.project:build",
                 "storage_env": "OPTUNA_STORAGE_URL",
                 "gpus": [0],
                 "mps_slots_per_gpu": 2,
@@ -256,7 +252,7 @@ def test_execute_starts_every_worker_before_collecting(
 def test_kaggle_profile_plans_one_worker_per_t4_and_redacts_the_url(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    _taxi_fixture(tmp_path, monkeypatch)
+    _amazon_fixture(tmp_path, monkeypatch)
     secret = "postgresql://optuna:TOPSECRET123@db/study"
     monkeypatch.setenv("OPTUNA_STORAGE_URL", secret)
     baseline = tmp_path / "baseline.json"
@@ -332,7 +328,7 @@ def test_per_worker_seeds_never_share_a_cold_start(
                 "--micro-batch", "8",
                 "--worker", str(worker),
                 "--seed", "1729",
-                "--objective", "adapters.taxi:build",
+                "--objective", "adapters.project:build",
             ]
         )  # fmt: skip
         run = hpo_kernel.run_model_study(
@@ -354,7 +350,7 @@ def test_per_worker_seeds_never_share_a_cold_start(
 
     monkeypatch.setattr(hpo_kernel.optuna.samplers, "TPESampler", recording_sampler)
     monkeypatch.delenv("OPTUNA_STORAGE_URL", raising=False)
-    _taxi_fixture(tmp_path, monkeypatch)
+    _amazon_fixture(tmp_path, monkeypatch)
     code = hpo_kernel.main(
         [
             "--config", str(_study_config(tmp_path)),
@@ -378,7 +374,7 @@ def test_parallel_workers_share_a_fresh_sqlite_study(
 ) -> None:
     # A fresh host-local study: both workers race the schema creation. Before the
     # inter-process lock, one worker died with "table study_directions already exists".
-    _taxi_fixture(tmp_path, monkeypatch)
+    _amazon_fixture(tmp_path, monkeypatch)
     study_config = _study_config(tmp_path)
     objective = _fake_objective_module(tmp_path, monkeypatch)
     environment = {
@@ -555,7 +551,7 @@ def test_prophet_step_needs_the_package_runs_a_cpu_fit_and_refuses_a_gpu(
 def test_preflight_requires_the_declared_dataset(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    parquet = _taxi_fixture(tmp_path, monkeypatch)
+    parquet = _amazon_fixture(tmp_path, monkeypatch)
     study = hpo_study.HpoStudyConfig.from_yaml(STUDY_CONFIG)
     identity = study.identity()
     assert identity.path == str(parquet)

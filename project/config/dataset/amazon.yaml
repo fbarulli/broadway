@@ -11,7 +11,7 @@ datetime_column: null
 #    different variable when stripped; the rename gives each its own label
 #  - processed_subdir / artifacts_subdir: this dataset's processed artifacts live
 #    in data/processed/amazon and its machine evidence under artifacts/amazon/,
-#    so an Amazon run cannot overwrite the taxi artifacts or tracked figures
+#    so an Amazon run cannot overwrite the predecessor dataset's artifacts or tracked figures
 column_renames:
   "Personalized_Recommendation_Frequency ": recommendation_personalization_score
   "Rating_Accuracy ": rating_accuracy_score

@@ -30,9 +30,6 @@ project/experiments/results/**
 # The per-feature evidence written next to the singular summary record.
 !project/experiments/results/**/*_feature_decisions.json
 !project/experiments/results/**/*.md
-# Pinned sample + evidence (single source of truth — committed on purpose)
-!project/experiments/results/univariate/sample_evidence/sample_evidence.parquet
-!project/experiments/results/univariate/sample_evidence/sample_evidence.json
 *.png
 !reports/figures/*.png
 !project/experiments/results/**/*.png

@@ -222,13 +222,13 @@ def test_hpo_configs_parse() -> None:
 
     from broadway.config.schema import HPOConfig
 
-    taxi_hpo = repo_root() / "project" / "config" / "experiments" / "mlflow.yaml"
-    if not taxi_hpo.exists():
-        pytest.skip("taxi-only: data-agnostic main carries no project/")
+    project_hpo = repo_root() / "project" / "config" / "experiments" / "amazon_hpo.yaml"
+    if not project_hpo.exists():
+        pytest.skip("project-only: data-agnostic main carries no project/")
 
     for path in (
         repo_root() / "configs" / "experiment" / "hyperopt.yaml",
-        taxi_hpo,
+        project_hpo,
     ):
         raw = yaml.safe_load(path.read_text())
         assert "hpo" in raw, f"{path.name} missing hpo block"
