@@ -31,6 +31,25 @@ logger = logging.getLogger(__name__)
 #: The series id under which ``results/pipeline`` is served.
 PIPELINE_FOCUS = "pipeline"
 
+#: The full expected step map: a pending step is listed, never omitted.
+#: One stem per lane; discovered directories outside this map are appended.
+PIPELINE_STEPS = (
+    "etl",
+    "eda",
+    "01_clean",
+    "02_missing",
+    "03_outliers",
+    "04_frame",
+    "05_features",
+    "06_correlation",
+    "07_clustering",
+    "08_timeseries",
+    "baseline",
+    "selection",
+    "hpo",
+    "evaluate",
+)
+
 _RECORD_SUFFIX = "_decision.json"
 #: Sidecar keys that are step metadata, not per-item conclusions.
 _SIDECAR_METADATA = frozenset({"dataset", "summary"})
@@ -147,14 +166,19 @@ class PipelineSeries:
         return self._pipeline_root.is_dir()
 
     def steps(self) -> list[str]:
-        """Step ids: the directories under ``results/pipeline``, sorted."""
+        """The expected map, then any discovered step directories not in it."""
         if not self.exists:
             return []
-        return sorted(path.name for path in self._pipeline_root.iterdir() if path.is_dir())
+        discovered = sorted(
+            path.name for path in self._pipeline_root.iterdir() if path.is_dir()
+        )
+        extra = [step for step in discovered if step not in PIPELINE_STEPS]
+        return [*PIPELINE_STEPS, *extra]
 
     def step_dir(self, step: str) -> Path | None:
-        """The step's directory, or None when the step is unknown."""
-        return self._pipeline_root / step if step in self.steps() else None
+        """The step's existing directory, or None when it has not run."""
+        candidate = self._pipeline_root / step
+        return candidate if step in self.steps() and candidate.is_dir() else None
 
     def artifacts(self, step: str) -> list[Path]:
         """Every file the step produced, sorted (records, figures, tables, reports)."""
@@ -189,7 +213,9 @@ class PipelineSeries:
                 {
                     "experiment": step,
                     "question": record.decision.question if record is not None else "",
-                    "status": record.decision.verdict if record is not None else "no record",
+                    "status": (
+                        record.decision.verdict if record is not None else "not run yet"
+                    ),
                     "artifacts": len(self.artifacts(step)),
                 }
             )

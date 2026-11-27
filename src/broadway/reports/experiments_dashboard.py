@@ -825,6 +825,12 @@ def _render_pipeline_step_page(step: str, series: list[str]) -> str:
     pipeline = PipelineSeries.from_experiments_root(EXPERIMENTS_ROOT)
     records = pipeline.records(step)
     primary = pipeline.primary(step)
+    if not records:
+        body = (
+            '<p class="not-run">not run yet — this step will publish its decision record, '
+            "per-item findings, figures and producing code here when it runs.</p>"
+        )
+        return _render_step_page(step, "", body, PIPELINE_FOCUS, series)
     strips = "\n".join(_render_pipeline_record(record, len(records) > 1) for record in records)
     findings = [finding for record in records for finding in record.findings()]
     module = pipeline.module_source(step)

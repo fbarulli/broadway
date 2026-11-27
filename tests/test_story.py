@@ -229,7 +229,15 @@ def test_story_leads_with_conclusions_and_skips_bad_records(
     assert "verdict: act" in page
     assert '<a href="/experiments/etl?focus=pipeline">ETL record</a>' in page
     # A stage without a record says so.
-    assert "not run yet — the features decision record has not been published." in page
+    assert "not run yet — the 05_features decision record has not been published." in page
+    # The full step map is present with explicit done / not run yet statuses.
+    assert "The step map" in page
+    assert "etl — done" in page
+    assert "eda — done" in page
+    assert "01_clean — not run yet" in page
+    step_map = page.split("<h2>The step map</h2>", 1)[1].split("</section>", 1)[0]
+    assert "<figure>" not in step_map
+    assert "<img" not in step_map
     # Dynamic record text is escaped.
     assert "&lt;b&gt;ingest&lt;/b&gt;" in page
     assert "<b>ingest</b>" not in page

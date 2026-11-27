@@ -18,6 +18,7 @@ from pathlib import Path
 
 from broadway.reports import experiments_dashboard as ui
 from broadway.reports.decision import Decision
+from broadway.reports.pipeline_evidence import PIPELINE_STEPS
 
 
 def _decision(**overrides: object) -> dict[str, object]:
@@ -110,24 +111,27 @@ def test_pipeline_series_lists_steps_and_renders_step_pages(
     assert ui.list_series() == ["alpha", "pipeline"]
     rows = ui.census_rows("pipeline")
     assert all(set(row) == {"experiment", "question", "status", "artifacts"} for row in rows)
-    assert rows[0] == {
-        "experiment": "bad",
-        "question": "",
-        "status": "no record",
-        "artifacts": 1,
-    }
-    assert rows[1] == {
+    assert [row["experiment"] for row in rows] == [*PIPELINE_STEPS, "bad"]
+    by_step = {row["experiment"]: row for row in rows}
+    assert by_step["etl"] == {
         "experiment": "etl",
         "question": "Does the metric clear its threshold?",
         "status": "act",
         "artifacts": 5,
     }
-    assert rows[2] == {
+    assert by_step["evaluate"] == {
         "experiment": "evaluate",
         "question": "Does the metric clear its threshold?",
         "status": "act",
         "artifacts": 2,
     }
+    assert by_step["01_clean"] == {
+        "experiment": "01_clean",
+        "question": "",
+        "status": "not run yet",
+        "artifacts": 0,
+    }
+    assert by_step["bad"]["status"] == "not run yet"
 
     with caplog.at_level(logging.ERROR):
         dashboard = ui.index("pipeline")
@@ -135,9 +139,10 @@ def test_pipeline_series_lists_steps_and_renders_step_pages(
         step_page = ui.experiment_page("etl", "pipeline")
         bad_page = ui.experiment_page("bad", "pipeline")
         multi_record_page = ui.experiment_page("evaluate", "pipeline")
+        pending_page = ui.experiment_page("01_clean", "pipeline")
 
     assert dashboard.status_code == 200
-    dashboard_html = dashboard.body.decode()
+    dashboard_html = bytes(dashboard.body).decode()
     assert "<tr><th>experiment</th><th>question</th><th>status</th><th>artifacts</th></tr>" in (
         dashboard_html
     )
@@ -148,7 +153,7 @@ def test_pipeline_series_lists_steps_and_renders_step_pages(
     assert "pipeline evidence" not in dashboard_html
 
     assert step_page.status_code == 200
-    page = step_page.body.decode()
+    page = bytes(step_page.body).decode()
     assert '<p class="question">Does the metric clear its threshold?</p>' in page
     assert 'class="decision act"' in page
     assert "code — module.py" in page
@@ -169,7 +174,7 @@ def test_pipeline_series_lists_steps_and_renders_step_pages(
     assert '<a href="/results/' not in page
     assert "observations" not in page
 
-    experiment = ui.experiment_page("01_step", "alpha").body.decode()
+    experiment = bytes(ui.experiment_page("01_step", "alpha").body).decode()
     assert '<p class="question">A script step.</p>' in experiment
     assert 'class="decision act"' in experiment
     assert "findings — features" in experiment
@@ -183,10 +188,63 @@ def test_pipeline_series_lists_steps_and_renders_step_pages(
     assert '<a href="/results/' not in experiment
     assert "observations" not in experiment
 
-    multi_record = multi_record_page.body.decode()
+    multi_record = bytes(multi_record_page.body).decode()
     assert "<h2>champion_promotion</h2>" in multi_record
     assert "<h2>tuned_promotion</h2>" in multi_record
     assert multi_record.count('class="decision act"') == 2
 
     assert bad_page.status_code == 200
+    assert pending_page.status_code == 200
+    pending_html = bytes(pending_page.body).decode()
+    assert "not run yet — this step will publish its decision record" in pending_html
+    assert "<table" not in pending_html
+    assert "<img" not in pending_html
     assert caplog.text.count("unreadable decision record") == 1
+
+
+def test_pipeline_map_lists_pending_and_fills_when_a_lane_runs(
+    monkeypatch, tmp_path: Path
+) -> None:
+    root = tmp_path / "experiments"
+    pipeline = root / "results" / "pipeline"
+    for step in ("etl", "eda"):
+        _write(
+            pipeline / step / f"{step}_decision.json",
+            Decision.model_validate(_decision(metric=step)).model_dump(mode="json"),
+        )
+    monkeypatch.setattr(ui, "EXPERIMENTS_ROOT", root)
+
+    rows = ui.census_rows("pipeline")
+    assert [row["experiment"] for row in rows] == list(PIPELINE_STEPS)
+    by_step = {row["experiment"]: row for row in rows}
+    assert by_step["etl"]["status"] == "act"
+    assert by_step["01_clean"] == {
+        "experiment": "01_clean",
+        "question": "",
+        "status": "not run yet",
+        "artifacts": 0,
+    }
+    for step in ("01_clean", "06_correlation", "evaluate"):
+        response = ui.experiment_page(step, "pipeline")
+        assert response.status_code == 200
+        body = bytes(response.body).decode()
+        assert "not run yet — this step will publish" in body
+        assert "<table" not in body
+        assert "<img" not in body
+
+    # A lane record fills its page and row on the next request.
+    _write(
+        pipeline / "01_clean" / "01_clean_decision.json",
+        Decision.model_validate(_decision(metric="rows_dropped_share")).model_dump(mode="json"),
+    )
+    _write(
+        pipeline / "01_clean" / "01_clean_feature_decisions.json",
+        {"features": [_decision(metric="association_clean")]},
+    )
+    by_step = {row["experiment"]: row for row in ui.census_rows("pipeline")}
+    assert by_step["01_clean"]["status"] == "act"
+    page = ui.experiment_page("01_clean", "pipeline")
+    assert page.status_code == 200
+    body = bytes(page.body).decode()
+    assert "findings — features" in body
+    assert "association_clean" in body

@@ -25,8 +25,9 @@ Every section that makes a **data claim** carries a figure: the question's
 decision boundary, the data funnel, the EDA effect sizes, the feature surface,
 the cleaning funnel, and the model intervals. "What we learned / what is next"
 is a next-steps section: it carries the numbers and record links, deliberately
-without a decorative chart. That split is the acceptance criterion, and the
-tests pin it.
+without a decorative chart. "The step map" is a status section (done / not run
+yet), not a data claim, so it carries no chart either. That split is the
+acceptance criterion, and the tests pin it.
 
 Graphs are drawn in memory with matplotlib's Agg backend and the shared
 ``broadway.viz`` helpers (deterministic, no new dependency, no scratch files);
@@ -153,9 +154,10 @@ class Story:
     # -- sections ----------------------------------------------------------
 
     def sections(self) -> list[Section]:
-        """All seven sections, in narrative order (missing stages say so)."""
+        """All eight sections, in narrative order (missing stages say so)."""
         return [
             self._question(),
+            self._step_map(),
             self._data(),
             self._eda(),
             self._changed(),
@@ -163,6 +165,28 @@ class Story:
             self._model(),
             self._learned(),
         ]
+
+    def _step_map(self) -> Section:
+        """The full step map with per-step status: done or not run yet."""
+        steps = self._pipeline.steps()
+        if not steps:
+            return Section(
+                title="The step map",
+                conclusions=("No pipeline steps are published yet.",),
+                not_run=True,
+            )
+        done = [step for step in steps if self._record(step) is not None]
+        pending = [step for step in steps if step not in done]
+        conclusions = [
+            (
+                f"{len(done)} of {len(steps)} steps have published a decision record; "
+                f"{len(pending)} are pending."
+            )
+        ]
+        numbers = tuple(
+            f"{step} — {'done' if step in done else 'not run yet'}" for step in steps
+        )
+        return Section(title="The step map", conclusions=tuple(conclusions), numbers=numbers)
 
     def _question(self) -> Section:
         config = self._config
@@ -382,9 +406,9 @@ class Story:
         )
 
     def _features(self) -> Section:
-        record = self._record("features")
+        record = self._record("05_features") or self._record("features")
         if record is None:
-            return _missing("The features", "features")
+            return _missing("The features", "05_features")
         decision = record.decision
         provenance = decision.evidence.provenance
         added = _sensitivity_int(decision, "features_added")
