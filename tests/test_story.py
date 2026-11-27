@@ -516,3 +516,58 @@ def test_story_does_not_invent_a_conclusion_when_evidence_is_missing(
     assert "found nothing" not in page
     assert "/story/figure/eda" not in page
     assert client.get("/story/figure/eda").status_code == 404
+
+
+def test_story_selection_survives_malformed_candidates(
+    monkeypatch, tmp_path: Path, caplog
+) -> None:
+    """A bad candidate row degrades the section; it never 500s the story page."""
+    root = tmp_path / "experiments"
+    selection = root / "results" / "pipeline" / "selection"
+    _write(
+        selection / "selection_decision.json",
+        Decision.model_validate(
+            _decision(
+                question="Does the selected champion beat the naive reference?",
+                metric="improvement_over_naive_rmse",
+                value=0.18,
+                interval_low=0.13,
+                interval_high=0.23,
+                threshold=0.02,
+                unit="relative_improvement",
+                verdict="act",
+                sample_size=50,
+            )
+        ).model_dump(mode="json"),
+    )
+    # The champion record exists but has no cv_mean; the CSV must be the fallback.
+    _write(selection / "selection_champion.json", {"champion": "rf"})
+    csv_path = selection / "selection_candidates.csv"
+    csv_path.write_text(
+        "candidate,rmse,rmse_low,rmse_high,role\n"
+        "oops,oops,oops,oops,candidate\n"
+        "rf,0.80,0.78,0.82,candidate\n",
+        encoding="utf-8",
+    )
+    _configure(monkeypatch, root, "synthetic")
+    client = TestClient(ui.app)
+
+    with caplog.at_level(logging.ERROR):
+        response = client.get("/story")
+        figure = client.get("/story/figure/model")
+        # Now only the malformed row survives: the section must degrade, not 500.
+        csv_path.write_text(
+            "candidate,rmse,rmse_low,rmse_high,role\n"
+            "oops,oops,oops,oops,candidate\n",
+            encoding="utf-8",
+        )
+        degraded = client.get("/story")
+        degraded_figure = client.get("/story/figure/model")
+
+    assert response.status_code == 200
+    assert "rf won the repeated-CV leaderboard at 0.800 RMSE [0.780, 0.820]" in response.text
+    assert figure.status_code == 200
+    assert degraded.status_code == 200
+    assert "candidate evidence table has not been published" in degraded.text
+    assert degraded_figure.status_code == 404
+    assert caplog.text.count("malformed candidate row") == 1

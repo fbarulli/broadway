@@ -147,6 +147,17 @@ class Effect:
     verdict: str
 
 
+@dataclass(frozen=True)
+class Candidate:
+    """One leaderboard row: name, point RMSE and its 95% interval."""
+
+    name: str
+    rmse: float
+    low: float
+    high: float
+    role: str
+
+
 class Story:
     """Build the story sections and figures from one pipeline results tree."""
 
@@ -484,8 +495,9 @@ class Story:
         else:
             conclusions.append("Baseline: not run yet.")
         candidate_frame = _read_csv(self._candidates_path())
+        candidates = _candidate_rows(candidate_frame, self._candidates_path())
         if selection is not None:
-            conclusions.append(_selection_conclusion(selection, candidate_frame))
+            conclusions.append(_selection_conclusion(selection, candidates))
             numbers.append(f"selection · {_decision_number(selection.decision)}")
             records.append(("selection", "selection"))
         else:
@@ -519,9 +531,7 @@ class Story:
             title="The model",
             conclusions=tuple(conclusions),
             numbers=tuple(numbers),
-            figure=(
-                "model" if selection is not None and candidate_frame is not None else None
-            ),
+            figure="model" if selection is not None and candidates else None,
             records=tuple(records),
         )
 
@@ -623,30 +633,16 @@ class Story:
     def _model_figure(self) -> Figure | None:
         if self._record("selection") is None:
             return None
-        path = self._candidates_path()
-        frame = _read_csv(path)
-        required = {"candidate", "rmse", "rmse_low", "rmse_high"}
-        if frame is None or not required.issubset(frame.columns):
+        rows = _candidate_rows(_read_csv(self._candidates_path()), self._candidates_path())
+        if not rows:
             return None
-        candidates: list[str] = []
-        rmses: list[float] = []
-        lows: list[float] = []
-        highs: list[float] = []
-        roles: list[str] = []
-        for _, row in frame.iterrows():
-            try:
-                candidates.append(str(row["candidate"]))
-                rmses.append(float(row["rmse"]))
-                lows.append(float(row["rmse_low"]))
-                highs.append(float(row["rmse_high"]))
-                roles.append(str(row["role"]) if "role" in frame.columns else "")
-            except (TypeError, ValueError):
-                if path not in _LOGGED_UNREADABLE:
-                    _LOGGED_UNREADABLE.add(path)
-                    logger.exception("story: malformed candidate row in %s", path)
-        if not candidates:
-            return None
-        return figures.model_figure(candidates, rmses, lows, highs, roles)
+        return figures.model_figure(
+            [row.name for row in rows],
+            [row.rmse for row in rows],
+            [row.low for row in rows],
+            [row.high for row in rows],
+            [row.role for row in rows],
+        )
 
     def _effects(self, record: PipelineRecord) -> list[Effect]:
         """Association effects from the dataset-tagged sidecar, ranked."""
@@ -777,8 +773,34 @@ def _shift_note(decision: Decision) -> str:
     )
 
 
+def _candidate_rows(frame: pd.DataFrame | None, path: Path) -> list[Candidate]:
+    """Parse leaderboard rows, skipping malformed ones with one traceback per file."""
+    if frame is None:
+        return []
+    required = {"candidate", "rmse", "rmse_low", "rmse_high"}
+    if not required.issubset(frame.columns):
+        return []
+    rows: list[Candidate] = []
+    for _, row in frame.iterrows():
+        try:
+            rows.append(
+                Candidate(
+                    name=str(row["candidate"]),
+                    rmse=float(row["rmse"]),
+                    low=float(row["rmse_low"]),
+                    high=float(row["rmse_high"]),
+                    role=str(row["role"]) if "role" in frame.columns else "",
+                )
+            )
+        except (TypeError, ValueError):
+            if path not in _LOGGED_UNREADABLE:
+                _LOGGED_UNREADABLE.add(path)
+                logger.exception("story: malformed candidate row in %s", path)
+    return rows
+
+
 def _selection_conclusion(
-    record: PipelineRecord | None, frame: pd.DataFrame | None
+    record: PipelineRecord | None, candidates: list[Candidate]
 ) -> str:
     """One plain-language outcome for the candidate leaderboard."""
     champion = _read_json(
@@ -788,14 +810,17 @@ def _selection_conclusion(
     rmse = champion.get("cv_mean") if isinstance(champion, dict) else None
     low = champion.get("interval_low") if isinstance(champion, dict) else None
     high = champion.get("interval_high") if isinstance(champion, dict) else None
-    if (winner is None or rmse is None) and frame is not None and not frame.empty:
-        top = frame.iloc[0]
-        winner = winner or str(top["candidate"])
-        rmse = rmse if rmse is not None else float(top["rmse"])
-        low = low if low is not None else float(top["rmse_low"])
-        high = high if high is not None else float(top["rmse_high"])
+    if (winner is None or rmse is None) and candidates:
+        top = candidates[0]
+        winner = winner or top.name
+        rmse = rmse if rmse is not None else top.rmse
+        low = low if low is not None else top.low
+        high = high if high is not None else top.high
     if winner is None or rmse is None:
-        return "The candidate leaderboard ran, but no champion is recorded."
+        return (
+            "The candidate evidence table has not been published, so the leaderboard is "
+            "not narrated."
+        )
     low = rmse if low is None else low
     high = rmse if high is None else high
     edge = None
